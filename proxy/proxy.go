@@ -1,7 +1,8 @@
 package proxy
 
 import (
-	"log"
+	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -9,6 +10,16 @@ import (
 // Proxy is proxy.
 type Proxy struct {
 	c *Config
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	ccs      []*ClusterConfig
+	clusters map[string]*Cluster
+	once     sync.Once
+
+	lock   sync.Mutex
+	closed bool
 }
 
 // New new a proxy by config.
@@ -19,30 +30,58 @@ func New(c *Config) (p *Proxy, err error) {
 	}
 	p = &Proxy{}
 	p.c = c
-	// TODO(felix)
+	p.ctx, p.cancel = context.WithCancel(context.Background())
+	// pprof
+	if c.Pprof != "" {
+		go PprofListenAndServe(c.Pprof)
+	}
 	return
 }
 
 // Serve is the main accept() loop of a server.
-func (p *Proxy) Serve() {
-	l, err := Listen(p.c.Proxy.Proto, p.c.Proxy.Addr)
+func (p *Proxy) Serve(ccs []*ClusterConfig) {
+	p.once.Do(func() {
+		p.ccs = ccs
+		p.clusters = map[string]*Cluster{}
+		for _, cc := range ccs {
+			go p.serve(cc)
+		}
+	})
+}
+
+func (p *Proxy) serve(cc *ClusterConfig) {
+	cluster := NewCluster(p.ctx, cc)
+	p.lock.Lock()
+	p.clusters[cc.Name] = cluster
+	p.lock.Unlock()
+	// listen
+	l, err := Listen(cc.ListenProto, cc.ListenAddr)
 	if err != nil {
 		panic(err)
 	}
 	for {
+		// TODO(felix): check MaxConnections
 		conn, err := l.Accept()
 		if err != nil {
-			log.Println("Proxy Serve Error accepting connection from remote:", err.Error())
 			if conn != nil {
 				conn.Close()
 			}
 			continue
 		}
-		// TODO(felix): deal conn
+		NewHandler(p.ctx, p.c, conn, cluster).Handle()
 	}
 }
 
 // Close close proxy resource.
-func (p *Proxy) Close() {
-
+func (p *Proxy) Close() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.closed {
+		return nil
+	}
+	p.cancel()
+	for _, cluster := range p.clusters {
+		cluster.Close()
+	}
+	return nil
 }

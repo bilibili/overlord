@@ -1,179 +1,326 @@
 package memcache
 
 import (
-	"bufio"
 	"bytes"
 	"io"
-	"log"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/felixhao/overlord/lib/bufio"
+	"github.com/felixhao/overlord/lib/conv"
+	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
 
 // memcached protocol: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 
+const (
+	decoderBufferSize = 128 * 1024 // NOTE: keep reading data from client, so relatively large
+)
+
 type decoder struct {
 	br *bufio.Reader
-
-	err error
 }
 
-func (d *decoder) Decode() (req *Request, err error) {
-	data, err := d.br.ReadString('\n')
-	start := time.Now()
+// NewDecoder new a memcache decoder.
+func NewDecoder(r io.Reader) proto.Decoder {
+	d := &decoder{
+		br: bufio.NewReaderSize(r, decoderBufferSize),
+	}
+	return d
+}
 
+// Decode decode bytes from reader.
+func (d *decoder) Decode() (req *proto.Request, err error) {
+	bs, err := d.br.ReadBytes(delim)
 	if err != nil {
-		if err == io.EOF {
-			log.Println("Connection closed")
-		} else {
-			log.Printf("Error while reading text command line: %s\n", err.Error())
-		}
-		err = errors.Wrap(err, "Error while reading text command line from decoder")
+		err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
 		return
 	}
-
-	clParts := strings.Split(strings.TrimSpace(data), " ")
-
-	switch clParts[0] {
-	case "set":
-		return setRequest(d.br, clParts, RequestSet)
-	case "add":
-		return setRequest(d.br, clParts, RequestAdd)
-	case "replace":
-		return setRequest(d.br, clParts, RequestReplace)
-	case "append":
-		return setRequest(d.br, clParts, RequestAppend)
-	case "prepend":
-		return setRequest(d.br, clParts, RequestPrepend)
-	case "get":
-		if len(clParts) < 2 {
-			return nil, ErrBadRequest
-		}
-
-		var keys [][]byte
-		for _, key := range clParts[1:] {
-			keys = append(keys, []byte(key))
-		}
-
-		opaques := make([]uint32, len(keys))
-		quiet := make([]bool, len(keys))
-
-		return &Request{
-			Keys:    keys,
-			Opaques: opaques,
-			Quiet:   quiet,
-			NoopEnd: false,
-		}, common.RequestGet, start, nil
-
-	case "delete":
-		if len(clParts) != 2 {
-			return nil, ErrBadRequest
-		}
-
-		return &Request{
-			Key:    []byte(clParts[1]),
-			Opaque: uint32(0),
-		}, common.RequestDelete, start, nil
-
-	// TODO: Error handling for invalid cmd line
-	case "touch":
-		if len(clParts) != 3 {
-			return nil, ErrBadRequest
-		}
-
-		key := []byte(clParts[1])
-
-		exptime, err := strconv.ParseUint(strings.TrimSpace(clParts[2]), 10, 32)
-		if err != nil {
-			log.Printf("Error parsing ttl for touch command: %s\n", err.Error())
-			return nil, ErrBadRequest
-		}
-
-		return &Request{
-			Key:     key,
-			Exptime: uint32(exptime),
-			Opaque:  uint32(0),
-		}, common.RequestTouch, start, nil
-	case "noop":
-		if len(clParts) != 1 {
-			return nil, ErrBadRequest
-		}
-		return &Request{
-			Opaque: 0,
-		}, common.RequestNoop, start, nil
-
-	case "quit":
-		if len(clParts) != 1 {
-			return nil, common.RequestQuit, start, common.ErrBadRequest
-		}
-		return &Request{
-			Opaque: 0,
-			Quiet:  false,
-		}, common.RequestQuit, start, nil
-
-	case "version":
-		if len(clParts) != 1 {
-			return nil, common.RequestQuit, start, common.ErrBadRequest
-		}
-		return &Request{
-			Opaque: 0,
-		}, common.RequestVersion, start, nil
-
-	default:
-		return nil, common.RequestUnknown, start, nil
+	i := bytes.IndexByte(bs, spaceByte)
+	if i <= 0 {
+		err = errors.Wrap(ErrBadRequest, "MC decoder Decode get cmd index")
+		return
 	}
+	cmd := string(conv.ToLower(bs[:i]))
+	ds := bs[i:] // NOTE: consume the begin ' '
+	switch cmd {
+	// Storage commands:
+	case "set":
+		return storageRequest(d.br, RequestTypeSet, ds, true)
+	case "add":
+		return storageRequest(d.br, RequestTypeAdd, ds, true)
+	case "replace":
+		return storageRequest(d.br, RequestTypeReplace, ds, true)
+	case "append":
+		return storageRequest(d.br, RequestTypeAppend, ds, true)
+	case "prepend":
+		return storageRequest(d.br, RequestTypePrepend, ds, true)
+	case "cas":
+		return storageRequest(d.br, RequestTypeCas, ds, false)
+	// Retrieval commands:
+	case "get":
+		return retrievalRequest(d.br, RequestTypeGet, ds)
+	case "gets":
+		return retrievalRequest(d.br, RequestTypeGets, ds)
+	// Deletion
+	case "delete":
+		return deleteRequest(d.br, RequestTypeDelete, ds)
+	// Increment/Decrement:
+	case "incr":
+		return incrDecrRequest(d.br, RequestTypeIncr, ds)
+	case "decr":
+		return incrDecrRequest(d.br, RequestTypeDecr, ds)
+	// Touch:
+	case "touch":
+		return touchRequest(d.br, RequestTypeTouch, ds)
+	// Get And Touch:
+	case "gat":
+		return getAndTouchRequest(d.br, RequestTypeGat, ds)
+	case "gats":
+		return getAndTouchRequest(d.br, RequestTypeGats, ds)
+	}
+	return nil, errors.Wrap(ErrError, "MC Decoder Decode command no exist")
 }
 
-func setRequest(r *bufio.Reader, clParts []string, reqType RequestType) (req *Request, err error) {
+func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool) (req *proto.Request, err error) {
 	// sanity check
-	if len(clParts) != 5 {
-		return nil, ErrBadRequest
+	if c := bytes.Count(bs, spaceBytes); (noCas && c != 4) || (!noCas && c != 5) {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder storage request sanity check spaceCount(%d) noCas(%t)", c, noCas)
+		return
 	}
-
-	key := []byte(clParts[1])
-	buf := bytes.NewBuffer()
-
-	flags, err := strconv.ParseUint(strings.TrimSpace(clParts[2]), 10, 32)
+	index := 1 // NOTE: ignore begin ' '
+	// key
+	ki := bytes.IndexByte(bs[index:], spaceByte)
+	if ki <= 0 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get key index")
+		return
+	}
+	key := bs[index : index+ki]
+	index += ki + 1 // NOTE: +1 consume the begin ' '
+	// flags
+	fi := bytes.IndexByte(bs[index:], spaceByte)
+	if fi <= 0 {
+		err = errors.Wrap(ErrBadFlags, "MC Decoder storage request get flags index")
+		return
+	}
+	flagBs := bs[index : index+fi]
+	if !bytes.Equal(flagBs, zeroBytes) { // NOTE: if equal to zero, there is no need to parse.
+		var flags int64
+		if flags, err = conv.Btoi(flagBs); err != nil || flags > maxUint32 {
+			err = errors.Wrapf(ErrBadFlags, "MC Decoder storage request parse flags(%s)", flagBs)
+			return
+		}
+	}
+	index += fi + 1
+	// exptime
+	ei := bytes.IndexByte(bs[index:], spaceByte)
+	if ei <= 0 {
+		err = errors.Wrap(ErrBadExptime, "MC Decoder storage request get exptime index")
+		return
+	}
+	expBs := bs[index : index+ei]
+	if !bytes.Equal(expBs, zeroBytes) {
+		if _, err = conv.Btoi(expBs); err != nil {
+			err = errors.Wrapf(ErrBadExptime, "MC Decoder storage request parse exptime(%s)", expBs)
+			return
+		}
+	}
+	index += ei + 1
+	// bytes length
+	var bsBs []byte
+	if noCas {
+		if index >= len(bs)-2 {
+			err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get bytes length index check bs length")
+			return
+		}
+		bsBs = bs[index : len(bs)-2] // NOTE: len(bs)-2 consume the last two bytes '\r\n'
+	} else {
+		bi := bytes.IndexByte(bs[index:], spaceByte)
+		if bi <= 0 {
+			err = errors.Wrap(ErrBadLength, "MC Decoder storage request get bytes length index")
+			return
+		}
+		bsBs = bs[index : index+bi]
+		index += bi + 1
+	}
+	length, err := conv.Btoi(bsBs)
 	if err != nil {
-		log.Printf("Error parsing flags for set/add/replace command: %s\n", err.Error())
-		return nil, ErrBadFlags
+		err = errors.Wrapf(ErrBadLength, "MC Decoder storage request parse bytes length(%s)", bsBs)
+		return
 	}
-	buf.WriteString(clParts[2])
-	buf.WriteByte(' ')
-
-	exptime, err := strconv.ParseUint(strings.TrimSpace(clParts[3]), 10, 32)
+	if !noCas {
+		if index >= len(bs)-2 {
+			err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get cas index check bs length")
+			return
+		}
+		casBs := bs[index : len(bs)-2]
+		if !bytes.Equal(casBs, zeroBytes) {
+			if _, err = conv.Btoi(casBs); err != nil {
+				err = errors.Wrapf(ErrBadCas, "MC Decoder storage request parse cas(%s)", casBs)
+				return
+			}
+		}
+	}
+	// read storage data
+	ds, err := r.ReadBytes(delim)
 	if err != nil {
-		log.Printf("Error parsing ttl for set/add/replace command: %s\n", err.Error())
-		return nil, ErrBadExptime
+		err = errors.Wrapf(err, "MC decoder storage request while reading data line")
+		return
 	}
-	buf.WriteString(clParts[3])
-	buf.WriteByte(' ')
-
-	length, err := strconv.ParseUint(strings.TrimSpace(clParts[4]), 10, 32)
-	if err != nil {
-		log.Printf("Error parsing length for set/add/replace command: %s\n", err.Error())
-		return nil, ErrBadLength
+	if len(ds)-2 != int(length) {
+		err = errors.Wrapf(ErrBadLength, "MC Decoder storage request check data len(%d) length(%d)", len(ds)-2, length)
+		return
 	}
-	buf.WriteString(clParts[4])
-	buf.WriteByte(' ')
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:  reqType,
+		key:  key,
+		data: append(bs[ki+1:], ds...), // TODO(felix): reuse buffer
+	})
+	return
+}
 
-	// Read in data
-	bs := make([]byte, length) // TODO: reuse bytes
-	n, err := io.ReadAtLeast(r, bs, int(length))
-	if err != nil {
-		return nil, ErrInternal
+func retrievalRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+	// sanity check
+	if len(bs) <= 3 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder retrieval request sanity check bsLen(%d)", len(bs))
+		return
 	}
-	buf.Write(bs)
-	buf.WriteString("\r\n")
+	index := 1
+	key := bs[index : len(bs)-2] // TODO(felix): multi keys
+	batch := bytes.Index(key, spaceBytes) > 0
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:   reqType,
+		key:   key,
+		data:  bs[len(bs)-2:],
+		batch: batch,
+	})
+	return
+}
 
-	// Consume the last two bytes "\r\n"
-	r.ReadString(byte('\n'))
+func deleteRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+	// sanity check
+	if len(bs) <= 3 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder delete request sanity check bsLen(%d)", len(bs))
+		return
+	}
+	index := 1
+	key := bs[index : len(bs)-2]
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:  reqType,
+		key:  key,
+		data: bs[len(bs)-2:],
+	})
+	return
+}
 
-	return &Request{
-		Type:  reqType,
-		Key:   key,
-		Value: buf.Bytes(),
-	}, nil
+func incrDecrRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+	// sanity check
+	if c := bytes.Count(bs, spaceBytes); c != 2 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder incrDecr request sanity check spaceCount(%d)", c)
+		return
+	}
+	index := 1
+	// key
+	ki := bytes.IndexByte(bs[index:], spaceByte)
+	if ki <= 0 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder incrDecr request get key index")
+		return
+	}
+	key := bs[index : index+ki]
+	index += ki + 1
+	// value
+	if index >= len(bs)-2 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder incrDecr request get value check bs length")
+		return
+	}
+	valueBs := bs[index : len(bs)-2]
+	if !bytes.Equal(valueBs, oneBytes) {
+		if _, err = conv.Btoi(valueBs); err != nil {
+			err = errors.Wrapf(ErrBadRequest, "MC Decoder incrDecr request parse value(%s)", valueBs)
+			return
+		}
+	}
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:  reqType,
+		key:  key,
+		data: bs[ki+1:],
+	})
+	return
+}
+
+func touchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+	// sanity check
+	if c := bytes.Count(bs, spaceBytes); c != 2 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder touch request sanity check spaceCount(%d)", c)
+		return
+	}
+	index := 1
+	// key
+	ki := bytes.IndexByte(bs[index:], spaceByte)
+	if ki <= 0 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder touch request get key index")
+		return
+	}
+	key := bs[index : index+ki]
+	index += ki + 1
+	// exptime
+	if index >= len(bs)-2 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder touch request get exptime check bs length")
+		return
+	}
+	expBs := bs[index : len(bs)-2]
+	if !bytes.Equal(expBs, zeroBytes) {
+		if _, err = conv.Btoi(expBs); err != nil {
+			err = errors.Wrapf(ErrBadRequest, "MC Decoder touch request parse exptime(%s)", expBs)
+			return
+		}
+	}
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:  reqType,
+		key:  key,
+		data: bs[ki+1:], // NOTE: contains '\r\n'
+	})
+	return
+}
+
+func getAndTouchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+	// sanity check
+	if c := bytes.Count(bs, spaceBytes); c < 2 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder getAndTouch request sanity check spaceCount(%d)", c)
+		return
+	}
+	index := 1
+	// exptime
+	ei := bytes.IndexByte(bs[index:], spaceByte)
+	if ei <= 0 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder getAndTouch request get exptime index")
+		return
+	}
+	expBs := bs[index : index+ei]
+	if !bytes.Equal(expBs, zeroBytes) {
+		if _, err = conv.Btoi(expBs); err != nil {
+			err = errors.Wrapf(ErrBadRequest, "MC Decoder getAndTouch request parse exptime(%s)", expBs)
+			return
+		}
+	}
+	index += ei + 1
+	// key
+	if index >= len(bs)-2 {
+		err = errors.Wrap(ErrBadRequest, "MC Decoder getAndTouch request get exptime check bs length")
+		return
+	}
+	key := bs[index : len(bs)-2]
+	batch := bytes.IndexByte(key, spaceByte) > 0
+	req = &proto.Request{Type: proto.CacheTypeMemcache}
+	req.WithProto(&MCRequest{
+		rTp:   reqType,
+		key:   key,
+		data:  expBs,
+		batch: batch,
+	})
+	return
 }
