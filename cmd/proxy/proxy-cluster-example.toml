@@ -1,0 +1,39 @@
+[[clusters]]
+# This be used to specify the name of cache cluster.
+name = "test-cluster"
+# The name of the hash function. Possible values are: sha1.
+has_method = "sha1"
+# The key distribution mode. Possible values are: ketama.
+has_distribution = "ketama"
+# A two character string that specifies the part of the key used for hashing. Eg "{}".
+has_tag = ""
+# cache type: memcache | redis
+cache_type = "memcache"
+# proxy listen proto: tcp | unix
+listen_proto = "tcp"
+# proxy listen addr: tcp addr | unix sock path
+listen_addr = "0.0.0.0:21211"
+# Authenticate to the Redis server on connect.
+redis_auth = ""
+# The dial timeout value in msec that we wait for to establish a connection to the server. By default, we wait indefinitely.
+dial_timeout = 1000
+# The read timeout value in msec that we wait for to receive a response from a server. By default, we wait indefinitely.
+read_timeout = 1000
+# The write timeout value in msec that we wait for to write a response to a server. By default, we wait indefinitely.
+write_timeout = 1000
+# The maximum number of connections that can be opened to each server. By default, we open at most 1 server connection.
+pool_active = 10
+# The maximum number of connections that can be idle to each server. By default, we open at most 1 server connection.
+pool_idle = 5
+# A boolean value that controls if overlord should wait for a connection to be returned to the pool before running when pool size at Active limit. Defaults to false.
+pool_get_wait = false
+# The pool idle timeout value in msec that we close connections after remaining idle. By default, we wait indefinitely.
+pool_idle_timeout = 90000
+# The number of consecutive failures on a server that would lead to it being temporarily ejected when auto_eject is set to true. Defaults to 3.
+ping_fail_limit = 3
+# A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.
+ping_auto_eject = true
+# A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
+servers = [
+    "127.0.0.1:11211:10",
+]
