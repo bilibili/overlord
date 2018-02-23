@@ -1,4 +1,4 @@
-# Overlord [![Build Status](https://travis-ci.org/felixhao/overlord.svg?branch=master)](https://travis-ci.org/felixhao/overlord) [![GoDoc](http://godoc.org/github.com/felixhao/overlord?status.svg)](http://godoc.org/github.com/felixhao/overlord)
+# Overlord [![Build Status](https://travis-ci.org/felixhao/overlord.svg?branch=master)](https://travis-ci.org/felixhao/overlord) [![GoDoc](http://godoc.org/github.com/felixhao/overlord/proxy?status.svg)](http://godoc.org/github.com/felixhao/overlord/proxy)
 
 
 Overlord is a proxy based high performance Memcached and Redis solution written in Go.  
@@ -39,6 +39,10 @@ echo -e "get a_11\r" | nc 127.0.0.1 21211
 ```
 
 Congratulations! You've just ran the overlord proxy.
+
+## Architecture
+
+![arch](doc/images/overlord_arch.png)
 
 ## Benchmark
 

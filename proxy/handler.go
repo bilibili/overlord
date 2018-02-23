@@ -2,11 +2,13 @@ package proxy
 
 import (
 	"context"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -80,10 +82,16 @@ func (h *Handler) handleReader() {
 	}()
 	for {
 		if h.Closed() || h.reqCh.Closed() {
+			if log.V(3) {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler closed", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			}
 			return
 		}
 		select {
 		case <-h.ctx.Done():
+			if log.V(3) {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) context canceled", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			}
 			return
 		default:
 		}
@@ -91,8 +99,16 @@ func (h *Handler) handleReader() {
 			h.conn.SetReadDeadline(time.Now().Add(time.Duration(h.c.Proxy.ReadTimeout) * time.Millisecond))
 		}
 		if req, err = h.decoder.Decode(); err != nil {
-			if ne, ok := err.(net.Error); ok {
+			rerr := errors.Cause(err)
+			if rerr == io.EOF {
+				if log.V(2) {
+					log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) close connection", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+				}
+				return
+			}
+			if ne, ok := rerr.(net.Error); ok {
 				if ne.Timeout() || !ne.Temporary() {
+					log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
 					return // NOTE: break when timeout or fatal error!!!
 				}
 				err = nil
@@ -102,6 +118,9 @@ func (h *Handler) handleReader() {
 			req.Process()
 			h.reqCh.PushBack(req)
 			req.DoneWithError(err)
+			if log.V(1) {
+				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+			}
 			continue
 		}
 		req.Process()
@@ -112,43 +131,49 @@ func (h *Handler) handleReader() {
 
 func (h *Handler) dispatchRequest(req *proto.Request) {
 	if !req.IsBatch() {
-		h.handleRequest(req, nil)
+		h.handleRequest(req)
 		return
 	}
 	subs, resp := req.Batch()
 	if len(subs) == 0 {
 		req.Done(resp) // FIXME(felix): error or done???
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
+		}
 		return
 	}
 	subl := len(subs)
-	dones := make(chan struct{}, subl)
 	for i := 0; i < subl; i++ {
 		subs[i].Process()
-		go h.handleRequest(&subs[i], dones)
+		go h.handleRequest(&subs[i])
 	}
-	for i := 0; i < subl; i++ {
-		<-dones
-	}
+	req.BatchWait()
 	resp.Merge(subs)
 	req.Done(resp)
 }
 
-func (h *Handler) handleRequest(req *proto.Request, done chan<- struct{}) {
-	if done != nil {
-		defer func() {
-			done <- struct{}{}
-		}()
+func (h *Handler) handleRequest(req *proto.Request) {
+	node, ok := h.cluster.Hash(req.Key())
+	if !ok {
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) hash node not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
+		}
 	}
-	node, _ := h.cluster.Hash(req.Key())
 	hdl, err := h.cluster.Get(node)
 	if err != nil {
 		req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
+		if log.V(2) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) cluster get handler error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key(), err)
+		}
 		return
 	}
 	resp, err := hdl.Handle(req)
 	h.cluster.Put(node, hdl, err)
 	if err != nil {
 		req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
+		if log.V(1) {
+			log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) handler handle error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key(), err)
+		}
 		return
 	}
 	req.Done(resp)
@@ -163,19 +188,29 @@ func (h *Handler) handleWriter() {
 	for {
 		// NOTE: no check handler closed, ensure that reqCh pop finished.
 		if err != nil {
-			if ne, ok := err.(net.Error); ok && (ne.Timeout() || ne.Temporary()) {
-				err = nil
-				continue
+			rerr := errors.Cause(err)
+			if ne, ok := rerr.(net.Error); ok && (ne.Timeout() || !ne.Temporary()) {
+				if log.V(1) {
+					log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) handler writer error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+				}
+				return
 			}
-			return
+			err = nil
+			continue
 		}
 		select {
 		case <-h.ctx.Done():
+			if log.V(3) {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) context canceled", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			}
 			return
 		default:
 		}
 		req, ok := h.reqCh.PopFront()
 		if !ok {
+			if log.V(3) {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request chan pop not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			}
 			return
 		}
 		req.Wait()
@@ -193,10 +228,16 @@ func (h *Handler) Closed() bool {
 
 func (h *Handler) closeWithError(err error) {
 	if atomic.CompareAndSwapInt32(&h.closed, handlerOpening, handlerClosed) {
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler start close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+		}
 		h.err = err
 		h.cancel()
 		h.wg.Wait()
 		h.reqCh.Close()
 		h.conn.Close()
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+		}
 	}
 }
