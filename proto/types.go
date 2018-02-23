@@ -31,13 +31,16 @@ type Request struct {
 	Type  CacheType
 	proto protoRequest
 	wg    *sync.WaitGroup
+	bWg   *sync.WaitGroup
 
 	Resp *Response
 }
 
 // Process means request processing.
 func (r *Request) Process() {
-	r.wg = &sync.WaitGroup{}
+	if r.wg == nil {
+		r.wg = &sync.WaitGroup{}
+	}
 	r.wg.Add(1)
 }
 
@@ -91,10 +94,22 @@ func (r *Request) IsBatch() bool {
 // Batch returns sub request if is batch.
 func (r *Request) Batch() ([]Request, *Response) {
 	subs, resp := r.proto.Batch()
-	for i := range subs {
-		subs[i].wg = r.wg
+	subl := len(subs)
+	if subl == 0 {
+		return nil, resp
+	}
+	r.bWg = &sync.WaitGroup{}
+	for i := 0; i < subl; i++ {
+		subs[i].wg = r.bWg
 	}
 	return subs, resp
+}
+
+// BatchWait blocks until the all sub request done.
+func (r *Request) BatchWait() {
+	if r.bWg != nil {
+		r.bWg.Wait()
+	}
 }
 
 type protoResponse interface {
@@ -118,6 +133,11 @@ func (r *Response) Proto() protoResponse {
 	return r.proto
 }
 
+// WithError with error.
+func (r *Response) WithError(err error) {
+	r.err = err
+}
+
 // Err returns error.
 func (r *Response) Err() error {
 	return r.err
@@ -125,6 +145,9 @@ func (r *Response) Err() error {
 
 // Merge merges subs response into self.
 func (r *Response) Merge(subs []Request) {
+	if r.err != nil || r.proto == nil {
+		return
+	}
 	r.proto.Merge(subs)
 }
 

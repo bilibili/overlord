@@ -8,6 +8,8 @@
 ##################################################
 pprof = "0.0.0.0:2110"
 debug = false
+log = ""
+log_lv = 0
 
 [proxy]
 # The read timeout value in msec that we wait for to receive a response from the client. By default, we wait indefinitely.

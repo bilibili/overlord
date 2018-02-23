@@ -10,11 +10,13 @@ import (
 type Config struct {
 	Pprof string
 	Debug bool
+	Log   string
+	LogVL int `toml:"log_vl"`
 	Proxy struct {
-		ReadTimeout    int  `toml:"read_timeout"`
-		WriteTimeout   int  `toml:"write_timeout"`
-		MaxConnections int  `toml:"max_connections"`
-		UseMetrics     bool `toml:"use_metrics"`
+		ReadTimeout    int   `toml:"read_timeout"`
+		WriteTimeout   int   `toml:"write_timeout"`
+		MaxConnections int32 `toml:"max_connections"`
+		UseMetrics     bool  `toml:"use_metrics"`
 	}
 }
 
@@ -103,6 +105,8 @@ const defaultConfig = `
 ##################################################
 pprof = "0.0.0.0:2110"
 debug = false
+log = ""
+log_lv = 0
 
 [proxy]
 # The read timeout value in msec that we wait for to receive a response from the client. By default, we wait indefinitely.

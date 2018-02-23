@@ -2,9 +2,19 @@ package proxy
 
 import (
 	"context"
+	errs "errors"
 	"sync"
+	"sync/atomic"
 
+	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/proto"
+	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
+)
+
+// proxy errors
+var (
+	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
 )
 
 // Proxy is proxy.
@@ -17,6 +27,8 @@ type Proxy struct {
 	ccs      []*ClusterConfig
 	clusters map[string]*Cluster
 	once     sync.Once
+
+	conns int32
 
 	lock   sync.Mutex
 	closed bool
@@ -60,13 +72,34 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		panic(err)
 	}
 	for {
-		// TODO(felix): check MaxConnections
 		conn, err := l.Accept()
 		if err != nil {
 			if conn != nil {
 				conn.Close()
 			}
+			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", cc.Name, cc.ListenAddr, err)
 			continue
+		}
+		if p.c.Proxy.MaxConnections > 0 {
+			if conns := atomic.AddInt32(&p.conns, 1); conns > p.c.Proxy.MaxConnections {
+				// cache type
+				switch cc.CacheType {
+				case proto.CacheTypeMemcache:
+					encoder := memcache.NewEncoder(conn)
+					resp := &proto.Response{}
+					resp.WithError(ErrProxyMoreMaxConns)
+					encoder.Encode(resp)
+					conn.Close()
+				case proto.CacheTypeRedis:
+					// TODO(felix): support redis.
+				default:
+					conn.Close()
+				}
+				if log.V(3) {
+					log.Warnf("proxy accept connection count(%d) more than max(%d)", conns, p.c.Proxy.MaxConnections)
+				}
+				continue
+			}
 		}
 		NewHandler(p.ctx, p.c, conn, cluster).Handle()
 	}
