@@ -94,6 +94,7 @@ var (
 	// doesn't conform to the protocol in some way. <error> is a
 	// human-readable error string.
 	ErrBadRequest = errs.New("CLIENT_ERROR bad request")
+	ErrBadKey     = errs.New("CLIENT_ERROR key invalid")
 	ErrBadFlags   = errs.New("CLIENT_ERROR flags is not a valid integer")
 	ErrBadExptime = errs.New("CLIENT_ERROR exptime is not a valid integer")
 	ErrBadLength  = errs.New("CLIENT_ERROR length is not a valid integer")
@@ -208,7 +209,7 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 		rebs[i] = mcr.data[:len(mcr.data)-endBytesLen]
 		reln += len(rebs[i])
 	}
-	r.data = make([]byte, reln+endBytesLen)
+	r.data = make([]byte, reln+endBytesLen) // TODO(felix): optimize
 	off := 0
 	for i := 0; i < subl; i++ {
 		bs := rebs[i]

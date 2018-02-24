@@ -13,16 +13,20 @@ services:
 install:
   - go get github.com/BurntSushi/toml
   - go get github.com/pkg/errors
+  - go get -u github.com/golang/lint/golint
   - go get -u github.com/mdempsky/unconvert
   - go get -u github.com/gordonklaus/ineffassign
-  - go get -u github.com/golang/lint/golint
   - go get -u honnef.co/go/tools/cmd/gosimple
+  - go get -u honnef.co/go/tools/cmd/staticcheck
 
 script:
   - find . ! \( -path './vendor' -prune \) -type f -name '*.go' -print0 | xargs -0 gofmt -l -s
-  - gosimple -ignore "$(cat .gosimpleignore)" $(go list ./... | grep -v /vendor/)
   - golint ./...
   - unconvert $(go list ./... | grep -v /vendor/)
   - ineffassign .
+  - gosimple -ignore "$(cat .gosimpleignore)" $(go list ./... | grep -v /vendor/)
+  - staticcheck $(go list ./... | grep -v /vendor/)
   - cd proxy
   - go test -run=TestProxy
+  - cd ../cmd/proxy
+  - go build

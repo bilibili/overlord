@@ -22,9 +22,9 @@ read_timeout = 1000
 # The write timeout value in msec that we wait for to write a response to a server. By default, we wait indefinitely.
 write_timeout = 1000
 # The maximum number of connections that can be opened to each server. By default, we open at most 1 server connection.
-pool_active = 10
+pool_active = 1000
 # The maximum number of connections that can be idle to each server. By default, we open at most 1 server connection.
-pool_idle = 5
+pool_idle = 100
 # A boolean value that controls if overlord should wait for a connection to be returned to the pool before running when pool size at Active limit. Defaults to false.
 pool_get_wait = false
 # The pool idle timeout value in msec that we close connections after remaining idle. By default, we wait indefinitely.

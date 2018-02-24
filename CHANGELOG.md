@@ -1,5 +1,9 @@
 #### Overlord
 
+##### Version 1.0.2
+> 1.add check legal key  
+> 2.optimize handler  
+
 ##### Version 1.0.1
 > 1.add log  
 > 2.check max connections  

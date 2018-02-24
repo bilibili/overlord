@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,7 +19,12 @@ const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
 
-	requestChanBuffer = 128 // TODO(felix): config???
+	handlerChanBuffer = 10240 // TODO(felix): config???
+	requestChanBuffer = 1024  // TODO(felix): config???
+)
+
+var (
+	hdlNum = runtime.NumCPU()
 )
 
 // Handler handle conn.
@@ -33,6 +39,7 @@ type Handler struct {
 	cluster *Cluster
 	decoder proto.Decoder
 	encoder proto.Encoder
+	hdlCh   chan *proto.Request
 	reqCh   *proto.RequestChan
 
 	closed int32
@@ -56,6 +63,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
+	h.hdlCh = make(chan *proto.Request, handlerChanBuffer)
 	h.reqCh = proto.NewRequestChanBuffer(requestChanBuffer)
 	return
 }
@@ -68,6 +76,9 @@ func (h *Handler) Handle() {
 		go h.handleWriter()
 		h.wg.Add(1)
 		go h.handleReader()
+		for i := 0; i < hdlNum; i++ {
+			go h.handle()
+		}
 	})
 }
 
@@ -125,7 +136,20 @@ func (h *Handler) handleReader() {
 		}
 		req.Process()
 		h.reqCh.PushBack(req)
-		go h.dispatchRequest(req)
+		h.hdlCh <- req
+	}
+}
+
+func (h *Handler) handle() {
+	for {
+		req, ok := <-h.hdlCh
+		if !ok {
+			if log.V(3) {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler chan not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			}
+			return
+		}
+		h.dispatchRequest(req)
 	}
 }
 
@@ -145,7 +169,7 @@ func (h *Handler) dispatchRequest(req *proto.Request) {
 	subl := len(subs)
 	for i := 0; i < subl; i++ {
 		subs[i].Process()
-		go h.handleRequest(&subs[i])
+		h.hdlCh <- &subs[i]
 	}
 	req.BatchWait()
 	resp.Merge(subs)
@@ -234,6 +258,7 @@ func (h *Handler) closeWithError(err error) {
 		h.err = err
 		h.cancel()
 		h.wg.Wait()
+		close(h.hdlCh)
 		h.reqCh.Close()
 		h.conn.Close()
 		if log.V(3) {
