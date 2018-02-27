@@ -17,14 +17,10 @@ install:
   - gometalinter --install
 
 script:
-  - gometalinter --disable-all  \
-    --enable=gosimple           \
-    --enable=golint             \
-    --enable=ineffassign        \
-    --enable=unconvert          \
-    --enable=vet                \
-    --skip=prote                \
-    --skip=.git                 \
-    --skip=vendor               \
+  - gometalinter --vendor --disable-all --enable=gosimple --enable=golint --enable=vet --enable=ineffassign --enable=unconvert \
+    --exclude="by other packages, and that stutters; consider calling this" \
+    --skip=proto \
+    --skip=vendor \
+    --skip=.git \
     --tests ./...
   - go test -run=TestProxy ./...
