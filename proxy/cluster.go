@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/felixhao/overlord/lib/backoff"
@@ -21,6 +22,7 @@ import (
 
 const (
 	hashRingSpots = 255
+	channelNum    = 1
 )
 
 // cluster errors
@@ -38,6 +40,25 @@ type pinger struct {
 	retries int
 }
 
+type channel struct {
+	idx int32
+	cnt int32
+	chs []chan *proto.Request
+}
+
+func newChannel(n int32) *channel {
+	chs := make([]chan *proto.Request, n)
+	for i := int32(0); i < n; i++ {
+		chs[i] = make(chan *proto.Request, requestChanBuffer)
+	}
+	return &channel{cnt: n, chs: chs}
+}
+
+func (c *channel) push(req *proto.Request) {
+	i := atomic.AddInt32(&c.idx, 1)
+	c.chs[i%c.cnt] <- req
+}
+
 // Cluster is cache cluster.
 type Cluster struct {
 	cc     *ClusterConfig
@@ -51,7 +72,7 @@ type Cluster struct {
 	nodePool  map[string]*pool.Pool
 	nodeAlias map[string]string
 	nodePing  map[string]*pinger
-	nodeCh    map[string]chan *proto.Request
+	nodeCh    map[string]*channel
 
 	lock   sync.Mutex
 	closed bool
@@ -78,7 +99,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	nm := map[string]*pool.Pool{}
 	am := map[string]string{}
 	pm := map[string]*pinger{}
-	cm := map[string]chan *proto.Request{}
+	cm := map[string]*channel{}
 	// for addrs
 	for i := range addrs {
 		node := addrs[i]
@@ -88,7 +109,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		}
 		nm[node] = newPool(cc, addrs[i])
 		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
-		rc := make(chan *proto.Request, requestChanBuffer)
+		rc := newChannel(channelNum)
 		cm[node] = rc
 		for i := 0; i < cc.PoolActive; i++ {
 			go c.process(node, rc)
@@ -126,32 +147,38 @@ func (c *Cluster) Dispatch(req *proto.Request) {
 		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request node chan"))
 		return
 	}
-	rc <- req
+	rc.push(req)
 }
 
-func (c *Cluster) process(node string, reqCh <-chan *proto.Request) {
-	hdl, err := c.get(node)
-	if err != nil {
-		// TODO(felix): is it possible?
-		return
-	}
-	defer c.put(node, hdl, err)
-	for {
-		var req *proto.Request
-		select {
-		case req = <-reqCh:
-		case <-c.ctx.Done():
-			return
-		}
-		resp, err := hdl.Handle(req)
-		if err != nil {
-			req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
-			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) request(%s) handler handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+func (c *Cluster) process(node string, rc *channel) {
+	for i := int32(0); i < rc.cnt; i++ {
+		go func(i int32) {
+			hdl, err := c.get(node)
+			if err != nil {
+				// TODO(felix): is it possible?
+				log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, err)
+				return
 			}
-			continue
-		}
-		req.Done(resp)
+			defer c.put(node, hdl, err)
+			ch := rc.chs[i]
+			for {
+				var req *proto.Request
+				select {
+				case req = <-ch:
+				case <-c.ctx.Done():
+					return
+				}
+				resp, err := hdl.Handle(req)
+				if err != nil {
+					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
+					if log.V(1) {
+						log.Errorf("cluster(%s) addr(%s) request(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+					}
+					continue
+				}
+				req.Done(resp)
+			}
+		}(i)
 	}
 }
 

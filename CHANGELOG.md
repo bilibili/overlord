@@ -1,8 +1,10 @@
 #### Overlord
 
-##### Version 1.0.2
-> 1.add check legal key  
-> 2.optimize handler  
+##### Version 1.1.0
+> 1.add prometheus  
+> 2.add check legal key  
+> 3.optimize dispatch  
+> 4.reuse sync.pool for slice make  
 
 ##### Version 1.0.1
 > 1.add log  

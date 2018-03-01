@@ -71,6 +71,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 	if err != nil {
 		panic(err)
 	}
+	log.Infof("overlord proxy cluster[%s] addr(%s) already listened", cc.Name, cc.ListenAddr)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
