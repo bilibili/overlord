@@ -12,9 +12,11 @@ import (
 	"github.com/felixhao/overlord/lib/backoff"
 	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/ketama"
+	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/lib/pool"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -49,6 +51,7 @@ type Cluster struct {
 	nodePool  map[string]*pool.Pool
 	nodeAlias map[string]string
 	nodePing  map[string]*pinger
+	nodeCh    map[string]chan *proto.Request
 
 	lock   sync.Mutex
 	closed bool
@@ -75,6 +78,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	nm := map[string]*pool.Pool{}
 	am := map[string]string{}
 	pm := map[string]*pinger{}
+	cm := map[string]chan *proto.Request{}
 	// for addrs
 	for i := range addrs {
 		node := addrs[i]
@@ -84,12 +88,18 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		}
 		nm[node] = newPool(cc, addrs[i])
 		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
+		rc := make(chan *proto.Request, requestChanBuffer)
+		cm[node] = rc
+		for i := 0; i < cc.PoolActive; i++ {
+			go c.process(node, rc)
+		}
 	}
 	c.ring = ring
 	c.alias = alias
 	c.nodePool = nm
 	c.nodeAlias = am
 	c.nodePing = pm
+	c.nodeCh = cm
 	// auto eject
 	if cc.PingAutoEject {
 		go c.keepAlive()
@@ -97,8 +107,56 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	return
 }
 
-// Hash returns node by hash hit.
-func (c *Cluster) Hash(key []byte) (node string, ok bool) {
+// Dispatch dispatchs request.
+func (c *Cluster) Dispatch(req *proto.Request) {
+	// hash
+	node, ok := c.hash(req.Key())
+	if !ok {
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) request(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
+		}
+		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request hash"))
+		return
+	}
+	rc, ok := c.nodeCh[node]
+	if !ok {
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) request(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
+		}
+		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request node chan"))
+		return
+	}
+	rc <- req
+}
+
+func (c *Cluster) process(node string, reqCh <-chan *proto.Request) {
+	hdl, err := c.get(node)
+	if err != nil {
+		// TODO(felix): is it possible?
+		return
+	}
+	defer c.put(node, hdl, err)
+	for {
+		var req *proto.Request
+		select {
+		case req = <-reqCh:
+		case <-c.ctx.Done():
+			return
+		}
+		resp, err := hdl.Handle(req)
+		if err != nil {
+			req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
+			if log.V(1) {
+				log.Errorf("cluster(%s) addr(%s) request(%s) handler handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+			}
+			continue
+		}
+		req.Done(resp)
+	}
+}
+
+// hash returns node by hash hit.
+func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	var realKey []byte
 	if len(c.hashTag) == 2 {
 		if b := bytes.IndexByte(key, c.hashTag[0]); b >= 0 {
@@ -114,8 +172,8 @@ func (c *Cluster) Hash(key []byte) (node string, ok bool) {
 	return
 }
 
-// Get returns proto handler by node name.
-func (c *Cluster) Get(node string) (h proto.Handler, err error) {
+// get returns proto handler by node name.
+func (c *Cluster) get(node string) (h proto.Handler, err error) {
 	p, ok := c.nodePool[node]
 	if !ok {
 		err = ErrClusterHashNoNode
@@ -128,8 +186,8 @@ func (c *Cluster) Get(node string) (h proto.Handler, err error) {
 	return
 }
 
-// Put puts proto handler into pool by node name.
-func (c *Cluster) Put(node string, h proto.Handler, err error) {
+// put puts proto handler into pool by node name.
+func (c *Cluster) put(node string, h proto.Handler, err error) {
 	p, ok := c.nodePool[node]
 	if !ok {
 		return

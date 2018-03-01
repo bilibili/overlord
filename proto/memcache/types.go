@@ -4,7 +4,9 @@ import (
 	"bytes"
 	errs "errors"
 	"math"
+	"sync"
 
+	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/proto"
 )
 
@@ -26,6 +28,12 @@ var (
 	notFoundBytes  = []byte("NOT_FOUND\r\n")
 	deletedBytes   = []byte("DELETED\r\n")
 	touchedBytes   = []byte("TOUCHED\r\n")
+)
+
+var (
+	bufPool = &sync.Pool{New: func() interface{} {
+		return &bufio.SliceAlloc{}
+	}}
 )
 
 // RequestType is the protocol-agnostic identifier for the command
@@ -111,6 +119,7 @@ var (
 	ErrPingerPong     = errs.New("SERVER_ERROR Pinger pong unexpected")
 	ErrAssertRequest  = errs.New("SERVER_ERROR assert MC request not ok")
 	ErrAssertResponse = errs.New("SERVER_ERROR assert MC response not ok")
+	ErrBadResponse    = errs.New("SERVER_ERROR bad response")
 )
 
 // MCRequest is the mc client request type and data.
@@ -209,7 +218,13 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 		rebs[i] = mcr.data[:len(mcr.data)-endBytesLen]
 		reln += len(rebs[i])
 	}
-	r.data = make([]byte, reln+endBytesLen) // TODO(felix): optimize
+	sa, ok := bufPool.Get().(*bufio.SliceAlloc)
+	if !ok {
+		r.data = make([]byte, reln+endBytesLen) // TODO(felix): optimize
+	} else {
+		r.data = sa.Make(reln + endBytesLen)
+		bufPool.Put(sa)
+	}
 	off := 0
 	for i := 0; i < subl; i++ {
 		bs := rebs[i]
