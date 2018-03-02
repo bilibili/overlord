@@ -43,10 +43,6 @@ func New(c *Config) (p *Proxy, err error) {
 	p = &Proxy{}
 	p.c = c
 	p.ctx, p.cancel = context.WithCancel(context.Background())
-	// pprof
-	if c.Pprof != "" {
-		go PprofListenAndServe(c.Pprof)
-	}
 	return
 }
 

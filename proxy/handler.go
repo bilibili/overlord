@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -62,6 +63,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		panic(proto.ErrNoSupportCacheType)
 	}
 	h.reqCh = proto.NewRequestChanBuffer(requestChanBuffer)
+	stat.ConnIncr(cluster.cc.Name)
 	return
 }
 
@@ -196,6 +198,7 @@ func (h *Handler) handleWriter() {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
 		err = h.encoder.Encode(req.Resp)
+		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Millisecond))
 	}
 }
 
@@ -217,5 +220,6 @@ func (h *Handler) closeWithError(err error) {
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
 		}
+		stat.ConnDecr(h.cluster.cc.Name)
 	}
 }

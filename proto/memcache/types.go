@@ -143,6 +143,11 @@ type MCRequest struct {
 	batch bool
 }
 
+// Cmd get request cmd.
+func (r *MCRequest) Cmd() string {
+	return r.rTp.String()
+}
+
 // Key get request key.
 func (r *MCRequest) Key() []byte {
 	return r.key

@@ -15,6 +15,7 @@ import (
 	"github.com/felixhao/overlord/lib/ketama"
 	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/lib/pool"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -170,13 +171,16 @@ func (c *Cluster) process(node string, rc *channel) {
 					}
 					return
 				}
+				now := time.Now()
 				resp, err := hdl.Handle(req)
 				c.put(node, hdl, err)
+				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Millisecond))
 				if err != nil {
 					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 					if log.V(1) {
 						log.Errorf("cluster(%s) addr(%s) request(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
 					}
+					stat.ErrIncr(c.cc.Name, node, req.Cmd(), err.Error())
 					continue
 				}
 				req.Done(resp)
@@ -324,7 +328,7 @@ func newPool(cc *ClusterConfig, addr string) *pool.Pool {
 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
-		dial = pool.PoolDial(memcache.Dial(addr, dto, rto, wto))
+		dial = pool.PoolDial(memcache.Dial(cc.Name, addr, dto, rto, wto))
 	case proto.CacheTypeRedis:
 		// TODO(felix): support redis
 	default:

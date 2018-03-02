@@ -9,6 +9,7 @@ import (
 	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/pool"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
@@ -22,11 +23,13 @@ const (
 )
 
 type handler struct {
-	conn net.Conn
-	br   *bufio.Reader
-	bw   *bufio.Writer
-	bss  [][]byte
-	buf  []byte
+	cluster string
+	addr    string
+	conn    net.Conn
+	br      *bufio.Reader
+	bw      *bufio.Writer
+	bss     [][]byte
+	buf     []byte
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
@@ -35,13 +38,15 @@ type handler struct {
 }
 
 // Dial returns pool Dial func.
-func Dial(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (dial func() (pool.Conn, error)) {
+func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (dial func() (pool.Conn, error)) {
 	dial = func() (pool.Conn, error) {
 		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h := &handler{
+			cluster:      cluster,
+			addr:         addr,
 			conn:         conn,
 			bw:           bufio.NewWriterSize(conn, handlerWriteBufferSize),
 			br:           bufio.NewReaderSize(conn, handlerReadBufferSize),
@@ -93,6 +98,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	}
 	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
 		if !bytes.Equal(bs, endBytes) {
+			stat.Hit(h.cluster, h.addr)
 			bss := bytes.Split(bs, spaceBytes)
 			if len(bss) <= 4 {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
@@ -104,7 +110,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 				return
 			}
 			var bs2 []byte
-			if bs2, err = h.br.ReadFull(int(length)); err != nil {
+			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 '\r\n'
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
 				return
 			}
@@ -135,6 +141,8 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 			}
 			copy(tmp[off:], endBytes)
 			bs = tmp
+		} else {
+			stat.Miss(h.cluster, h.addr)
 		}
 	}
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}
