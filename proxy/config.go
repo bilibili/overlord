@@ -115,6 +115,6 @@ read_timeout = 0
 write_timeout = 0
 # proxy accept max connections from client. By default, we no limit.
 max_connections = 0
-# proxy support prometheus metrics. By default, we use it.
+# proxy support prometheus metrics, reuse the pprof port. By default, we use it.
 use_metrics = true
 `

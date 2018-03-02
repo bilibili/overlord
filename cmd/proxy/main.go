@@ -3,18 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof" // NOTE: use http pprof
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proxy"
 )
 
 const (
 	// VERSION version
-	VERSION = "1.0.1"
+	VERSION = "1.1.0"
 )
 
 var (
@@ -24,6 +27,7 @@ var (
 	logVl    int
 	debug    bool
 	pprof    string
+	metrics  bool
 	config   string
 	clusters clustersFlag
 )
@@ -52,6 +56,7 @@ func init() {
 	flag.StringVar(&logFile, "log", "", "log will printing file {log}. high priority than conf.log.")
 	flag.IntVar(&logVl, "log-vl", 0, "log verbose level. high priority than conf.log_vl.")
 	flag.StringVar(&pprof, "pprof", "", "pprof listen addr. high priority than conf.pprof.")
+	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
 	flag.StringVar(&config, "conf", "", "run with the specific configuration.")
 	flag.Var(&clusters, "cluster", "specify cache cluster configuration.")
 }
@@ -65,6 +70,13 @@ func main() {
 	c, ccs := parseConfig()
 	if initLog(c) {
 		defer log.Close()
+	}
+	// pprof
+	if c.Pprof != "" {
+		go http.ListenAndServe(c.Pprof, nil)
+		if c.Proxy.UseMetrics {
+			stat.Init()
+		}
 	}
 	// new proxy
 	p, err := proxy.New(c)
@@ -105,6 +117,9 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 	// high priority start
 	if pprof != "" {
 		c.Pprof = pprof
+	}
+	if metrics {
+		c.Proxy.UseMetrics = metrics
 	}
 	if debug {
 		c.Debug = debug

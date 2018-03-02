@@ -1,10 +1,12 @@
 package bufio
 
-type sliceAlloc struct {
+// SliceAlloc make big memory then slice.
+type SliceAlloc struct {
 	buf []byte
 }
 
-func (d *sliceAlloc) Make(n int) (ss []byte) {
+// Make make bytes slice from buf.
+func (d *SliceAlloc) Make(n int) (ss []byte) {
 	switch {
 	case n == 0:
 		return []byte{}

@@ -95,6 +95,10 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 		return
 	}
 	key := bs[index : index+ki]
+	if !legalKey(key, false) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder storage request legal key")
+		return
+	}
 	index += ki + 1 // NOTE: +1 consume the begin ' '
 	// flags
 	fi := bytes.IndexByte(bs[index:], spaceByte)
@@ -161,13 +165,13 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 		}
 	}
 	// read storage data
-	ds, err := r.ReadBytes(delim)
+	ds, err := r.ReadFull(int(length + 2)) // NOTE: +2 means until '\r\n'
 	if err != nil {
 		err = errors.Wrapf(err, "MC decoder storage request while reading data line")
 		return
 	}
-	if len(ds)-2 != int(length) {
-		err = errors.Wrapf(ErrBadLength, "MC Decoder storage request check data len(%d) length(%d)", len(ds)-2, length)
+	if !bytes.HasSuffix(ds, crlfBytes) {
+		err = errors.Wrapf(ErrBadLength, "MC Decoder storage request data not end with CRLF length(%d)", length)
 		return
 	}
 	req = &proto.Request{Type: proto.CacheTypeMemcache}
@@ -186,7 +190,11 @@ func retrievalRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *pro
 		return
 	}
 	index := 1
-	key := bs[index : len(bs)-2] // TODO(felix): multi keys
+	key := bs[index : len(bs)-2]
+	if !legalKey(key, true) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder retrieval request legal key")
+		return
+	}
 	batch := bytes.Index(key, spaceBytes) > 0
 	req = &proto.Request{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCRequest{
@@ -206,6 +214,10 @@ func deleteRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.
 	}
 	index := 1
 	key := bs[index : len(bs)-2]
+	if !legalKey(key, false) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder delete request legal key")
+		return
+	}
 	req = &proto.Request{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCRequest{
 		rTp:  reqType,
@@ -229,6 +241,10 @@ func incrDecrRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *prot
 		return
 	}
 	key := bs[index : index+ki]
+	if !legalKey(key, false) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder incrDecr request legal key")
+		return
+	}
 	index += ki + 1
 	// value
 	if index >= len(bs)-2 {
@@ -265,6 +281,10 @@ func touchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.R
 		return
 	}
 	key := bs[index : index+ki]
+	if !legalKey(key, false) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder touch request legal key")
+		return
+	}
 	index += ki + 1
 	// exptime
 	if index >= len(bs)-2 {
@@ -282,7 +302,7 @@ func touchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.R
 	req.WithProto(&MCRequest{
 		rTp:  reqType,
 		key:  key,
-		data: bs[ki+1:], // NOTE: contains '\r\n'
+		data: bs[ki+1:],
 	})
 	return
 }
@@ -314,13 +334,37 @@ func getAndTouchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *p
 		return
 	}
 	key := bs[index : len(bs)-2]
+	if !legalKey(key, true) {
+		err = errors.Wrap(ErrBadKey, "MC Decoder getAndTouch request legal key")
+		return
+	}
 	batch := bytes.IndexByte(key, spaceByte) > 0
 	req = &proto.Request{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCRequest{
 		rTp:   reqType,
 		key:   key,
-		data:  expBs,
+		data:  expBs, // NOTE: no contains '\r\n'!!!
 		batch: batch,
 	})
 	return
+}
+
+// Currently the length limit of a key is set at 250 characters.
+// the key must not include control characters or whitespace.
+func legalKey(key []byte, isMulti bool) bool {
+	if !isMulti && len(key) > 250 {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		if isMulti && key[i] < ' ' {
+			return false
+		}
+		if !isMulti && key[i] <= ' ' {
+			return false
+		}
+		if key[i] == 0x7f {
+			return false
+		}
+	}
+	return true
 }

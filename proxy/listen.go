@@ -2,8 +2,6 @@ package proxy
 
 import (
 	"net"
-	"net/http"
-	_ "net/http/pprof" // NOTE: use http pprof
 	"os"
 
 	"github.com/pkg/errors"
@@ -38,9 +36,4 @@ func listenUnix(addr string) (net.Listener, error) {
 		return nil, errors.Wrap(err, "Proxy Listen unix ResolveUnixAddr")
 	}
 	return net.ListenUnix("unix", unixAddr)
-}
-
-// PprofListenAndServe pprof serve.
-func PprofListenAndServe(addr string) {
-	http.ListenAndServe(addr, nil)
 }
