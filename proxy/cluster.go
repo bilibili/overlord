@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	hashRingSpots = 255
-	channelNum    = 1
+	hashRingSpots     = 255
+	channelNum        = 10
+	channelRoutineNum = channelNum * 10
 )
 
 // cluster errors
@@ -153,13 +154,6 @@ func (c *Cluster) Dispatch(req *proto.Request) {
 func (c *Cluster) process(node string, rc *channel) {
 	for i := int32(0); i < rc.cnt; i++ {
 		go func(i int32) {
-			hdl, err := c.get(node)
-			if err != nil {
-				// TODO(felix): is it possible?
-				log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, err)
-				return
-			}
-			defer c.put(node, hdl, err)
 			ch := rc.chs[i]
 			for {
 				var req *proto.Request
@@ -168,7 +162,16 @@ func (c *Cluster) process(node string, rc *channel) {
 				case <-c.ctx.Done():
 					return
 				}
+				hdl, err := c.get(node)
+				if err != nil {
+					req.DoneWithError(errors.Wrap(err, "Cluster process get handler"))
+					if log.V(1) {
+						log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, err)
+					}
+					return
+				}
 				resp, err := hdl.Handle(req)
+				c.put(node, hdl, err)
 				if err != nil {
 					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 					if log.V(1) {
