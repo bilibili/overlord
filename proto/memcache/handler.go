@@ -100,18 +100,25 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		if !bytes.Equal(bs, endBytes) {
 			stat.Hit(h.cluster, h.addr)
 			bss := bytes.Split(bs, spaceBytes)
-			if len(bss) <= 4 {
+			if len(bss) < 4 {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
 				return
 			}
 			var length int64
+			if len(bss) == 4 { // NOTE: if len==4, means gets|gats
+				if len(bss[3]) < 2 {
+					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
+					return
+				}
+				bss[3] = bss[3][:len(bss[3])-2] // NOTE: gets|gats contains '\r\n'
+			}
 			if length, err = conv.Btoi(bss[3]); err != nil {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
 				return
 			}
 			var bs2 []byte
-			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 '\r\n'
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
+			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 read contains '\r\n'
+				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
 				return
 			}
 			h.bss = h.bss[:2]
