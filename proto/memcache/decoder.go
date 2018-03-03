@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/felixhao/overlord/lib/bufio"
@@ -42,6 +43,7 @@ func (d *decoder) Decode() (req *proto.Request, err error) {
 	}
 	cmd := string(conv.ToLower(bs[:i]))
 	ds := bytes.TrimSpace(bs[i:])
+	fmt.Printf("cmd %v key %s", cmd, ds)
 	switch cmd {
 	// Storage commands:
 	case "set":
@@ -83,30 +85,17 @@ func (d *decoder) Decode() (req *proto.Request, err error) {
 
 func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool) (req *proto.Request, err error) {
 	// sanity check
-	if c := bytes.Count(bs, spaceBytes); (noCas && c != 4) || (!noCas && c != 5) {
-		err = errors.Wrapf(ErrBadRequest, "MC Decoder storage request sanity check spaceCount(%d) noCas(%t)", c, noCas)
+	var c [][]byte
+	if c = bytes.Split(bs, spaceBytes); (noCas && len(c) != 4) || (!noCas && len(c) != 5) {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder storage request sanity check spaceCount(%d) noCas(%t)", len(c), noCas)
 		return
 	}
-	index := 1 // NOTE: ignore begin ' '
-	// key
-	ki := bytes.IndexByte(bs[index:], spaceByte)
-	if ki <= 0 {
-		err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get key index")
-		return
-	}
-	key := bs[index : index+ki]
+	key := c[0]
 	if !legalKey(key, false) {
 		err = errors.Wrap(ErrBadKey, "MC Decoder storage request legal key")
 		return
 	}
-	index += ki + 1 // NOTE: +1 consume the begin ' '
-	// flags
-	fi := bytes.IndexByte(bs[index:], spaceByte)
-	if fi <= 0 {
-		err = errors.Wrap(ErrBadFlags, "MC Decoder storage request get flags index")
-		return
-	}
-	flagBs := bs[index : index+fi]
+	flagBs := c[1]
 	if !bytes.Equal(flagBs, zeroBytes) { // NOTE: if equal to zero, there is no need to parse.
 		var flags int64
 		if flags, err = conv.Btoi(flagBs); err != nil || flags > maxUint32 {
@@ -114,49 +103,22 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 			return
 		}
 	}
-	index += fi + 1
-	// exptime
-	ei := bytes.IndexByte(bs[index:], spaceByte)
-	if ei <= 0 {
-		err = errors.Wrap(ErrBadExptime, "MC Decoder storage request get exptime index")
-		return
-	}
-	expBs := bs[index : index+ei]
+	expBs := c[2]
 	if !bytes.Equal(expBs, zeroBytes) {
 		if _, err = conv.Btoi(expBs); err != nil {
 			err = errors.Wrapf(ErrBadExptime, "MC Decoder storage request parse exptime(%s)", expBs)
 			return
 		}
 	}
-	index += ei + 1
 	// bytes length
-	var bsBs []byte
-	if noCas {
-		if index >= len(bs)-2 {
-			err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get bytes length index check bs length")
-			return
-		}
-		bsBs = bs[index : len(bs)-2] // NOTE: len(bs)-2 consume the last two bytes '\r\n'
-	} else {
-		bi := bytes.IndexByte(bs[index:], spaceByte)
-		if bi <= 0 {
-			err = errors.Wrap(ErrBadLength, "MC Decoder storage request get bytes length index")
-			return
-		}
-		bsBs = bs[index : index+bi]
-		index += bi + 1
-	}
+	bsBs := c[3]
 	length, err := conv.Btoi(bsBs)
 	if err != nil {
 		err = errors.Wrapf(ErrBadLength, "MC Decoder storage request parse bytes length(%s)", bsBs)
 		return
 	}
 	if !noCas {
-		if index >= len(bs)-2 {
-			err = errors.Wrap(ErrBadRequest, "MC Decoder storage request get cas index check bs length")
-			return
-		}
-		casBs := bs[index : len(bs)-2]
+		casBs := c[4]
 		if !bytes.Equal(casBs, zeroBytes) {
 			if _, err = conv.Btoi(casBs); err != nil {
 				err = errors.Wrapf(ErrBadCas, "MC Decoder storage request parse cas(%s)", casBs)
@@ -178,7 +140,7 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 	req.WithProto(&MCRequest{
 		rTp:  reqType,
 		key:  key,
-		data: append(bs[ki+1:], ds...), // TODO(felix): reuse buffer
+		data: append(bs[len(key):], ds...), // TODO(felix): reuse buffer
 	})
 	return
 }
