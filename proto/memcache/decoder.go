@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/felixhao/overlord/lib/bufio"
@@ -43,7 +42,6 @@ func (d *decoder) Decode() (req *proto.Request, err error) {
 	}
 	cmd := string(conv.ToLower(bs[:i]))
 	ds := bytes.TrimSpace(bs[i:])
-	fmt.Printf("cmd %v key %s", cmd, ds)
 	switch cmd {
 	// Storage commands:
 	case "set":
@@ -140,7 +138,7 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 	req.WithProto(&MCRequest{
 		rTp:  reqType,
 		key:  key,
-		data: append(bs[len(key):], ds...), // TODO(felix): reuse buffer
+		data: append(append(bs[len(key):], []byte{'\r', '\n'}...), ds...), // TODO(felix): reuse buffer
 	})
 	return
 }
@@ -160,7 +158,7 @@ func retrievalRequest(r *bufio.Reader, reqType RequestType, key []byte) (req *pr
 	req.WithProto(&MCRequest{
 		rTp:   reqType,
 		key:   key,
-		data:  nil,
+		data:  []byte{'\n'},
 		batch: batch,
 	})
 	return
