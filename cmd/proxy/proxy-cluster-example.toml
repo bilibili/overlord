@@ -2,11 +2,11 @@
 # This be used to specify the name of cache cluster.
 name = "test-cluster"
 # The name of the hash function. Possible values are: sha1.
-has_method = "sha1"
+hash_method = "sha1"
 # The key distribution mode. Possible values are: ketama.
-has_distribution = "ketama"
+hash_distribution = "ketama"
 # A two character string that specifies the part of the key used for hashing. Eg "{}".
-has_tag = ""
+hash_tag = ""
 # cache type: memcache | redis
 cache_type = "memcache"
 # proxy listen proto: tcp | unix
