@@ -4,11 +4,13 @@ import (
 	"context"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -18,7 +20,11 @@ const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
 
-	requestChanBuffer = 128 // TODO(felix): config???
+	requestChanBuffer = 1024 // TODO(felix): config???
+)
+
+var (
+	hdlNum = runtime.NumCPU()
 )
 
 // Handler handle conn.
@@ -57,6 +63,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		panic(proto.ErrNoSupportCacheType)
 	}
 	h.reqCh = proto.NewRequestChanBuffer(requestChanBuffer)
+	stat.ConnIncr(cluster.cc.Name)
 	return
 }
 
@@ -125,13 +132,13 @@ func (h *Handler) handleReader() {
 		}
 		req.Process()
 		h.reqCh.PushBack(req)
-		go h.dispatchRequest(req)
+		h.dispatchRequest(req)
 	}
 }
 
 func (h *Handler) dispatchRequest(req *proto.Request) {
 	if !req.IsBatch() {
-		h.handleRequest(req)
+		h.cluster.Dispatch(req)
 		return
 	}
 	subs, resp := req.Batch()
@@ -145,37 +152,10 @@ func (h *Handler) dispatchRequest(req *proto.Request) {
 	subl := len(subs)
 	for i := 0; i < subl; i++ {
 		subs[i].Process()
-		go h.handleRequest(&subs[i])
+		h.cluster.Dispatch(&subs[i])
 	}
 	req.BatchWait()
 	resp.Merge(subs)
-	req.Done(resp)
-}
-
-func (h *Handler) handleRequest(req *proto.Request) {
-	node, ok := h.cluster.Hash(req.Key())
-	if !ok {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) hash node not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
-		}
-	}
-	hdl, err := h.cluster.Get(node)
-	if err != nil {
-		req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
-		if log.V(2) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) cluster get handler error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key(), err)
-		}
-		return
-	}
-	resp, err := hdl.Handle(req)
-	h.cluster.Put(node, hdl, err)
-	if err != nil {
-		req.DoneWithError(errors.Wrap(err, "Proxy Handler handle request"))
-		if log.V(1) {
-			log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) handler handle error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key(), err)
-		}
-		return
-	}
 	req.Done(resp)
 }
 
@@ -218,6 +198,7 @@ func (h *Handler) handleWriter() {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
 		err = h.encoder.Encode(req.Resp)
+		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Millisecond))
 	}
 }
 
@@ -239,5 +220,6 @@ func (h *Handler) closeWithError(err error) {
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
 		}
+		stat.ConnDecr(h.cluster.cc.Name)
 	}
 }

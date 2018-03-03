@@ -43,10 +43,6 @@ func New(c *Config) (p *Proxy, err error) {
 	p = &Proxy{}
 	p.c = c
 	p.ctx, p.cancel = context.WithCancel(context.Background())
-	// pprof
-	if c.Pprof != "" {
-		go PprofListenAndServe(c.Pprof)
-	}
 	return
 }
 
@@ -71,6 +67,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 	if err != nil {
 		panic(err)
 	}
+	log.Infof("overlord proxy cluster[%s] addr(%s) already listened", cc.Name, cc.ListenAddr)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
