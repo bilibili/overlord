@@ -41,7 +41,7 @@ func (d *decoder) Decode() (req *proto.Request, err error) {
 		return
 	}
 	cmd := string(conv.ToLower(bs[:i]))
-	ds := bs[i:] // NOTE: consume the begin ' '
+	ds := bytes.TrimSpace(bs[i:])
 	switch cmd {
 	// Storage commands:
 	case "set":
@@ -183,14 +183,12 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 	return
 }
 
-func retrievalRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.Request, err error) {
+func retrievalRequest(r *bufio.Reader, reqType RequestType, key []byte) (req *proto.Request, err error) {
 	// sanity check
-	if len(bs) <= 3 {
-		err = errors.Wrapf(ErrBadRequest, "MC Decoder retrieval request sanity check bsLen(%d)", len(bs))
+	if len(key) == 0 {
+		err = errors.Wrapf(ErrBadRequest, "MC Decoder retrieval request sanity check empty key")
 		return
 	}
-	index := 1
-	key := bs[index : len(bs)-2]
 	if !legalKey(key, true) {
 		err = errors.Wrap(ErrBadKey, "MC Decoder retrieval request legal key")
 		return
@@ -200,7 +198,7 @@ func retrievalRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *pro
 	req.WithProto(&MCRequest{
 		rTp:   reqType,
 		key:   key,
-		data:  bs[len(bs)-2:],
+		data:  nil,
 		batch: batch,
 	})
 	return
