@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/felixhao/overlord/lib/bufio"
+	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/pool"
+	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
@@ -21,11 +23,13 @@ const (
 )
 
 type handler struct {
-	conn net.Conn
-	br   *bufio.Reader
-	bw   *bufio.Writer
-	bss  [][]byte
-	buf  []byte
+	cluster string
+	addr    string
+	conn    net.Conn
+	br      *bufio.Reader
+	bw      *bufio.Writer
+	bss     [][]byte
+	buf     []byte
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
@@ -34,17 +38,19 @@ type handler struct {
 }
 
 // Dial returns pool Dial func.
-func Dial(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (dial func() (pool.Conn, error)) {
+func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (dial func() (pool.Conn, error)) {
 	dial = func() (pool.Conn, error) {
 		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h := &handler{
+			cluster:      cluster,
+			addr:         addr,
 			conn:         conn,
 			bw:           bufio.NewWriterSize(conn, handlerWriteBufferSize),
 			br:           bufio.NewReaderSize(conn, handlerReadBufferSize),
-			bss:          make([][]byte, 1), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n', and not copy 'END\r\n'
+			bss:          make([][]byte, 2), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n', and not copy 'END\r\n'
 			readTimeout:  readTimeout,
 			writeTimeout: writeTimeout,
 		}
@@ -92,19 +98,43 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	}
 	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
 		if !bytes.Equal(bs, endBytes) {
-			h.bss = h.bss[:1]
-			h.bss[0] = bs
-			tl := len(bs)
+			stat.Hit(h.cluster, h.addr)
+			bss := bytes.Split(bs, spaceBytes)
+			if len(bss) < 4 {
+				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
+				return
+			}
+			var length int64
+			if len(bss) == 4 { // NOTE: if len==4, means gets|gats
+				if len(bss[3]) < 2 {
+					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
+					return
+				}
+				bss[3] = bss[3][:len(bss[3])-2] // NOTE: gets|gats contains '\r\n'
+			}
+			if length, err = conv.Btoi(bss[3]); err != nil {
+				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
+				return
+			}
 			var bs2 []byte
-			for !bytes.Equal(bs2, endBytes) {
-				if bs2 != nil { // NOTE: here, avoid copy 'END\r\n'
-					h.bss = append(h.bss, bs2)
-					tl += len(bs2)
+			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 read contains '\r\n'
+				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
+				return
+			}
+			h.bss = h.bss[:2]
+			h.bss[0] = bs
+			h.bss[1] = bs2
+			tl := len(bs) + len(bs2)
+			var bs3 []byte
+			for !bytes.Equal(bs3, endBytes) {
+				if bs3 != nil { // NOTE: here, avoid copy 'END\r\n'
+					h.bss = append(h.bss, bs3)
+					tl += len(bs3)
 				}
 				if h.readTimeout > 0 {
 					h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
 				}
-				if bs2, err = h.br.ReadBytes(delim); err != nil {
+				if bs3, err = h.br.ReadBytes(delim); err != nil {
 					err = errors.Wrap(err, "MC Handler handle reread response bytes")
 					return
 				}
@@ -118,6 +148,8 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 			}
 			copy(tmp[off:], endBytes)
 			bs = tmp
+		} else {
+			stat.Miss(h.cluster, h.addr)
 		}
 	}
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}

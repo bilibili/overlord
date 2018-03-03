@@ -9,10 +9,88 @@
 			"revisionTime": "2017-06-26T11:06:00Z"
 		},
 		{
+			"checksumSHA1": "spyv5/YFBjYyZLZa1U2LBfDR8PM=",
+			"path": "github.com/beorn7/perks/quantile",
+			"revision": "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9",
+			"revisionTime": "2016-08-04T10:47:26Z"
+		},
+		{
+			"checksumSHA1": "WX1+2gktHcBmE9MGwFSGs7oqexU=",
+			"path": "github.com/golang/protobuf/proto",
+			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
+			"revisionTime": "2018-02-02T18:43:18Z"
+		},
+		{
+			"checksumSHA1": "bKMZjd2wPw13VwoE7mBeSv5djFA=",
+			"path": "github.com/matttproud/golang_protobuf_extensions/pbutil",
+			"revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
+			"revisionTime": "2016-04-24T11:30:07Z"
+		},
+		{
 			"checksumSHA1": "ljd3FhYRJ91cLZz3wsH9BQQ2JbA=",
 			"path": "github.com/pkg/errors",
 			"revision": "30136e27e2ac8d167177e8a583aa4c3fea5be833",
 			"revisionTime": "2018-01-27T01:58:12Z"
+		},
+		{
+			"checksumSHA1": "I87tkF1e/hrl4d/XIKFfkPRq1ww=",
+			"path": "github.com/prometheus/client_golang/prometheus",
+			"revision": "c3324c1198cf3374996e9d3098edd46a6b55afc9",
+			"revisionTime": "2018-02-23T14:47:18Z"
+		},
+		{
+			"checksumSHA1": "mIWVz1E1QJ6yZnf7ELNwLboyK4w=",
+			"path": "github.com/prometheus/client_golang/prometheus/promhttp",
+			"revision": "c3324c1198cf3374996e9d3098edd46a6b55afc9",
+			"revisionTime": "2018-02-23T14:47:18Z"
+		},
+		{
+			"checksumSHA1": "DvwvOlPNAgRntBzt3b3OSRMS2N4=",
+			"path": "github.com/prometheus/client_model/go",
+			"revision": "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c",
+			"revisionTime": "2017-11-17T10:05:41Z"
+		},
+		{
+			"checksumSHA1": "+wZ+Pa6NX+NOxUvayXBXGOcqFe8=",
+			"path": "github.com/prometheus/common/expfmt",
+			"revision": "6fb6fce6f8b75884b92e1889c150403fc0872c5e",
+			"revisionTime": "2018-02-28T09:25:48Z"
+		},
+		{
+			"checksumSHA1": "GWlM3d2vPYyNATtTFgftS10/A9w=",
+			"path": "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
+			"revision": "6fb6fce6f8b75884b92e1889c150403fc0872c5e",
+			"revisionTime": "2018-02-28T09:25:48Z"
+		},
+		{
+			"checksumSHA1": "YU+/K48IMawQnToO4ETE6a+hhj4=",
+			"path": "github.com/prometheus/common/model",
+			"revision": "6fb6fce6f8b75884b92e1889c150403fc0872c5e",
+			"revisionTime": "2018-02-28T09:25:48Z"
+		},
+		{
+			"checksumSHA1": "8dG0WrUCw4ZQTgjFK6qzGEdqEGI=",
+			"path": "github.com/prometheus/procfs",
+			"revision": "d274e363d5759d1c916232217be421f1cc89c5fe",
+			"revisionTime": "2018-02-28T15:07:32Z"
+		},
+		{
+			"checksumSHA1": "lv9rIcjbVEGo8AT1UCUZXhXrfQc=",
+			"path": "github.com/prometheus/procfs/internal/util",
+			"revision": "d274e363d5759d1c916232217be421f1cc89c5fe",
+			"revisionTime": "2018-02-28T15:07:32Z"
+		},
+		{
+			"checksumSHA1": "EekY1iRG9JY74mDD0jsbFCWbAFs=",
+			"path": "github.com/prometheus/procfs/nfs",
+			"revision": "d274e363d5759d1c916232217be421f1cc89c5fe",
+			"revisionTime": "2018-02-28T15:07:32Z"
+		},
+		{
+			"checksumSHA1": "yItvTQLUVqm/ArLEbvEhqG0T5a0=",
+			"path": "github.com/prometheus/procfs/xfs",
+			"revision": "d274e363d5759d1c916232217be421f1cc89c5fe",
+			"revisionTime": "2018-02-28T15:07:32Z"
 		}
 	],
 	"rootPath": "github.com/felixhao/overlord"

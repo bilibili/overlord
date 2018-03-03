@@ -17,7 +17,7 @@ type Reader struct {
 	rpos int
 	wpos int
 
-	slice sliceAlloc
+	slice SliceAlloc
 }
 
 // NewReader returns a new Reader whose buffer has the default size.

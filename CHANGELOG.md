@@ -1,5 +1,12 @@
 #### Overlord
 
+##### Version 1.1.0
+> 1.add prometheus  
+> 2.add check legal key  
+> 3.optimize dispatch  
+> 4.reuse sync.pool for slice make  
+> 5.fix read bytes length forget +2 '\r\n'  
+
 ##### Version 1.0.1
 > 1.add log  
 > 2.check max connections  

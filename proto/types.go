@@ -3,6 +3,7 @@ package proto
 import (
 	errs "errors"
 	"sync"
+	"time"
 )
 
 // errors
@@ -21,6 +22,7 @@ const (
 )
 
 type protoRequest interface {
+	Cmd() string
 	Key() []byte
 	IsBatch() bool
 	Batch() ([]Request, *Response)
@@ -34,6 +36,7 @@ type Request struct {
 	bWg   *sync.WaitGroup
 
 	Resp *Response
+	st   time.Time
 }
 
 // Process means request processing.
@@ -42,6 +45,7 @@ func (r *Request) Process() {
 		r.wg = &sync.WaitGroup{}
 	}
 	r.wg.Add(1)
+	r.st = time.Now()
 }
 
 // Done done.
@@ -81,6 +85,11 @@ func (r *Request) Proto() protoRequest {
 	return r.proto
 }
 
+// Cmd returns proto request cmd.
+func (r *Request) Cmd() string {
+	return r.proto.Cmd()
+}
+
 // Key returns proto request key.
 func (r *Request) Key() []byte {
 	return r.proto.Key()
@@ -110,6 +119,11 @@ func (r *Request) BatchWait() {
 	if r.bWg != nil {
 		r.bWg.Wait()
 	}
+}
+
+// Since returns the time elapsed since t.
+func (r *Request) Since() time.Duration {
+	return time.Since(r.st)
 }
 
 type protoResponse interface {
