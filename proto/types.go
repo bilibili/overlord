@@ -28,6 +28,26 @@ type protoRequest interface {
 	Batch() ([]Request, *Response)
 }
 
+type errProto struct{}
+
+func (e *errProto) Cmd() string {
+	return "ErrCmd"
+}
+func (e *errProto) Key() []byte {
+	return []byte("Err")
+}
+func (e *errProto) IsBatch() bool {
+	return false
+}
+func (e *errProto) Batch() ([]Request, *Response) {
+	return nil, nil
+}
+
+// ErrRequest return err request.
+func ErrRequest() *Request {
+	return &Request{proto: &errProto{}}
+}
+
 // Request read from client.
 type Request struct {
 	Type  CacheType

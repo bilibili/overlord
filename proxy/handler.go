@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"runtime"
@@ -107,7 +106,6 @@ func (h *Handler) handleReader() {
 			h.conn.SetReadDeadline(time.Now().Add(time.Duration(h.c.Proxy.ReadTimeout) * time.Millisecond))
 		}
 		if req, err = h.decoder.Decode(); err != nil {
-			fmt.Printf("err %+v", err)
 			rerr := errors.Cause(err)
 			if rerr == io.EOF {
 				if log.V(2) {
@@ -123,7 +121,7 @@ func (h *Handler) handleReader() {
 				err = nil
 				continue
 			}
-			req = &proto.Request{}
+			req = proto.ErrRequest()
 			req.Process()
 			h.reqCh.PushBack(req)
 			req.DoneWithError(err)
