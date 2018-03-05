@@ -214,8 +214,8 @@ func (h *Handler) closeWithError(err error) {
 		}
 		h.err = err
 		h.cancel()
-		h.wg.Wait()
 		h.reqCh.Close()
+		h.wg.Wait()
 		h.conn.Close()
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
