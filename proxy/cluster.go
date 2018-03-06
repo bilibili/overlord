@@ -171,10 +171,9 @@ func (c *Cluster) process(node string, rc *channel) {
 					}
 					return
 				}
-				now := time.Now()
 				resp, err := hdl.Handle(req)
 				c.put(node, hdl, err)
-				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Millisecond))
+				stat.HandleTime(c.cc.Name, node, req.Cmd(), float64(req.Since()/time.Microsecond))
 				if err != nil {
 					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 					if log.V(1) {

@@ -84,19 +84,19 @@ func metrics() {
 }
 
 // ProxyTime log timing information (in milliseconds).
-func ProxyTime(cluster, node string, ts int64) {
+func ProxyTime(cluster, node string, ts float64) {
 	if proxyTimer == nil {
 		return
 	}
-	proxyTimer.WithLabelValues(cluster, node).Observe(float64(ts))
+	proxyTimer.WithLabelValues(cluster, node).Observe(ts)
 }
 
 // HandleTime log timing information (in milliseconds).
-func HandleTime(cluster, node, cmd string, ts int64) {
+func HandleTime(cluster, node, cmd string, ts float64) {
 	if handlerTimer == nil {
 		return
 	}
-	handlerTimer.WithLabelValues(cluster, node, cmd).Observe(float64(ts))
+	handlerTimer.WithLabelValues(cluster, node, cmd).Observe(ts)
 }
 
 // ErrIncr increments one stat error counter.

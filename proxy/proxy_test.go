@@ -20,7 +20,7 @@ var (
 			HashTag:          "",
 			CacheType:        proto.CacheType("memcache"),
 			ListenProto:      "tcp",
-			ListenAddr:       "127.0.0.1:21211",
+			ListenAddr:       "0.0.0.0:21211",
 			RedisAuth:        "",
 			DialTimeout:      1000,
 			ReadTimeout:      1000,
@@ -32,7 +32,7 @@ var (
 			PingFailLimit:    3,
 			PingAutoEject:    false,
 			Servers: []string{
-				"127.0.0.1:11211:10",
+				"192.168.99.100:32768:10",
 				// "127.0.0.1:11212:10",
 				// "127.0.0.1:11213:10",
 			},
@@ -42,7 +42,7 @@ var (
 	cmds = [][]byte{
 		[]byte("SET a_11 0 0 1\r\n1\r\n"),
 		[]byte("get a_11\r\n"),
-		[]byte("get a_11 a_22 a_33\r\n"),
+		[]byte("get a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66\r\n"),
 		[]byte("set a_22 0 123456 4\r\nhalo\r\n"),
 		[]byte("set a_33 1 123456 3\r\ncao\r\n"),
 		[]byte("cas a_11 0 0 3 181\r\ncao\r\n"),
@@ -77,10 +77,11 @@ func mockProxy() {
 	}
 	// serve
 	go p.Serve(ccs)
+	time.Sleep(time.Second)
 }
 
 func testCmd(t testing.TB, cmds ...[]byte) {
-	conn, err := net.DialTimeout("tcp", "127.0.0.1:21211", time.Second)
+	conn, err := net.DialTimeout("tcp", "0.0.0.0:21211", time.Second)
 	if err != nil {
 		t.Fatalf("net dial error:%v", err)
 	}
@@ -112,12 +113,13 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 				bs = append(bs, bs2...)
 			}
 		}
-		// t.Logf("read string:%s", bs)
+		t.Logf("read string:%s", bs)
 	}
 }
 
 func TestProxy(t *testing.T) {
-	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	//testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	testCmd(t, cmds[2])
 }
 
 func BenchmarkCmdSet(b *testing.B) {
