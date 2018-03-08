@@ -38,6 +38,7 @@ type Request struct {
 	Resp *Response
 	st   time.Time
 }
+
 type errProto struct{}
 
 func (e *errProto) Cmd() string {

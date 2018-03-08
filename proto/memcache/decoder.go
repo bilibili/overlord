@@ -32,7 +32,7 @@ func NewDecoder(r io.Reader) proto.Decoder {
 func (d *decoder) Decode() (req *proto.Request, err error) {
 	bs, err := d.br.ReadBytes(delim)
 	if err != nil {
-		//	err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
+		err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
 		return
 	}
 	i := bytes.IndexByte(bs, spaceByte)
