@@ -38,6 +38,25 @@ type Request struct {
 	Resp *Response
 	st   time.Time
 }
+type errProto struct{}
+
+func (e *errProto) Cmd() string {
+	return "ErrCmd"
+}
+func (e *errProto) Key() []byte {
+	return []byte("Err")
+}
+func (e *errProto) IsBatch() bool {
+	return false
+}
+func (e *errProto) Batch() ([]Request, *Response) {
+	return nil, nil
+}
+
+// ErrRequest return err request.
+func ErrRequest() *Request {
+	return &Request{proto: &errProto{}}
+}
 
 // Process means request processing.
 func (r *Request) Process() {
@@ -221,7 +240,8 @@ func NewRequestChanBuffer(n int) *RequestChan {
 func (c *RequestChan) PushBack(r *Request) int {
 	c.lock.Lock()
 	if c.closed {
-		panic("send on closed chan")
+		c.lock.Unlock()
+		return 0
 	}
 	c.data = append(c.data, r)
 	n := len(c.data)
@@ -237,6 +257,7 @@ func (c *RequestChan) PopFront() (*Request, bool) {
 	c.lock.Lock()
 	for len(c.data) == 0 {
 		if c.closed {
+			c.lock.Unlock()
 			return nil, false
 		}
 		c.data = c.buff[:0]

@@ -14,16 +14,19 @@ import (
 
 const (
 	decoderBufferSize = 128 * 1024 // NOTE: keep reading data from client, so relatively large
+	bufSize           = 1024
 )
 
 type decoder struct {
-	br *bufio.Reader
+	br  *bufio.Reader
+	buf []byte
 }
 
 // NewDecoder new a memcache decoder.
 func NewDecoder(r io.Reader) proto.Decoder {
 	d := &decoder{
-		br: bufio.NewReaderSize(r, decoderBufferSize),
+		br:  bufio.NewReaderSize(r, decoderBufferSize),
+		buf: make([]byte, 0, bufSize),
 	}
 	return d
 }
@@ -32,7 +35,7 @@ func NewDecoder(r io.Reader) proto.Decoder {
 func (d *decoder) Decode() (req *proto.Request, err error) {
 	bs, err := d.br.ReadBytes(delim)
 	if err != nil {
-		err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
+		//	err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
 		return
 	}
 	i := bytes.IndexByte(bs, spaceByte)
