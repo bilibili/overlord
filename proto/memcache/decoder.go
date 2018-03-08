@@ -14,19 +14,16 @@ import (
 
 const (
 	decoderBufferSize = 128 * 1024 // NOTE: keep reading data from client, so relatively large
-	bufSize           = 1024
 )
 
 type decoder struct {
-	br  *bufio.Reader
-	buf []byte
+	br *bufio.Reader
 }
 
 // NewDecoder new a memcache decoder.
 func NewDecoder(r io.Reader) proto.Decoder {
 	d := &decoder{
-		br:  bufio.NewReaderSize(r, decoderBufferSize),
-		buf: make([]byte, 0, bufSize),
+		br: bufio.NewReaderSize(r, decoderBufferSize),
 	}
 	return d
 }
