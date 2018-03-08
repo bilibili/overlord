@@ -1,4 +1,7 @@
 #### Overlord
+##### Version 1.1.1
+> 1.fix error dead lock
+> 2.fix empty request.
 
 ##### Version 1.1.0
 > 1.add prometheus  
