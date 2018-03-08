@@ -121,7 +121,7 @@ func (h *Handler) handleReader() {
 				err = nil
 				continue
 			}
-			req = &proto.Request{}
+			req = proto.ErrRequest()
 			req.Process()
 			h.reqCh.PushBack(req)
 			req.DoneWithError(err)
@@ -198,7 +198,7 @@ func (h *Handler) handleWriter() {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
 		err = h.encoder.Encode(req.Resp)
-		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Millisecond))
+		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), float64(req.Since()/time.Microsecond))
 	}
 }
 
@@ -214,8 +214,8 @@ func (h *Handler) closeWithError(err error) {
 		}
 		h.err = err
 		h.cancel()
-		h.wg.Wait()
 		h.reqCh.Close()
+		h.wg.Wait()
 		h.conn.Close()
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())

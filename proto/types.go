@@ -28,15 +28,35 @@ type protoRequest interface {
 	Batch() ([]Request, *Response)
 }
 
+type errProto struct{}
+
+func (e *errProto) Cmd() string {
+	return "ErrCmd"
+}
+func (e *errProto) Key() []byte {
+	return []byte("Err")
+}
+func (e *errProto) IsBatch() bool {
+	return false
+}
+func (e *errProto) Batch() ([]Request, *Response) {
+	return nil, nil
+}
+
+// ErrRequest return err request.
+func ErrRequest() *Request {
+	return &Request{proto: &errProto{}}
+}
+
 // Request read from client.
 type Request struct {
 	Type  CacheType
 	proto protoRequest
 	wg    *sync.WaitGroup
 	bWg   *sync.WaitGroup
-
-	Resp *Response
-	st   time.Time
+	Next  *Request
+	Resp  *Response
+	st    time.Time
 }
 
 // Process means request processing.
@@ -177,7 +197,7 @@ type Decoder interface {
 
 // Handler handle request to backend cache server and read response.
 type Handler interface {
-	Handle(*Request) (*Response, error)
+	Handle(*Request) ([]*Response, error)
 }
 
 // Pinger ping node connection.
@@ -191,9 +211,8 @@ type RequestChan struct {
 	lock sync.Mutex
 	cond *sync.Cond
 
-	data []*Request
-	buff []*Request
-
+	head   *Request
+	tail   *Request
 	waits  int
 	closed bool
 }
@@ -207,55 +226,87 @@ func NewRequestChan() *RequestChan {
 
 // NewRequestChanBuffer new request chan with buffer.
 func NewRequestChanBuffer(n int) *RequestChan {
-	if n <= 0 {
-		n = defaultRequestChanBuffer
-	}
-	ch := &RequestChan{
-		buff: make([]*Request, n),
-	}
+	ch := &RequestChan{}
 	ch.cond = sync.NewCond(&ch.lock)
 	return ch
 }
 
 // PushBack push request back queue.
-func (c *RequestChan) PushBack(r *Request) int {
+func (c *RequestChan) PushBack(r *Request) {
 	c.lock.Lock()
 	if c.closed {
 		panic("send on closed chan")
 	}
-	c.data = append(c.data, r)
-	n := len(c.data)
+	if c.head == nil {
+		c.head = r
+	}
+	if c.tail == nil {
+		c.tail = r
+	} else {
+		c.tail.Next = r
+		c.tail = r
+	}
 	if c.waits != 0 {
 		c.cond.Signal()
 	}
 	c.lock.Unlock()
-	return n
+	return
 }
 
 // PopFront pop front from queue.
 func (c *RequestChan) PopFront() (*Request, bool) {
 	c.lock.Lock()
-	for len(c.data) == 0 {
+	for c.head == nil {
 		if c.closed {
 			return nil, false
 		}
-		c.data = c.buff[:0]
 		c.waits++
 		c.cond.Wait()
 		c.waits--
 	}
-	r := c.data[0]
-	c.data[0], c.data = nil, c.data[1:]
+	r := c.head
+	c.head = c.head.Next
+	r.Next = nil
+	if c.head == nil {
+		c.tail = nil
+	}
 	c.lock.Unlock()
 	return r, true
 }
 
-// Buffered returns buffer.
-func (c *RequestChan) Buffered() int {
+// PopAll pop all request.
+func (c *RequestChan) PopAll() (*Request, bool) {
 	c.lock.Lock()
-	n := len(c.data)
+	for c.head == nil {
+		if c.closed {
+			c.lock.Unlock()
+			return nil, false
+		}
+		c.waits++
+		c.cond.Wait()
+		c.waits--
+	}
+	r := c.head
+	tmp := c.head
+	for i := 0; i < 5; i++ {
+		if tmp != nil {
+			tmp = tmp.Next
+		} else {
+			break
+		}
+	}
+	if tmp != nil {
+		c.head = tmp.Next
+		if tmp.Next == nil {
+			c.tail = nil
+		}
+		tmp.Next = nil
+	} else {
+		c.tail = nil
+		c.head = nil
+	}
 	c.lock.Unlock()
-	return n
+	return r, true
 }
 
 // Close close request chan.
