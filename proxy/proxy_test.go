@@ -41,7 +41,7 @@ var (
 
 	cmds = [][]byte{
 		[]byte("SET a_11 0 0 1\r\n1\r\n"),
-		[]byte("get a_11\r\n"),
+		[]byte("get a_11 a_22\r\n"),
 		[]byte("get a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66 a_11 a_22 a_33 a_44 a_55 a_66\r\n"),
 		[]byte("set a_22 0 123456 4\r\nhalo\r\n"),
 		[]byte("set a_33 1 123456 3\r\ncao\r\n"),
@@ -113,13 +113,13 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 				bs = append(bs, bs2...)
 			}
 		}
-		t.Logf("read string:%s", bs)
+		//	t.Logf("read string:%s", bs)
 	}
 }
 
 func TestProxy(t *testing.T) {
 	//testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-	testCmd(t, cmds[2])
+	testCmd(t, cmds[1])
 }
 
 func BenchmarkCmdSet(b *testing.B) {

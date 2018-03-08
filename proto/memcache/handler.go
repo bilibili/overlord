@@ -60,29 +60,35 @@ func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Dura
 }
 
 // Handle call server node by request and read response returned.
-func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
+func (h *handler) Handle(reqs *proto.Request) (resps []*proto.Response, err error) {
 	if h.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle request")
 		return
 	}
-	mcr, ok := req.Proto().(*MCRequest)
-	if !ok {
-		err = errors.Wrap(ErrAssertRequest, "MC Handler handle assert MCRequest")
-		return
-	}
-	if h.writeTimeout > 0 {
-		h.conn.SetWriteDeadline(time.Now().Add(h.writeTimeout))
-	}
-	h.bw.WriteString(mcr.rTp.String())
-	h.bw.WriteByte(spaceByte)
-	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
-		h.bw.Write(mcr.data) // NOTE: exptime
+	var mcrs []*MCRequest
+	var i int
+	for req := reqs; req != nil; req = req.Next {
+		i++
+		mcr, ok := req.Proto().(*MCRequest)
+		if !ok {
+			err = errors.Wrap(ErrAssertRequest, "MC Handler handle assert MCRequest")
+			return
+		}
+		mcrs = append(mcrs, mcr)
+		if h.writeTimeout > 0 {
+			h.conn.SetWriteDeadline(time.Now().Add(h.writeTimeout))
+		}
+		h.bw.WriteString(mcr.rTp.String())
 		h.bw.WriteByte(spaceByte)
-		h.bw.Write(mcr.key)
-		h.bw.Write(crlfBytes)
-	} else {
-		h.bw.Write(mcr.key)
-		h.bw.Write(mcr.data)
+		if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
+			h.bw.Write(mcr.data) // NOTE: exptime
+			h.bw.WriteByte(spaceByte)
+			h.bw.Write(mcr.key)
+			h.bw.Write(crlfBytes)
+		} else {
+			h.bw.Write(mcr.key)
+			h.bw.Write(mcr.data)
+		}
 	}
 	if err = h.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Handler handle flush request bytes")
@@ -91,70 +97,76 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	if h.readTimeout > 0 {
 		h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
 	}
-	bs, err := h.br.ReadBytes(delim)
-	if err != nil {
-		err = errors.Wrap(err, "MC Handler handle read response bytes")
-		return
-	}
-	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
-		if !bytes.Equal(bs, endBytes) {
-			stat.Hit(h.cluster, h.addr)
-			bss := bytes.Split(bs, spaceBytes)
-			if len(bss) < 4 {
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
-				return
-			}
-			var length int64
-			if len(bss) == 4 { // NOTE: if len==4, means gets|gats
-				if len(bss[3]) < 2 {
-					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
-					return
-				}
-				bss[3] = bss[3][:len(bss[3])-2] // NOTE: gets|gats contains '\r\n'
-			}
-			if length, err = conv.Btoi(bss[3]); err != nil {
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
-				return
-			}
-			var bs2 []byte
-			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 read contains '\r\n'
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
-				return
-			}
-			h.bss = h.bss[:2]
-			h.bss[0] = bs
-			h.bss[1] = bs2
-			tl := len(bs) + len(bs2)
-			var bs3 []byte
-			for !bytes.Equal(bs3, endBytes) {
-				if bs3 != nil { // NOTE: here, avoid copy 'END\r\n'
-					h.bss = append(h.bss, bs3)
-					tl += len(bs3)
-				}
-				if h.readTimeout > 0 {
-					h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
-				}
-				if bs3, err = h.br.ReadBytes(delim); err != nil {
-					err = errors.Wrap(err, "MC Handler handle reread response bytes")
-					return
-				}
-			}
-			const endBytesLen = 5 // NOTE: endBytes length
-			tmp := h.makeBytes(tl + endBytesLen)
-			off := 0
-			for i := range h.bss {
-				copy(tmp[off:], h.bss[i])
-				off += len(h.bss[i])
-			}
-			copy(tmp[off:], endBytes)
-			bs = tmp
-		} else {
-			stat.Miss(h.cluster, h.addr)
+	for i := 0; i < len(mcrs); i++ {
+		mcr := mcrs[i]
+		var bs []byte
+		bs, err = h.br.ReadBytes(delim)
+		if err != nil {
+			err = errors.Wrap(err, "MC Handler handle read response bytes")
+			return
 		}
+		if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
+			if !bytes.Equal(bs, endBytes) {
+				stat.Hit(h.cluster, h.addr)
+				bss := bytes.Split(bs, spaceBytes)
+				if len(bss) < 4 {
+					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
+					return
+				}
+				var length int64
+				if len(bss) == 4 { // NOTE: if len==4, means gets|gats
+					if len(bss[3]) < 2 {
+						err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
+						return
+					}
+					bss[3] = bss[3][:len(bss[3])-2] // NOTE: gets|gats contains '\r\n'
+				}
+				if length, err = conv.Btoi(bss[3]); err != nil {
+					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
+					return
+				}
+				var bs2 []byte
+				if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 read contains '\r\n'
+					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
+					return
+				}
+				h.bss = h.bss[:2]
+				h.bss[0] = bs
+				h.bss[1] = bs2
+				tl := len(bs) + len(bs2)
+				var bs3 []byte
+				for !bytes.Equal(bs3, endBytes) {
+					if bs3 != nil { // NOTE: here, avoid copy 'END\r\n'
+						h.bss = append(h.bss, bs3)
+						tl += len(bs3)
+					}
+					if h.readTimeout > 0 {
+						h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
+					}
+					if bs3, err = h.br.ReadBytes(delim); err != nil {
+						err = errors.Wrap(err, "MC Handler handle reread response bytes")
+						return
+					}
+				}
+				const endBytesLen = 5 // NOTE: endBytes length
+				tmp := h.makeBytes(tl + endBytesLen)
+				off := 0
+				for i := range h.bss {
+					copy(tmp[off:], h.bss[i])
+					off += len(h.bss[i])
+				}
+				copy(tmp[off:], endBytes)
+				bs = tmp
+			} else {
+				stat.Miss(h.cluster, h.addr)
+			}
+		}
+		resp := &proto.Response{Type: proto.CacheTypeMemcache}
+		pr := &MCResponse{rTp: mcr.rTp, data: bs}
+		resp.WithProto(pr)
+		resps = append(resps, resp)
 	}
-	resp = &proto.Response{Type: proto.CacheTypeMemcache}
-	pr := &MCResponse{rTp: mcr.rTp, data: bs}
-	resp.WithProto(pr)
+	//fmt.Println(i, len(mcrs), len(resps))
 	return
 }
 
