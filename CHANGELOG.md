@@ -3,6 +3,14 @@
 > 1.fix error dead lock
 > 2.fix empty request.
 
+##### Version 1.1.2
+> 1.optimize handler bytes alloc  
+> 2.adjust cluster routine num  
+
+##### Version 1.1.1
+> 1.fix error dead lock  
+> 2.fix empty request.  
+
 ##### Version 1.1.0
 > 1.add prometheus  
 > 2.add check legal key  

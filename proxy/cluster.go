@@ -22,9 +22,7 @@ import (
 )
 
 const (
-	hashRingSpots     = 255
-	channelNum        = 10
-	channelRoutineNum = channelNum * 10
+	hashRingSpots = 255
 )
 
 // cluster errors
@@ -111,11 +109,9 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		}
 		nm[node] = newPool(cc, addrs[i])
 		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
-		rc := newChannel(channelNum)
+		rc := newChannel(int32(cc.PoolActive))
 		cm[node] = rc
-		for i := 0; i < cc.PoolActive; i++ {
-			go c.process(node, rc)
-		}
+		go c.process(node, rc)
 	}
 	c.ring = ring
 	c.alias = alias
