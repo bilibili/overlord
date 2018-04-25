@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"io"
 	"net"
 	"runtime"
 	"sync"
@@ -71,9 +70,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
 	h.once.Do(func() {
-		h.wg.Add(1)
 		go h.handleWriter()
-		h.wg.Add(1)
 		go h.handleReader()
 	})
 }
@@ -84,7 +81,6 @@ func (h *Handler) handleReader() {
 		err error
 	)
 	defer func() {
-		h.wg.Done()
 		h.closeWithError(err)
 	}()
 	for {
@@ -106,32 +102,31 @@ func (h *Handler) handleReader() {
 			h.conn.SetReadDeadline(time.Now().Add(time.Duration(h.c.Proxy.ReadTimeout) * time.Millisecond))
 		}
 		if req, err = h.decoder.Decode(); err != nil {
-			rerr := errors.Cause(err)
-			if rerr == io.EOF {
-				if log.V(2) {
-					log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) close connection", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+			//rerr := errors.Cause(err)
+			if ne, ok := err.(net.Error); ok {
+				if ne.Temporary() {
+					req = proto.ErrRequest()
+					req.Process()
+					if h.reqCh.PushBack(req) == 0 {
+						return
+					}
+					req.DoneWithError(err)
+					if log.V(1) {
+						log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+					}
+					err = nil
+					continue
 				}
-				return
 			}
-			if ne, ok := rerr.(net.Error); ok {
-				if ne.Timeout() || !ne.Temporary() {
-					log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
-					return // NOTE: break when timeout or fatal error!!!
-				}
-				err = nil
-				continue
-			}
-			req = &proto.Request{}
-			req.Process()
-			h.reqCh.PushBack(req)
-			req.DoneWithError(err)
 			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) close connection error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
 			}
-			continue
+			return
 		}
 		req.Process()
-		h.reqCh.PushBack(req)
+		if h.reqCh.PushBack(req) == 0 {
+			return
+		}
 		h.dispatchRequest(req)
 	}
 }
@@ -162,7 +157,6 @@ func (h *Handler) dispatchRequest(req *proto.Request) {
 func (h *Handler) handleWriter() {
 	var err error
 	defer func() {
-		h.wg.Done()
 		h.closeWithError(err)
 	}()
 	for {
@@ -198,7 +192,7 @@ func (h *Handler) handleWriter() {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
 		err = h.encoder.Encode(req.Resp)
-		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Millisecond))
+		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Microsecond))
 	}
 }
 
@@ -214,7 +208,6 @@ func (h *Handler) closeWithError(err error) {
 		}
 		h.err = err
 		h.cancel()
-		h.wg.Wait()
 		h.reqCh.Close()
 		h.conn.Close()
 		if log.V(3) {

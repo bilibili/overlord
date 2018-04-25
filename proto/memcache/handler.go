@@ -99,20 +99,31 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
 		if !bytes.Equal(bs, endBytes) {
 			stat.Hit(h.cluster, h.addr)
-			bss := bytes.Split(bs, spaceBytes)
-			if len(bss) < 4 {
+			c := bytes.Count(bs, spaceBytes)
+			if c < 3 {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
 				return
 			}
-			var length int64
-			if len(bss) == 4 { // NOTE: if len==4, means gets|gats
-				if len(bss[3]) < 2 {
+			var (
+				lenBs  []byte
+				length int64
+			)
+			i := bytes.IndexByte(bs, spaceByte) + 1 // VALUE <key> <flags> <bytes> [<cas unique>]\r\n
+			i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
+			i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
+			if c == 3 { // NOTE: if c==3, means get|gat
+				lenBs = bs[i:]
+				l := len(lenBs)
+				if l < 2 {
 					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
 					return
 				}
-				bss[3] = bss[3][:len(bss[3])-2] // NOTE: gets|gats contains '\r\n'
+				lenBs = lenBs[:l-2] // NOTE: get|gat contains '\r\n'
+			} else { // NOTE: if c>3, means gets|gats
+				j := i + bytes.IndexByte(bs[i:], spaceByte)
+				lenBs = bs[i:j]
 			}
-			if length, err = conv.Btoi(bss[3]); err != nil {
+			if length, err = conv.Btoi(lenBs); err != nil {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
 				return
 			}

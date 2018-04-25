@@ -22,9 +22,7 @@ import (
 )
 
 const (
-	hashRingSpots     = 255
-	channelNum        = 10
-	channelRoutineNum = channelNum * 10
+	hashRingSpots = 255
 )
 
 // cluster errors
@@ -111,11 +109,9 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		}
 		nm[node] = newPool(cc, addrs[i])
 		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
-		rc := newChannel(channelNum)
+		rc := newChannel(int32(cc.PoolActive))
 		cm[node] = rc
-		for i := 0; i < cc.PoolActive; i++ {
-			go c.process(node, rc)
-		}
+		go c.process(node, rc)
 	}
 	c.ring = ring
 	c.alias = alias
@@ -156,6 +152,7 @@ func (c *Cluster) process(node string, rc *channel) {
 	for i := int32(0); i < rc.cnt; i++ {
 		go func(i int32) {
 			ch := rc.chs[i]
+			hdl, herr := c.get(node)
 			for {
 				var req *proto.Request
 				select {
@@ -163,24 +160,25 @@ func (c *Cluster) process(node string, rc *channel) {
 				case <-c.ctx.Done():
 					return
 				}
-				hdl, err := c.get(node)
-				if err != nil {
-					req.DoneWithError(errors.Wrap(err, "Cluster process get handler"))
+				if herr != nil {
+					req.DoneWithError(errors.Wrap(herr, "Cluster process get handler"))
 					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, err)
+						log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, herr)
 					}
-					return
+					hdl, herr = c.get(node)
+					continue
 				}
 				now := time.Now()
 				resp, err := hdl.Handle(req)
-				c.put(node, hdl, err)
-				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Millisecond))
+				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
 				if err != nil {
+					c.put(node, hdl, err)
+					hdl, herr = c.get(node)
 					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 					if log.V(1) {
 						log.Errorf("cluster(%s) addr(%s) request(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
 					}
-					stat.ErrIncr(c.cc.Name, node, req.Cmd(), err.Error())
+					stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
 					continue
 				}
 				req.Done(resp)
