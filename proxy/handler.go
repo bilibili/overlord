@@ -192,7 +192,7 @@ func (h *Handler) handleWriter() {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
 		err = h.encoder.Encode(req.Resp)
-		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Millisecond))
+		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Microsecond))
 	}
 }
 
