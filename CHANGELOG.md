@@ -1,7 +1,4 @@
 #### Overlord
-##### Version 1.1.1
-> 1.fix error dead lock
-> 2.fix empty request.
 
 ##### Version 1.1.3
 1. reuse handler when process  
