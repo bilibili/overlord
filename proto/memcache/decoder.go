@@ -83,11 +83,7 @@ func (d *decoder) Decode() (req *proto.Request, err error) {
 
 func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool) (req *proto.Request, err error) {
 	// sanity check
-	if c := bytes.Count(bs, spaceBytes); (noCas && c != 4) || (!noCas && c != 5) {
-		err = errors.Wrapf(ErrBadRequest, "MC Decoder storage request sanity check spaceCount(%d) noCas(%t)", c, noCas)
-		return
-	}
-	index := 1 // NOTE: ignore begin ' '
+	index := noSpaceIdx(bs)
 	// key
 	ki := bytes.IndexByte(bs[index:], spaceByte)
 	if ki <= 0 {
@@ -99,7 +95,7 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 		err = errors.Wrap(ErrBadKey, "MC Decoder storage request legal key")
 		return
 	}
-	index += ki + 1 // NOTE: +1 consume the begin ' '
+	index += ki + noSpaceIdx(bs[index+ki:]) // NOTE: +1 consume the begin ' '
 	// flags
 	fi := bytes.IndexByte(bs[index:], spaceByte)
 	if fi <= 0 {
@@ -114,7 +110,7 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 			return
 		}
 	}
-	index += fi + 1
+	index += fi + noSpaceIdx(bs[index+fi:])
 	// exptime
 	ei := bytes.IndexByte(bs[index:], spaceByte)
 	if ei <= 0 {
@@ -128,7 +124,7 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 			return
 		}
 	}
-	index += ei + 1
+	index += ei + noSpaceIdx(bs[index+ei:])
 	// bytes length
 	var bsBs []byte
 	if noCas {
@@ -367,4 +363,13 @@ func legalKey(key []byte, isMulti bool) bool {
 		}
 	}
 	return true
+}
+
+func noSpaceIdx(bs []byte) int {
+	for i, b := range bs {
+		if b != ' ' {
+			return i
+		}
+	}
+	return len(bs)
 }
