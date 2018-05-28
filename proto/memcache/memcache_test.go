@@ -20,9 +20,9 @@ var (
 		[]byte("set a_22 0 123456 4\r\nhalo\r\n"),
 		[]byte("set a_33 1 123456 3\r\ncao\r\n"),
 		[]byte("cas a_11 0 0 3 39\r\ncao\r\n"),
-		[]byte("  get   a_11\r\n"),
+		[]byte("  get   \r\n"),
 		[]byte("get a_11 a_22 a_33\r\n"),
-		[]byte("  gets    a_22\r\n"),
+		[]byte("gets    a_22\r\n"),
 		[]byte("gets a_11 a_22 a_33\r\n"),
 		[]byte("delete a_11\r\n"),
 		[]byte("incr a_11 1\r\n"),
@@ -95,7 +95,7 @@ func newPool(t *testing.T) *pool.Pool {
 	dto := time.Duration(1000) * time.Millisecond
 	rto := time.Duration(1000) * time.Millisecond
 	wto := time.Duration(1000) * time.Millisecond
-	dial := pool.PoolDial(memcache.Dial("", "127.0.0.1:11211", dto, rto, wto))
+	dial := pool.PoolDial(memcache.Dial("", "192.168.99.100:32769", dto, rto, wto))
 	act := pool.PoolActive(2)
 	idle := pool.PoolIdle(1)
 	idleTo := pool.PoolIdleTimeout(time.Duration(10) * time.Second)

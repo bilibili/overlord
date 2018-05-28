@@ -1,4 +1,6 @@
 #### Overlord
+##### Version 1.1.4
+1. support multi space command.
 
 ##### Version 1.1.3
 1. reuse handler when process  
@@ -12,7 +14,7 @@
 1. fix error dead lock  
 2. fix empty request.  
 
-##### Version 1.1.0
+##### Version 1.1.0，
 1. add prometheus  
 2. add check legal key  
 3. optimize dispatch  
