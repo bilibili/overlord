@@ -3,7 +3,6 @@ package memcache_test
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -21,9 +20,9 @@ var (
 		[]byte("set a_22 0 123456 4\r\nhalo\r\n"),
 		[]byte("set a_33 1 123456 3\r\ncao\r\n"),
 		[]byte("cas a_11 0 0 3 39\r\ncao\r\n"),
-		[]byte("get a_11\r\n"),
+		[]byte("  get   a_11\r\n"),
 		[]byte("get a_11 a_22 a_33\r\n"),
-		[]byte("gets a_22\r\n"),
+		[]byte("  gets    a_22\r\n"),
 		[]byte("gets a_11 a_22 a_33\r\n"),
 		[]byte("delete a_11\r\n"),
 		[]byte("incr a_11 1\r\n"),
@@ -45,9 +44,7 @@ func mockProxyServer(t *testing.T, wg *sync.WaitGroup) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Println("wocao111111")
 		handlerConn(t, wg, conn)
-		fmt.Println("wocao222222")
 	}()
 }
 
@@ -118,9 +115,7 @@ func TestMemcache(t *testing.T) {
 	br := bufio.NewReader(conn)
 	for _, cmd := range cmds {
 		wg.Add(1)
-		fmt.Println("wori11111")
 		conn.Write(cmd)
-		fmt.Println("wori22222")
 		// read
 		bs, err := br.ReadSlice('\n')
 		if err != nil {
