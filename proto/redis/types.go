@@ -12,6 +12,7 @@ import (
 
 var (
 	crlfBytes = []byte{'\r', '\n'}
+	lfByte    = byte('\n')
 )
 
 // errors
@@ -39,6 +40,22 @@ type resp struct {
 	array []*resp
 }
 
+func newRespBalk(data []byte) *resp {
+	return &resp{
+		rtype: respBulk,
+		data:  data,
+		array: nil,
+	}
+}
+
+func newRespPlain(rtype respType, data []byte) *resp {
+	return &resp{
+		rtype: rtype,
+		data:  data,
+		array: nil,
+	}
+}
+
 func newRespEmpty() *resp {
 	return &resp{
 		data:  nil,
@@ -51,6 +68,13 @@ func newRespString(val string) *resp {
 		rtype: respString,
 		data:  []byte(val),
 		array: nil,
+	}
+}
+func newRespArray(resps []*resp) *resp {
+	return &resp{
+		rtype: respArray,
+		data:  nil,
+		array: resps,
 	}
 }
 
@@ -116,6 +140,28 @@ type RRequest struct {
 
 	cmdType   CmdType
 	batchStep int
+}
+
+// NewCommand will create new command by given args
+// example:
+//     NewCommand("GET", "mykey")
+//     NewCommand("MGST", "mykey", "yourkey")
+func NewCommand(cmd string, args ...string) *RRequest {
+	respObj := newRespArrayWithCapcity(len(args) + 1)
+	respObj.replace(0, newRespString(cmd))
+	maxLen := len(args) + 1
+	for i := 1; i < maxLen; i++ {
+		respObj.replace(i, newRespString(args[i-1]))
+	}
+	return newRRequest(respObj)
+}
+
+func newRRequest(obj *resp) *RRequest {
+	r := &RRequest{respObj: obj}
+	cmd := r.Cmd()
+	r.cmdType = getCmdType(cmd)
+	r.batchStep = getBatchStep(cmd)
+	return r
 }
 
 // Cmd get the cmd
