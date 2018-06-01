@@ -1,11 +1,15 @@
 package redis
 
-// COMMAND GET or SET
+// Command type
+// MSET split with command change command as SET
+// EXISTS will return an existed count
+// DELETE will return delete count
+// CLUSTER NODES will return an mock response of cluster
 
 // CmdType is the type of proxy
 type CmdType = uint8
 
-// command types
+// command types for read/write spliting
 const (
 	CmdTypeRead uint8 = iota
 	CmdTypeWrite
@@ -144,15 +148,27 @@ var cmdTypeMap = map[string]CmdType{
 	"CONFIG":           CmdTypeNotSupport,
 }
 
+func getCmdType(cmd string) CmdType {
+	if ctype, ok := cmdTypeMap[cmd]; ok {
+		return ctype
+	}
+	return CmdTypeNotSupport
+}
+
+const defaultBatchStep = 0
+
 var defaultBatchSteps = map[string]int{
-	"MSET": 2,
+	"MSET":   2,
+	"MGET":   1,
+	"EXISTS": 1,
+	"DEL":    1,
 }
 
 func getBatchStep(cmd string) int {
 	if bstep, ok := defaultBatchSteps[cmd]; ok {
 		return bstep
 	}
-	return 1
+	return defaultBatchStep
 }
 
 // MergeType is used to decript the merge operation.
@@ -162,10 +178,12 @@ type MergeType = uint8
 const (
 	MergeTypeCount MergeType = iota
 	MergeTypeOk
+	MergeTypeJoin
 	MergeTypeBasic
 )
 
 var defaultMergeTypeMap = map[string]MergeType{
+	"MGET":   MergeTypeJoin,
 	"MSET":   MergeTypeOk,
 	"EXISTS": MergeTypeCount,
 	"DEL":    MergeTypeCount,
@@ -178,8 +196,14 @@ func getMergeType(cmd string) MergeType {
 	return MergeTypeBasic
 }
 
-// Command type
-// MSET split with command change command as SET
-// EXISTS will return an interger of exists
-// DELETE will return delete count
-// CLUSTER NODES will return an mock response of cluster
+var defaultBatchCmdMap = map[string]string{
+	"MSET": "SET",
+	"MGET": "GET",
+}
+
+func getBatchCmd(cmd string) string {
+	if m, ok := defaultBatchCmdMap[cmd]; ok {
+		return m
+	}
+	return cmd
+}
