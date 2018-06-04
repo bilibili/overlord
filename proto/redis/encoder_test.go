@@ -118,7 +118,7 @@ func TestEncodeCacheTypeMissMatch(t *testing.T) {
 
 func TestEncodeResponseOk(t *testing.T) {
 	response := &proto.Response{Type: proto.CacheTypeRedis}
-	proto := newRResponse(MergeTypeBasic)
+	proto := newRResponse(MergeTypeBasic, nil)
 	proto.respObj = newRespArray([]*resp{
 		newRespPlain(respString, []byte("get")),
 		newRespBulk([]byte("my")),

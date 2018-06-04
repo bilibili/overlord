@@ -2,10 +2,8 @@ package redis
 
 import (
 	"errors"
-
-	"strings"
-
 	"strconv"
+	"strings"
 
 	"github.com/felixhao/overlord/proto"
 )
@@ -52,13 +50,6 @@ func newRespPlain(rtype respType, data []byte) *resp {
 	return &resp{
 		rtype: rtype,
 		data:  data,
-		array: nil,
-	}
-}
-
-func newRespEmpty() *resp {
-	return &resp{
-		data:  nil,
 		array: nil,
 	}
 }
@@ -239,7 +230,7 @@ func (rr *RRequest) batchByStep(step int) ([]proto.Request, *proto.Response) {
 	response := &proto.Response{
 		Type: proto.CacheTypeRedis,
 	}
-	response.WithProto(newRResponse(mergeType))
+	response.WithProto(newRResponse(mergeType, nil))
 	return resps, response
 }
 
@@ -250,9 +241,10 @@ type RResponse struct {
 	mergeType MergeType
 }
 
-func newRResponse(mtype MergeType) *RResponse {
+func newRResponse(mtype MergeType, robj *resp) *RResponse {
 	return &RResponse{
 		mergeType: mtype,
+		respObj:   robj,
 	}
 }
 
@@ -261,7 +253,7 @@ func (rr *RResponse) Merge(subs []proto.Request) {
 	switch rr.mergeType {
 	case MergeTypeBasic:
 		srr, ok := subs[0].Resp.Proto().(*RResponse)
-		if ok {
+		if !ok {
 			// TOOD(wayslog): log it
 			return
 		}
@@ -299,23 +291,25 @@ func (rr *RResponse) mergeCount(subs []proto.Request) {
 			// TODO(wayslog): log it
 			continue
 		}
-		count++
+		ssr, ok := sub.Resp.Proto().(*RResponse)
+		if !ok {
+			continue
+		}
+		ival, err := strconv.Atoi(string(ssr.respObj.data))
+		if err != nil {
+			continue
+		}
+		count += ival
 	}
 	rr.respObj = newRespInt(count)
 }
 
 func (rr *RResponse) mergeOk(subs []proto.Request) {
 	for _, sub := range subs {
-		if err := sub.Resp.Err(); err == nil {
-			continue
+		if err := sub.Resp.Err(); err != nil {
+			// TODO(wayslog): set as bad response
+			return
 		}
-		ssr, ok := sub.Resp.Proto().(*RResponse)
-		if !ok {
-			continue
-		}
-		rr.respObj = ssr.respObj
-		return
 	}
-
 	rr.respObj = newRespString("OK")
 }
