@@ -22,6 +22,6 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
-  - cd proxy
   - go test ./proto/redis
+  - cd proxy
   - go test -run=TestProxy
