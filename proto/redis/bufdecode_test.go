@@ -1,27 +1,26 @@
 package redis
 
 import (
-	"bufio"
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func _buildDecoder(data []byte) *decoder {
+func _buildBuffer(data []byte) *buffer {
 	buf := bytes.NewBuffer(data)
-	return &decoder{br: bufio.NewReader(buf)}
+	return newBuffer(buf, nil)
 }
 
 func TestDecodeErrByRespNotSupportRESPType(t *testing.T) {
-	de := _buildDecoder([]byte("@bcdefg\r\n"))
+	de := _buildBuffer([]byte("@bcdefg\r\n"))
 	_, err := de.decodeRespObj()
 	assert.Error(t, err)
 	assert.Equal(t, ErrNotSupportRESPType, err)
 }
 
 func TestDecodeRespPlainStringOk(t *testing.T) {
-	de := _buildDecoder([]byte("+bug\r\n"))
+	de := _buildBuffer([]byte("+bug\r\n"))
 	robj, err := de.decodeRespPlain()
 	assert.NoError(t, err)
 	assert.Equal(t, respString, robj.rtype)
@@ -29,7 +28,7 @@ func TestDecodeRespPlainStringOk(t *testing.T) {
 }
 
 func TestDecodeRespPlainErrorOk(t *testing.T) {
-	de := _buildDecoder([]byte("-error by the boy next door\r\n"))
+	de := _buildBuffer([]byte("-error by the boy next door\r\n"))
 	robj, err := de.decodeRespPlain()
 	assert.NoError(t, err)
 	assert.Equal(t, respError, robj.rtype)
@@ -37,7 +36,7 @@ func TestDecodeRespPlainErrorOk(t *testing.T) {
 }
 
 func TestDecodeRespPlainIntPositiveOk(t *testing.T) {
-	de := _buildDecoder([]byte(":1024\r\n"))
+	de := _buildBuffer([]byte(":1024\r\n"))
 	robj, err := de.decodeRespPlain()
 	assert.NoError(t, err)
 	assert.Equal(t, respInt, robj.rtype)
@@ -45,7 +44,7 @@ func TestDecodeRespPlainIntPositiveOk(t *testing.T) {
 }
 
 func TestDecodeRespPlainIntNegativeOk(t *testing.T) {
-	de := _buildDecoder([]byte(":-10\r\n"))
+	de := _buildBuffer([]byte(":-10\r\n"))
 	robj, err := de.decodeRespPlain()
 	assert.NoError(t, err)
 	assert.Equal(t, respInt, robj.rtype)
@@ -53,14 +52,14 @@ func TestDecodeRespPlainIntNegativeOk(t *testing.T) {
 }
 
 func TestDecodeRespBulkNullOk(t *testing.T) {
-	de := _buildDecoder([]byte("$-1\r\n"))
+	de := _buildBuffer([]byte("$-1\r\n"))
 	robj, err := de.decodeRespBulk()
 	assert.NoError(t, err)
 	assert.Equal(t, respBulk, robj.rtype)
 	assert.Equal(t, []byte(nil), robj.data)
 	assert.True(t, robj.isNull())
 
-	de = _buildDecoder([]byte("$-1\r\n$-1\r\n"))
+	de = _buildBuffer([]byte("$-1\r\n$-1\r\n"))
 	_, err = de.decodeRespBulk()
 	assert.NoError(t, err)
 
@@ -72,7 +71,7 @@ func TestDecodeRespBulkNullOk(t *testing.T) {
 }
 
 func TestDecodeRespBulkOk(t *testing.T) {
-	de := _buildDecoder([]byte("$10\r\nhelloworld\r\n"))
+	de := _buildBuffer([]byte("$10\r\nhelloworld\r\n"))
 	robj, err := de.decodeRespBulk()
 	assert.NoError(t, err)
 	assert.Equal(t, respBulk, robj.rtype)
@@ -81,7 +80,7 @@ func TestDecodeRespBulkOk(t *testing.T) {
 }
 
 func TestDecodeRespBulkEmptyOk(t *testing.T) {
-	de := _buildDecoder([]byte("$0\r\n\r\n"))
+	de := _buildBuffer([]byte("$0\r\n\r\n"))
 	robj, err := de.decodeRespBulk()
 	assert.NoError(t, err)
 	assert.Equal(t, respBulk, robj.rtype)
@@ -90,7 +89,7 @@ func TestDecodeRespBulkEmptyOk(t *testing.T) {
 }
 
 func TestDecodeRespArrayNullOk(t *testing.T) {
-	de := _buildDecoder([]byte("*-1\r\n"))
+	de := _buildBuffer([]byte("*-1\r\n"))
 	robj, err := de.decodeRespArray()
 	assert.NoError(t, err)
 	assert.Equal(t, respArray, robj.rtype)
@@ -100,7 +99,7 @@ func TestDecodeRespArrayNullOk(t *testing.T) {
 }
 
 func TestDecodeRespArrayEmptyOk(t *testing.T) {
-	de := _buildDecoder([]byte("*0\r\n"))
+	de := _buildBuffer([]byte("*0\r\n"))
 	robj, err := de.decodeRespArray()
 	assert.NoError(t, err)
 	assert.Equal(t, respArray, robj.rtype)
@@ -109,7 +108,7 @@ func TestDecodeRespArrayEmptyOk(t *testing.T) {
 }
 
 func TestDecodeRespArrayOk(t *testing.T) {
-	de := _buildDecoder([]byte("*3\r\n+get\r\n$2\r\nmy\r\n:1024\r\n"))
+	de := _buildBuffer([]byte("*3\r\n+get\r\n$2\r\nmy\r\n:1024\r\n"))
 	robj, err := de.decodeRespArray()
 	assert.NoError(t, err)
 	assert.Equal(t, respArray, robj.rtype)

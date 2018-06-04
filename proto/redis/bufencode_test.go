@@ -4,19 +4,17 @@ import (
 	"bytes"
 	"testing"
 
-	"bufio"
-
 	"io"
 
-	"github.com/felixhao/overlord/proto"
 	"github.com/stretchr/testify/assert"
 )
 
-func _buildEncoder() (*bytes.Buffer, *encoder) {
+func _buildBufMut() (*bytes.Buffer, *buffer) {
 	var buf = new(bytes.Buffer)
 	var cpy = new(bytes.Buffer)
 	writer := io.MultiWriter(buf, cpy)
-	return cpy, &encoder{bw: bufio.NewWriter(writer)}
+
+	return cpy, newBuffer(nil, writer)
 }
 
 func _readAll(t *testing.T, buf *bytes.Buffer) []byte {
@@ -27,7 +25,7 @@ func _readAll(t *testing.T, buf *bytes.Buffer) []byte {
 }
 
 func TestEncodeRespPlainOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespPlain(respString, []byte("Bilibili 干杯 - ( ゜- ゜)つロ"))
 	err := en.encodeRespPlain(resp)
 	assert.NoError(t, err, "fail to encode RespPlain")
@@ -38,7 +36,7 @@ func TestEncodeRespPlainOk(t *testing.T) {
 }
 
 func TestEncodeRespBulkNullOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespPlain(respBulk, nil)
 	err := en.encodeRespBulk(resp)
 	assert.NoError(t, err, "fail to encode RespPlain")
@@ -49,7 +47,7 @@ func TestEncodeRespBulkNullOk(t *testing.T) {
 }
 
 func TestEncodeRespBulkNotNullOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespPlain(respBulk, []byte("Bilibili 干杯 - ( ゜- ゜)つロ"))
 	err := en.encodeRespBulk(resp)
 	assert.NoError(t, err, "fail to encode resp bulk")
@@ -60,7 +58,7 @@ func TestEncodeRespBulkNotNullOk(t *testing.T) {
 }
 
 func TestEncodeRespBulkEmptyOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespPlain(respBulk, []byte(""))
 	err := en.encodeRespBulk(resp)
 	assert.NoError(t, err, "fail to encode resp bulk")
@@ -71,7 +69,7 @@ func TestEncodeRespBulkEmptyOk(t *testing.T) {
 }
 
 func TestEncodeRespArrayNullOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespPlain(respArray, nil)
 	err := en.encodeRespArray(resp)
 	assert.NoError(t, err, "fail to encode resp bulk")
@@ -82,7 +80,7 @@ func TestEncodeRespArrayNullOk(t *testing.T) {
 }
 
 func TestEncodeRespArrayOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespArray([]*resp{
 		newRespPlain(respString, []byte("get")),
 		newRespBulk([]byte("my")),
@@ -97,7 +95,7 @@ func TestEncodeRespArrayOk(t *testing.T) {
 }
 
 func TestEncodeRespArrayEmptyOk(t *testing.T) {
-	cpy, en := _buildEncoder()
+	cpy, en := _buildBufMut()
 	resp := newRespArray([]*resp{})
 
 	err := en.encodeRespArray(resp)
@@ -106,29 +104,4 @@ func TestEncodeRespArrayEmptyOk(t *testing.T) {
 
 	buf := _readAll(t, cpy)
 	assert.Equal(t, "*0\r\n", string(buf))
-}
-
-func TestEncodeCacheTypeMissMatch(t *testing.T) {
-	response := &proto.Response{Type: proto.CacheTypeMemcache}
-	_, en := _buildEncoder()
-	err := en.Encode(response)
-	assert.Error(t, err)
-	assert.Equal(t, ErrMissMatchResponseType, err)
-}
-
-func TestEncodeResponseOk(t *testing.T) {
-	response := &proto.Response{Type: proto.CacheTypeRedis}
-	proto := newRResponse(MergeTypeBasic, nil)
-	proto.respObj = newRespArray([]*resp{
-		newRespPlain(respString, []byte("get")),
-		newRespBulk([]byte("my")),
-		newRespInt(1024),
-	})
-	response.WithProto(proto)
-	cpy, en := _buildEncoder()
-	err := en.Encode(response)
-	assert.NoError(t, err)
-
-	buf := _readAll(t, cpy)
-	assert.Equal(t, "*3\r\n+get\r\n$2\r\nmy\r\n:1024\r\n", string(buf))
 }
