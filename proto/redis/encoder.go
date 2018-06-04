@@ -29,7 +29,11 @@ func (e *encoder) Encode(response *proto.Response) error {
 	if !ok {
 		return ErrMissMatchResponseType
 	}
-	return e.encodeResp(r.respObj)
+	err := e.encodeResp(r.respObj)
+	if err != nil {
+		return err
+	}
+	return e.bw.Flush()
 }
 
 func (e *encoder) encodeResp(respObj *resp) error {

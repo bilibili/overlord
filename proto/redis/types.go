@@ -40,7 +40,7 @@ type resp struct {
 	array []*resp
 }
 
-func newRespBalk(data []byte) *resp {
+func newRespBulk(data []byte) *resp {
 	return &resp{
 		rtype: respBulk,
 		data:  data,
@@ -89,7 +89,7 @@ func newRespArrayWithCapcity(length int) *resp {
 func newRespInt(val int) *resp {
 	s := strconv.Itoa(val)
 	return &resp{
-		rtype: respArray,
+		rtype: respInt,
 		data:  []byte(s),
 		array: nil,
 	}
@@ -148,10 +148,10 @@ type RRequest struct {
 //     NewCommand("MGST", "mykey", "yourkey")
 func NewCommand(cmd string, args ...string) *RRequest {
 	respObj := newRespArrayWithCapcity(len(args) + 1)
-	respObj.replace(0, newRespString(cmd))
+	respObj.replace(0, newRespBulk([]byte(cmd)))
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
-		respObj.replace(i, newRespString(args[i-1]))
+		respObj.replace(i, newRespBulk([]byte(args[i-1])))
 	}
 	return newRRequest(respObj)
 }

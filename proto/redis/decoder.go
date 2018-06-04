@@ -75,7 +75,7 @@ func (d *decoder) decodeRespBulk() (*resp, error) {
 	}
 
 	if count == -1 {
-		return newRespBalk(nil), nil
+		return newRespBulk(nil), nil
 	}
 
 	data, err := d.readExact(count)
@@ -86,7 +86,7 @@ func (d *decoder) decodeRespBulk() (*resp, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newRespBalk(data), nil
+	return newRespBulk(data), nil
 }
 
 func (d *decoder) decodeRespArray() (*resp, error) {
