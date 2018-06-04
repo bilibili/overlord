@@ -23,4 +23,5 @@ script:
     --skip=.git \
     --tests ./...
   - cd proxy
+  - go test ./proto/redis
   - go test -run=TestProxy
