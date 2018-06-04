@@ -12,7 +12,8 @@ type connection struct {
 	readerTimeout time.Duration
 	writerTimeout time.Duration
 
-	hasDeadline bool
+	hasReadDeadline  bool
+	hasWriteDeadline bool
 
 	LastWrite time.Time
 }
@@ -68,12 +69,12 @@ func (c *connection) Read(b []byte) (int, error) {
 		if err := c.sock.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 			return 0, err
 		}
-		c.hasDeadline = true
-	} else if c.hasDeadline {
+		c.hasReadDeadline = true
+	} else if c.hasReadDeadline {
 		if err := c.sock.SetReadDeadline(time.Time{}); err != nil {
 			return 0, err
 		}
-		c.hasDeadline = false
+		c.hasReadDeadline = false
 	}
 	return c.sock.Read(b)
 }
@@ -83,12 +84,12 @@ func (c *connection) Write(b []byte) (int, error) {
 		if err := c.sock.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return 0, err
 		}
-		c.hasDeadline = true
-	} else if c.hasDeadline {
+		c.hasWriteDeadline = true
+	} else if c.hasWriteDeadline {
 		if err := c.sock.SetWriteDeadline(time.Time{}); err != nil {
 			return 0, err
 		}
-		c.hasDeadline = false
+		c.hasWriteDeadline = false
 	}
 	n, err := c.sock.Write(b)
 	if err != nil {
