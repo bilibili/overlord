@@ -70,12 +70,12 @@ func (d *decoder) decodeRespBulk() (*resp, error) {
 	}
 
 	count, err := d.readCountAndDiscardCRLF()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
 	if count == -1 {
-		return newRespBulk(nil), nil
+		return newRespBulk(nil), err
 	}
 
 	data, err := d.readExact(count)
@@ -83,10 +83,7 @@ func (d *decoder) decodeRespBulk() (*resp, error) {
 		return nil, err
 	}
 	err = d.discardCRLF()
-	if err != nil {
-		return nil, err
-	}
-	return newRespBulk(data), nil
+	return newRespBulk(data), err
 }
 
 func (d *decoder) decodeRespArray() (*resp, error) {
@@ -103,22 +100,25 @@ func (d *decoder) decodeRespArray() (*resp, error) {
 		return newRespArray(nil), nil
 	}
 
+	var sub *resp
 	resp := newRespArrayWithCapcity(count)
 	for i := 0; i < count; i++ {
-		sub, err := d.decodeRespObj()
+		sub, err = d.decodeRespObj()
 		if err != nil {
-			return nil, err
+			if i != count-1 || err == io.EOF {
+				return nil, err
+			}
 		}
 		resp.replace(i, sub)
 	}
-	return resp, nil
+	return resp, err
 }
 
 func (d *decoder) readUntilCRLF() ([]byte, error) {
 	var allBytes []byte
 	for {
 		data, err := d.br.ReadBytes(lfByte)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return nil, err
 		}
 		allBytes = append(allBytes, data...)
@@ -146,9 +146,5 @@ func (d *decoder) readCountAndDiscardCRLF() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	ival, err := strconv.Atoi(string(countBytes))
-	if err != nil {
-		return 0, err
-	}
-	return ival, d.discardCRLF()
+	return strconv.Atoi(string(countBytes))
 }

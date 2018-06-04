@@ -203,7 +203,7 @@ func (rr *RRequest) batchOne() ([]proto.Request, *proto.Response) {
 }
 
 func (rr *RRequest) batchByStep(step int) ([]proto.Request, *proto.Response) {
-	// NEEDTEST(wayslog): we assume that the rquest is full.
+	// NEEDTEST(wayslog): we assume that the request is full.
 
 	// trim cmd
 	cmd := rr.Cmd()
