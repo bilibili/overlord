@@ -95,7 +95,7 @@ func newPool(t *testing.T) *pool.Pool {
 	dto := time.Duration(1000) * time.Millisecond
 	rto := time.Duration(1000) * time.Millisecond
 	wto := time.Duration(1000) * time.Millisecond
-	dial := pool.PoolDial(memcache.Dial("", "192.168.99.100:32769", dto, rto, wto))
+	dial := pool.PoolDial(memcache.Dial("", "127.0.0.1:11211", dto, rto, wto))
 	act := pool.PoolActive(2)
 	idle := pool.PoolIdle(1)
 	idleTo := pool.PoolIdleTimeout(time.Duration(10) * time.Second)
