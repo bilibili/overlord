@@ -26,11 +26,11 @@ type respType = byte
 
 // resp type define
 const (
-	respString = '+'
-	respError  = '-'
-	respInt    = ':'
-	respBulk   = '$'
-	respArray  = '*'
+	respString respType = '+'
+	respError  respType = '-'
+	respInt    respType = ':'
+	respBulk   respType = '$'
+	respArray  respType = '*'
 )
 
 // resp is a redis resp protocol item.
@@ -145,7 +145,7 @@ type RRequest struct {
 // NewCommand will create new command by given args
 // example:
 //     NewCommand("GET", "mykey")
-//     NewCommand("MGST", "mykey", "yourkey")
+//     NewCommand("MGET", "mykey", "yourkey")
 func NewCommand(cmd string, args ...string) *RRequest {
 	respObj := newRespArrayWithCapcity(len(args) + 1)
 	respObj.replace(0, newRespBulk([]byte(cmd)))

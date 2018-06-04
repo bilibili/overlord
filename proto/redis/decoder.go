@@ -123,10 +123,10 @@ func (d *decoder) readUntilCRLF() ([]byte, error) {
 		}
 		allBytes = append(allBytes, data...)
 		if bytes.HasSuffix(data, crlfBytes) {
-			// ignore crlf
 			break
 		}
 	}
+	// ignore crlf
 	return allBytes[:len(allBytes)-2], nil
 }
 
