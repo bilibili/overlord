@@ -18,9 +18,9 @@ func NewFnv1a32() *Fnv {
 	return h
 }
 
-func (f *Fnv) fnv1a32(key string) (value uint) {
+func (f *Fnv) fnv1a32(key []byte) (value uint) {
 	hs := f.pool.Get().(hash.Hash32)
-	hs.Write([]byte(key))
+	hs.Write(key)
 	value = uint(hs.Sum32())
 	hs.Reset()
 	f.pool.Put(hs)

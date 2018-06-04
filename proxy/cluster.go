@@ -12,17 +12,13 @@ import (
 
 	"github.com/felixhao/overlord/lib/backoff"
 	"github.com/felixhao/overlord/lib/conv"
-	"github.com/felixhao/overlord/lib/ketama"
+	"github.com/felixhao/overlord/lib/hashkit"
 	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/lib/pool"
 	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
-)
-
-const (
-	hashRingSpots = 255
 )
 
 // cluster errors
@@ -67,7 +63,7 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring      *ketama.HashRing
+	ring      *hashkit.HashRing
 	alias     bool
 	nodePool  map[string]*pool.Pool
 	nodeAlias map[string]string
@@ -90,7 +86,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	if len(cc.HashTag) == 2 {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
-	ring := ketama.NewRing(hashRingSpots)
+	ring := hashkit.Ketama()
 	if alias {
 		ring.Init(ans, ws)
 	} else {

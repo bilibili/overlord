@@ -29,23 +29,21 @@ func (p *tickArray) Sort()              { sort.Sort(p) }
 
 // HashRing ketama hash ring.
 type HashRing struct {
-	spots int
 	ticks atomic.Value
-	hash  func(string) uint
+	hash  func([]byte) uint
 }
 
-// NewRing new a hash ring.
+// Ketama new a hash ring with ketama consistency.
 // Default hash: sha1
-func NewRing(n int) (h *HashRing) {
+func Ketama() (h *HashRing) {
 	h = new(HashRing)
-	h.spots = n
 	h.hash = NewFnv1a32().fnv1a32
 	return
 }
 
 // NewRingWithHash new a hash ring with a hash func.
-func NewRingWithHash(n int, hash func(string) uint) (h *HashRing) {
-	h = NewRing(n)
+func NewRingWithHash(hash func([]byte) uint) (h *HashRing) {
+	h = Ketama()
 	h.hash = hash
 	return
 }
@@ -121,32 +119,32 @@ func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
 // AddNode a new node to the hash ring.
 // n: name of the server
 // s: multiplier for default number of ticks (useful when one cache node has more resources, like RAM, than another)
-// func (h *HashRing) AddNode(node string, spot int) {
-// 	tmpTs := &tickArray{}
-// 	if ts, ok := h.ticks.Load().(*tickArray); ok {
-// 		for i := range ts.nodes {
-// 			if ts.nodes[i].node == node {
-// 				continue
-// 			}
-// 			tmpTs.nodes = append(tmpTs.nodes, ts.nodes[i])
-// 		}
-// 	}
-// 	hash := h.hash()
-// 	for i := 1; i <= h.spots*spot; i++ {
-// 		hash.Write([]byte(node + ":" + strconv.Itoa(i)))
-// 		hashBytes := hash.Sum(nil)
-// 		n := &nodeHash{
-// 			node: node,
-// 			hash: uint(hashBytes[19]) | uint(hashBytes[18])<<8 | uint(hashBytes[17])<<16 | uint(hashBytes[16])<<24,
-// 		}
-// 		tmpTs.nodes = append(tmpTs.nodes, *n)
-// 		hash.Reset()
-// 	}
-// 	h.pool.Put(hash)
-// 	tmpTs.length = len(tmpTs.nodes)
-// 	tmpTs.Sort()
-// 	h.ticks.Store(tmpTs)
-// }
+func (h *HashRing) AddNode(node string, spot int) {
+	// tmpTs := &tickArray{}
+	// if ts, ok := h.ticks.Load().(*tickArray); ok {
+	// 	for i := range ts.nodes {
+	// 		if ts.nodes[i].node == node {
+	// 			continue
+	// 		}
+	// 		tmpTs.nodes = append(tmpTs.nodes, ts.nodes[i])
+	// 	}
+	// }
+	// hash := h.hash()
+	// for i := 1; i <= h.spots*spot; i++ {
+	// 	hash.Write([]byte(node + ":" + strconv.Itoa(i)))
+	// 	hashBytes := hash.Sum(nil)
+	// 	n := &nodeHash{
+	// 		node: node,
+	// 		hash: uint(hashBytes[19]) | uint(hashBytes[18])<<8 | uint(hashBytes[17])<<16 | uint(hashBytes[16])<<24,
+	// 	}
+	// 	tmpTs.nodes = append(tmpTs.nodes, *n)
+	// 	hash.Reset()
+	// }
+	// h.pool.Put(hash)
+	// tmpTs.length = len(tmpTs.nodes)
+	// tmpTs.Sort()
+	// h.ticks.Store(tmpTs)
+}
 
 // DelNode delete a node from the hash ring.
 // n: name of the server
@@ -169,7 +167,7 @@ func (h *HashRing) DelNode(n string) {
 }
 
 // Hash returns result node.
-func (h *HashRing) Hash(key string) (string, bool) {
+func (h *HashRing) Hash(key []byte) (string, bool) {
 	ts, ok := h.ticks.Load().(*tickArray)
 	if !ok || ts.length == 0 {
 		return "", false

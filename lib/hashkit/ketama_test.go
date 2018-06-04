@@ -1,6 +1,7 @@
 package hashkit_test
 
 import (
+	"bytes"
 	"strconv"
 	"testing"
 
@@ -8,7 +9,7 @@ import (
 )
 
 var (
-	ring  = hashkit.NewRing(255)
+	ring  = hashkit.Ketama()
 	nodes = []string{
 		"test1.server.com",
 		"test2.server.com",
@@ -56,13 +57,17 @@ func testHash(t *testing.T) {
 	m := make(map[string]int)
 	for i := 0; i < 1e6; i++ {
 		s := "test value" + strconv.FormatUint(uint64(i), 10)
-		n, ok := ring.Hash(s)
+		bs := []byte(s)
+		n, ok := ring.Hash(bs)
 		if !ok {
 			if !delAll {
 				t.Error("unexpected not ok???")
 			}
 		}
 		m[n]++
+		if !bytes.Equal([]byte(s), bs) {
+			t.Error("hash change the bytes")
+		}
 	}
 	for _, node := range nodes {
 		t.Log(node, m[node])
