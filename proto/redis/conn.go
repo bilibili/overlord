@@ -43,6 +43,28 @@ func (c *connection) Close() error {
 	return c.sock.Close()
 }
 
+// SetDeadline sets the read and write deadlines associated
+// sockets.
+func (c *connection) SetDeadline(t time.Time) error {
+	return c.sock.SetDeadline(t)
+}
+
+// SetReadDeadline sets the deadline for future Read calls
+// and any currently-blocked Read call.
+// A zero value for t means Read will not time out.
+func (c *connection) SetReadDeadline(t time.Time) error {
+	return c.sock.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets the deadline for future Write calls
+// and any currently-blocked Write call.
+// Even if write times out, it may return n > 0, indicating that
+// some of the data was successfully written.
+// A zero value for t means Write will not time out.
+func (c *connection) SetWriteDeadline(t time.Time) error {
+	return c.sock.SetWriteDeadline(t)
+}
+
 func (c *connection) CloseReader() error {
 	if t, ok := c.sock.(*net.TCPConn); ok {
 		return t.CloseRead()
@@ -50,28 +72,14 @@ func (c *connection) CloseReader() error {
 	return c.Close()
 }
 
-func (c *connection) SetKeepAlivePeriod(d time.Duration) error {
-	if t, ok := c.sock.(*net.TCPConn); ok {
-		if err := t.SetKeepAlive(d != 0); err != nil {
-			return err
-		}
-		if d != 0 {
-			if err := t.SetKeepAlivePeriod(d); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func (c *connection) Read(b []byte) (int, error) {
 	if timeout := c.readerTimeout; timeout != 0 {
-		if err := c.sock.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		if err := c.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 			return 0, err
 		}
 		c.hasReadDeadline = true
 	} else if c.hasReadDeadline {
-		if err := c.sock.SetReadDeadline(time.Time{}); err != nil {
+		if err := c.SetReadDeadline(time.Time{}); err != nil {
 			return 0, err
 		}
 		c.hasReadDeadline = false
@@ -81,12 +89,12 @@ func (c *connection) Read(b []byte) (int, error) {
 
 func (c *connection) Write(b []byte) (int, error) {
 	if timeout := c.writerTimeout; timeout != 0 {
-		if err := c.sock.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+		if err := c.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return 0, err
 		}
 		c.hasWriteDeadline = true
 	} else if c.hasWriteDeadline {
-		if err := c.sock.SetWriteDeadline(time.Time{}); err != nil {
+		if err := c.SetWriteDeadline(time.Time{}); err != nil {
 			return 0, err
 		}
 		c.hasWriteDeadline = false

@@ -120,7 +120,7 @@ func (r *Request) IsBatch() bool {
 	return r.proto.IsBatch()
 }
 
-// Batch return sub requests if is batch.
+// Batch returns sub requests if is batch.
 func (r *Request) Batch() ([]Request, *Response) {
 	subs, resp := r.proto.Batch()
 	subl := len(subs)
