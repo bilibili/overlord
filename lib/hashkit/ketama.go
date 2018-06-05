@@ -41,7 +41,7 @@ type HashRing struct {
 // Default hash: sha1
 func Ketama() (h *HashRing) {
 	h = new(HashRing)
-	h.hash = NewFnv1a32().fnv1a32
+	h.hash = NewFnv1a64().fnv1a64
 	return
 }
 
@@ -159,6 +159,7 @@ func (h *HashRing) Hash(key []byte) (string, bool) {
 		return "", false
 	}
 	value := h.hash(key)
+
 	i := sort.Search(ts.length, func(i int) bool { return ts.nodes[i].hash >= value })
 	if i == ts.length {
 		i = 0
