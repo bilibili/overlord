@@ -7,7 +7,7 @@ import (
 
 // defaultConfig uses values specified for backoff in common.
 var defaultConfig = Config{
-	MaxDelay:  120 * time.Second,
+	MaxDelay:  20 * time.Second,
 	BaseDelay: 1 * time.Second,
 	Factor:    1.6,
 	Jitter:    0.2,

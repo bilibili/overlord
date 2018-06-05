@@ -117,7 +117,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeCh = cm
 	// auto eject
 	if cc.PingAutoEject {
-		go c.keepAlive()
+		c.keepAlive()
 	}
 	return
 }
@@ -255,6 +255,7 @@ func (c *Cluster) keepAlive() {
 				p.failure = 0
 				if del {
 					c.ring.AddNode(p.node, p.weight)
+					del = false
 				}
 			}
 			if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
@@ -272,7 +273,7 @@ func (c *Cluster) keepAlive() {
 	}
 	// keepalive
 	for _, p := range c.nodePing {
-		period(p)
+		go period(p)
 	}
 }
 

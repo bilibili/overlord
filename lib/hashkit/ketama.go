@@ -117,7 +117,7 @@ func (h *HashRing) AddNode(node string, spot int) {
 		if nd == node {
 			exitst = true
 			tmpSpot = append(tmpSpot, spot)
-			log.Info("add exist node ,update spot from %d to %d", h.spots[i], spot)
+			log.Infof("add exist node %s update spot from %d to %d", nd, h.spots[i], spot)
 		} else {
 			tmpSpot = append(tmpSpot, h.spots[i])
 		}
@@ -125,6 +125,7 @@ func (h *HashRing) AddNode(node string, spot int) {
 	if !exitst {
 		tmpNode = append(tmpNode, node)
 		tmpSpot = append(tmpSpot, spot)
+		log.Infof("add node %s spot %d", node, spot)
 	}
 	h.Init(tmpNode, tmpSpot)
 }
