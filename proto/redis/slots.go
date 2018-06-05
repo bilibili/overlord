@@ -43,7 +43,7 @@ func parseSlots(data []byte) (NodeSlots, error) {
 	br := bufio.NewReader(bytes.NewBuffer(data))
 	lines := []string{}
 	for {
-		// NOTICE: we assesume that each line is not longer
+		// NOTICE: we assume that each line is not longer
 		// than 65535.
 		token, _, err := br.ReadLine()
 		if err != nil && err != io.EOF {
