@@ -5,6 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"bytes"
+
+	"github.com/felixhao/overlord/lib/crc"
 	"github.com/felixhao/overlord/proto"
 )
 
@@ -18,6 +21,12 @@ var (
 	ErrProxyFail         = errors.New("fail to send proxy")
 	ErrRequestBadFormat  = errors.New("redis must be a RESP array")
 	ErrRedirectBadFormat = errors.New("bad format of MOVED or ASK")
+)
+
+// const values
+const (
+	SlotCount  = 16384
+	SlotShiled = 0x3fff
 )
 
 // respType is the type of redis resp
@@ -156,6 +165,23 @@ func newRRequest(obj *resp) *RRequest {
 	return r
 }
 
+// Slot will caculate the redis crc and return the slot value
+func (rr *RRequest) Slot() int {
+	keyData := rr.respObj.nth(1).data
+
+	// support HashTag
+	idx := bytes.IndexByte(keyData, '{')
+	if idx != -1 {
+		eidx := bytes.IndexByte(keyData, '}')
+		if eidx > idx {
+			// matched
+			keyData = keyData[idx+1 : eidx]
+		}
+	}
+	crcVal := crc.Crc16(string(keyData))
+	return int(crcVal) & SlotShiled
+}
+
 // Cmd get the cmd
 func (rr *RRequest) Cmd() string {
 	return strings.ToUpper(rr.respObj.nth(0).String())
@@ -290,13 +316,19 @@ func (rr *RResponse) mergeJoin(subs []proto.Request) {
 // second is the slot of redirect
 // third is the redirect addr
 // last is the error when parse the redirect body
-func (rr *RResponse) RedirectTriple() (string, int, string, error) {
+func (rr *RResponse) RedirectTriple() (redirect string, slot int, addr string, err error) {
 	fields := strings.Fields(string(rr.respObj.data))
 	if len(fields) != 3 {
-		return "", 0, "", ErrRedirectBadFormat
+		err = ErrRedirectBadFormat
+		return
 	}
-	slot, err := strconv.Atoi(fields[1])
-	return fields[0], slot, fields[2], err
+	redirect = fields[0]
+	addr = fields[2]
+	ival, parseErr := strconv.Atoi(fields[1])
+
+	slot = ival
+	err = parseErr
+	return
 }
 
 func (rr *RResponse) mergeCount(subs []proto.Request) {
