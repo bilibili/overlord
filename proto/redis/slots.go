@@ -7,8 +7,6 @@ import (
 
 	"strconv"
 
-	"sort"
-
 	"bufio"
 	"bytes"
 
@@ -268,11 +266,12 @@ func (n *node) setSlots(vals ...string) {
 			slots = append(slots, subslots...)
 		}
 	}
+	//sort.IntSlice(slots).Sort()
 	n.slots = slots
 }
 
 func parseSlotField(val string) ([]int, bool) {
-	if val == "-" {
+	if len(val) == 0 || val == "-" {
 		return nil, false
 	}
 	vsp := strings.SplitN(val, "-", 2)
@@ -290,11 +289,15 @@ func parseSlotField(val string) ([]int, bool) {
 		return nil, false
 	}
 
+	if end < begin {
+		return nil, false
+	}
+
 	slots := []int{}
 	for i := begin; i <= end; i++ {
 		slots = append(slots, i)
 	}
-	sort.IntSlice(slots).Sort()
+	//sort.IntSlice(slots).Sort()
 	return slots, true
 }
 
@@ -304,7 +307,7 @@ func (n *node) Addr() string {
 func (n *node) Role() string {
 	return n.role
 }
-func (n *node) SloaveOf() string {
+func (n *node) SlaveOf() string {
 	return n.slaveOf
 }
 
@@ -319,7 +322,7 @@ func (n *node) Slots() []int {
 type Node interface {
 	Addr() string
 	Role() string
-	SloaveOf() string
+	SlaveOf() string
 	Flags() []string
 	Slots() []int
 }
