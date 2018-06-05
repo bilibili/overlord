@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"sync/atomic"
+
+	"github.com/felixhao/overlord/lib/log"
 )
 
 const (
@@ -29,6 +31,8 @@ func (p *tickArray) Sort()              { sort.Sort(p) }
 
 // HashRing ketama hash ring.
 type HashRing struct {
+	nodes []string
+	spots []int
 	ticks atomic.Value
 	hash  func([]byte) uint
 }
@@ -53,6 +57,8 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
+	h.nodes = nodes
+	h.spots = spots
 	var (
 		ticks          []nodeHash
 		svrn           = len(nodes)
@@ -86,25 +92,6 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 	ts := &tickArray{nodes: ticks, length: len(ticks)}
 	ts.Sort()
 	h.ticks.Store(ts)
-	// var ticks []nodeHash
-	// hash := h.hash()
-	// for i := range nodes {
-	// 	tSpots := h.spots * spots[i]
-	// 	for j := 1; j <= tSpots; j++ {
-	// 		hash.Write([]byte(nodes[i] + ":" + strconv.Itoa(j)))
-	// 		hashBytes := hash.Sum(nil)
-	// 		n := &nodeHash{
-	// 			node: nodes[i],
-	// 			hash: uint(hashBytes[19]) | uint(hashBytes[18])<<8 | uint(hashBytes[17])<<16 | uint(hashBytes[16])<<24,
-	// 		}
-	// 		ticks = append(ticks, *n)
-	// 		hash.Reset()
-	// 	}
-	// }
-	// h.pool.Put(hash)
-	// ts := &tickArray{nodes: ticks, length: len(ticks)}
-	// ts.Sort()
-	// h.ticks.Store(ts)
 }
 
 func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
@@ -120,50 +107,49 @@ func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
 // n: name of the server
 // s: multiplier for default number of ticks (useful when one cache node has more resources, like RAM, than another)
 func (h *HashRing) AddNode(node string, spot int) {
-	// tmpTs := &tickArray{}
-	// if ts, ok := h.ticks.Load().(*tickArray); ok {
-	// 	for i := range ts.nodes {
-	// 		if ts.nodes[i].node == node {
-	// 			continue
-	// 		}
-	// 		tmpTs.nodes = append(tmpTs.nodes, ts.nodes[i])
-	// 	}
-	// }
-	// hash := h.hash()
-	// for i := 1; i <= h.spots*spot; i++ {
-	// 	hash.Write([]byte(node + ":" + strconv.Itoa(i)))
-	// 	hashBytes := hash.Sum(nil)
-	// 	n := &nodeHash{
-	// 		node: node,
-	// 		hash: uint(hashBytes[19]) | uint(hashBytes[18])<<8 | uint(hashBytes[17])<<16 | uint(hashBytes[16])<<24,
-	// 	}
-	// 	tmpTs.nodes = append(tmpTs.nodes, *n)
-	// 	hash.Reset()
-	// }
-	// h.pool.Put(hash)
-	// tmpTs.length = len(tmpTs.nodes)
-	// tmpTs.Sort()
-	// h.ticks.Store(tmpTs)
+	var (
+		tmpNode []string
+		tmpSpot []int
+		exitst  bool
+	)
+	for i, nd := range h.nodes {
+		tmpNode = append(tmpNode, nd)
+		if nd == node {
+			exitst = true
+			tmpSpot = append(tmpSpot, spot)
+			log.Info("add exist node ,update spot from %d to %d", h.spots[i], spot)
+		} else {
+			tmpSpot = append(tmpSpot, h.spots[i])
+		}
+	}
+	if !exitst {
+		tmpNode = append(tmpNode, node)
+		tmpSpot = append(tmpSpot, spot)
+	}
+	h.Init(tmpNode, tmpSpot)
 }
 
 // DelNode delete a node from the hash ring.
 // n: name of the server
 // s: multiplier for default number of ticks (useful when one cache node has more resources, like RAM, than another)
 func (h *HashRing) DelNode(n string) {
-	ts, ok := h.ticks.Load().(*tickArray)
-	if !ok {
-		panic("hash ring has not been initialized")
-	}
-	tmpTs := &tickArray{}
-	for i := range ts.nodes {
-		if ts.nodes[i].node == n {
-			continue
+	var (
+		tmpNode []string
+		tmpSpot []int
+		del     bool
+	)
+	for i, nd := range h.nodes {
+		if nd != n {
+			tmpNode = append(tmpNode, nd)
+			tmpSpot = append(tmpSpot, h.spots[i])
+		} else {
+			del = true
+			log.Info("ketama del node ", n)
 		}
-		tmpTs.nodes = append(tmpTs.nodes, ts.nodes[i])
 	}
-	tmpTs.length = len(tmpTs.nodes)
-	tmpTs.Sort()
-	h.ticks.Store(tmpTs)
+	if del {
+		h.Init(tmpNode, tmpSpot)
+	}
 }
 
 // Hash returns result node.

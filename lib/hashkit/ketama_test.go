@@ -28,29 +28,29 @@ func TestGetInfo(t *testing.T) {
 	testHash(t)
 	t.Log("----init test ok:expect 1 1 2 5----\n")
 
-	// ring.AddNode(nodes[3], 1)
-	// testHash(t)
-	// t.Log("----add exist node test ok:expect 1 1 2 1----\n")
+	ring.AddNode(nodes[3], 1)
+	testHash(t)
+	t.Log("----add exist node test ok:expect 1 1 2 1----\n")
 
-	// ring.AddNode(node5, 5)
-	// testHash(t)
-	// t.Log("----add no exist node test ok:expect 1 1 2 1 5----\n")
+	ring.AddNode(node5, 5)
+	testHash(t)
+	t.Log("----add no exist node test ok:expect 1 1 2 1 5----\n")
 
-	// ring.DelNode(nodes[0])
-	// testHash(t)
-	// t.Log("----del exist node test ok:expect 0 1 2 1 5----\n")
+	ring.DelNode(nodes[0])
+	testHash(t)
+	t.Log("----del exist node test ok:expect 0 1 2 1 5----\n")
 
-	// ring.DelNode("wocao")
-	// testHash(t)
-	// t.Log("----del exist node test ok:expect 0 1 2 1 5----\n")
+	ring.DelNode("wocao")
+	testHash(t)
+	t.Log("----del exist node test ok:expect 0 1 2 1 5----\n")
 
-	// for _, node := range nodes {
-	// 	ring.DelNode(node)
-	// }
-	// ring.DelNode(node5)
-	// delAll = true
-	// testHash(t)
-	// t.Log("----del all node test ok:expect 0 0 0 0 0----\n")
+	for _, node := range nodes {
+		ring.DelNode(node)
+	}
+	ring.DelNode(node5)
+	delAll = true
+	testHash(t)
+	t.Log("----del all node test ok:expect 0 0 0 0 0----\n")
 }
 
 func testHash(t *testing.T) {
