@@ -15,8 +15,9 @@ var (
 
 // errors
 var (
-	ErrProxyFail        = errors.New("fail to send proxy")
-	ErrRequestBadFormat = errors.New("redis must be a RESP array")
+	ErrProxyFail         = errors.New("fail to send proxy")
+	ErrRequestBadFormat  = errors.New("redis must be a RESP array")
+	ErrRedirectBadFormat = errors.New("bad format of MOVED or ASK")
 )
 
 // respType is the type of redis resp
@@ -282,6 +283,20 @@ func (rr *RResponse) mergeJoin(subs []proto.Request) {
 		}
 		rr.respObj.replace(idx, srr.respObj)
 	}
+}
+
+// RedirectTriple will check and send back by is
+// first return variable which was called as redirectType maybe return ASK or MOVED
+// second is the slot of redirect
+// third is the redirect addr
+// last is the error when parse the redirect body
+func (rr *RResponse) RedirectTriple() (string, int, string, error) {
+	fields := strings.Fields(string(rr.respObj.data))
+	if len(fields) != 3 {
+		return "", 0, "", ErrRedirectBadFormat
+	}
+	slot, err := strconv.Atoi(fields[1])
+	return fields[0], slot, fields[2], err
 }
 
 func (rr *RResponse) mergeCount(subs []proto.Request) {

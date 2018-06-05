@@ -100,3 +100,25 @@ func TestRResponseMergeOkOk(t *testing.T) {
 	assert.Equal(t, respString, protoResponse.respObj.rtype)
 	assert.Equal(t, "OK", string(protoResponse.respObj.data))
 }
+
+func TestRResponseRedirectTripleOk(t *testing.T) {
+	rr := newRResponse(MergeTypeOk, newRespPlain(respError, []byte("ASK 10 127.0.0.100:1024")))
+	redirect, slot, addr, err := rr.RedirectTriple()
+	assert.NoError(t, err)
+	assert.Equal(t, "ASK", redirect)
+	assert.Equal(t, 10, slot)
+	assert.Equal(t, "127.0.0.100:1024", addr)
+}
+
+func TestRResponseRedirectTripleParseIntError(t *testing.T) {
+	rr := newRResponse(MergeTypeOk, newRespPlain(respError, []byte("ASK @basad 127.0.0.100:1024")))
+	_, _, _, err := rr.RedirectTriple()
+	assert.Error(t, err)
+}
+
+func TestRResponseRedirectTripleRedirectBadFormatError(t *testing.T) {
+	rr := newRResponse(MergeTypeOk, newRespPlain(respError, []byte("ASK 127.0.0.100:1024")))
+	_, _, _, err := rr.RedirectTriple()
+	assert.Error(t, err)
+	assert.Equal(t, ErrRedirectBadFormat, err)
+}
