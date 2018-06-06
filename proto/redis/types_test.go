@@ -8,6 +8,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRRequestSlotOk(t *testing.T) {
+	req := NewCommand("GET", "mykey")
+	slot := req.Slot()
+	assert.Equal(t, 14687, slot)
+}
+
+func TestRRequestSlotHashTagOk(t *testing.T) {
+	req := NewCommand("GET", "my{boy next door}key")
+	slot := req.Slot()
+	assert.Equal(t, 5772, slot)
+}
+
+func TestRRequestSlotHashTagUnClosed(t *testing.T) {
+	req := NewCommand("GET", "my{boy next doorkey")
+	slot := req.Slot()
+	assert.Equal(t, 3866, slot)
+}
+
+func TestRRequestIsBatch(t *testing.T) {
+	req := NewCommand("GET", "mykey")
+	assert.Equal(t, "mykey", string(req.Key()))
+	assert.False(t, req.IsBatch())
+
+	req = NewCommand("MGET", "mykey", "YourKey")
+	assert.True(t, req.IsBatch())
+}
+
 func TestRRequestBatchMGETOk(t *testing.T) {
 	req := NewCommand("MGET", "mykey", "yourkey")
 	reqs, _ := req.Batch()

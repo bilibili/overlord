@@ -59,7 +59,9 @@ func parseSlots(data []byte) (NodeSlots, error) {
 	nodes := make(map[string]Node)
 	slots := make([]string, SlotCount)
 	slaveSlots := make([][]string, SlotCount)
+	masterIDMap := make(map[string]Node)
 
+	// full fill master slots
 	for _, line := range lines {
 		node, err := parseNode(line)
 		if err != nil {
@@ -68,20 +70,29 @@ func parseSlots(data []byte) (NodeSlots, error) {
 
 		nodes[node.Addr()] = node
 		subSlots := node.Slots()
-		if node.Role() == roleMaster {
-			for _, slot := range subSlots {
-				slots[slot] = node.Addr()
-			}
-		} else if node.Role() == roleSlave {
+		if node.Role() != roleMaster {
+			continue
+		}
+		masterIDMap[node.ID] = node
+		for _, slot := range subSlots {
+			slots[slot] = node.Addr()
+		}
+	}
 
-			for _, slot := range subSlots {
+	// full fill slave slots
+	for _, node := range nodes {
+		if node.Role() != roleSlave {
+			continue
+		}
+
+		if mn, ok := masterIDMap[node.SlaveOf()]; ok {
+			for _, slot := range mn.Slots() {
 				if slaveSlots[slot] == nil {
 					slaveSlots[slot] = []string{}
 				}
 				slaveSlots[slot] = append(slaveSlots[slot], node.Addr())
 			}
 		}
-
 	}
 
 	return &nodeSlots{nodes: nodes, slots: slots, slaveSlots: slaveSlots}, nil

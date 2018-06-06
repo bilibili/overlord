@@ -8,7 +8,7 @@ import (
 
 // errors
 var (
-	ErrMissMatchResponseType = errors.New("response type miss match, except: CacheTypeRedis")
+	ErrMissMatchResponseType = errors.New("response type miss match")
 	ErrNotSupportRESPType    = errors.New("-not support RESP type (+ ,- ,: ,$ ,* )")
 )
 
