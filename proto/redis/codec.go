@@ -1,8 +1,24 @@
 package redis
 
 import (
+	"io"
+
 	"github.com/felixhao/overlord/proto"
 )
+
+// NewEncoder will create a new redis encoder
+func NewEncoder(w io.Writer) proto.Encoder {
+	return &encoder{
+		buf: newBuffer(nil, w),
+	}
+}
+
+// NewDecoder will create new redis decoder
+func NewDecoder(r io.Reader) proto.Decoder {
+	return &decoder{
+		buf: newBuffer(r, nil),
+	}
+}
 
 type encoder struct {
 	buf *buffer
