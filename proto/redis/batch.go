@@ -136,16 +136,17 @@ var cmdTypeMap = map[string]CmdType{
 	"PFMERGE":          CmdTypeWrite,
 	"EVAL":             CmdTypeWrite,
 	"EVALSHA":          CmdTypeNotSupport,
-	"AUTH":             CmdTypeNotSupport,
-	"ECHO":             CmdTypeNotSupport,
-	"PING":             CmdTypeNotSupport,
-	"INFO":             CmdTypeNotSupport,
-	"PROXY":            CmdTypeNotSupport,
-	"SLOWLOG":          CmdTypeNotSupport,
-	"QUIT":             CmdTypeNotSupport,
-	"SELECT":           CmdTypeNotSupport,
-	"TIME":             CmdTypeNotSupport,
-	"CONFIG":           CmdTypeNotSupport,
+
+	"PING":    CmdTypeRead,
+	"AUTH":    CmdTypeNotSupport,
+	"ECHO":    CmdTypeNotSupport,
+	"INFO":    CmdTypeNotSupport,
+	"PROXY":   CmdTypeNotSupport,
+	"SLOWLOG": CmdTypeNotSupport,
+	"QUIT":    CmdTypeNotSupport,
+	"SELECT":  CmdTypeNotSupport,
+	"TIME":    CmdTypeNotSupport,
+	"CONFIG":  CmdTypeNotSupport,
 }
 
 func getCmdType(cmd string) CmdType {
