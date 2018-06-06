@@ -149,3 +149,11 @@ func TestRResponseRedirectTripleRedirectBadFormatError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, ErrRedirectBadFormat, err)
 }
+
+func TestRResponseIsRedirectOk(t *testing.T) {
+	assert.True(t, newRResponse(MergeTypeBasic, newRespPlain(respError, []byte("ASK 5 127.0.0.1:1888"))).IsRedirect())
+	assert.True(t, newRResponse(MergeTypeBasic, newRespPlain(respError, []byte("MOVED 5 127.0.0.1:1888"))).IsRedirect())
+	assert.False(t, newRResponse(MergeTypeBasic, newRespPlain(respError, []byte("boy next door"))).IsRedirect())
+	assert.False(t, newRResponse(MergeTypeBasic, newRespPlain(respInt, []byte("ASK 109 127.0.0.1:1888"))).IsRedirect())
+	assert.False(t, newRResponse(MergeTypeBasic, newRespPlain(respInt, []byte("pachuli go"))).IsRedirect())
+}

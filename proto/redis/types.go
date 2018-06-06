@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	crlfBytes = []byte{'\r', '\n'}
-	lfByte    = byte('\n')
+	crlfBytes  = []byte{'\r', '\n'}
+	lfByte     = byte('\n')
+	movedBytes = []byte("MOVED")
+	askBytes   = []byte("ASK")
 )
 
 // errors
@@ -309,6 +311,20 @@ func (rr *RResponse) mergeJoin(subs []proto.Request) {
 		}
 		rr.respObj.replace(idx, srr.respObj)
 	}
+}
+
+// IsRedirect check if response type is Redis Error
+// and payload was prefix with "ASK" && "MOVED"
+func (rr *RResponse) IsRedirect() bool {
+	if rr.respObj.rtype != respError {
+		return false
+	}
+	if rr.respObj.data == nil {
+		return false
+	}
+
+	return bytes.HasPrefix(rr.respObj.data, movedBytes) ||
+		bytes.HasPrefix(rr.respObj.data, askBytes)
 }
 
 // RedirectTriple will check and send back by is
