@@ -105,15 +105,18 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		}
 		nm[node] = newPool(cc, addrs[i])
 		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
-		rc := newChannel(int32(cc.PoolActive))
-		cm[node] = rc
-		go c.process(node, rc)
+
 	}
 	c.ring = ring
 	c.alias = alias
 	c.nodePool = nm
 	c.nodeAlias = am
 	c.nodePing = pm
+	for node := range c.nodePool {
+		rc := newChannel(int32(cc.PoolActive))
+		cm[node] = rc
+		go c.process(node, rc)
+	}
 	c.nodeCh = cm
 	// auto eject
 	if cc.PingAutoEject {
