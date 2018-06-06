@@ -12,6 +12,7 @@ import (
 	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
+	"github.com/felixhao/overlord/proto/redis"
 	"github.com/pkg/errors"
 )
 
@@ -57,7 +58,8 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		h.decoder = memcache.NewDecoder(conn)
 		h.encoder = memcache.NewEncoder(conn)
 	case proto.CacheTypeRedis:
-		// TODO(felix): support redis.
+		h.decoder = redis.NewDecoder(conn)
+		h.encoder = redis.NewEncoder(conn)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}

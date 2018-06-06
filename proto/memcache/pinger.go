@@ -96,7 +96,7 @@ func (p *pinger) Ping() (err error) {
 }
 
 func (p *pinger) Close() error {
-	if atomic.CompareAndSwapInt32(&p.closed, handlerOpening, handlerClosed) {
+	if atomic.CompareAndSwapInt32(&p.closed, pingerOpening, pingerClosed) {
 		if p.conn != nil {
 			return p.conn.Close()
 		}
@@ -105,5 +105,5 @@ func (p *pinger) Close() error {
 }
 
 func (p *pinger) Closed() bool {
-	return atomic.LoadInt32(&p.closed) == handlerClosed
+	return atomic.LoadInt32(&p.closed) == pingerClosed
 }
