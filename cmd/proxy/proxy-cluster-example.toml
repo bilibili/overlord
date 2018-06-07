@@ -36,6 +36,4 @@ ping_auto_eject = true
 # A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
     "127.0.0.1:11211:10",
-     "127.0.0.1:11212:10",
-      "127.0.0.1:11213:10",
 ]

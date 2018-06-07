@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"github.com/felixhao/overlord/lib/log"
@@ -34,6 +35,7 @@ type HashRing struct {
 	nodes []string
 	spots []int
 	ticks atomic.Value
+	lock  sync.Mutex
 	hash  func([]byte) uint
 }
 
@@ -57,8 +59,10 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
+	h.lock.Lock()
 	h.nodes = nodes
 	h.spots = spots
+	h.lock.Unlock()
 	var (
 		ticks          []nodeHash
 		svrn           = len(nodes)
@@ -112,6 +116,7 @@ func (h *HashRing) AddNode(node string, spot int) {
 		tmpSpot []int
 		exitst  bool
 	)
+	h.lock.Lock()
 	for i, nd := range h.nodes {
 		tmpNode = append(tmpNode, nd)
 		if nd == node {
@@ -122,6 +127,7 @@ func (h *HashRing) AddNode(node string, spot int) {
 			tmpSpot = append(tmpSpot, h.spots[i])
 		}
 	}
+	h.lock.Unlock()
 	if !exitst {
 		tmpNode = append(tmpNode, node)
 		tmpSpot = append(tmpSpot, spot)
@@ -139,6 +145,7 @@ func (h *HashRing) DelNode(n string) {
 		tmpSpot []int
 		del     bool
 	)
+	h.lock.Lock()
 	for i, nd := range h.nodes {
 		if nd != n {
 			tmpNode = append(tmpNode, nd)
@@ -148,6 +155,7 @@ func (h *HashRing) DelNode(n string) {
 			log.Info("ketama del node ", n)
 		}
 	}
+	h.lock.Unlock()
 	if del {
 		h.Init(tmpNode, tmpSpot)
 	}
