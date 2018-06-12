@@ -28,7 +28,8 @@ func NewSliceAlloc() *SliceAlloc {
 		},
 	}
 
-	sa.buf = sa.tinyPool.Get().([]byte)
+	b := sa.tinyPool.Get().(*buffer)
+	sa.buf = []byte(*b)
 	return sa
 }
 
