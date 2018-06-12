@@ -21,11 +21,17 @@ const (
 	CacheTypeRedis    CacheType = "redis"
 )
 
+type releaser interface {
+	Release()
+}
+
 type protoRequest interface {
 	Cmd() string
 	Key() []byte
 	IsBatch() bool
 	Batch() ([]Request, *Response)
+
+	releaser
 }
 
 // Request read from client.
@@ -40,6 +46,8 @@ type Request struct {
 }
 
 type errProto struct{}
+
+func (e *errProto) Release() {}
 
 func (e *errProto) Cmd() string {
 	return "ErrCmd"
@@ -147,6 +155,8 @@ func (r *Request) Since() time.Duration {
 }
 
 type protoResponse interface {
+	releaser
+
 	Merge([]Request)
 }
 

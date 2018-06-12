@@ -164,7 +164,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		}
 	}
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}
-	pr := &MCResponse{rTp: mcr.rTp, data: bs}
+	pr := &MCResponse{rTp: mcr.rTp, data: bs, slice: h.br.Slice()}
 	resp.WithProto(pr)
 	return
 }

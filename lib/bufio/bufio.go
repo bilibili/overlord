@@ -17,7 +17,7 @@ type Reader struct {
 	rpos int
 	wpos int
 
-	slice SliceAlloc
+	slice *SliceAlloc
 }
 
 // NewReader returns a new Reader whose buffer has the default size.
@@ -32,7 +32,17 @@ func NewReaderSize(rd io.Reader, size int) *Reader {
 	if size <= 0 {
 		size = defaultBufferSize
 	}
-	return &Reader{rd: rd, buf: make([]byte, size)}
+	return &Reader{rd: rd, buf: make([]byte, size), slice: NewSliceAlloc()}
+}
+
+// Slice returns a SliceAlloc instance
+func (b *Reader) Slice() *SliceAlloc {
+	return b.slice
+}
+
+// Put will release bytes buffer
+func (b *Reader) Put(data []byte) {
+	b.slice.Put(data)
 }
 
 func (b *Reader) fill() error {

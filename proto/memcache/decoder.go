@@ -177,6 +177,8 @@ func storageRequest(r *bufio.Reader, reqType RequestType, bs []byte, noCas bool)
 		rTp:  reqType,
 		key:  key,
 		data: append(bs[ki+1:], ds...), // TODO(felix): reuse buffer
+
+		slice: r.Slice(),
 	})
 	return
 }
@@ -200,6 +202,8 @@ func retrievalRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *pro
 		key:   key,
 		data:  bs[len(bs)-2:],
 		batch: batch,
+
+		slice: r.Slice(),
 	})
 	return
 }
@@ -221,6 +225,8 @@ func deleteRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.
 		rTp:  reqType,
 		key:  key,
 		data: bs[len(bs)-2:],
+
+		slice: r.Slice(),
 	})
 	return
 }
@@ -256,6 +262,8 @@ func incrDecrRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *prot
 		rTp:  reqType,
 		key:  key,
 		data: bs[ki+1:],
+
+		slice: r.Slice(),
 	})
 	return
 }
@@ -296,6 +304,8 @@ func touchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *proto.R
 		rTp:  reqType,
 		key:  key,
 		data: bs[ki+1:],
+
+		slice: r.Slice(),
 	})
 	return
 }
@@ -333,6 +343,8 @@ func getAndTouchRequest(r *bufio.Reader, reqType RequestType, bs []byte) (req *p
 		key:   key,
 		data:  expBs, // NOTE: no contains '\r\n'!!!
 		batch: batch,
+
+		slice: r.Slice(),
 	})
 	return
 }
