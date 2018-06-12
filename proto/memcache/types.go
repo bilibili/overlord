@@ -141,6 +141,14 @@ type MCRequest struct {
 	key   []byte
 	data  []byte
 	batch bool
+
+	slice *bufio.SliceAlloc
+}
+
+// Release impl releaser
+func (r *MCRequest) Release() {
+	r.slice.Put(r.key)
+	r.slice.Put(r.data)
 }
 
 // Cmd get request cmd.
@@ -194,6 +202,13 @@ func (r *MCRequest) String() string {
 type MCResponse struct {
 	rTp  RequestType
 	data []byte
+
+	slice *bufio.SliceAlloc
+}
+
+// Release impl releaser
+func (r *MCResponse) Release() {
+	r.slice.Put(r.data)
 }
 
 // Merge merges subs response into self.
