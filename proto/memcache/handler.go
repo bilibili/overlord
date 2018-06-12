@@ -29,7 +29,6 @@ type handler struct {
 	br      *bufio.Reader
 	bw      *bufio.Writer
 	bss     [][]byte
-	buf     []byte
 
 	readTimeout  time.Duration
 	writeTimeout time.Duration
@@ -50,7 +49,7 @@ func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Dura
 			conn:         conn,
 			bw:           bufio.NewWriterSize(conn, handlerWriteBufferSize),
 			br:           bufio.NewReaderSize(conn, handlerReadBufferSize),
-			bss:          make([][]byte, 2), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n', and not copy 'END\r\n'
+			bss:          make([][]byte, 3), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n'
 			readTimeout:  readTimeout,
 			writeTimeout: writeTimeout,
 		}
@@ -91,11 +90,13 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	if h.readTimeout > 0 {
 		h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
 	}
+	bss := make([][]byte, 2)
 	bs, err := h.br.ReadBytes(delim)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
+	bss[0] = bs
 	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
 		if !bytes.Equal(bs, endBytes) {
 			stat.Hit(h.cluster, h.addr)
@@ -132,15 +133,11 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
 				return
 			}
-			h.bss = h.bss[:2]
-			h.bss[0] = bs
-			h.bss[1] = bs2
-			tl := len(bs) + len(bs2)
+			bss[1] = bs2
 			var bs3 []byte
 			for !bytes.Equal(bs3, endBytes) {
 				if bs3 != nil { // NOTE: here, avoid copy 'END\r\n'
-					h.bss = append(h.bss, bs3)
-					tl += len(bs3)
+					bss = append(bss, bs3)
 				}
 				if h.readTimeout > 0 {
 					h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
@@ -150,21 +147,15 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 					return
 				}
 			}
-			const endBytesLen = 5 // NOTE: endBytes length
-			tmp := h.makeBytes(tl + endBytesLen)
-			off := 0
-			for i := range h.bss {
-				copy(tmp[off:], h.bss[i])
-				off += len(h.bss[i])
-			}
-			copy(tmp[off:], endBytes)
-			bs = tmp
+			bss = append(bss, endBytes)
 		} else {
 			stat.Miss(h.cluster, h.addr)
 		}
 	}
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}
-	pr := &MCResponse{rTp: mcr.rTp, data: bs}
+	pr := &MCResponse{rTp: mcr.rTp}
+	pr.data = new(net.Buffers)
+	*pr.data = bss
 	resp.WithProto(pr)
 	return
 }
@@ -178,19 +169,4 @@ func (h *handler) Close() error {
 
 func (h *handler) Closed() bool {
 	return atomic.LoadInt32(&h.closed) == handlerClosed
-}
-
-func (h *handler) makeBytes(n int) (ss []byte) {
-	switch {
-	case n == 0:
-		return []byte{}
-	case n >= handlerWriteBufferSize:
-		return make([]byte, n)
-	default:
-		if len(h.buf) < n {
-			h.buf = make([]byte, handlerReadBufferSize)
-		}
-		ss, h.buf = h.buf[:n:n], h.buf[n:]
-		return ss
-	}
 }

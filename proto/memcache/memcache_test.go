@@ -20,7 +20,7 @@ var (
 		[]byte("set a_22 0 123456 4\r\nhalo\r\n"),
 		[]byte("set a_33 1 123456 3\r\ncao\r\n"),
 		[]byte("cas a_11 0 0 3 39\r\ncao\r\n"),
-		[]byte("  get   \r\n"),
+		[]byte("  get  a \r\n"),
 		[]byte("get a_11 a_22 a_33\r\n"),
 		[]byte("gets    a_22\r\n"),
 		[]byte("gets a_11 a_22 a_33\r\n"),
@@ -132,7 +132,7 @@ func TestMemcache(t *testing.T) {
 				bs = append(bs, bs2...)
 			}
 		}
-		// t.Logf("cmd:%s, read bytes(%s)", cmd, bs)
+		t.Logf("cmd:%s, read bytes(%s)", cmd, bs)
 	}
 	wg.Wait()
 	t.Log("all commands handle success")

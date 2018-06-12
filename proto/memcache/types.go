@@ -4,6 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"math"
+	"net"
 	"sync"
 
 	"github.com/felixhao/overlord/lib/bufio"
@@ -193,7 +194,7 @@ func (r *MCRequest) String() string {
 // MCResponse is the mc server response type and data.
 type MCResponse struct {
 	rTp  RequestType
-	data []byte
+	data *net.Buffers
 }
 
 // Merge merges subs response into self.
@@ -203,10 +204,8 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 		// TODO(felix): log or ???
 		return
 	}
-	const endBytesLen = 5 // NOTE: endBytes length
 	subl := len(subs)
 	rebs := make([][]byte, subl)
-	reln := 0
 	for i := 0; i < subl; i++ {
 		if err := subs[i].Resp.Err(); err != nil {
 			// TODO(felix): log or ???
@@ -217,27 +216,14 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 			// TODO(felix): log or ???
 			continue
 		}
-		if bytes.Equal(mcr.data, endBytes) {
-			continue
+		for _, ds := range *mcr.data {
+			if len(ds) == 0 || bytes.Equal(ds, endBytes) {
+				continue
+			}
+			rebs = append(rebs, ds)
 		}
-		rebs[i] = mcr.data[:len(mcr.data)-endBytesLen]
-		reln += len(rebs[i])
 	}
-	sa, ok := bufPool.Get().(*bufio.SliceAlloc)
-	if !ok {
-		r.data = make([]byte, reln+endBytesLen) // TODO(felix): optimize
-	} else {
-		r.data = sa.Make(reln + endBytesLen)
-		bufPool.Put(sa)
-	}
-	off := 0
-	for i := 0; i < subl; i++ {
-		bs := rebs[i]
-		if len(bs) == 0 {
-			continue
-		}
-		copy(r.data[off:], bs)
-		off += len(bs)
-	}
-	copy(r.data[off:], endBytes)
+	rebs = append(rebs, endBytes)
+	r.data = new(net.Buffers)
+	*r.data = rebs
 }

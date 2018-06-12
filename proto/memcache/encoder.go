@@ -46,7 +46,7 @@ func (e *encoder) Encode(resp *proto.Response) (err error) {
 		e.bw.WriteString(se)
 		e.bw.Write(crlfBytes)
 	} else {
-		e.bw.Write(mcr.data)
+		mcr.data.WriteTo(e.bw)
 	}
 	if fe := e.bw.Flush(); fe != nil {
 		err = errors.Wrap(fe, "MC Encoder encode response flush bytes")

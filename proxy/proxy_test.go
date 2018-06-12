@@ -98,7 +98,7 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 			continue
 		}
 		if bytes.HasPrefix(bs, []byte("ERROR")) || bytes.HasPrefix(bs, []byte("CLIENT_ERROR")) || bytes.HasPrefix(bs, []byte("SERVER_ERROR")) {
-			t.Errorf("conn error:%s", bs)
+			t.Errorf("conn error:%s %s", bs, cmd)
 			continue
 		}
 		if !bytes.Equal(bs, []byte("END\r\n")) && (bytes.HasPrefix(cmd, []byte("get")) || bytes.HasPrefix(cmd, []byte("gets")) || bytes.HasPrefix(cmd, []byte("gat")) || bytes.HasPrefix(cmd, []byte("gats"))) {
@@ -112,12 +112,15 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 				bs = append(bs, bs2...)
 			}
 		}
-		// t.Logf("read string:%s", bs)
+		//	t.Logf("read string:%s", bs)
+
 	}
 }
 
 func TestProxy(t *testing.T) {
-	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	for i := 0; i < 100; i++ {
+		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	}
 }
 
 func BenchmarkCmdSet(b *testing.B) {
