@@ -8,6 +8,7 @@ import (
 
 	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/lib/conv"
+	"github.com/felixhao/overlord/lib/net2"
 	"github.com/felixhao/overlord/lib/pool"
 	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
@@ -40,28 +41,23 @@ type handler struct {
 	bw      *bufio.Writer
 	bss     [][]byte
 
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-
 	closed int32
 }
 
 // Dial returns pool Dial func.
 func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (dial func() (pool.Conn, error)) {
 	dial = func() (pool.Conn, error) {
-		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
+		conn, err := net2.DialWithTimeout(addr, dialTimeout, readTimeout, writeTimeout)
 		if err != nil {
 			return nil, err
 		}
 		h := &handler{
-			cluster:      cluster,
-			addr:         addr,
-			conn:         conn,
-			bw:           bufio.NewWriterSize(conn, handlerWriteBufferSize),
-			br:           bufio.NewReaderSize(conn, handlerReadBufferSize),
-			bss:          make([][]byte, 3), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n'
-			readTimeout:  readTimeout,
-			writeTimeout: writeTimeout,
+			cluster: cluster,
+			addr:    addr,
+			conn:    conn,
+			bw:      bufio.NewWriterSize(conn, handlerWriteBufferSize),
+			br:      bufio.NewReaderSize(conn, handlerReadBufferSize),
+			bss:     make([][]byte, 3), // NOTE: like: 'VALUE a_11 0 0 3\r\naaa\r\nEND\r\n'
 		}
 		return h, nil
 	}
@@ -79,9 +75,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		err = errors.Wrap(ErrAssertRequest, "MC Handler handle assert MCRequest")
 		return
 	}
-	if h.writeTimeout > 0 {
-		h.conn.SetWriteDeadline(time.Now().Add(h.writeTimeout))
-	}
+
 	h.bw.WriteString(mcr.rTp.String())
 	h.bw.WriteByte(spaceByte)
 	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
@@ -96,9 +90,6 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	if err = h.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Handler handle flush request bytes")
 		return
-	}
-	if h.readTimeout > 0 {
-		h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
 	}
 
 	bss := make([][]byte, 1)
