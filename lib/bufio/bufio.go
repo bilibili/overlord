@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net"
 )
 
 const (
@@ -262,37 +263,6 @@ func (b *Reader) ReReadFull(size int, backoff int) ([]byte, error) {
 	}
 }
 
-// ReadSlice reads until the first occurrence of delim in the input,
-// returning a slice pointing at the bytes in the buffer.
-// The bytes stop being valid at the next read.
-// If ReadSlice encounters an error before finding a delimiter,
-// it returns all the data in the buffer and the error itself (often io.EOF).
-// ReadSlice fails with error ErrBufferFull if the buffer fills without a delim.
-// Because the data returned from ReadSlice will be overwritten
-// by the next I/O operation, most clients should use ReadBytes instead.
-// ReadSlice returns err != nil if and only if line does not end in delim.
-func (b *Reader) ReadSlice(delim byte) ([]byte, error) {
-	if b.err != nil {
-		return nil, b.err
-	}
-	for {
-		var index = bytes.IndexByte(b.buf[b.rpos:b.wpos], delim)
-		if index >= 0 {
-			limit := b.rpos + index + 1
-			slice := b.buf[b.rpos:limit]
-			b.rpos = limit
-			return slice, nil
-		}
-		if b.buffered() == len(b.buf) {
-			b.rpos = b.wpos
-			return b.buf, bufio.ErrBufferFull
-		}
-		if b.fill() != nil {
-			return nil, b.err
-		}
-	}
-}
-
 // ReadFull reads exactly n bytes from r into buf.
 // It returns the number of bytes copied and an error if fewer bytes were read.
 // The error is EOF only if no bytes were read.
@@ -434,4 +404,21 @@ func (b *Writer) WriteString(s string) (nn int, err error) {
 	n := copy(b.buf[b.wpos:], s)
 	b.wpos += n
 	return nn + n, nil
+}
+
+// writeBuffers impl the net.buffersWriter to support writev
+func (b *Writer) writeBuffers(buf *net.Buffers) (int64, error) {
+	return buf.WriteTo(b.wr)
+}
+
+// Buffer will return the slice of real data
+func (b *Writer) Buffer() []byte {
+	return b.buf
+}
+
+// Reset may always be called after Flush to flush
+// datas into connection.
+func (b *Writer) Reset(buf []byte) {
+	b.wpos = 0
+	b.buf = buf
 }
