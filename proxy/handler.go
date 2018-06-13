@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/lib/net2"
 	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
@@ -48,7 +49,7 @@ type Handler struct {
 // NewHandler new a conn handler.
 func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster) (h *Handler) {
 	h = &Handler{c: c}
-	h.conn = conn
+	h.conn = net2.NewConn(conn, time.Duration(h.c.Proxy.ReadTimeout), time.Duration(h.c.Proxy.WriteTimeout))
 	h.cluster = cluster
 	h.ctx, h.cancel = context.WithCancel(ctx)
 	// cache type
@@ -97,9 +98,6 @@ func (h *Handler) handleReader() {
 			}
 			return
 		default:
-		}
-		if h.c.Proxy.ReadTimeout > 0 {
-			h.conn.SetReadDeadline(time.Now().Add(time.Duration(h.c.Proxy.ReadTimeout) * time.Millisecond))
 		}
 		if req, err = h.decoder.Decode(); err != nil {
 			//rerr := errors.Cause(err)
@@ -188,9 +186,6 @@ func (h *Handler) handleWriter() {
 			return
 		}
 		req.Wait()
-		if h.c.Proxy.WriteTimeout > 0 {
-			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
-		}
 		err = h.encoder.Encode(req.Resp)
 		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Microsecond))
 	}

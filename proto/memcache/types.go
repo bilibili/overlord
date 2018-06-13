@@ -93,6 +93,15 @@ const (
 	RequestTypeGats
 )
 
+var (
+	retrievalRequestTypes = map[RequestType]struct{}{
+		RequestTypeGet:  struct{}{},
+		RequestTypeGets: struct{}{},
+		RequestTypeGat:  struct{}{},
+		RequestTypeGats: struct{}{},
+	}
+)
+
 // errors
 var (
 	// ERROR means the client sent a nonexistent command name.
@@ -200,10 +209,11 @@ type MCResponse struct {
 // Merge merges subs response into self.
 // NOTE: This normally means that the Merge func for an get|gets|gat|gats command.
 func (r *MCResponse) Merge(subs []proto.Request) {
-	if r.rTp != RequestTypeGet && r.rTp != RequestTypeGets && r.rTp != RequestTypeGat && r.rTp != RequestTypeGats {
+	if _, ok := retrievalRequestTypes[r.rTp]; !ok {
 		// TODO(felix): log or ???
 		return
 	}
+
 	subl := len(subs)
 	rebs := make([][]byte, subl)
 	for i := 0; i < subl; i++ {
@@ -220,9 +230,7 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 			if len(ds) == 0 || bytes.Equal(ds, endBytes) {
 				continue
 			}
-			if bytes.HasSuffix(ds, endBytes) {
-				ds = ds[:len(ds)-len(endBytes)]
-			}
+			ds = bytes.TrimSuffix(ds, endBytes)
 			rebs = append(rebs, ds)
 		}
 	}

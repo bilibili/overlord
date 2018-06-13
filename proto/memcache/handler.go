@@ -25,12 +25,6 @@ const (
 
 var (
 	errMissRequest = errors.New("missing request")
-	rTpWithData    = map[RequestType]struct{}{
-		RequestTypeGet:  struct{}{},
-		RequestTypeGets: struct{}{},
-		RequestTypeGat:  struct{}{},
-		RequestTypeGats: struct{}{},
-	}
 )
 
 type handler struct {
@@ -101,7 +95,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		return
 	}
 
-	if _, ok := rTpWithData[mcr.rTp]; ok {
+	if _, ok := retrievalRequestTypes[mcr.rTp]; ok {
 		bss[0], err = h.readResponseData(bs)
 		if err == errMissRequest {
 			err = nil
