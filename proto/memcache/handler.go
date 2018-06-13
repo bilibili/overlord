@@ -22,6 +22,16 @@ const (
 	handlerReadBufferSize  = 128 * 1024 // NOTE: read data, so relatively large
 )
 
+var (
+	errMissRequest = errors.New("missing request")
+	rTpWithData    = map[RequestType]struct{}{
+		RequestTypeGet:  struct{}{},
+		RequestTypeGets: struct{}{},
+		RequestTypeGat:  struct{}{},
+		RequestTypeGats: struct{}{},
+	}
+)
+
 type handler struct {
 	cluster string
 	addr    string
@@ -90,73 +100,75 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	if h.readTimeout > 0 {
 		h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
 	}
-	bss := make([][]byte, 2)
-	bs, err := h.br.ReadBytes(delim)
+
+	bss := make([][]byte, 1)
+
+	// TODO: reset bytes buffer to reuse the bytes
+	bs, err := h.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
-	bss[0] = bs
-	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
-		if !bytes.Equal(bs, endBytes) {
-			stat.Hit(h.cluster, h.addr)
-			c := bytes.Count(bs, spaceBytes)
-			if c < 3 {
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
-				return
-			}
-			var (
-				lenBs  []byte
-				length int64
-			)
-			i := bytes.IndexByte(bs, spaceByte) + 1 // VALUE <key> <flags> <bytes> [<cas unique>]\r\n
-			i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
-			i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
-			if c == 3 { // NOTE: if c==3, means get|gat
-				lenBs = bs[i:]
-				l := len(lenBs)
-				if l < 2 {
-					err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
-					return
-				}
-				lenBs = lenBs[:l-2] // NOTE: get|gat contains '\r\n'
-			} else { // NOTE: if c>3, means gets|gats
-				j := i + bytes.IndexByte(bs[i:], spaceByte)
-				lenBs = bs[i:j]
-			}
-			if length, err = conv.Btoi(lenBs); err != nil {
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
-				return
-			}
-			var bs2 []byte
-			if bs2, err = h.br.ReadFull(int(length + 2)); err != nil { // NOTE: +2 read contains '\r\n'
-				err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes read")
-				return
-			}
-			bss[1] = bs2
-			var bs3 []byte
-			for !bytes.Equal(bs3, endBytes) {
-				if bs3 != nil { // NOTE: here, avoid copy 'END\r\n'
-					bss = append(bss, bs3)
-				}
-				if h.readTimeout > 0 {
-					h.conn.SetReadDeadline(time.Now().Add(h.readTimeout))
-				}
-				if bs3, err = h.br.ReadBytes(delim); err != nil {
-					err = errors.Wrap(err, "MC Handler handle reread response bytes")
-					return
-				}
-			}
-			bss = append(bss, endBytes)
-		} else {
-			stat.Miss(h.cluster, h.addr)
+
+	if _, ok := rTpWithData[mcr.rTp]; ok {
+		bss[0], err = h.readResponseData(bs)
+		if err != nil {
+			return
 		}
 	}
+
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}
 	pr := &MCResponse{rTp: mcr.rTp}
 	pr.data = new(net.Buffers)
 	*pr.data = bss
 	resp.WithProto(pr)
+	return
+}
+
+func (h *handler) readResponseData(bs []byte) (data []byte, err error) {
+	if bytes.Equal(bs, endBytes) {
+		stat.Miss(h.cluster, h.addr)
+		err = errMissRequest
+		return
+	}
+
+	stat.Hit(h.cluster, h.addr)
+	c := bytes.Count(bs, spaceBytes)
+	if c < 3 {
+		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
+		return
+	}
+
+	i := bytes.IndexByte(bs, spaceByte) + 1 // VALUE <key> <flags> <bytes> [<cas unique>]\r\n
+	i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
+	i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
+	var high int
+
+	if len(bs[i:]) < 2 { // check if bytes length is null
+		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
+		return
+	}
+
+	if c == 3 {
+		// GET/GAT
+		high = len(bs) - 2
+	} else {
+		// GETS/GATS
+		high = i + bytes.IndexByte(bs[i:], spaceByte)
+	}
+
+	var size int64
+	if size, err = conv.Btoi(bs[i:high]); err != nil {
+		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
+		return
+	}
+	if data, err = h.br.ReReadFull(int(size), len(bs)); err != nil {
+		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes data")
+		return
+	}
+	if data, err = h.br.ReReadUntilBytes(endBytes, len(data)); err != nil {
+		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes end bytes")
+	}
 	return
 }
 
