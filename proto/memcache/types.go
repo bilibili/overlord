@@ -220,6 +220,9 @@ func (r *MCResponse) Merge(subs []proto.Request) {
 			if len(ds) == 0 || bytes.Equal(ds, endBytes) {
 				continue
 			}
+			if bytes.HasSuffix(ds, endBytes) {
+				ds = ds[:len(ds)-len(endBytes)]
+			}
 			rebs = append(rebs, ds)
 		}
 	}

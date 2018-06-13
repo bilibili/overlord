@@ -92,7 +92,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		return
 	}
 
-	bss := make([][]byte, 1)
+	bss := make([][]byte, 2)
 
 	// TODO: reset bytes buffer to reuse the bytes
 	bs, err := h.br.ReadUntil(delim)
@@ -103,9 +103,13 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 
 	if _, ok := rTpWithData[mcr.rTp]; ok {
 		bss[0], err = h.readResponseData(bs)
-		if err != nil {
+		if err == errMissRequest {
+			err = nil
+		} else if err != nil {
 			return
 		}
+	} else {
+		bss[0] = bs
 	}
 
 	resp = &proto.Response{Type: proto.CacheTypeMemcache}

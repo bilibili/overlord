@@ -38,6 +38,7 @@ func (e *encoder) Encode(resp *proto.Response) (err error) {
 			err = errors.Wrap(ErrAssertResponse, "MC Encoder encode assert MCResponse")
 		}
 	}
+
 	if err != nil {
 		se := errors.Cause(err).Error()
 		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol

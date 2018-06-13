@@ -53,6 +53,10 @@ func (b *Reader) grow() {
 }
 
 func (b *Reader) growTo(size int) {
+	if len(b.buf) > size {
+		return
+	}
+
 	except := len(b.buf)
 	for except <= size {
 		except = except * growFactor
@@ -152,13 +156,20 @@ func (b *Reader) ReadUntil(delim byte) ([]byte, error) {
 		return nil, b.err
 	}
 	for {
-		d, err := b.ReadSlice(delim)
-		if err != nil {
-			return d, err
+		var index = bytes.IndexByte(b.buf[b.rpos:b.wpos], delim)
+		if index != -1 {
+			limit := b.rpos + index + 1
+			buf := b.buf[b.rpos:limit]
+			b.rpos = limit
+			return buf, nil
 		}
 
-		if err == bufio.ErrBufferFull {
+		if b.buffered() == len(b.buf) {
 			b.grow()
+		}
+
+		if b.fill() != nil {
+			return b.buf, b.err
 		}
 	}
 }
@@ -174,7 +185,7 @@ func (b *Reader) ReReadUntilBytes(delims []byte, backoff int) ([]byte, error) {
 
 	for {
 		var index = bytes.Index(b.buf[b.rpos+backoff:b.wpos], delims)
-		if index >= 0 {
+		if index != -1 {
 			limit := b.rpos + backoff + index + len(delims)
 			slice := b.buf[b.rpos:limit]
 			b.rpos = limit
@@ -198,7 +209,7 @@ func (b *Reader) ReReadUntilBytes(delims []byte, backoff int) ([]byte, error) {
 // In redis protocol, you might look up `\r\n`, you can call:
 //     buf, _ := b.ReadUntil('\n')
 // But, if buf[len(buf)-2] != '\r'
-// you can use the function as:
+// you can use the function in loop as follows:
 //     buf, _ := b.ReReadUntil('\n', len(buf))
 // until buf[len(buf)-2] == '\r'
 func (b *Reader) ReReadUntil(delim byte, backoff int) ([]byte, error) {
@@ -209,7 +220,7 @@ func (b *Reader) ReReadUntil(delim byte, backoff int) ([]byte, error) {
 	b.rpos -= backoff
 	for {
 		var index = bytes.IndexByte(b.buf[b.rpos+backoff:b.wpos], delim)
-		if index >= 0 {
+		if index != -1 {
 			limit := b.rpos + backoff + index + 1
 			slice := b.buf[b.rpos:limit]
 			b.rpos = limit
