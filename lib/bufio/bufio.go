@@ -416,9 +416,9 @@ func (b *Writer) Buffer() []byte {
 	return b.buf
 }
 
-// Reset may always be called after Flush to flush
+// ResetBuffer may always be called after Flush to flush
 // datas into connection.
-func (b *Writer) Reset(buf []byte) {
+func (b *Writer) ResetBuffer(buf []byte) {
 	b.wpos = 0
 	b.buf = buf
 }

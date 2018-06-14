@@ -86,19 +86,19 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 	}
 	br := bufio.NewReader(conn)
 	for _, cmd := range cmds {
+		t.Logf("\n\nexecute cmd %s", cmd)
 		conn.SetWriteDeadline(time.Now().Add(time.Second))
 		if _, err = conn.Write(cmd); err != nil {
-			t.Errorf("conn write cmd:%s error:%v", cmd, err)
-			continue
+			t.Fatalf("conn write cmd:%s error:%v", cmd, err)
 		}
 		conn.SetReadDeadline(time.Now().Add(time.Second))
 		var bs []byte
-		if bs, err = br.ReadSlice('\n'); err != nil {
-			t.Errorf("conn read cmd:%s error:%v", cmd, err)
+		if bs, err = br.ReadBytes('\n'); err != nil {
+			t.Fatalf("conn read cmd:%s error:%s resp:xxx%sxxx", cmd, err, bs)
 			continue
 		}
 		if bytes.HasPrefix(bs, []byte("ERROR")) || bytes.HasPrefix(bs, []byte("CLIENT_ERROR")) || bytes.HasPrefix(bs, []byte("SERVER_ERROR")) {
-			t.Errorf("conn error:%s %s", bs, cmd)
+			t.Fatalf("conn error:%s %s", bs, cmd)
 			continue
 		}
 		if !bytes.Equal(bs, []byte("END\r\n")) && (bytes.HasPrefix(cmd, []byte("get")) || bytes.HasPrefix(cmd, []byte("gets")) || bytes.HasPrefix(cmd, []byte("gat")) || bytes.HasPrefix(cmd, []byte("gats"))) {
@@ -106,13 +106,13 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 			for !bytes.Equal(bs2, []byte("END\r\n")) {
 				conn.SetReadDeadline(time.Now().Add(time.Second))
 				if bs2, err = br.ReadSlice('\n'); err != nil {
-					t.Errorf("conn read cmd:%s error:%v", cmd, err)
+					t.Fatalf("conn read cmd:%s error:%v", cmd, err)
 					continue
 				}
 				bs = append(bs, bs2...)
 			}
 		}
-		//	t.Logf("read string:%s", bs)
+		t.Logf("read string:%s", bs)
 
 	}
 }

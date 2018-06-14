@@ -78,7 +78,7 @@ func (h *Handler) Handle() {
 
 func (h *Handler) handleReader() {
 	var (
-		req *proto.Msg
+		req = proto.NewMsg()
 		err error
 	)
 	defer func() {
@@ -122,7 +122,6 @@ func (h *Handler) handleReader() {
 			}
 			return
 		}
-		req.Process()
 		if h.reqCh.PushBack(req) == 0 {
 			return
 		}
@@ -131,13 +130,14 @@ func (h *Handler) handleReader() {
 }
 
 func (h *Handler) dispatchMsg(req *proto.Msg) {
-	if req.IsBatch() {
+	if !req.IsBatch() {
+		req.Process()
 		h.cluster.Dispatch(req)
 		return
 	}
+
 	subs := req.Batch()
 	if len(subs) == 0 {
-		req.Done() // FIXME(felix): error or done???
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
 		}
@@ -183,9 +183,8 @@ func (h *Handler) handleWriter() {
 			}
 			return
 		}
-		req.BatchWait()
+		req.Wait()
 		req.Merge()
-		req.Done()
 		if h.c.Proxy.WriteTimeout > 0 {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}

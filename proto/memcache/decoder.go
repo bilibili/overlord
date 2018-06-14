@@ -30,6 +30,7 @@ func NewDecoder(r io.Reader) proto.Decoder {
 
 // Decode decode bytes from reader.
 func (d *decoder) Decode(req *proto.Msg) (err error) {
+	req.Type = proto.CacheTypeMemcache
 	bs, err := d.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
@@ -172,7 +173,6 @@ func storageMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte, noC
 		err = errors.Wrapf(ErrBadLength, "MC Decoder storage Msg data not end with CRLF length(%d)", length)
 		return
 	}
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:  reqType,
 		key:  key,
@@ -194,7 +194,6 @@ func retrievalMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte) (
 		return
 	}
 	batch := bytes.Index(key, spaceBytes) > 0
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:   reqType,
 		key:   key,
@@ -216,7 +215,6 @@ func deleteMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte) (err
 		err = errors.Wrap(ErrBadKey, "MC Decoder delete Msg legal key")
 		return
 	}
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:  reqType,
 		key:  key,
@@ -251,7 +249,6 @@ func incrDecrMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte) (e
 			return
 		}
 	}
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:  reqType,
 		key:  key,
@@ -291,7 +288,6 @@ func touchMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte) (err 
 			return
 		}
 	}
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:  reqType,
 		key:  key,
@@ -327,7 +323,6 @@ func getAndTouchMsg(r *bufio.Reader, req *proto.Msg, reqType MsgType, bs []byte)
 		return
 	}
 	batch := bytes.IndexByte(key, spaceByte) > 0
-	req = &proto.Msg{Type: proto.CacheTypeMemcache}
 	req.WithProto(&MCMsg{
 		rTp:   reqType,
 		key:   key,

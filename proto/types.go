@@ -35,10 +35,16 @@ type Msg struct {
 	Type  CacheType
 	proto protoMsg
 	wg    *sync.WaitGroup
-	bWg   *sync.WaitGroup
 	Resp  net.Buffers
 	st    time.Time
 	err   error
+}
+
+// NewMsg will create new message object
+func NewMsg() *Msg {
+	return &Msg{
+		wg: &sync.WaitGroup{},
+	}
 }
 
 type errProto struct{}
@@ -67,9 +73,6 @@ func ErrMsg() *Msg {
 
 // Process means Msg processing.
 func (r *Msg) Process() {
-	if r.wg == nil {
-		r.wg = &sync.WaitGroup{}
-	}
 	r.wg.Add(1)
 	r.st = time.Now()
 }
@@ -131,25 +134,15 @@ func (r *Msg) Batch() []Msg {
 	if subl == 0 {
 		return nil
 	}
-	r.bWg = &sync.WaitGroup{}
 	for i := 0; i < subl; i++ {
-		subs[i].wg = r.bWg
+		subs[i].wg = r.wg
 	}
 	return subs
-}
-
-// BatchWait blocks until the all sub Msg done.
-func (r *Msg) BatchWait() {
-	if r.bWg != nil {
-		r.bWg.Wait()
-	}
-	r.Wait()
 }
 
 // Merge merge all sub response.
 func (r *Msg) Merge() {
 	r.Resp = net.Buffers(r.proto.Merge())
-	return
 }
 
 // Since returns the time elapsed since t.
