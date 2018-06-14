@@ -4,9 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net"
 )
 
-const defaultBufferSize = 1024
+const (
+	defaultBufferSize = 1024
+	growFactor        = 2
+)
 
 // Reader implements buffering for an io.Reader object.
 type Reader struct {
@@ -16,8 +20,6 @@ type Reader struct {
 	rd   io.Reader
 	rpos int
 	wpos int
-
-	slice SliceAlloc
 }
 
 // NewReader returns a new Reader whose buffer has the default size.
@@ -33,6 +35,40 @@ func NewReaderSize(rd io.Reader, size int) *Reader {
 		size = defaultBufferSize
 	}
 	return &Reader{rd: rd, buf: make([]byte, size)}
+}
+
+// ResetBuffer bytes buffer
+func (b *Reader) ResetBuffer(buf []byte) {
+	b.rpos = 0
+	b.wpos = 0
+	b.buf = buf
+}
+
+// Buffer will return the slice of real data
+func (b *Reader) Buffer() []byte {
+	return b.buf
+}
+
+func (b *Reader) grow() {
+	b.growTo(growFactor * len(b.buf))
+}
+
+func (b *Reader) growTo(size int) {
+	if len(b.buf) > size {
+		return
+	}
+
+	except := len(b.buf)
+	for except <= size {
+		except = except * growFactor
+	}
+
+	// TODO(wayslog): recycle using of global bytes pool
+	buf := make([]byte, except)
+	copy(buf, b.buf[b.rpos:b.wpos])
+	b.buf = buf
+	b.wpos = b.wpos - b.rpos
+	b.rpos = 0
 }
 
 func (b *Reader) fill() error {
@@ -60,10 +96,7 @@ func (b *Reader) buffered() int {
 }
 
 // Read reads data into p.
-// It returns the number of bytes read into p.
-// The bytes are taken from at most one Read on the underlying Reader,
-// hence n may be less than len(p).
-// At EOF, the count will be zero and err will be io.EOF.
+// NOTICE: We don't recomand to use it any more.
 func (b *Reader) Read(p []byte) (int, error) {
 	if b.err != nil || len(p) == 0 {
 		return 0, b.err
@@ -101,69 +134,133 @@ func (b *Reader) ReadByte() (byte, error) {
 	return c, nil
 }
 
-// ReadSlice reads until the first occurrence of delim in the input,
-// returning a slice pointing at the bytes in the buffer.
-// The bytes stop being valid at the next read.
-// If ReadSlice encounters an error before finding a delimiter,
-// it returns all the data in the buffer and the error itself (often io.EOF).
-// ReadSlice fails with error ErrBufferFull if the buffer fills without a delim.
-// Because the data returned from ReadSlice will be overwritten
-// by the next I/O operation, most clients should use ReadBytes instead.
-// ReadSlice returns err != nil if and only if line does not end in delim.
-func (b *Reader) ReadSlice(delim byte) ([]byte, error) {
+// Peek some bytes and don't have any I/O or buffer operation
+// if buffered is not long enough to slice the n bytes,
+// error will be return as bufio.ErrBufferFull
+func (b *Reader) Peek(n int) ([]byte, error) {
+	if b.buffered() < n {
+		return b.buf[b.rpos:b.wpos], bufio.ErrBufferFull
+	}
+	return b.buf[b.rpos : b.rpos+n], nil
+}
+
+// ReadUntil reads until the first delim occur,
+// returning a slice pointing at the bytes in the reader's buffer.
+// if ReadUntil encounters an error before finding a delimiter,
+// it returns all the data in the buffer and the err itself(offten io.EOF).
+// ReadUntil will grow local buffer to read until the buffer is large enough
+// to contains all the bytes from begin until the occurrence of the delim.
+// So that this function will never return ErrBufferFull.
+// Notice, the data will be overwritten by the next I/O operation.
+func (b *Reader) ReadUntil(delim byte) ([]byte, error) {
 	if b.err != nil {
 		return nil, b.err
 	}
 	for {
 		var index = bytes.IndexByte(b.buf[b.rpos:b.wpos], delim)
-		if index >= 0 {
+		if index != -1 {
 			limit := b.rpos + index + 1
+			buf := b.buf[b.rpos:limit]
+			b.rpos = limit
+			return buf, nil
+		}
+
+		if b.buffered() == len(b.buf) {
+			b.grow()
+		}
+
+		if b.fill() != nil {
+			return b.buf, b.err
+		}
+	}
+}
+
+// ReReadUntilBytes must be called after last Read operation, so that we can have enough
+// buffer size to backoff, it will read until the first occurrence
+// of delims.
+func (b *Reader) ReReadUntilBytes(delims []byte, backoff int) ([]byte, error) {
+	if b.err != nil {
+		return nil, b.err
+	}
+	b.rpos -= backoff
+
+	for {
+		var index = bytes.Index(b.buf[b.rpos+backoff:b.wpos], delims)
+		if index != -1 {
+			limit := b.rpos + backoff + index + len(delims)
 			slice := b.buf[b.rpos:limit]
 			b.rpos = limit
 			return slice, nil
 		}
+
 		if b.buffered() == len(b.buf) {
-			b.rpos = b.wpos
-			return b.buf, bufio.ErrBufferFull
+			b.grow()
 		}
+
 		if b.fill() != nil {
 			return nil, b.err
 		}
 	}
 }
 
-// ReadBytes reads until the first occurrence of delim in the input,
-// returning a slice containing the data up to and including the delimiter.
-// If ReadBytes encounters an error before finding a delimiter,
-// it returns the data read before the error and the error itself (often io.EOF).
-// ReadBytes returns err != nil if and only if the returned data does not end in
-// delim.
-// For simple uses, a Scanner may be more convenient.
-func (b *Reader) ReadBytes(delim byte) ([]byte, error) {
-	var full [][]byte
-	var last []byte
-	var size int
-	for last == nil {
-		f, err := b.ReadSlice(delim)
-		if err != nil {
-			if err != bufio.ErrBufferFull {
-				return nil, b.err
-			}
-			dup := b.slice.Make(len(f))
-			copy(dup, f)
-			full = append(full, dup)
-		} else {
-			last = f
+// ReReadUntil must be called after last Read operation, so that we can have enough
+// buffer size to backoff, it will read until the first occurrence
+// of delim but contains backoff size bytes as a prefix
+// of return datas.
+// In redis protocol, you might look up `\r\n`, you can call:
+//     buf, _ := b.ReadUntil('\n')
+// But, if buf[len(buf)-2] != '\r'
+// you can use the function in loop as follows:
+//     buf, _ := b.ReReadUntil('\n', len(buf))
+// until buf[len(buf)-2] == '\r'
+func (b *Reader) ReReadUntil(delim byte, backoff int) ([]byte, error) {
+	if b.err != nil {
+		return nil, b.err
+	}
+
+	b.rpos -= backoff
+	for {
+		var index = bytes.IndexByte(b.buf[b.rpos+backoff:b.wpos], delim)
+		if index != -1 {
+			limit := b.rpos + backoff + index + 1
+			slice := b.buf[b.rpos:limit]
+			b.rpos = limit
+			return slice, nil
 		}
-		size += len(f)
+
+		if b.buffered() == len(b.buf) {
+			b.grow()
+		}
+
+		if b.fill() != nil {
+			return nil, b.err
+		}
 	}
-	var n int
-	var buf = b.slice.Make(size)
-	for _, frag := range full {
-		n += copy(buf[n:], frag)
+}
+
+// ReReadFull must be called after last Read operation, so that we can
+// have enough buffer size to backoff, it will read until the size is fill now.
+func (b *Reader) ReReadFull(size int, backoff int) ([]byte, error) {
+	if b.err != nil {
+		return nil, b.err
 	}
-	copy(buf[n:], last)
-	return buf, nil
+
+	b.rpos -= backoff
+	if len(b.buf) < size+backoff {
+		b.growTo(size + backoff)
+	}
+
+	for {
+		if b.buffered() >= size+backoff {
+			buf := b.buf[b.rpos : b.rpos+size+backoff]
+			b.rpos += size + backoff
+			return buf, nil
+		}
+
+		if b.fill() == nil {
+			return b.buf, b.err
+		}
+	}
 }
 
 // ReadFull reads exactly n bytes from r into buf.
@@ -176,10 +273,24 @@ func (b *Reader) ReadFull(n int) ([]byte, error) {
 	if b.err != nil || n == 0 {
 		return nil, b.err
 	}
-	var buf = b.slice.Make(n)
-	if _, err := io.ReadFull(b, buf); err != nil {
-		return nil, err
+
+	if b.buffered() >= n {
+		pos := b.rpos
+		b.rpos += n
+		return b.buf[pos:b.rpos], nil
 	}
+
+	if n > len(b.buf) {
+		b.growTo(n + len(b.buf))
+	}
+
+	for b.buffered() < n {
+		if b.fill() != nil {
+			return b.buf, b.err
+		}
+	}
+	buf := b.buf[b.rpos:b.wpos]
+	b.rpos += n
 	return buf, nil
 }
 
@@ -293,4 +404,21 @@ func (b *Writer) WriteString(s string) (nn int, err error) {
 	n := copy(b.buf[b.wpos:], s)
 	b.wpos += n
 	return nn + n, nil
+}
+
+// writeBuffers impl the net.buffersWriter to support writev
+func (b *Writer) writeBuffers(buf *net.Buffers) (int64, error) {
+	return buf.WriteTo(b.wr)
+}
+
+// Buffer will return the slice of real data
+func (b *Writer) Buffer() []byte {
+	return b.buf
+}
+
+// Reset may always be called after Flush to flush
+// datas into connection.
+func (b *Writer) Reset(buf []byte) {
+	b.wpos = 0
+	b.buf = buf
 }

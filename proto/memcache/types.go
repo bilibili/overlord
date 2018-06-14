@@ -4,9 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"math"
-	"sync"
 
-	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/proto"
 )
 
@@ -17,23 +15,17 @@ const (
 )
 
 var (
-	spaceBytes     = []byte{' '}
-	zeroBytes      = []byte{'0'}
-	oneBytes       = []byte{'1'}
-	crlfBytes      = []byte("\r\n")
-	endBytes       = []byte("END\r\n")
-	storedBytes    = []byte("STORED\r\n")
-	notStoredBytes = []byte("NOT_STORED\r\n")
-	existsBytes    = []byte("EXISTS\r\n")
-	notFoundBytes  = []byte("NOT_FOUND\r\n")
-	deletedBytes   = []byte("DELETED\r\n")
-	touchedBytes   = []byte("TOUCHED\r\n")
-)
-
-var (
-	bufPool = &sync.Pool{New: func() interface{} {
-		return &bufio.SliceAlloc{}
-	}}
+	spaceBytes = []byte{' '}
+	zeroBytes  = []byte{'0'}
+	oneBytes   = []byte{'1'}
+	crlfBytes  = []byte("\r\n")
+	endBytes   = []byte("END\r\n")
+	// storedBytes    = []byte("STORED\r\n")
+	// notStoredBytes = []byte("NOT_STORED\r\n")
+	// existsBytes    = []byte("EXISTS\r\n")
+	// notFoundBytes  = []byte("NOT_FOUND\r\n")
+	// deletedBytes   = []byte("DELETED\r\n")
+	// touchedBytes   = []byte("TOUCHED\r\n")
 )
 
 // MsgType is the protocol-agnostic identifier for the command
@@ -90,6 +82,15 @@ const (
 	MsgTypeTouch
 	MsgTypeGat
 	MsgTypeGats
+)
+
+var (
+	retrievalRequestTypes = map[MsgType]struct{}{
+		MsgTypeGet:  struct{}{},
+		MsgTypeGets: struct{}{},
+		MsgTypeGat:  struct{}{},
+		MsgTypeGats: struct{}{},
+	}
 )
 
 // errors

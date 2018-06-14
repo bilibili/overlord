@@ -30,7 +30,7 @@ func NewDecoder(r io.Reader) proto.Decoder {
 
 // Decode decode bytes from reader.
 func (d *decoder) Decode(req *proto.Msg) (err error) {
-	bs, err := d.br.ReadBytes(delim)
+	bs, err := d.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrapf(err, "MC decoder while reading text command line from decoder")
 		return
