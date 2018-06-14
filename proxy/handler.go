@@ -130,8 +130,9 @@ func (h *Handler) handleReader() {
 }
 
 func (h *Handler) dispatchMsg(req *proto.Msg) {
+	req.Start()
 	if !req.IsBatch() {
-		req.Process()
+		req.Add()
 		h.cluster.Dispatch(req)
 		return
 	}
@@ -145,7 +146,7 @@ func (h *Handler) dispatchMsg(req *proto.Msg) {
 	}
 	subl := len(subs)
 	for i := 0; i < subl; i++ {
-		subs[i].Process()
+		subs[i].Add()
 		h.cluster.Dispatch(&subs[i])
 	}
 }

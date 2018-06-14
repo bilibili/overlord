@@ -71,9 +71,13 @@ func ErrMsg() *Msg {
 	return &Msg{proto: &errProto{}}
 }
 
-// Process means Msg processing.
-func (r *Msg) Process() {
+// Add add wg.
+func (r *Msg) Add() {
 	r.wg.Add(1)
+}
+
+// Start means Msg start processing.
+func (r *Msg) Start() {
 	r.st = time.Now()
 }
 
