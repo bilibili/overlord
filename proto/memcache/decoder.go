@@ -30,6 +30,7 @@ func NewDecoder(r io.Reader) proto.Decoder {
 
 // Decode decode bytes from reader.
 func (d *decoder) Decode(req *proto.Msg) (err error) {
+	d.br.ResetBuffer(req.Buf())
 	req.Type = proto.CacheTypeMemcache
 	bs, err := d.br.ReadUntil(delim)
 	if err != nil {

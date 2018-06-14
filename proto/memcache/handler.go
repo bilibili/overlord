@@ -89,6 +89,7 @@ func (h *handler) Handle(req *proto.Msg) (err error) {
 	bss := make([][]byte, 2)
 
 	// TODO: reset bytes buffer to reuse the bytes
+	h.br.ResetBuffer(req.Buf())
 	bs, err := h.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")

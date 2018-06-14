@@ -35,6 +35,7 @@ type Msg struct {
 	Type  CacheType
 	proto protoMsg
 	wg    *sync.WaitGroup
+	buf   []byte
 	Resp  net.Buffers
 	st    time.Time
 	err   error
@@ -43,7 +44,8 @@ type Msg struct {
 // NewMsg will create new message object
 func NewMsg() *Msg {
 	return &Msg{
-		wg: &sync.WaitGroup{},
+		wg:  &sync.WaitGroup{},
+		buf: make([]byte, 1024), // FIXME(lintanghui):get from pool
 	}
 }
 
@@ -74,6 +76,16 @@ func ErrMsg() *Msg {
 // Add add wg.
 func (r *Msg) Add() {
 	r.wg.Add(1)
+}
+
+// Buf return req buffer.
+func (r *Msg) Buf() []byte {
+	return r.Buf()
+}
+
+// Release release req buf and set back to pool.
+func (r *Msg) Release() {
+	// TODO:set buf back to pool.
 }
 
 // Start means Msg start processing.

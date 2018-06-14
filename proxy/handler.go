@@ -105,7 +105,7 @@ func (h *Handler) handleReader() {
 			if ne, ok := err.(net.Error); ok {
 				if ne.Temporary() {
 					req = proto.ErrMsg()
-					req.Process()
+					req.Add()
 					if h.reqCh.PushBack(req) == 0 {
 						return
 					}
@@ -186,6 +186,7 @@ func (h *Handler) handleWriter() {
 		}
 		req.Wait()
 		req.Merge()
+		req.Release()
 		if h.c.Proxy.WriteTimeout > 0 {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
