@@ -30,14 +30,8 @@ func NewEncoder(w io.Writer) proto.Encoder {
 }
 
 // Encode encode response and write into writer.
-func (e *encoder) Encode(resp *proto.Response) (err error) {
-	var mcr *MCResponse
-	if err = resp.Err(); err == nil {
-		var ok bool
-		if mcr, ok = resp.Proto().(*MCResponse); !ok || mcr == nil {
-			err = errors.Wrap(ErrAssertResponse, "MC Encoder encode assert MCResponse")
-		}
-	}
+func (e *encoder) Encode(msg *proto.Msg) (err error) {
+	err = msg.Err()
 	if err != nil {
 		se := errors.Cause(err).Error()
 		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
@@ -46,7 +40,7 @@ func (e *encoder) Encode(resp *proto.Response) (err error) {
 		e.bw.WriteString(se)
 		e.bw.Write(crlfBytes)
 	} else {
-		mcr.data.WriteTo(e.bw)
+		msg.Resp.WriteTo(e.bw)
 	}
 	if fe := e.bw.Flush(); fe != nil {
 		err = errors.Wrap(fe, "MC Encoder encode response flush bytes")

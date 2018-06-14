@@ -19,7 +19,7 @@ const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
 
-	requestChanBuffer = 1024 // TODO(felix): config???
+	MsgChanBuffer = 1024 // TODO(felix): config???
 )
 
 var (
@@ -38,7 +38,7 @@ type Handler struct {
 	cluster *Cluster
 	decoder proto.Decoder
 	encoder proto.Encoder
-	reqCh   *proto.RequestChan
+	reqCh   *proto.MsgChan
 
 	closed int32
 	wg     sync.WaitGroup
@@ -61,12 +61,12 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
-	h.reqCh = proto.NewRequestChanBuffer(requestChanBuffer)
+	h.reqCh = proto.NewMsgChanBuffer(MsgChanBuffer)
 	stat.ConnIncr(cluster.cc.Name)
 	return
 }
 
-// Handle reads request from client connection and dispatchs request back to cache servers,
+// Handle reads Msg from client connection and dispatchs Msg back to cache servers,
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
 	h.once.Do(func() {
@@ -77,7 +77,7 @@ func (h *Handler) Handle() {
 
 func (h *Handler) handleReader() {
 	var (
-		req *proto.Request
+		req *proto.Msg
 		err error
 	)
 	defer func() {
@@ -101,11 +101,12 @@ func (h *Handler) handleReader() {
 		if h.c.Proxy.ReadTimeout > 0 {
 			h.conn.SetReadDeadline(time.Now().Add(time.Duration(h.c.Proxy.ReadTimeout) * time.Millisecond))
 		}
-		if req, err = h.decoder.Decode(); err != nil {
+		// TODO:get req from pool.
+		if err = h.decoder.Decode(req); err != nil {
 			//rerr := errors.Cause(err)
 			if ne, ok := err.(net.Error); ok {
 				if ne.Temporary() {
-					req = proto.ErrRequest()
+					req = proto.ErrMsg()
 					req.Process()
 					if h.reqCh.PushBack(req) == 0 {
 						return
@@ -127,20 +128,20 @@ func (h *Handler) handleReader() {
 		if h.reqCh.PushBack(req) == 0 {
 			return
 		}
-		h.dispatchRequest(req)
+		h.dispatchMsg(req)
 	}
 }
 
-func (h *Handler) dispatchRequest(req *proto.Request) {
-	if !req.IsBatch() {
+func (h *Handler) dispatchMsg(req *proto.Msg) {
+	if req.IsBatch() {
 		h.cluster.Dispatch(req)
 		return
 	}
-	subs, resp := req.Batch()
+	subs := req.Batch()
 	if len(subs) == 0 {
-		req.Done(resp) // FIXME(felix): error or done???
+		req.Done() // FIXME(felix): error or done???
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
 		}
 		return
 	}
@@ -149,9 +150,6 @@ func (h *Handler) dispatchRequest(req *proto.Request) {
 		subs[i].Process()
 		h.cluster.Dispatch(&subs[i])
 	}
-	req.BatchWait()
-	resp.Merge(subs)
-	req.Done(resp)
 }
 
 func (h *Handler) handleWriter() {
@@ -183,15 +181,17 @@ func (h *Handler) handleWriter() {
 		req, ok := h.reqCh.PopFront()
 		if !ok {
 			if log.V(3) {
-				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) request chan pop not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg chan pop not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
 			}
 			return
 		}
-		req.Wait()
+		req.BatchWait()
+		req.Merge()
+		req.Done()
 		if h.c.Proxy.WriteTimeout > 0 {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}
-		err = h.encoder.Encode(req.Resp)
+		err = h.encoder.Encode(req)
 		stat.ProxyTime(h.cluster.cc.Name, req.Cmd(), int64(req.Since()/time.Microsecond))
 	}
 }

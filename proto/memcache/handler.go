@@ -58,15 +58,15 @@ func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Dura
 	return
 }
 
-// Handle call server node by request and read response returned.
-func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
+// Handle call server node by Msg and read response returned.
+func (h *handler) Handle(req *proto.Msg) (err error) {
 	if h.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Handler handle request")
+		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
-	mcr, ok := req.Proto().(*MCRequest)
+	mcr, ok := req.Proto().(*MCMsg)
 	if !ok {
-		err = errors.Wrap(ErrAssertRequest, "MC Handler handle assert MCRequest")
+		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
 	if h.writeTimeout > 0 {
@@ -74,7 +74,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 	}
 	h.bw.WriteString(mcr.rTp.String())
 	h.bw.WriteByte(spaceByte)
-	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
+	if mcr.rTp == MsgTypeGat || mcr.rTp == MsgTypeGats {
 		h.bw.Write(mcr.data) // NOTE: exptime
 		h.bw.WriteByte(spaceByte)
 		h.bw.Write(mcr.key)
@@ -84,7 +84,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		h.bw.Write(mcr.data)
 	}
 	if err = h.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Handler handle flush request bytes")
+		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
 		return
 	}
 	if h.readTimeout > 0 {
@@ -97,7 +97,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 		return
 	}
 	bss[0] = bs
-	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
+	if mcr.rTp == MsgTypeGet || mcr.rTp == MsgTypeGets || mcr.rTp == MsgTypeGat || mcr.rTp == MsgTypeGats {
 		if !bytes.Equal(bs, endBytes) {
 			stat.Hit(h.cluster, h.addr)
 			c := bytes.Count(bs, spaceBytes)
@@ -152,11 +152,7 @@ func (h *handler) Handle(req *proto.Request) (resp *proto.Response, err error) {
 			stat.Miss(h.cluster, h.addr)
 		}
 	}
-	resp = &proto.Response{Type: proto.CacheTypeMemcache}
-	pr := &MCResponse{rTp: mcr.rTp}
-	pr.data = new(net.Buffers)
-	*pr.data = bss
-	resp.WithProto(pr)
+	mcr.resp = bss
 	return
 }
 

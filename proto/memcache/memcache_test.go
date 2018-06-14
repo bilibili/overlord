@@ -61,14 +61,14 @@ func handlerConn(t *testing.T, wg *sync.WaitGroup, conn net.Conn) {
 			} else {
 				t.Errorf("%+v", err)
 			}
-			req := &proto.Request{Type: proto.CacheTypeMemcache}
+			req := &proto.Msg{Type: proto.CacheTypeMemcache}
 			req.Process()
 			req.DoneWithError(err)
 			e.Encode(req.Resp)
 			continue
 		}
 		req.Process()
-		r := req.Proto().(*memcache.MCRequest)
+		r := req.Proto().(*memcache.MCMsg)
 		t.Logf("mcreq: %v", r)
 
 		h, ok := p.Get().(proto.Handler)

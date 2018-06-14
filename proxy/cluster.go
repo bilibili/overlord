@@ -39,18 +39,18 @@ type pinger struct {
 type channel struct {
 	idx int32
 	cnt int32
-	chs []chan *proto.Request
+	chs []chan *proto.Msg
 }
 
 func newChannel(n int32) *channel {
-	chs := make([]chan *proto.Request, n)
+	chs := make([]chan *proto.Msg, n)
 	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.Request, requestChanBuffer)
+		chs[i] = make(chan *proto.Msg, MsgChanBuffer)
 	}
 	return &channel{cnt: n, chs: chs}
 }
 
-func (c *channel) push(req *proto.Request) {
+func (c *channel) push(req *proto.Msg) {
 	i := atomic.AddInt32(&c.idx, 1)
 	c.chs[i%c.cnt] <- req
 }
@@ -125,23 +125,23 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	return
 }
 
-// Dispatch dispatchs request.
-func (c *Cluster) Dispatch(req *proto.Request) {
+// Dispatch dispatchs Msg.
+func (c *Cluster) Dispatch(req *proto.Msg) {
 	// hash
 	node, ok := c.hash(req.Key())
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) request(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
+			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
 		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request hash"))
+		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg hash"))
 		return
 	}
 	rc, ok := c.nodeCh[node]
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) request(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
+			log.Warnf("cluster(%s) addr(%s) Msg(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
 		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request node chan"))
+		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg node chan"))
 		return
 	}
 	rc.push(req)
@@ -153,7 +153,7 @@ func (c *Cluster) process(node string, rc *channel) {
 			ch := rc.chs[i]
 			hdl, herr := c.get(node)
 			for {
-				var req *proto.Request
+				var req *proto.Msg
 				select {
 				case req = <-ch:
 				case <-c.ctx.Done():
@@ -168,19 +168,19 @@ func (c *Cluster) process(node string, rc *channel) {
 					continue
 				}
 				now := time.Now()
-				resp, err := hdl.Handle(req)
+				err := hdl.Handle(req)
 				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
 				if err != nil {
 					c.put(node, hdl, err)
 					hdl, herr = c.get(node)
 					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) request(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+						log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
 					}
 					stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
 					continue
 				}
-				req.Done(resp)
+				req.Done()
 			}
 		}(i)
 	}
