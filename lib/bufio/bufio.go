@@ -139,9 +139,9 @@ func (b *Reader) ReadByte() (byte, error) {
 // error will be return as bufio.ErrBufferFull
 func (b *Reader) Peek(n int) ([]byte, error) {
 	if b.buffered() < n {
-		return nil, bufio.ErrBufferFull
+		return b.buf[b.rpos:b.wpos], bufio.ErrBufferFull
 	}
-	return b.buf[b.rpos:b.wpos], nil
+	return b.buf[b.rpos : b.rpos+n], nil
 }
 
 // ReadUntil reads until the first delim occur,
