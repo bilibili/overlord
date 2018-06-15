@@ -118,9 +118,9 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 }
 
 func TestProxy(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-	}
+	// for i := 0; i < 100; i++ {
+	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	// }
 }
 
 func BenchmarkCmdSet(b *testing.B) {

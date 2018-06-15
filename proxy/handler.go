@@ -2,12 +2,14 @@ package proxy
 
 import (
 	"context"
+	"io"
 	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/lib/net2"
 	"github.com/felixhao/overlord/lib/stat"
@@ -35,7 +37,9 @@ type Handler struct {
 
 	once sync.Once
 
-	conn    net.Conn
+	conn net.Conn
+	br   *bufio.Reader
+
 	cluster *Cluster
 	decoder proto.Decoder
 	encoder proto.Encoder
@@ -62,6 +66,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
+	h.br = bufio.NewReader(h.conn)
 	h.reqCh = proto.NewMsgChanBuffer(MsgChanBuffer)
 	stat.ConnIncr(cluster.cc.Name)
 	return
@@ -80,9 +85,9 @@ func (h *Handler) handleReader() {
 	var (
 		err error
 	)
-	defer func() {
-		h.closeWithError(err)
-	}()
+	// defer func() {
+	// 	h.closeWithError(err)
+	// }()
 	for {
 		if h.Closed() || h.reqCh.Closed() {
 			if log.V(3) {
@@ -99,35 +104,72 @@ func (h *Handler) handleReader() {
 		default:
 		}
 
-		req := proto.NewMsg()
+		err = h.br.ReadAll()
+		if err == io.EOF {
+			if len(h.br.Bytes()) == 0 {
+				return
+			}
+		} else if err != nil {
+			return
+		}
+		// //rerr := errors.Cause(err)
+		// if ne, ok := err.(net.Error); ok {
+		// 	if ne.Temporary() {
+		// 		req = proto.ErrMsg()
+		// 		req.Add()
+		// 		if h.reqCh.PushBack(req) == 0 {
+		// 			return
+		// 		}
+		// 		req.DoneWithError(err)
+		// 		if log.V(1) {
+		// 			log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+		// 		}
+		// 		err = nil
+		// 		continue
+		// 	}
+		// }
+		// if log.V(1) {
+		// 	log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) close connection error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+		// }
+
 		// TODO:get req from pool.
-		if err = h.decoder.Decode(req); err != nil {
-			//rerr := errors.Cause(err)
-			if ne, ok := err.(net.Error); ok {
-				if ne.Temporary() {
-					req = proto.ErrMsg()
-					req.Add()
-					if h.reqCh.PushBack(req) == 0 {
-						return
-					}
-					req.DoneWithError(err)
-					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
-					}
-					err = nil
-					continue
-				}
-			}
-			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) close connection error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
-			}
-			return
+
+		err = h.tryingHandle()
+		if err == proto.ErrMoreData {
+			err = nil
+			continue
+		} else if err != nil {
+			// TODO(wayslog): with PROXY_ERROR response
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) decode error with error %s", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+			break
 		}
-		if h.reqCh.PushBack(req) == 0 {
-			return
-		}
-		h.dispatchMsg(req)
 	}
+}
+
+// tryingHandle until reach error: ErrMoreData
+func (h *Handler) tryingHandle() (err error) {
+	var reqs = []*proto.Msg{}
+	for {
+		// TODO: get NewMsg from object pool
+		req := proto.NewMsg()
+		bs := h.br.Bytes()
+		err = h.decoder.Decode(req, bs)
+		if err != nil {
+			break
+		}
+		h.br.Advance(len(req.RefData()))
+		h.dispatchMsg(req)
+		reqs = append(reqs, req)
+	}
+
+	for i := range reqs {
+		reqs[i].Wait()
+		reqs[i].Merge()
+		if h.reqCh.PushBack(reqs[i]) == 0 {
+			return
+		}
+	}
+	return
 }
 
 func (h *Handler) dispatchMsg(req *proto.Msg) {
@@ -185,9 +227,7 @@ func (h *Handler) handleWriter() {
 			}
 			return
 		}
-		req.Wait()
-		req.Merge()
-		req.Release()
+
 		if h.c.Proxy.WriteTimeout > 0 {
 			h.conn.SetWriteDeadline(time.Now().Add(time.Duration(h.c.Proxy.WriteTimeout) * time.Millisecond))
 		}

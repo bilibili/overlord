@@ -24,14 +24,17 @@ func init() {
 
 	bufPoolList = make([]*sync.Pool, len(sizeList))
 	for idx := range bufPoolList {
-		bufPoolList[idx] = &sync.Pool{
-			New: func() interface{} {
-				b := buffer(make([]byte, sizeList[idx]))
-				return &b
-			},
-		}
+		setBufPoolList(idx)
 	}
+}
 
+func setBufPoolList(idx int) {
+	bufPoolList[idx] = &sync.Pool{
+		New: func() interface{} {
+			b := buffer(make([]byte, sizeList[idx]))
+			return &b
+		},
+	}
 }
 
 func searchExceptRange(n int) (low, top int) {
@@ -84,6 +87,9 @@ func Get(size int) []byte {
 // Put the data into global pool
 func Put(data []byte) {
 	low, _ := searchExceptRange(len(data))
+	if low == -1 {
+		return
+	}
 	b := buffer(data[:sizeList[low]])
 	bufPoolList[low].Put(&b)
 }

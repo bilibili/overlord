@@ -85,7 +85,7 @@ const (
 )
 
 var (
-	retrievalRequestTypes = map[MsgType]struct{}{
+	withDataMsgTypes = map[MsgType]struct{}{
 		MsgTypeGet:  struct{}{},
 		MsgTypeGets: struct{}{},
 		MsgTypeGat:  struct{}{},
@@ -143,8 +143,7 @@ type MCMsg struct {
 	data  []byte
 	batch bool
 
-	resp   [][]byte // FIXME:use global buffer pool.
-	subReq []MCMsg
+	subReq []*proto.Msg
 }
 
 // Cmd get Msg cmd.
@@ -169,18 +168,21 @@ func (r *MCMsg) Batch() []proto.Msg {
 		return nil
 	}
 	subs := make([]proto.Msg, n+1)
-	r.subReq = make([]MCMsg, n+1)
+	r.subReq = make([]*proto.Msg, n+1)
 	begin := 0
 	end := bytes.IndexByte(r.key, spaceByte)
 	for i := 0; i <= n; i++ {
 		subs[i] = *proto.NewMsg()
 		subs[i].Type = proto.CacheTypeMemcache
-		r.subReq[i] = MCMsg{
-			rTp:  r.rTp,
-			key:  r.key[begin:end],
-			data: r.data,
+		msg := MCMsg{
+			rTp:   r.rTp,
+			key:   r.key[begin:end],
+			data:  r.data,
+			batch: true,
 		}
-		subs[i].WithProto(&r.subReq[i])
+
+		subs[i].WithProto(&msg)
+		r.subReq[i] = &subs[i]
 		begin = end + 1
 		if i >= n-1 { // NOTE: the last sub.
 			end = len(r.key)
@@ -197,11 +199,12 @@ func (r *MCMsg) String() string {
 
 // Merge merge subreq's response.
 func (r *MCMsg) Merge() [][]byte {
-	for _, sub := range r.subReq {
-		r.resp = append(r.resp, sub.resp...)
+	rs := make([][]byte, len(r.subReq))
+	for i, sub := range r.subReq {
+		rs[i] = bytes.TrimSuffix(sub.Bytes(), endBytes)
 	}
-	if _, ok := retrievalRequestTypes[r.rTp]; ok {
-		r.resp = append(r.resp, endBytes)
+	if _, ok := withDataMsgTypes[r.rTp]; ok {
+		rs = append(rs, endBytes)
 	}
-	return r.resp
+	return rs
 }

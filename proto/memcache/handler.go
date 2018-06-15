@@ -23,10 +23,6 @@ const (
 	handlerReadBufferSize  = 128 * 1024 // NOTE: read data, so relatively large
 )
 
-var (
-	errMissRequest = errors.New("missing request")
-)
-
 type handler struct {
 	cluster string
 	addr    string
@@ -60,59 +56,58 @@ func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Dura
 
 // Handle call server node by Msg and read response returned.
 func (h *handler) Handle(req *proto.Msg) (err error) {
-	h.bw.ResetBuffer(req.Buf())
 	if h.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
+
 	mcr, ok := req.Proto().(*MCMsg)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-	h.bw.WriteString(mcr.rTp.String())
-	h.bw.WriteByte(spaceByte)
-	if mcr.rTp == MsgTypeGat || mcr.rTp == MsgTypeGats {
-		h.bw.Write(mcr.data) // NOTE: exptime
+	if req.IsBatch() {
+		h.bw.WriteString(mcr.rTp.String())
 		h.bw.WriteByte(spaceByte)
-		h.bw.Write(mcr.key)
-		h.bw.Write(crlfBytes)
+		if mcr.rTp == MsgTypeGat || mcr.rTp == MsgTypeGats {
+			h.bw.Write(mcr.data) // NOTE: exptime
+			h.bw.WriteByte(spaceByte)
+			h.bw.Write(mcr.key)
+			h.bw.Write(crlfBytes)
+		} else {
+			h.bw.Write(mcr.key)
+			h.bw.Write(mcr.data)
+		}
 	} else {
-		h.bw.Write(mcr.key)
-		h.bw.Write(mcr.data)
+		h.bw.ResetBuffer(req.RefData())
 	}
+
 	if err = h.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
 		return
 	}
 
-	bss := make([][]byte, 1)
-
-	// TODO: reset bytes buffer to reuse the bytes
 	h.br.ResetBuffer(req.Buf())
 	bs, err := h.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
-	if _, ok := retrievalRequestTypes[mcr.rTp]; ok {
-		bss[0], err = h.readResponseData(bs)
-		if err == errMissRequest {
-			err = nil
-		} else if err != nil {
-			return
-		}
+
+	if _, ok := withDataMsgTypes[mcr.rTp]; ok {
+		data, ierr := h.readResponseData(bs)
+		err = ierr
+		req.Forward(len(data))
 	} else {
-		bss[0] = bs
+		req.Forward(len(bs))
 	}
-	mcr.resp = bss
 	return
 }
 
 func (h *handler) readResponseData(bs []byte) (data []byte, err error) {
 	if bytes.Equal(bs, endBytes) {
 		stat.Miss(h.cluster, h.addr)
-		err = errMissRequest
+		err = nil
 		return
 	}
 

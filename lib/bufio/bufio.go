@@ -111,6 +111,34 @@ func (b *Reader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// Bytes will return the reference of the read data array.
+func (b *Reader) Bytes() []byte {
+	return b.buf[b.rpos:b.wpos]
+}
+
+// Advance will trying to advance the rpos
+func (b *Reader) Advance(size int) {
+	if b.rpos+size > b.wpos {
+		b.rpos = b.wpos
+	} else {
+		b.rpos += size
+	}
+}
+
+// ReadAll will trying to read bytes data to fill buffer,
+// if b.buffered() == len(b.buf), the buffer will grow
+// ReadAll will never grow b.rpos, but can reduce it by
+// using fill or grow.
+func (b *Reader) ReadAll() error {
+	if b.err != nil {
+		return b.err
+	}
+	if b.buffered() == len(b.buf) {
+		b.grow()
+	}
+	return b.fill()
+}
+
 // ReadByte reads and returns a single byte.
 // If no byte is available, returns an error.
 func (b *Reader) ReadByte() (byte, error) {
@@ -412,6 +440,6 @@ func (b *Writer) Buffer() []byte {
 // ResetBuffer may always be called after Flush to flush
 // datas into connection.
 func (b *Writer) ResetBuffer(buf []byte) {
-	b.wpos = 0
+	b.wpos = len(buf)
 	b.buf = buf
 }

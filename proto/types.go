@@ -11,6 +11,7 @@ import (
 
 // errors
 var (
+	ErrMoreData           = errs.New("need more data")
 	ErrNoSupportCacheType = errs.New("unsupported cache type")
 )
 
@@ -25,7 +26,7 @@ const (
 )
 
 const (
-	defaultBufSize = 1024
+	defaultBufSize = 16
 )
 
 type protoMsg interface {
@@ -41,10 +42,18 @@ type Msg struct {
 	Type  CacheType
 	proto protoMsg
 	wg    *sync.WaitGroup
-	buf   []byte
-	Resp  net.Buffers
-	st    time.Time
-	err   error
+
+	// refData storage all the bytes reference to
+	// proxy.Handler's reader
+	refData []byte
+
+	// buf is the owner data to using to store response
+	buf  []byte
+	wpos int
+
+	Resp net.Buffers
+	st   time.Time
+	err  error
 }
 
 // NewMsg will create new message object
@@ -89,9 +98,14 @@ func (r *Msg) Buf() []byte {
 	return r.buf
 }
 
-// Release release req buf and set back to pool.
-func (r *Msg) Release() {
-	// TODO:set buf back to pool.
+// RefData will return the Msg data to flush and reset
+func (r *Msg) RefData() []byte {
+	return r.refData
+}
+
+// SetRefData sets the rdata to r.refData
+func (r *Msg) SetRefData(rdata []byte) {
+	r.refData = rdata
 }
 
 // Start means Msg start processing.
@@ -164,12 +178,26 @@ func (r *Msg) Batch() []Msg {
 
 // Merge merge all sub response.
 func (r *Msg) Merge() {
-	r.Resp = net.Buffers(r.proto.Merge())
+	if r.IsBatch() {
+		r.Resp = net.Buffers(r.proto.Merge())
+	} else {
+		r.Resp = net.Buffers([][]byte{r.Buf()})
+	}
 }
 
 // Since returns the time elapsed since t.
 func (r *Msg) Since() time.Duration {
 	return time.Since(r.st)
+}
+
+// Bytes return the real Buf data
+func (r *Msg) Bytes() []byte {
+	return r.buf[:r.wpos]
+}
+
+// Forward wpos size
+func (r *Msg) Forward(size int) {
+	r.wpos += size
 }
 
 // WithError with error.
@@ -189,7 +217,7 @@ type Encoder interface {
 
 // Decoder decode bytes from client.
 type Decoder interface {
-	Decode(*Msg) error
+	Decode(*Msg, []byte) error
 }
 
 // Handler handle Msg to backend cache server and read response.

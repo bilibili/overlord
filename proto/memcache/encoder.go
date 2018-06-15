@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"io"
-	"net"
 	"strings"
 
 	"github.com/felixhao/overlord/lib/bufio"
@@ -46,16 +45,5 @@ func (e *encoder) Encode(msg *proto.Msg) (err error) {
 	if fe := e.bw.Flush(); fe != nil {
 		err = errors.Wrap(fe, "MC Encoder encode response flush bytes")
 	}
-	releaseBuffers(&msg.Resp)
-	bufio.Put(msg.Buf())
 	return
-}
-
-func releaseBuffers(b *net.Buffers) {
-	d := [][]byte(*b)
-	for _, v := range d {
-		if v != nil {
-			bufio.Put(v)
-		}
-	}
 }
