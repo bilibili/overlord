@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/felixhao/overlord/lib/bufio"
 )
 
 // errors
@@ -20,6 +22,10 @@ const (
 	CacheTypeUnknown  CacheType = "unknown"
 	CacheTypeMemcache CacheType = "memcache"
 	CacheTypeRedis    CacheType = "redis"
+)
+
+const (
+	defaultBufSize = 1024
 )
 
 type protoMsg interface {
@@ -45,7 +51,7 @@ type Msg struct {
 func NewMsg() *Msg {
 	return &Msg{
 		wg:  &sync.WaitGroup{},
-		buf: make([]byte, 1024), // FIXME(lintanghui):get from pool
+		buf: bufio.Get(defaultBufSize),
 	}
 }
 

@@ -7,11 +7,6 @@ import (
 	"net"
 )
 
-const (
-	defaultBufferSize = 1024
-	growFactor        = 2
-)
-
 // Reader implements buffering for an io.Reader object.
 type Reader struct {
 	err error
@@ -34,7 +29,7 @@ func NewReaderSize(rd io.Reader, size int) *Reader {
 	if size <= 0 {
 		size = defaultBufferSize
 	}
-	return &Reader{rd: rd, buf: make([]byte, size)}
+	return &Reader{rd: rd, buf: Get(size)}
 }
 
 // ResetBuffer bytes buffer
@@ -58,14 +53,12 @@ func (b *Reader) growTo(size int) {
 		return
 	}
 
-	except := len(b.buf)
-	for except <= size {
-		except = except * growFactor
-	}
-
 	// TODO(wayslog): recycle using of global bytes pool
-	buf := make([]byte, except)
+	buf := Get(size)
 	copy(buf, b.buf[b.rpos:b.wpos])
+
+	// Release it first
+	Put(b.buf)
 	b.buf = buf
 	b.wpos = b.wpos - b.rpos
 	b.rpos = 0
@@ -320,7 +313,7 @@ func NewWriterSize(wr io.Writer, size int) *Writer {
 	if size <= 0 {
 		size = defaultBufferSize
 	}
-	return &Writer{wr: wr, buf: make([]byte, size)}
+	return &Writer{wr: wr, buf: Get(size)}
 }
 
 // Flush writes any buffered data to the underlying io.Writer.

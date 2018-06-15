@@ -78,7 +78,6 @@ func (h *Handler) Handle() {
 
 func (h *Handler) handleReader() {
 	var (
-		req = proto.NewMsg()
 		err error
 	)
 	defer func() {
@@ -99,6 +98,8 @@ func (h *Handler) handleReader() {
 			return
 		default:
 		}
+
+		req := proto.NewMsg()
 		// TODO:get req from pool.
 		if err = h.decoder.Decode(req); err != nil {
 			//rerr := errors.Cause(err)
