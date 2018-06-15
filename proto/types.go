@@ -80,7 +80,7 @@ func (r *Msg) Add() {
 
 // Buf return req buffer.
 func (r *Msg) Buf() []byte {
-	return r.Buf()
+	return r.buf
 }
 
 // Release release req buf and set back to pool.

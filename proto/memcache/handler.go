@@ -60,6 +60,7 @@ func Dial(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Dura
 
 // Handle call server node by Msg and read response returned.
 func (h *handler) Handle(req *proto.Msg) (err error) {
+	h.bw.ResetBuffer(req.Buf())
 	if h.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
@@ -69,7 +70,6 @@ func (h *handler) Handle(req *proto.Msg) (err error) {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-
 	h.bw.WriteString(mcr.rTp.String())
 	h.bw.WriteByte(spaceByte)
 	if mcr.rTp == MsgTypeGat || mcr.rTp == MsgTypeGats {
@@ -86,7 +86,7 @@ func (h *handler) Handle(req *proto.Msg) (err error) {
 		return
 	}
 
-	bss := make([][]byte, 2)
+	bss := make([][]byte, 1)
 
 	// TODO: reset bytes buffer to reuse the bytes
 	h.br.ResetBuffer(req.Buf())
@@ -146,12 +146,9 @@ func (h *handler) readResponseData(bs []byte) (data []byte, err error) {
 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
 		return
 	}
-	if data, err = h.br.ReReadFull(int(size), len(bs)); err != nil {
+	if data, err = h.br.ReReadFull(int(size+2), len(bs)); err != nil {
 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes data")
 		return
-	}
-	if data, err = h.br.ReReadUntilBytes(endBytes, len(data)); err != nil {
-		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes end bytes")
 	}
 	return
 }

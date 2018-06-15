@@ -173,6 +173,7 @@ func (r *MCMsg) Batch() []proto.Msg {
 	begin := 0
 	end := bytes.IndexByte(r.key, spaceByte)
 	for i := 0; i <= n; i++ {
+		subs[i] = *proto.NewMsg()
 		subs[i].Type = proto.CacheTypeMemcache
 		r.subReq[i] = MCMsg{
 			rTp:  r.rTp,
@@ -198,6 +199,9 @@ func (r *MCMsg) String() string {
 func (r *MCMsg) Merge() [][]byte {
 	for _, sub := range r.subReq {
 		r.resp = append(r.resp, sub.resp...)
+	}
+	if _, ok := retrievalRequestTypes[r.rTp]; ok {
+		r.resp = append(r.resp, endBytes)
 	}
 	return r.resp
 }
