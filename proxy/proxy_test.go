@@ -82,23 +82,23 @@ func mockProxy() {
 func testCmd(t testing.TB, cmds ...[]byte) {
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:21211", time.Second)
 	if err != nil {
-		t.Fatalf("net dial error:%v", err)
+		t.Errorf("net dial error:%v", err)
 	}
 	br := bufio.NewReader(conn)
 	for _, cmd := range cmds {
+		t.Logf("\n\nexecute cmd %s", cmd)
 		conn.SetWriteDeadline(time.Now().Add(time.Second))
 		if _, err = conn.Write(cmd); err != nil {
 			t.Errorf("conn write cmd:%s error:%v", cmd, err)
-			continue
 		}
 		conn.SetReadDeadline(time.Now().Add(time.Second))
 		var bs []byte
-		if bs, err = br.ReadSlice('\n'); err != nil {
-			t.Errorf("conn read cmd:%s error:%v", cmd, err)
+		if bs, err = br.ReadBytes('\n'); err != nil {
+			t.Errorf("conn read cmd:%s error:%s resp:xxx%sxxx", cmd, err, bs)
 			continue
 		}
 		if bytes.HasPrefix(bs, []byte("ERROR")) || bytes.HasPrefix(bs, []byte("CLIENT_ERROR")) || bytes.HasPrefix(bs, []byte("SERVER_ERROR")) {
-			t.Errorf("conn error:%s", bs)
+			t.Errorf("conn error:%s %s", bs, cmd)
 			continue
 		}
 		if !bytes.Equal(bs, []byte("END\r\n")) && (bytes.HasPrefix(cmd, []byte("get")) || bytes.HasPrefix(cmd, []byte("gets")) || bytes.HasPrefix(cmd, []byte("gat")) || bytes.HasPrefix(cmd, []byte("gats"))) {
@@ -112,12 +112,15 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 				bs = append(bs, bs2...)
 			}
 		}
-		// t.Logf("read string:%s", bs)
+		t.Logf("read string:%s", bs)
+
 	}
 }
 
 func TestProxy(t *testing.T) {
+	// for i := 0; i < 100; i++ {
 	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	// }
 }
 
 func BenchmarkCmdSet(b *testing.B) {

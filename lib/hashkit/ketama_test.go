@@ -1,15 +1,15 @@
-package ketama_test
+package hashkit_test
 
 import (
 	"bytes"
 	"strconv"
 	"testing"
 
-	"github.com/felixhao/overlord/lib/ketama"
+	"github.com/felixhao/overlord/lib/hashkit"
 )
 
 var (
-	ring  = ketama.NewRing(255)
+	ring  = hashkit.Ketama()
 	nodes = []string{
 		"test1.server.com",
 		"test2.server.com",

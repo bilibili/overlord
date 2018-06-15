@@ -2,12 +2,16 @@ package proto
 
 import (
 	errs "errors"
+	"net"
 	"sync"
 	"time"
+
+	"github.com/felixhao/overlord/lib/bufio"
 )
 
 // errors
 var (
+	ErrMoreData           = errs.New("need more data")
 	ErrNoSupportCacheType = errs.New("unsupported cache type")
 )
 
@@ -21,22 +25,43 @@ const (
 	CacheTypeRedis    CacheType = "redis"
 )
 
-type protoRequest interface {
+const (
+	defaultBufSize = 16
+)
+
+type protoMsg interface {
 	Cmd() string
 	Key() []byte
 	IsBatch() bool
-	Batch() ([]Request, *Response)
+	Batch() []Msg
+	Merge() [][]byte
 }
 
-// Request read from client.
-type Request struct {
+// Msg read from client.
+type Msg struct {
 	Type  CacheType
-	proto protoRequest
+	proto protoMsg
 	wg    *sync.WaitGroup
-	bWg   *sync.WaitGroup
 
-	Resp *Response
+	// refData storage all the bytes reference to
+	// proxy.Handler's reader
+	refData []byte
+
+	// buf is the owner data to using to store response
+	buf  []byte
+	wpos int
+
+	Resp net.Buffers
 	st   time.Time
+	err  error
+}
+
+// NewMsg will create new message object
+func NewMsg() *Msg {
+	return &Msg{
+		wg:  &sync.WaitGroup{},
+		buf: bufio.Get(defaultBufSize),
+	}
 }
 
 type errProto struct{}
@@ -50,154 +75,154 @@ func (e *errProto) Key() []byte {
 func (e *errProto) IsBatch() bool {
 	return false
 }
-func (e *errProto) Batch() ([]Request, *Response) {
-	return nil, nil
+func (e *errProto) Batch() []Msg {
+	return nil
 }
 
-// ErrRequest return err request.
-func ErrRequest() *Request {
-	return &Request{proto: &errProto{}}
+func (e *errProto) Merge() [][]byte {
+	return nil
 }
 
-// Process means request processing.
-func (r *Request) Process() {
-	if r.wg == nil {
-		r.wg = &sync.WaitGroup{}
-	}
+// ErrMsg return err Msg.
+func ErrMsg() *Msg {
+	return &Msg{proto: &errProto{}}
+}
+
+// Add add wg.
+func (r *Msg) Add() {
 	r.wg.Add(1)
+}
+
+// Buf return req buffer.
+func (r *Msg) Buf() []byte {
+	return r.buf
+}
+
+// RefData will return the Msg data to flush and reset
+func (r *Msg) RefData() []byte {
+	return r.refData
+}
+
+// SetRefData sets the rdata to r.refData
+func (r *Msg) SetRefData(rdata []byte) {
+	r.refData = rdata
+}
+
+// Start means Msg start processing.
+func (r *Msg) Start() {
 	r.st = time.Now()
 }
 
 // Done done.
-func (r *Request) Done(resp *Response) {
+func (r *Msg) Done() {
 	if r.wg == nil {
-		panic("request waitgroup nil")
+		panic("Msg waitgroup nil")
 	}
-	r.Resp = resp
 	r.wg.Done()
 }
 
 // DoneWithError done with error.
-func (r *Request) DoneWithError(err error) {
+func (r *Msg) DoneWithError(err error) {
 	// TODO(felix): handle error
 	if r.wg == nil {
-		panic("request waitgroup nil")
+		panic("Msg waitgroup nil")
 	}
-	r.Resp = &Response{Type: r.Type, err: err}
 	r.wg.Done()
 }
 
 // Wait wait group.
-func (r *Request) Wait() {
+func (r *Msg) Wait() {
 	if r.wg == nil {
-		panic("request waitgroup nil")
+		panic("Msg waitgroup nil")
 	}
 	r.wg.Wait()
 }
 
-// WithProto with proto request.
-func (r *Request) WithProto(proto protoRequest) {
+// WithProto with proto Msg.
+func (r *Msg) WithProto(proto protoMsg) {
 	r.proto = proto
 }
 
-// Proto returns proto request.
-func (r *Request) Proto() protoRequest {
+// Proto returns proto Msg.
+func (r *Msg) Proto() protoMsg {
 	return r.proto
 }
 
-// Cmd returns proto request cmd.
-func (r *Request) Cmd() string {
+// Cmd returns proto Msg cmd.
+func (r *Msg) Cmd() string {
 	return r.proto.Cmd()
 }
 
-// Key returns proto request key.
-func (r *Request) Key() []byte {
+// Key returns proto Msg key.
+func (r *Msg) Key() []byte {
 	return r.proto.Key()
 }
 
 // IsBatch returns whether or not batch.
-func (r *Request) IsBatch() bool {
+func (r *Msg) IsBatch() bool {
 	return r.proto.IsBatch()
 }
 
-// Batch returns sub request if is batch.
-func (r *Request) Batch() ([]Request, *Response) {
-	subs, resp := r.proto.Batch()
+// Batch returns sub Msg if is batch.
+func (r *Msg) Batch() []Msg {
+	subs := r.proto.Batch()
 	subl := len(subs)
 	if subl == 0 {
-		return nil, resp
+		return nil
 	}
-	r.bWg = &sync.WaitGroup{}
 	for i := 0; i < subl; i++ {
-		subs[i].wg = r.bWg
+		subs[i].wg = r.wg
 	}
-	return subs, resp
+	return subs
 }
 
-// BatchWait blocks until the all sub request done.
-func (r *Request) BatchWait() {
-	if r.bWg != nil {
-		r.bWg.Wait()
+// Merge merge all sub response.
+func (r *Msg) Merge() {
+	if r.IsBatch() {
+		r.Resp = net.Buffers(r.proto.Merge())
+	} else {
+		r.Resp = net.Buffers([][]byte{r.Buf()})
 	}
 }
 
 // Since returns the time elapsed since t.
-func (r *Request) Since() time.Duration {
+func (r *Msg) Since() time.Duration {
 	return time.Since(r.st)
 }
 
-type protoResponse interface {
-	Merge([]Request)
+// Bytes return the real Buf data
+func (r *Msg) Bytes() []byte {
+	return r.buf[:r.wpos]
 }
 
-// Response read from cache server.
-type Response struct {
-	Type  CacheType
-	proto protoResponse
-	err   error
-}
-
-// WithProto with proto response.
-func (r *Response) WithProto(proto protoResponse) {
-	r.proto = proto
-}
-
-// Proto returns proto response.
-func (r *Response) Proto() protoResponse {
-	return r.proto
+// Forward wpos size
+func (r *Msg) Forward(size int) {
+	r.wpos += size
 }
 
 // WithError with error.
-func (r *Response) WithError(err error) {
+func (r *Msg) WithError(err error) {
 	r.err = err
 }
 
 // Err returns error.
-func (r *Response) Err() error {
+func (r *Msg) Err() error {
 	return r.err
-}
-
-// Merge merges subs response into self.
-func (r *Response) Merge(subs []Request) {
-	if r.err != nil || r.proto == nil {
-		return
-	}
-	r.proto.Merge(subs)
 }
 
 // Encoder encode response.
 type Encoder interface {
-	Encode(*Response) error
+	Encode(*Msg) error
 }
 
 // Decoder decode bytes from client.
 type Decoder interface {
-	Decode() (*Request, error)
+	Decode(*Msg, []byte) error
 }
 
-// Handler handle request to backend cache server and read response.
+// Handler handle Msg to backend cache server and read response.
 type Handler interface {
-	Handle(*Request) (*Response, error)
+	Handle(*Msg) error
 }
 
 // Pinger ping node connection.
@@ -206,39 +231,39 @@ type Pinger interface {
 	Close() error
 }
 
-// RequestChan is queue be used process request.
-type RequestChan struct {
+// MsgChan is queue be used process Msg.
+type MsgChan struct {
 	lock sync.Mutex
 	cond *sync.Cond
 
-	data []*Request
-	buff []*Request
+	data []*Msg
+	buff []*Msg
 
 	waits  int
 	closed bool
 }
 
-const defaultRequestChanBuffer = 128
+const defaultMsgChanBuffer = 128
 
-// NewRequestChan new request chan, defalut buffer 128.
-func NewRequestChan() *RequestChan {
-	return NewRequestChanBuffer(0)
+// NewMsgChan new Msg chan, defalut buffer 128.
+func NewMsgChan() *MsgChan {
+	return NewMsgChanBuffer(0)
 }
 
-// NewRequestChanBuffer new request chan with buffer.
-func NewRequestChanBuffer(n int) *RequestChan {
+// NewMsgChanBuffer new Msg chan with buffer.
+func NewMsgChanBuffer(n int) *MsgChan {
 	if n <= 0 {
-		n = defaultRequestChanBuffer
+		n = defaultMsgChanBuffer
 	}
-	ch := &RequestChan{
-		buff: make([]*Request, n),
+	ch := &MsgChan{
+		buff: make([]*Msg, n),
 	}
 	ch.cond = sync.NewCond(&ch.lock)
 	return ch
 }
 
-// PushBack push request back queue.
-func (c *RequestChan) PushBack(r *Request) int {
+// PushBack push Msg back queue.
+func (c *MsgChan) PushBack(r *Msg) int {
 	c.lock.Lock()
 	if c.closed {
 		c.lock.Unlock()
@@ -254,7 +279,7 @@ func (c *RequestChan) PushBack(r *Request) int {
 }
 
 // PopFront pop front from queue.
-func (c *RequestChan) PopFront() (*Request, bool) {
+func (c *MsgChan) PopFront() (*Msg, bool) {
 	c.lock.Lock()
 	for len(c.data) == 0 {
 		if c.closed {
@@ -273,15 +298,15 @@ func (c *RequestChan) PopFront() (*Request, bool) {
 }
 
 // Buffered returns buffer.
-func (c *RequestChan) Buffered() int {
+func (c *MsgChan) Buffered() int {
 	c.lock.Lock()
 	n := len(c.data)
 	c.lock.Unlock()
 	return n
 }
 
-// Close close request chan.
-func (c *RequestChan) Close() {
+// Close close Msg chan.
+func (c *MsgChan) Close() {
 	c.lock.Lock()
 	if !c.closed {
 		c.closed = true
@@ -291,7 +316,7 @@ func (c *RequestChan) Close() {
 }
 
 // Closed return closed.
-func (c *RequestChan) Closed() bool {
+func (c *MsgChan) Closed() bool {
 	c.lock.Lock()
 	b := c.closed
 	c.lock.Unlock()

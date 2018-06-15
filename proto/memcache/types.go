@@ -4,9 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"math"
-	"sync"
 
-	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/proto"
 )
 
@@ -17,79 +15,82 @@ const (
 )
 
 var (
-	spaceBytes     = []byte{' '}
-	zeroBytes      = []byte{'0'}
-	oneBytes       = []byte{'1'}
-	crlfBytes      = []byte("\r\n")
-	endBytes       = []byte("END\r\n")
-	storedBytes    = []byte("STORED\r\n")
-	notStoredBytes = []byte("NOT_STORED\r\n")
-	existsBytes    = []byte("EXISTS\r\n")
-	notFoundBytes  = []byte("NOT_FOUND\r\n")
-	deletedBytes   = []byte("DELETED\r\n")
-	touchedBytes   = []byte("TOUCHED\r\n")
+	spaceBytes = []byte{' '}
+	zeroBytes  = []byte{'0'}
+	oneBytes   = []byte{'1'}
+	crlfBytes  = []byte("\r\n")
+	endBytes   = []byte("END\r\n")
+	// storedBytes    = []byte("STORED\r\n")
+	// notStoredBytes = []byte("NOT_STORED\r\n")
+	// existsBytes    = []byte("EXISTS\r\n")
+	// notFoundBytes  = []byte("NOT_FOUND\r\n")
+	// deletedBytes   = []byte("DELETED\r\n")
+	// touchedBytes   = []byte("TOUCHED\r\n")
 )
 
-var (
-	bufPool = &sync.Pool{New: func() interface{} {
-		return &bufio.SliceAlloc{}
-	}}
-)
+// MsgType is the protocol-agnostic identifier for the command
+type MsgType byte
 
-// RequestType is the protocol-agnostic identifier for the command
-type RequestType byte
-
-func (rt RequestType) String() string {
+func (rt MsgType) String() string {
 	switch rt {
-	case RequestTypeSet:
+	case MsgTypeSet:
 		return "set"
-	case RequestTypeAdd:
+	case MsgTypeAdd:
 		return "add"
-	case RequestTypeReplace:
+	case MsgTypeReplace:
 		return "replace"
-	case RequestTypeAppend:
+	case MsgTypeAppend:
 		return "append"
-	case RequestTypePrepend:
+	case MsgTypePrepend:
 		return "prepend"
-	case RequestTypeCas:
+	case MsgTypeCas:
 		return "cas"
-	case RequestTypeGet:
+	case MsgTypeGet:
 		return "get"
-	case RequestTypeGets:
+	case MsgTypeGets:
 		return "gets"
-	case RequestTypeDelete:
+	case MsgTypeDelete:
 		return "delete"
-	case RequestTypeIncr:
+	case MsgTypeIncr:
 		return "incr"
-	case RequestTypeDecr:
+	case MsgTypeDecr:
 		return "decr"
-	case RequestTypeTouch:
+	case MsgTypeTouch:
 		return "touch"
-	case RequestTypeGat:
+	case MsgTypeGat:
 		return "gat"
-	case RequestTypeGats:
+	case MsgTypeGats:
 		return "gats"
 	}
 	return "unknown"
 }
 
-// all memcache request type
+// all memcache Msg type
 const (
-	RequestTypeUnknown RequestType = iota
-	RequestTypeSet
-	RequestTypeAdd
-	RequestTypeReplace
-	RequestTypeAppend
-	RequestTypePrepend
-	RequestTypeCas
-	RequestTypeGet
-	RequestTypeGets
-	RequestTypeDelete
-	RequestTypeIncr
-	RequestTypeDecr
-	RequestTypeTouch
-	RequestTypeGat
-	RequestTypeGats
+	MsgTypeUnknown MsgType = iota
+	MsgTypeSet
+	MsgTypeAdd
+	MsgTypeReplace
+	MsgTypeAppend
+	MsgTypePrepend
+	MsgTypeCas
+	MsgTypeGet
+	MsgTypeGets
+	MsgTypeDelete
+	MsgTypeIncr
+	MsgTypeDecr
+	MsgTypeTouch
+	MsgTypeGat
+	MsgTypeGats
+)
+
+var (
+	withDataMsgTypes = map[MsgType]struct{}{
+		MsgTypeGet:  struct{}{},
+		MsgTypeGets: struct{}{},
+		MsgTypeGat:  struct{}{},
+		MsgTypeGats: struct{}{},
+	}
 )
 
 // errors
@@ -101,7 +102,7 @@ var (
 	// means some sort of client error in the input line, i.e. the input
 	// doesn't conform to the protocol in some way. <error> is a
 	// human-readable error string.
-	ErrBadRequest = errs.New("CLIENT_ERROR bad request")
+	ErrBadMsg     = errs.New("CLIENT_ERROR bad Msg")
 	ErrBadKey     = errs.New("CLIENT_ERROR key invalid")
 	ErrBadFlags   = errs.New("CLIENT_ERROR flags is not a valid integer")
 	ErrBadExptime = errs.New("CLIENT_ERROR exptime is not a valid integer")
@@ -117,12 +118,12 @@ var (
 	// case in which the server closes a connection to a client.
 	ErrClosed         = errs.New("SERVER_ERROR connection closed")
 	ErrPingerPong     = errs.New("SERVER_ERROR Pinger pong unexpected")
-	ErrAssertRequest  = errs.New("SERVER_ERROR assert MC request not ok")
+	ErrAssertMsg      = errs.New("SERVER_ERROR assert MC Msg not ok")
 	ErrAssertResponse = errs.New("SERVER_ERROR assert MC response not ok")
 	ErrBadResponse    = errs.New("SERVER_ERROR bad response")
 )
 
-// MCRequest is the mc client request type and data.
+// MCMsg is the mc client Msg type and data.
 // Storage commands:
 // 	<command name> <key> <flags> <exptime> <bytes> [noreply]\r\n
 //  cas <key> <flags> <exptime> <bytes> <cas unique> [noreply]\r\n
@@ -136,44 +137,52 @@ var (
 // 	touch <key> <exptime> [noreply]\r\n
 // Get And Touch:
 // 	gat|gats <exptime> <key>*\r\n
-type MCRequest struct {
-	rTp   RequestType
+type MCMsg struct {
+	rTp   MsgType
 	key   []byte
 	data  []byte
 	batch bool
+
+	subReq []*proto.Msg
 }
 
-// Cmd get request cmd.
-func (r *MCRequest) Cmd() string {
+// Cmd get Msg cmd.
+func (r *MCMsg) Cmd() string {
 	return r.rTp.String()
 }
 
-// Key get request key.
-func (r *MCRequest) Key() []byte {
+// Key get Msg key.
+func (r *MCMsg) Key() []byte {
 	return r.key
 }
 
 // IsBatch returns whether or not batch.
-func (r *MCRequest) IsBatch() bool {
+func (r *MCMsg) IsBatch() bool {
 	return r.batch
 }
 
-// Batch returns sub MC request by multi key.
-func (r *MCRequest) Batch() ([]proto.Request, *proto.Response) {
+// Batch returns sub MC Msg by multi key.
+func (r *MCMsg) Batch() []proto.Msg {
 	n := bytes.Count(r.key, spaceBytes) // NOTE: like 'a_11 a_22 a_33'
 	if n == 0 {
-		return nil, nil
+		return nil
 	}
-	subs := make([]proto.Request, n+1)
+	subs := make([]proto.Msg, n+1)
+	r.subReq = make([]*proto.Msg, n+1)
 	begin := 0
 	end := bytes.IndexByte(r.key, spaceByte)
 	for i := 0; i <= n; i++ {
+		subs[i] = *proto.NewMsg()
 		subs[i].Type = proto.CacheTypeMemcache
-		subs[i].WithProto(&MCRequest{
-			rTp:  r.rTp,
-			key:  r.key[begin:end],
-			data: r.data,
-		})
+		msg := MCMsg{
+			rTp:   r.rTp,
+			key:   r.key[begin:end],
+			data:  r.data,
+			batch: true,
+		}
+
+		subs[i].WithProto(&msg)
+		r.subReq[i] = &subs[i]
 		begin = end + 1
 		if i >= n-1 { // NOTE: the last sub.
 			end = len(r.key)
@@ -181,63 +190,21 @@ func (r *MCRequest) Batch() ([]proto.Request, *proto.Response) {
 			end = begin + bytes.IndexByte(r.key[end+1:], spaceByte)
 		}
 	}
-	resp := &proto.Response{Type: proto.CacheTypeMemcache}
-	resp.WithProto(&MCResponse{rTp: r.rTp})
-	return subs, resp
+	return subs
 }
 
-func (r *MCRequest) String() string {
+func (r *MCMsg) String() string {
 	return "type:" + r.rTp.String() + " key:" + string(r.key) + " data:" + string(r.data)
 }
 
-// MCResponse is the mc server response type and data.
-type MCResponse struct {
-	rTp  RequestType
-	data []byte
-}
-
-// Merge merges subs response into self.
-// NOTE: This normally means that the Merge func for an get|gets|gat|gats command.
-func (r *MCResponse) Merge(subs []proto.Request) {
-	if r.rTp != RequestTypeGet && r.rTp != RequestTypeGets && r.rTp != RequestTypeGat && r.rTp != RequestTypeGats {
-		// TODO(felix): log or ???
-		return
+// Merge merge subreq's response.
+func (r *MCMsg) Merge() [][]byte {
+	rs := make([][]byte, len(r.subReq))
+	for i, sub := range r.subReq {
+		rs[i] = bytes.TrimSuffix(sub.Bytes(), endBytes)
 	}
-	const endBytesLen = 5 // NOTE: endBytes length
-	subl := len(subs)
-	rebs := make([][]byte, subl)
-	reln := 0
-	for i := 0; i < subl; i++ {
-		if err := subs[i].Resp.Err(); err != nil {
-			// TODO(felix): log or ???
-			continue
-		}
-		mcr, ok := subs[i].Resp.Proto().(*MCResponse)
-		if !ok {
-			// TODO(felix): log or ???
-			continue
-		}
-		if bytes.Equal(mcr.data, endBytes) {
-			continue
-		}
-		rebs[i] = mcr.data[:len(mcr.data)-endBytesLen]
-		reln += len(rebs[i])
+	if _, ok := withDataMsgTypes[r.rTp]; ok {
+		rs = append(rs, endBytes)
 	}
-	sa, ok := bufPool.Get().(*bufio.SliceAlloc)
-	if !ok {
-		r.data = make([]byte, reln+endBytesLen) // TODO(felix): optimize
-	} else {
-		r.data = sa.Make(reln + endBytesLen)
-		bufPool.Put(sa)
-	}
-	off := 0
-	for i := 0; i < subl; i++ {
-		bs := rebs[i]
-		if len(bs) == 0 {
-			continue
-		}
-		copy(r.data[off:], bs)
-		off += len(bs)
-	}
-	copy(r.data[off:], endBytes)
+	return rs
 }
