@@ -82,10 +82,9 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				// cache type
 				switch cc.CacheType {
 				case proto.CacheTypeMemcache:
-					encoder := memcache.NewEncoder(conn)
-					msg := &proto.Msg{}
-					msg.WithError(ErrProxyMoreMaxConns)
-					encoder.Encode(msg)
+					encoder := memcache.NewProxyConn(conn)
+					m := proto.ErrMessage(ErrProxyMoreMaxConns)
+					encoder.Encode(m)
 					conn.Close()
 				case proto.CacheTypeRedis:
 					// TODO(felix): support redis.

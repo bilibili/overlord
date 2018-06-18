@@ -60,10 +60,7 @@ type ClusterConfig struct {
 	DialTimeout      int             `toml:"dial_timeout"`
 	ReadTimeout      int             `toml:"read_timeout"`
 	WriteTimeout     int             `toml:"write_timeout"`
-	PoolActive       int             `toml:"pool_active"`
-	PoolIdle         int             `toml:"pool_idle"`
-	PoolIdleTimeout  int             `toml:"pool_idle_timeout"`
-	PoolGetWait      bool            `toml:"pool_get_wait"`
+	NodeConnections  int32           `toml:"node_connections"`
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
 	Servers          []string

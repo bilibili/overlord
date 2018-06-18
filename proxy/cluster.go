@@ -10,12 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/felixhao/overlord/lib/backoff"
 	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/hashkit"
 	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/pool"
-	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -39,18 +36,18 @@ type pinger struct {
 type channel struct {
 	idx int32
 	cnt int32
-	chs []chan *proto.Msg
+	chs []chan *proto.Message
 }
 
 func newChannel(n int32) *channel {
-	chs := make([]chan *proto.Msg, n)
+	chs := make([]chan *proto.Message, n)
 	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.Msg, MsgChanBuffer)
+		chs[i] = make(chan *proto.Message, 1)
 	}
 	return &channel{cnt: n, chs: chs}
 }
 
-func (c *channel) push(req *proto.Msg) {
+func (c *channel) push(req *proto.Message) {
 	i := atomic.AddInt32(&c.idx, 1)
 	c.chs[i%c.cnt] <- req
 }
@@ -63,12 +60,12 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring      *hashkit.HashRing
-	alias     bool
-	nodePool  map[string]*pool.Pool
+	ring  *hashkit.HashRing
+	alias bool
+	// nodeConn  map[string]proto.NodeConn
 	nodeAlias map[string]string
-	nodePing  map[string]*pinger
-	nodeCh    map[string]*channel
+	// nodePing  map[string]*pinger
+	nodeCh map[string]*channel
 
 	lock   sync.Mutex
 	closed bool
@@ -92,9 +89,9 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	} else {
 		ring.Init(addrs, ws)
 	}
-	nm := map[string]*pool.Pool{}
+	// nm := map[string]proto.NodeConn{}
 	am := map[string]string{}
-	pm := map[string]*pinger{}
+	// pm := map[string]*pinger{}
 	cm := map[string]*channel{}
 	// for addrs
 	for i := range addrs {
@@ -103,86 +100,105 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 			node = ans[i]
 			am[ans[i]] = addrs[i]
 		}
-		nm[node] = newPool(cc, addrs[i])
-		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
+		rc := newChannel(cc.NodeConnections)
+		cm[node] = rc
+		go c.process(rc, addrs[i])
+		// nm[node] = newNodeConn(cc, addrs[i])
+		// pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
 
 	}
 	c.ring = ring
 	c.alias = alias
-	c.nodePool = nm
+	// c.nodeConn = nm
 	c.nodeAlias = am
-	c.nodePing = pm
-	for node := range c.nodePool {
-		rc := newChannel(int32(cc.PoolActive))
-		cm[node] = rc
-		go c.process(node, rc)
-	}
+	// c.nodePing = pm
+	// for node := range c.nodeConn {
+	// 	rc := newChannel(cc.NodeConnections)
+	// 	cm[node] = rc
+	// 	go c.process(node, rc)
+	// }
 	c.nodeCh = cm
 	// auto eject
-	if cc.PingAutoEject {
-		c.keepAlive()
-	}
+	// if cc.PingAutoEject {
+	// 	c.keepAlive()
+	// }
 	return
 }
 
 // Dispatch dispatchs Msg.
-func (c *Cluster) Dispatch(req *proto.Msg) {
+func (c *Cluster) Dispatch(m *proto.Message) {
 	// hash
-	node, ok := c.hash(req.Key())
+	node, ok := c.hash(m.Request().Key())
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
+			// log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
 		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg hash"))
+		m.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg hash"))
 		return
 	}
 	rc, ok := c.nodeCh[node]
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) Msg(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
+			// log.Warnf("cluster(%s) addr(%s) Msg(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
 		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg node chan"))
+		m.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg node chan"))
 		return
 	}
-	rc.push(req)
+	rc.push(m)
 }
 
-func (c *Cluster) process(node string, rc *channel) {
+func (c *Cluster) process(rc *channel, addr string) {
 	for i := int32(0); i < rc.cnt; i++ {
 		go func(i int32) {
 			ch := rc.chs[i]
-			hdl, herr := c.get(node)
-			for {
-				var req *proto.Msg
-				select {
-				case req = <-ch:
-				case <-c.ctx.Done():
-					return
-				}
-				if herr != nil {
-					req.DoneWithError(errors.Wrap(herr, "Cluster process get handler"))
-					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, herr)
-					}
-					hdl, herr = c.get(node)
-					continue
-				}
-				now := time.Now()
-				err := hdl.Handle(req)
-				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
-				if err != nil {
-					c.put(node, hdl, err)
-					hdl, herr = c.get(node)
-					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
-					}
-					stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
-					continue
-				}
-				req.Done()
-			}
+			w := newNodeConn(c.cc, addr)
+			mCh := make(chan *proto.Message, 1024)
+			go c.processWrite(ch, w, mCh)
+			go c.processRead(w, mCh)
 		}(i)
+	}
+}
+
+func (c *Cluster) processWrite(ch <-chan *proto.Message, w proto.NodeConn, mCh chan<- *proto.Message) {
+	for {
+		var m *proto.Message
+		select {
+		case m = <-ch:
+		case <-c.ctx.Done():
+			w.Close()
+			return
+		default:
+			// TODO(felix): multi
+		}
+		// now := time.Now()
+		err := w.Write(m)
+		// stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
+		if err != nil {
+			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
+			if log.V(1) {
+				// log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+			}
+			// stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
+			continue
+		}
+		mCh <- m
+	}
+}
+
+func (c *Cluster) processRead(r proto.NodeConn, mCh <-chan *proto.Message) {
+	for {
+		m := <-mCh
+		m.ResetBuffer()
+		err := r.Read(m)
+		if err != nil {
+			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
+			if log.V(1) {
+				// log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
+			}
+			// stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
+			continue
+		}
+		m.Done()
 	}
 }
 
@@ -203,33 +219,6 @@ func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	return
 }
 
-// get returns proto handler by node name.
-func (c *Cluster) get(node string) (h proto.Handler, err error) {
-	p, ok := c.nodePool[node]
-	if !ok {
-		err = ErrClusterHashNoNode
-		return
-	}
-	tmp := p.Get()
-	if h, ok = tmp.(proto.Handler); !ok {
-		err = ErrClusterHashNoNode
-	}
-	return
-}
-
-// put puts proto handler into pool by node name.
-func (c *Cluster) put(node string, h proto.Handler, err error) {
-	p, ok := c.nodePool[node]
-	if !ok {
-		return
-	}
-	conn, ok := h.(pool.Conn)
-	if !ok {
-		return
-	}
-	p.Put(conn, err != nil)
-}
-
 // Close closes resources.
 func (c *Cluster) Close() error {
 	c.lock.Lock()
@@ -238,46 +227,46 @@ func (c *Cluster) Close() error {
 		return nil
 	}
 	c.closed = true
-	for _, p := range c.nodePing {
-		p.ping.Close()
-	}
-	for _, p := range c.nodePool {
-		p.Close()
-	}
+	// for _, p := range c.nodePing {
+	// 	p.ping.Close()
+	// }
+	// for _, p := range c.nodeConn {
+	// 	p.Close()
+	// }
 	return nil
 }
 
 func (c *Cluster) keepAlive() {
-	var period = func(p *pinger) {
-		del := false
-		for {
-			if err := p.ping.Ping(); err != nil {
-				p.failure++
-				p.retries = 0
-			} else {
-				p.failure = 0
-				if del {
-					c.ring.AddNode(p.node, p.weight)
-					del = false
-				}
-			}
-			if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
-				c.ring.DelNode(p.node)
-				del = true
-			}
-			select {
-			case <-time.After(backoff.Backoff(p.retries)):
-				p.retries++
-				continue
-			case <-c.ctx.Done():
-				return
-			}
-		}
-	}
+	// var period = func(p *pinger) {
+	// 	del := false
+	// 	for {
+	// 		if err := p.ping.Ping(); err != nil {
+	// 			p.failure++
+	// 			p.retries = 0
+	// 		} else {
+	// 			p.failure = 0
+	// 			if del {
+	// 				c.ring.AddNode(p.node, p.weight)
+	// 				del = false
+	// 			}
+	// 		}
+	// 		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
+	// 			c.ring.DelNode(p.node)
+	// 			del = true
+	// 		}
+	// 		select {
+	// 		case <-time.After(backoff.Backoff(p.retries)):
+	// 			p.retries++
+	// 			continue
+	// 		case <-c.ctx.Done():
+	// 			return
+	// 		}
+	// 	}
+	// }
 	// keepalive
-	for _, p := range c.nodePing {
-		go period(p)
-	}
+	// for _, p := range c.nodePing {
+	// 	go period(p)
+	// }
 }
 
 func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias bool, err error) {
@@ -319,33 +308,13 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 	return
 }
 
-func newPool(cc *ClusterConfig, addr string) *pool.Pool {
-	var dial *pool.PoolOption
+func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	dto := time.Duration(cc.DialTimeout) * time.Millisecond
 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
-		dial = pool.PoolDial(memcache.Dial(cc.Name, addr, dto, rto, wto))
-	case proto.CacheTypeRedis:
-		// TODO(felix): support redis
-	default:
-		panic(proto.ErrNoSupportCacheType)
-	}
-	act := pool.PoolActive(cc.PoolActive)
-	idle := pool.PoolIdle(cc.PoolIdle)
-	idleTo := pool.PoolIdleTimeout(time.Duration(cc.PoolIdleTimeout) * time.Millisecond)
-	wait := pool.PoolWait(cc.PoolGetWait)
-	return pool.NewPool(dial, act, idle, idleTo, wait)
-}
-
-func newPinger(cc *ClusterConfig, addr string) proto.Pinger {
-	dto := time.Duration(cc.DialTimeout) * time.Millisecond
-	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
-	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
-		return memcache.NewPinger(addr, dto, rto, wto)
+		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
 		// TODO(felix): support redis
 	default:
@@ -353,3 +322,18 @@ func newPinger(cc *ClusterConfig, addr string) proto.Pinger {
 	}
 	return nil
 }
+
+// func newPinger(cc *ClusterConfig, addr string) proto.Pinger {
+// 	dto := time.Duration(cc.DialTimeout) * time.Millisecond
+// 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
+// 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
+// 	switch cc.CacheType {
+// 	case proto.CacheTypeMemcache:
+// 		// return memcache.NewPinger(addr, dto, rto, wto)
+// 	case proto.CacheTypeRedis:
+// 		// TODO(felix): support redis
+// 	default:
+// 		panic(proto.ErrNoSupportCacheType)
+// 	}
+// 	return nil
+// }

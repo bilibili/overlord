@@ -1,11 +1,8 @@
 package memcache
 
 import (
-	"bytes"
 	errs "errors"
 	"math"
-
-	"github.com/felixhao/overlord/proto"
 )
 
 const (
@@ -28,38 +25,38 @@ var (
 	// touchedBytes   = []byte("TOUCHED\r\n")
 )
 
-// MsgType is the protocol-agnostic identifier for the command
-type MsgType byte
+// RequestType is the protocol-agnostic identifier for the command
+type RequestType byte
 
-func (rt MsgType) String() string {
+func (rt RequestType) String() string {
 	switch rt {
-	case MsgTypeSet:
+	case RequestTypeSet:
 		return "set"
-	case MsgTypeAdd:
+	case RequestTypeAdd:
 		return "add"
-	case MsgTypeReplace:
+	case RequestTypeReplace:
 		return "replace"
-	case MsgTypeAppend:
+	case RequestTypeAppend:
 		return "append"
-	case MsgTypePrepend:
+	case RequestTypePrepend:
 		return "prepend"
-	case MsgTypeCas:
+	case RequestTypeCas:
 		return "cas"
-	case MsgTypeGet:
+	case RequestTypeGet:
 		return "get"
-	case MsgTypeGets:
+	case RequestTypeGets:
 		return "gets"
-	case MsgTypeDelete:
+	case RequestTypeDelete:
 		return "delete"
-	case MsgTypeIncr:
+	case RequestTypeIncr:
 		return "incr"
-	case MsgTypeDecr:
+	case RequestTypeDecr:
 		return "decr"
-	case MsgTypeTouch:
+	case RequestTypeTouch:
 		return "touch"
-	case MsgTypeGat:
+	case RequestTypeGat:
 		return "gat"
-	case MsgTypeGats:
+	case RequestTypeGats:
 		return "gats"
 	}
 	return "unknown"
@@ -67,29 +64,29 @@ func (rt MsgType) String() string {
 
 // all memcache Msg type
 const (
-	MsgTypeUnknown MsgType = iota
-	MsgTypeSet
-	MsgTypeAdd
-	MsgTypeReplace
-	MsgTypeAppend
-	MsgTypePrepend
-	MsgTypeCas
-	MsgTypeGet
-	MsgTypeGets
-	MsgTypeDelete
-	MsgTypeIncr
-	MsgTypeDecr
-	MsgTypeTouch
-	MsgTypeGat
-	MsgTypeGats
+	RequestTypeUnknown RequestType = iota
+	RequestTypeSet
+	RequestTypeAdd
+	RequestTypeReplace
+	RequestTypeAppend
+	RequestTypePrepend
+	RequestTypeCas
+	RequestTypeGet
+	RequestTypeGets
+	RequestTypeDelete
+	RequestTypeIncr
+	RequestTypeDecr
+	RequestTypeTouch
+	RequestTypeGat
+	RequestTypeGats
 )
 
 var (
-	withDataMsgTypes = map[MsgType]struct{}{
-		MsgTypeGet:  struct{}{},
-		MsgTypeGets: struct{}{},
-		MsgTypeGat:  struct{}{},
-		MsgTypeGats: struct{}{},
+	withDataMsgTypes = map[RequestType]struct{}{
+		RequestTypeGet:  struct{}{},
+		RequestTypeGets: struct{}{},
+		RequestTypeGat:  struct{}{},
+		RequestTypeGats: struct{}{},
 	}
 )
 
@@ -102,7 +99,7 @@ var (
 	// means some sort of client error in the input line, i.e. the input
 	// doesn't conform to the protocol in some way. <error> is a
 	// human-readable error string.
-	ErrBadMsg     = errs.New("CLIENT_ERROR bad Msg")
+	ErrBadRequest = errs.New("CLIENT_ERROR bad request")
 	ErrBadKey     = errs.New("CLIENT_ERROR key invalid")
 	ErrBadFlags   = errs.New("CLIENT_ERROR flags is not a valid integer")
 	ErrBadExptime = errs.New("CLIENT_ERROR exptime is not a valid integer")
@@ -123,7 +120,7 @@ var (
 	ErrBadResponse    = errs.New("SERVER_ERROR bad response")
 )
 
-// MCMsg is the mc client Msg type and data.
+// MCRequest is the mc client Msg type and data.
 // Storage commands:
 // 	<command name> <key> <flags> <exptime> <bytes> [noreply]\r\n
 //  cas <key> <flags> <exptime> <bytes> <cas unique> [noreply]\r\n
@@ -137,74 +134,74 @@ var (
 // 	touch <key> <exptime> [noreply]\r\n
 // Get And Touch:
 // 	gat|gats <exptime> <key>*\r\n
-type MCMsg struct {
-	rTp   MsgType
+type MCRequest struct {
+	rTp   RequestType
 	key   []byte
 	data  []byte
 	batch bool
 
-	subReq []*proto.Msg
+	// subReq []*proto.Msg
 }
 
 // Cmd get Msg cmd.
-func (r *MCMsg) Cmd() string {
+func (r *MCRequest) Cmd() string {
 	return r.rTp.String()
 }
 
 // Key get Msg key.
-func (r *MCMsg) Key() []byte {
+func (r *MCRequest) Key() []byte {
 	return r.key
 }
 
-// IsBatch returns whether or not batch.
-func (r *MCMsg) IsBatch() bool {
-	return r.batch
-}
+// // IsBatch returns whether or not batch.
+// func (r *MCRequest) IsBatch() bool {
+// 	return r.batch
+// }
 
-// Batch returns sub MC Msg by multi key.
-func (r *MCMsg) Batch() []proto.Msg {
-	n := bytes.Count(r.key, spaceBytes) // NOTE: like 'a_11 a_22 a_33'
-	if n == 0 {
-		return nil
-	}
-	subs := make([]proto.Msg, n+1)
-	r.subReq = make([]*proto.Msg, n+1)
-	begin := 0
-	end := bytes.IndexByte(r.key, spaceByte)
-	for i := 0; i <= n; i++ {
-		subs[i] = *proto.NewMsg()
-		subs[i].Type = proto.CacheTypeMemcache
-		msg := MCMsg{
-			rTp:   r.rTp,
-			key:   r.key[begin:end],
-			data:  r.data,
-			batch: true,
-		}
+// // Batch returns sub MC Msg by multi key.
+// func (r *MCRequest) Batch() []proto.Message {
+// 	n := bytes.Count(r.key, spaceBytes) // NOTE: like 'a_11 a_22 a_33'
+// 	if n == 0 {
+// 		return nil
+// 	}
+// 	subs := make([]proto.Msg, n+1)
+// 	r.subReq = make([]*proto.Msg, n+1)
+// 	begin := 0
+// 	end := bytes.IndexByte(r.key, spaceByte)
+// 	for i := 0; i <= n; i++ {
+// 		subs[i] = *proto.NewMsg()
+// 		subs[i].Type = proto.CacheTypeMemcache
+// 		msg := MCMsg{
+// 			rTp:   r.rTp,
+// 			key:   r.key[begin:end],
+// 			data:  r.data,
+// 			batch: true,
+// 		}
 
-		subs[i].WithProto(&msg)
-		r.subReq[i] = &subs[i]
-		begin = end + 1
-		if i >= n-1 { // NOTE: the last sub.
-			end = len(r.key)
-		} else {
-			end = begin + bytes.IndexByte(r.key[end+1:], spaceByte)
-		}
-	}
-	return subs
-}
+// 		subs[i].WithProto(&msg)
+// 		r.subReq[i] = &subs[i]
+// 		begin = end + 1
+// 		if i >= n-1 { // NOTE: the last sub.
+// 			end = len(r.key)
+// 		} else {
+// 			end = begin + bytes.IndexByte(r.key[end+1:], spaceByte)
+// 		}
+// 	}
+// 	return subs
+// }
 
-func (r *MCMsg) String() string {
+func (r *MCRequest) String() string {
 	return "type:" + r.rTp.String() + " key:" + string(r.key) + " data:" + string(r.data)
 }
 
-// Merge merge subreq's response.
-func (r *MCMsg) Merge() [][]byte {
-	rs := make([][]byte, len(r.subReq))
-	for i, sub := range r.subReq {
-		rs[i] = bytes.TrimSuffix(sub.Bytes(), endBytes)
-	}
-	if _, ok := withDataMsgTypes[r.rTp]; ok {
-		rs = append(rs, endBytes)
-	}
-	return rs
-}
+// // Merge merge subreq's response.
+// func (r *MCRequest) Merge() [][]byte {
+// 	rs := make([][]byte, len(r.subReq))
+// 	for i, sub := range r.subReq {
+// 		rs[i] = bytes.TrimSuffix(sub.Bytes(), endBytes)
+// 	}
+// 	if _, ok := withDataMsgTypes[r.rTp]; ok {
+// 		rs = append(rs, endBytes)
+// 	}
+// 	return rs
+// }
