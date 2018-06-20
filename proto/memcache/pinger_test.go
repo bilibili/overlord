@@ -95,9 +95,7 @@ func TestPingerPing100Ok(t *testing.T) {
 
 	err := pinger.Ping()
 	assert.Error(t, err)
-
-	err = errors.Cause(err)
-	assert.Equal(t, io.EOF, err)
+	_causeEqual(t, io.EOF, err)
 }
 
 func TestPingerClosed(t *testing.T) {
@@ -108,4 +106,13 @@ func TestPingerClosed(t *testing.T) {
 
 	err = pinger.Ping()
 	assert.Error(t, err)
+	assert.NoError(t, pinger.Close())
+}
+
+func TestPingerNotReturnPong(t *testing.T) {
+	conn := _createRepeatConn([]byte("baka\r\n"), 100)
+	pinger := newMCPinger(conn)
+	err := pinger.Ping()
+	assert.Error(t, err)
+	_causeEqual(t, ErrPingerPong, err)
 }

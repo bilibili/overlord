@@ -47,10 +47,6 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	}
 	bg, ed := nextField(line)
 	lower := conv.ToLower(line[bg:ed])
-	if len(lower) == 0 {
-		err = errors.Wrapf(ErrBadRequest, "MC request get bad with zero length")
-		return
-	}
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -116,7 +112,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
+		err = errors.Wrap(ErrBadKey, "MC decoder storage request legal key")
 		return
 	}
 	// length
@@ -133,7 +129,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		return
 	}
 	if !bytes.HasSuffix(data, crlfBytes) {
-		err = errors.Wrap(ErrBadLength, "MC decoder data not end with CRLF")
+		err = errors.Wrap(ErrBadRequest, "MC decoder data not end with CRLF")
 		return
 	}
 	m.WithRequest(&MCRequest{
@@ -190,7 +186,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
+		err = errors.Wrap(ErrBadKey, "MC decoder incr/decr request legal key")
 		return
 	}
 	ns := bs[keyE:]
@@ -214,7 +210,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
+		err = errors.Wrap(ErrBadKey, "MC decoder touch request legal key")
 		return
 	}
 	ns := bs[keyE:]
@@ -314,9 +310,6 @@ func legalKey(key []byte) bool {
 		return false
 	}
 	for i := 0; i < len(key); i++ {
-		if key[i] < ' ' {
-			return false
-		}
 		if key[i] <= ' ' {
 			return false
 		}

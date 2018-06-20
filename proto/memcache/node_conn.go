@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"sync/atomic"
 	"time"
@@ -109,6 +108,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 	}
 
 	if bytes.Equal(bs, endBytes) {
+		stat.Miss(n.cluster, n.addr)
 		m.ResetBuffer(n.br.Buffer())
 		return
 	}
@@ -119,15 +119,10 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 
-	if bytes.Equal(bs, endBytes) {
-		stat.Miss(n.cluster, n.addr)
-		return
-	}
-
 	stat.Hit(n.cluster, n.addr)
 
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
-	fmt.Println("bs:", bs, "rtype:", mcr.rTp.String(), "length:", length, "err:", err)
+	// fmt.Println("bs:", bs, "rtype:", mcr.rTp.String(), "length:", length, "err:", err)
 	// fmt.Printf("bs len:%d bs:%v bs-str:%s length:%d error:%s\n", len(bs), bs, string(bs), length, err)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")

@@ -28,6 +28,11 @@ func newMCPinger(nc *libnet.Conn) *mcPinger {
 }
 
 func (m *mcPinger) Ping() (err error) {
+	if atomic.LoadInt32(&m.closed) == handlerClosed {
+		err = ErrPingerPong
+		return
+	}
+
 	err = m.bw.WriteString(ping)
 	if err != nil {
 		err = errors.Wrap(err, "MC ping write")
