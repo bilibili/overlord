@@ -45,7 +45,7 @@ type NodeConn interface {
 }
 
 // Pinger ping node connection.
-type Pinger interface {
-	Ping() error
-	Close() error
-}
+// type Pinger interface {
+// 	Ping() error
+// 	Close() error
+// }

@@ -16,8 +16,6 @@ const (
 	errorPrefix       = "ERROR"
 	clientErrorPrefix = "CLIENT_ERROR "
 	serverErrorPrefix = "SERVER_ERROR "
-
-	encoderBufferSize = 64 * 1024 // NOTE: keep writing data into client, so relatively large
 )
 
 type proxyConn struct {
@@ -97,9 +95,24 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		p.bw.WriteString(se)
 		p.bw.Write(crlfBytes)
 	} else {
-		res := m.Response()
-		for _, bs := range res {
-			p.bw.Write(bs)
+		mcr, ok := m.Request().(*MCRequest)
+		if !ok {
+			p.bw.WriteString(serverErrorPrefix)
+			p.bw.WriteString(ErrAssertMsg.Error())
+			p.bw.Write(crlfBytes)
+		} else {
+			res := m.Response()
+			_, ok := withValueTypes[mcr.rTp]
+			trimEnd := ok && m.IsBatch()
+			for _, bs := range res {
+				if trimEnd {
+					bs = bytes.TrimRight(bs, endString)
+				}
+				p.bw.Write(bs)
+			}
+			if trimEnd {
+				p.bw.Write(endBytes)
+			}
 		}
 	}
 	if fe := p.bw.Flush(); fe != nil {
@@ -122,7 +135,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		return
 	}
 	keyOffset := len(bs) - keyE
-	p.br.Advance(-keyOffset)
+	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
 	data, err := p.br.ReadFull(keyOffset + length + 2)
 	if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
@@ -281,7 +294,6 @@ func nextField(bs []byte) (begin, end int) {
 }
 
 func findLength(bs []byte, cas bool) (int, error) {
-
 	pos := len(bs) - 2
 	if cas {
 		// skip cas filed
@@ -292,7 +304,6 @@ func findLength(bs []byte, cas bool) (int, error) {
 	if pos < 0 {
 		return 0, ErrBadLength
 	}
-
 	up := revNoSpacIdx(bs[:pos]) + 1
 	low := revSpacIdx(bs[:up]) + 1
 	lengthBs := bs[low:up]

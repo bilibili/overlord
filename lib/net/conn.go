@@ -22,7 +22,7 @@ type Conn struct {
 // DialWithTimeout will create new auto timeout Conn
 func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (c *Conn) {
 	sock, err := net.DialTimeout("tcp", addr, dialTimeout)
-	c = &Conn{Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout, err: err}
+	c = &Conn{addr: addr, Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout, err: err}
 	return
 }
 
@@ -34,7 +34,7 @@ func NewConn(sock net.Conn, readTimeout, writeTimeout time.Duration) (c *Conn) {
 
 // Dup will re-dial to the given addr by using timeouts stored in itself.
 func (c *Conn) Dup() *Conn {
-	return DialWithTimeout(c.RemoteAddr().String(), c.dialTimeout, c.readTimeout, c.writeTimeout)
+	return DialWithTimeout(c.addr, c.dialTimeout, c.readTimeout, c.writeTimeout)
 }
 
 // ReConnect re connect.
@@ -42,10 +42,7 @@ func (c *Conn) ReConnect() (err error) {
 	if c.Conn != nil {
 		c.Conn.Close()
 	}
-	if c.addr == "" {
-		return
-	}
-	if c.closed {
+	if c.addr == "" || c.closed {
 		return
 	}
 	sock, err := net.DialTimeout("tcp", c.addr, c.dialTimeout)

@@ -65,9 +65,9 @@ func (b *Buffer) Advance(n int) {
 	}
 }
 
-func (b *Buffer) Buf() []byte {
-	return b.buf
-}
+// func (b *Buffer) Buf() []byte {
+// 	return b.buf
+// }
 
 func (b *Buffer) buffered() int {
 	return b.w - b.r

@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-
 	"sync/atomic"
 
 	"github.com/felixhao/overlord/lib/bufio"
@@ -32,9 +31,7 @@ func (m *mcPinger) Ping() (err error) {
 		err = ErrPingerPong
 		return
 	}
-
-	err = m.bw.WriteString(ping)
-	if err != nil {
+	if err = m.bw.WriteString(ping); err != nil {
 		err = errors.Wrap(err, "MC ping write")
 		return
 	}
@@ -42,17 +39,13 @@ func (m *mcPinger) Ping() (err error) {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-
 	var b []byte
-	b, err = m.br.ReadUntil(delim)
-	if err != nil {
+	if b, err = m.br.ReadUntil(delim); err != nil {
 		err = errors.Wrap(err, "MC ping read response")
 		return
 	}
-
 	if !bytes.Equal(b, pong) {
 		err = ErrPingerPong
-		return
 	}
 	return
 }

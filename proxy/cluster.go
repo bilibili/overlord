@@ -144,6 +144,7 @@ func (c *Cluster) Dispatch(m *proto.Message) {
 }
 
 func (c *Cluster) process(rc *channel, addr string) {
+	var once sync.Once // FIXME(felix): pinger
 	for i := int32(0); i < rc.cnt; i++ {
 		go func(i int32) {
 			ch := rc.chs[i]
@@ -151,11 +152,13 @@ func (c *Cluster) process(rc *channel, addr string) {
 			mCh := make(chan *proto.Message, 1024)
 			go c.processWrite(ch, w, mCh)
 			go c.processRead(w, mCh)
-			// auto eject
-			if c.cc.PingAutoEject {
-				p := &pinger{ping: w, node: addr, weight: 1}
-				go c.processPing(p)
-			}
+			once.Do(func() {
+				// auto eject
+				if c.cc.PingAutoEject {
+					p := &pinger{ping: w, node: addr, weight: 1} // FIXME(felix): weight 1~~
+					go c.processPing(p)
+				}
+			})
 		}(i)
 	}
 }
@@ -255,6 +258,7 @@ func (c *Cluster) Close() error {
 	c.closed = true
 	return nil
 }
+
 func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias bool, err error) {
 	for _, svr := range svrs {
 		if strings.Contains(svr, " ") {

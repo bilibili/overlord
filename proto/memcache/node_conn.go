@@ -106,36 +106,33 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
-
+	n.br.Advance(-len(bs)) // NOTE: for response bytes
+	if _, ok := withValueTypes[mcr.rTp]; !ok {
+		// m.ResetBuffer(n.br.Buffer())
+		// m.Buffer().Advance(-len(bs))
+		return
+	}
 	if bytes.Equal(bs, endBytes) {
 		stat.Miss(n.cluster, n.addr)
-		m.ResetBuffer(n.br.Buffer())
+		// m.ResetBuffer(n.br.Buffer())
 		return
 	}
-
-	if _, ok := withDataMsgTypes[mcr.rTp]; !ok {
-		m.ResetBuffer(n.br.Buffer())
-		m.Buffer().Advance(-len(bs))
-		return
-	}
-
 	stat.Hit(n.cluster, n.addr)
-
+	// value length
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
-	// fmt.Println("bs:", bs, "rtype:", mcr.rTp.String(), "length:", length, "err:", err)
-	// fmt.Printf("bs len:%d bs:%v bs-str:%s length:%d error:%s\n", len(bs), bs, string(bs), length, err)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
-	rlen := length + 2 + len(endBytes)
+	rlen := len(bs) + length + 2 + len(endBytes)
 	if _, err = n.br.ReadFull(rlen); err != nil {
 		err = errors.Wrap(err, "MC Handler while reading length full data")
 		return
 	}
-	m.ResetBuffer(n.br.Buffer())
-	m.Buffer().Advance(-len(bs))
-	m.Buffer().Advance(-rlen)
+	n.br.Advance(-rlen) // NOTE: for response bytes
+	// m.ResetBuffer(n.br.Buffer())
+	// m.Buffer().Advance(-len(bs))
+	// m.Buffer().Advance(-rlen)
 	return
 }
 

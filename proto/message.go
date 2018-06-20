@@ -30,10 +30,6 @@ func NewMessage() *Message {
 	}
 }
 
-func (m *Message) Wg() *sync.WaitGroup {
-	return m.wg
-}
-
 // Add add wg.
 func (m *Message) Add(n int) {
 	m.wg.Add(n)
@@ -71,9 +67,9 @@ func (m *Message) Buffer() *bufio.Buffer {
 
 // ResetBuffer will reset bufio's buffer,
 // for bufio's grow
-func (m *Message) ResetBuffer(buf *bufio.Buffer) {
-	m.buf = buf
-}
+// func (m *Message) ResetBuffer(buf *bufio.Buffer) {
+// 	m.buf = buf
+// }
 
 // Reset will return the Msg data to flush and reset
 func (m *Message) Reset() {
