@@ -3,6 +3,7 @@ package memcache
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"time"
 
@@ -18,14 +19,19 @@ const (
 	handlerClosed  = int32(1)
 )
 
+const ping = "set _ping 0 0 4\r\npong\r\n"
+
+var pong = []byte("STORED\r\n")
+
 type nodeConn struct {
 	cluster string
 	addr    string
 	conn    *libnet.Conn
 	bw      *bufio.Writer
 	br      *bufio.Reader
+	closed  int32
 
-	closed int32
+	pinger *mcPinger
 }
 
 // NewNodeConn returns node conn.
@@ -37,7 +43,19 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
 		br:      bufio.NewReader(conn, nil),
+		pinger:  newMCPinger(conn),
 	}
+	return
+}
+
+// Ping will send some special command by checking mc node is alive
+func (n *nodeConn) Ping() (err error) {
+	if n.Closed() {
+		err = io.EOF
+		return
+	}
+
+	err = n.pinger.Ping()
 	return
 }
 
@@ -52,16 +70,16 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-	n.bw.WriteString(mcr.rTp.String())
-	n.bw.Write(spaceBytes)
+	_ = n.bw.WriteString(mcr.rTp.String())
+	_ = n.bw.Write(spaceBytes)
 	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
-		n.bw.Write(mcr.data) // NOTE: exp time
-		n.bw.Write(spaceBytes)
-		n.bw.Write(mcr.key)
-		n.bw.Write(crlfBytes)
+		_ = n.bw.Write(mcr.data) // NOTE: exp time
+		_ = n.bw.Write(spaceBytes)
+		_ = n.bw.Write(mcr.key)
+		_ = n.bw.Write(crlfBytes)
 	} else {
-		n.bw.Write(mcr.key)
-		n.bw.Write(mcr.data)
+		_ = n.bw.Write(mcr.key)
+		_ = n.bw.Write(mcr.data)
 	}
 	if err = n.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
@@ -128,7 +146,10 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 
 func (n *nodeConn) Close() error {
 	if atomic.CompareAndSwapInt32(&n.closed, handlerOpening, handlerClosed) {
-		return n.conn.Close()
+		_ = n.pinger.Close()
+		n.pinger = nil
+		err := n.conn.Close()
+		return err
 	}
 	return nil
 }

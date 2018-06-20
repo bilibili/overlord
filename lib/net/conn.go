@@ -32,6 +32,11 @@ func NewConn(sock net.Conn, readTimeout, writeTimeout time.Duration) (c *Conn) {
 	return
 }
 
+// Dup will re-dial to the given addr by using timeouts stored in itself.
+func (c *Conn) Dup() *Conn {
+	return DialWithTimeout(c.RemoteAddr().String(), c.dialTimeout, c.readTimeout, c.writeTimeout)
+}
+
 // ReConnect re connect.
 func (c *Conn) ReConnect() (err error) {
 	if c.Conn != nil {

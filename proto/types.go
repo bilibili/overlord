@@ -40,6 +40,8 @@ type NodeConn interface {
 	Write(*Message) error
 	Read(*Message) error
 	Close() error
+
+	Ping() error
 }
 
 // Pinger ping node connection.

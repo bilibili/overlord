@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/felixhao/overlord/lib/backoff"
 	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/hashkit"
 	"github.com/felixhao/overlord/lib/log"
@@ -25,7 +26,7 @@ var (
 )
 
 type pinger struct {
-	ping   proto.Pinger
+	ping   proto.NodeConn
 	node   string
 	weight int
 
@@ -103,14 +104,13 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		rc := newChannel(cc.NodeConnections)
 		cm[node] = rc
 		go c.process(rc, addrs[i])
-		// nm[node] = newNodeConn(cc, addrs[i])
-		// pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
 
 	}
 	c.ring = ring
 	c.alias = alias
 	// c.nodeConn = nm
 	c.nodeAlias = am
+
 	// c.nodePing = pm
 	// for node := range c.nodeConn {
 	// 	rc := newChannel(cc.NodeConnections)
@@ -118,10 +118,6 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	// 	go c.process(node, rc)
 	// }
 	c.nodeCh = cm
-	// auto eject
-	// if cc.PingAutoEject {
-	// 	c.keepAlive()
-	// }
 	return
 }
 
@@ -155,6 +151,11 @@ func (c *Cluster) process(rc *channel, addr string) {
 			mCh := make(chan *proto.Message, 1024)
 			go c.processWrite(ch, w, mCh)
 			go c.processRead(w, mCh)
+			// auto eject
+			if c.cc.PingAutoEject {
+				p := &pinger{ping: w, node: addr, weight: 1}
+				go c.processPing(p)
+			}
 		}(i)
 	}
 }
@@ -200,6 +201,33 @@ func (c *Cluster) processRead(r proto.NodeConn, mCh <-chan *proto.Message) {
 	}
 }
 
+func (c *Cluster) processPing(p *pinger) {
+	del := false
+	for {
+		if err := p.ping.Ping(); err != nil {
+			p.failure++
+			p.retries = 0
+		} else {
+			p.failure = 0
+			if del {
+				c.ring.AddNode(p.node, p.weight)
+				del = false
+			}
+		}
+		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
+			c.ring.DelNode(p.node)
+			del = true
+		}
+		select {
+		case <-time.After(backoff.Backoff(p.retries)):
+			p.retries++
+			continue
+		case <-c.ctx.Done():
+			return
+		}
+	}
+}
+
 // hash returns node by hash hit.
 func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	var realKey []byte
@@ -225,48 +253,8 @@ func (c *Cluster) Close() error {
 		return nil
 	}
 	c.closed = true
-	// for _, p := range c.nodePing {
-	// 	p.ping.Close()
-	// }
-	// for _, p := range c.nodeConn {
-	// 	p.Close()
-	// }
 	return nil
 }
-
-func (c *Cluster) keepAlive() {
-	// var period = func(p *pinger) {
-	// 	del := false
-	// 	for {
-	// 		if err := p.ping.Ping(); err != nil {
-	// 			p.failure++
-	// 			p.retries = 0
-	// 		} else {
-	// 			p.failure = 0
-	// 			if del {
-	// 				c.ring.AddNode(p.node, p.weight)
-	// 				del = false
-	// 			}
-	// 		}
-	// 		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
-	// 			c.ring.DelNode(p.node)
-	// 			del = true
-	// 		}
-	// 		select {
-	// 		case <-time.After(backoff.Backoff(p.retries)):
-	// 			p.retries++
-	// 			continue
-	// 		case <-c.ctx.Done():
-	// 			return
-	// 		}
-	// 	}
-	// }
-	// keepalive
-	// for _, p := range c.nodePing {
-	// 	go period(p)
-	// }
-}
-
 func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias bool, err error) {
 	for _, svr := range svrs {
 		if strings.Contains(svr, " ") {
@@ -314,24 +302,9 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case proto.CacheTypeMemcache:
 		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
-		// TODO(felix): support redis
+	// TODO(felix): support redis
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
 	return nil
 }
-
-// func newPinger(cc *ClusterConfig, addr string) proto.Pinger {
-// 	dto := time.Duration(cc.DialTimeout) * time.Millisecond
-// 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
-// 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-// 	switch cc.CacheType {
-// 	case proto.CacheTypeMemcache:
-// 		// return memcache.NewPinger(addr, dto, rto, wto)
-// 	case proto.CacheTypeRedis:
-// 		// TODO(felix): support redis
-// 	default:
-// 		panic(proto.ErrNoSupportCacheType)
-// 	}
-// 	return nil
-// }
