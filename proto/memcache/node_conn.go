@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -66,21 +67,6 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
 		return
 	}
-
-	// h.br.ResetBuffer(req.Buf())
-	// bs, err := h.br.ReadUntil(delim)
-	// if err != nil {
-	// 	err = errors.Wrap(err, "MC Handler handle read response bytes")
-	// 	return
-	// }
-
-	// if _, ok := withDataMsgTypes[mcr.rTp]; ok {
-	// 	data, ierr := h.readResponseData(bs)
-	// 	err = ierr
-	// 	req.Forward(len(data))
-	// } else {
-	// 	req.Forward(len(bs))
-	// }
 	return
 }
 
@@ -90,79 +76,55 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
+	// TODO: this read was only support read one key's result
+	n.br.ResetBuffer(m.Buffer())
+
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-	n.br.ResetBuffer(m.Buffer())
 	bs, err := n.br.ReadUntil(delim)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
-	if _, ok := withDataMsgTypes[mcr.rTp]; !ok {
+
+	if bytes.Equal(bs, endBytes) {
+		m.ResetBuffer(n.br.Buffer())
 		return
 	}
+
+	if _, ok := withDataMsgTypes[mcr.rTp]; !ok {
+		m.ResetBuffer(n.br.Buffer())
+		m.Buffer().Advance(-len(bs))
+		return
+	}
+
 	if bytes.Equal(bs, endBytes) {
 		stat.Miss(n.cluster, n.addr)
 		return
 	}
+
 	stat.Hit(n.cluster, n.addr)
+
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
+	fmt.Println("bs:", bs, "rtype:", mcr.rTp.String(), "length:", length, "err:", err)
+	// fmt.Printf("bs len:%d bs:%v bs-str:%s length:%d error:%s\n", len(bs), bs, string(bs), length, err)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
-	if _, err = n.br.ReadFull(length); err != nil {
+	rlen := length + 2 + len(endBytes)
+	if _, err = n.br.ReadFull(rlen); err != nil {
 		err = errors.Wrap(err, "MC Handler while reading length full data")
+		return
 	}
+	m.ResetBuffer(n.br.Buffer())
+	m.Buffer().Advance(-len(bs))
+	m.Buffer().Advance(-rlen)
 	return
 }
-
-// func (n *nodeConn) readResponseData(bs []byte) (data []byte, err error) {
-// 	if bytes.Equal(bs, endBytes) {
-// 		stat.Miss(h.cluster, h.addr)
-// 		err = nil
-// 		return
-// 	}
-
-// 	stat.Hit(h.cluster, h.addr)
-// 	c := bytes.Count(bs, spaceBytes)
-// 	if c < 3 {
-// 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes split")
-// 		return
-// 	}
-
-// 	i := bytes.IndexByte(bs, spaceByte) + 1 // VALUE <key> <flags> <bytes> [<cas unique>]\r\n
-// 	i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
-// 	i = i + bytes.IndexByte(bs[i:], spaceByte) + 1
-// 	var high int
-
-// 	if len(bs[i:]) < 2 { // check if bytes length is null
-// 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes check")
-// 		return
-// 	}
-
-// 	if c == 3 {
-// 		// GET/GAT
-// 		high = len(bs) - 2
-// 	} else {
-// 		// GETS/GATS
-// 		high = i + bytes.IndexByte(bs[i:], spaceByte)
-// 	}
-
-// 	var size int64
-// 	if size, err = conv.Btoi(bs[i:high]); err != nil {
-// 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes length")
-// 		return
-// 	}
-// 	if data, err = h.br.ReReadFull(int(size+2), len(bs)); err != nil {
-// 		err = errors.Wrap(ErrBadResponse, "MC Handler handle read response bytes data")
-// 		return
-// 	}
-// 	return
-// }
 
 func (n *nodeConn) Close() error {
 	if atomic.CompareAndSwapInt32(&n.closed, handlerOpening, handlerClosed) {

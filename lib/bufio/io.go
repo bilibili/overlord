@@ -17,25 +17,7 @@ func NewReader(rd io.Reader, b *Buffer) *Reader {
 	return &Reader{rd: rd, b: b}
 }
 
-// NewReaderSize returns a new Reader whose buffer has at least the specified
-// size. If the argument io.Reader is already a Reader with large enough
-// size, it returns the underlying Reader.
-// func NewReaderSize(rd io.Reader, size int) *Reader {
-// 	if size <= 0 {
-// 		size = defaultBufferSize
-// 	}
-// 	return &Reader{rd: rd, buf: make([]byte, size)}
-// }
-
 func (r *Reader) fill() error {
-	// if r.err != nil {
-	// 	return r.err
-	// }
-	// if r.rpos > 0 {
-	// 	n := copy(r.buf, r.buf[r.rpos:r.wpos])
-	// 	r.rpos = 0
-	// 	r.wpos = n
-	// }
 	n, err := r.rd.Read(r.b.buf[r.b.w:])
 	if err != nil {
 		return err
@@ -47,9 +29,15 @@ func (r *Reader) fill() error {
 	return nil
 }
 
-// func (r *Reader) buffered() int {
-// 	return r.b.w - r.b.r
-// }
+// Advance proxy to buffer advance
+func (r *Reader) Advance(n int) {
+	r.b.Advance(n)
+}
+
+// Buffer will return the reference of local buffer
+func (r *Reader) Buffer() *Buffer {
+	return r.b
+}
 
 // ResetBuffer reset buf.
 func (r *Reader) ResetBuffer(b *Buffer) {
@@ -63,49 +51,8 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 	}
 	r.b = b
 	r.b.w = n
+	r.b.r = 0
 }
-
-// Read reads data into p.
-// It returns the number of bytes read into p.
-// The bytes are taken from at most one Read on the underlying Reader,
-// hence n may be less than len(p).
-// At EOF, the count will be zero and err will be io.EOF.
-// func (r *Reader) Read(p []byte) (int, error) {
-// 	if len(p) == 0 {
-// 		return 0, nil
-// 	}
-// 	if r.buffered() == 0 {
-// 		if len(p) >= len(b.buf) {
-// 			n, err := b.rd.Read(p)
-// 			if err != nil {
-// 				b.err = err
-// 			}
-// 			return n, b.err
-// 		}
-// 		if b.fill() != nil {
-// 			return 0, b.err
-// 		}
-// 	}
-// 	n := copy(p, b.buf[b.rpos:b.wpos])
-// 	b.rpos += n
-// 	return n, nil
-// }
-
-// ReadByte reads and returns a single byte.
-// If no byte is available, returns an error.
-// func (b *Reader) ReadByte() (byte, error) {
-// 	if b.err != nil {
-// 		return 0, b.err
-// 	}
-// 	if b.buffered() == 0 {
-// 		if b.fill() != nil {
-// 			return 0, b.err
-// 		}
-// 	}
-// 	c := b.buf[b.rpos]
-// 	b.rpos++
-// 	return c, nil
-// }
 
 // ReadUntil reads until the first occurrence of delim in the input,
 // returning a slice pointing at the bytes in the buffer.
@@ -125,45 +72,12 @@ func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
 		if r.b.w >= r.b.len() {
 			r.b.grow()
 		}
-		if err := r.fill(); err != nil {
+		err := r.fill()
+		if err != nil {
 			return nil, err
 		}
 	}
 }
-
-// ReadBytes reads until the first occurrence of delim in the input,
-// returning a slice containing the data up to and including the delimiter.
-// If ReadBytes encounters an error before finding a delimiter,
-// it returns the data read before the error and the error itself (often io.EOF).
-// ReadBytes returns err != nil if and only if the returned data does not end in
-// delim.
-// For simple uses, a Scanner may be more convenient.
-// func (b *Reader) ReadBytes(delim byte) ([]byte, error) {
-// 	var full [][]byte
-// 	var last []byte
-// 	var size int
-// 	for last == nil {
-// 		f, err := b.ReadSlice(delim)
-// 		if err != nil {
-// 			if err != bufio.ErrBufferFull {
-// 				return nil, b.err
-// 			}
-// 			dup := b.slice.Make(len(f))
-// 			copy(dup, f)
-// 			full = append(full, dup)
-// 		} else {
-// 			last = f
-// 		}
-// 		size += len(f)
-// 	}
-// 	var n int
-// 	var buf = b.slice.Make(size)
-// 	for _, frag := range full {
-// 		n += copy(buf[n:], frag)
-// 	}
-// 	copy(buf[n:], last)
-// 	return buf, nil
-// }
 
 // ReadFull reads exactly n bytes from r into buf.
 // It returns the number of bytes copied and an error if fewer bytes were read.
@@ -181,10 +95,11 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 			r.b.r += n
 			return bs, nil
 		}
-		if r.b.len()-r.b.w < n-r.b.buffered() {
+		maxCanRead := r.b.len() - r.b.w + r.b.buffered()
+		if maxCanRead < n {
 			r.b.grow()
 		}
-		if err := r.fill(); err != nil {
+		if err := r.fill(); err != nil && err != io.ErrNoProgress {
 			return nil, err
 		}
 	}
@@ -207,16 +122,6 @@ type Writer struct {
 func NewWriter(wr io.Writer) *Writer {
 	return &Writer{wr: wr, bufs: net.Buffers(make([][]byte, 0, 128))}
 }
-
-// NewWriterSize returns a new Writer whose buffer has at least the specified
-// size. If the argument io.Writer is already a Writer with large enough
-// size, it returns the underlying Writer.
-// func NewWriterSize(wr io.Writer, size int) *Writer {
-// 	if size <= 0 {
-// 		size = defaultBufferSize
-// 	}
-// 	return &Writer{wr: wr, buf: make([]byte, size)}
-// }
 
 // Flush writes any buffered data to the underlying io.Writer.
 func (w *Writer) Flush() error {
@@ -242,6 +147,10 @@ func (w *Writer) Write(p []byte) (err error) {
 	if w.err != nil {
 		return w.err
 	}
+	if p == nil {
+		return nil
+	}
+
 	if len(w.bufs) == 10 {
 		w.Flush()
 	}

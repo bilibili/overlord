@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -21,10 +22,6 @@ const (
 
 	messageChanBuffer = 1024 // TODO(felix): config???
 )
-
-// var (
-// 	hdlNum = runtime.NumCPU()
-// )
 
 // Handler handle conn.
 type Handler struct {
@@ -51,7 +48,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		cluster: cluster,
 	}
 	h.ctx, h.cancel = context.WithCancel(ctx)
-	h.conn = libnet.NewConn(conn, time.Duration(h.c.Proxy.ReadTimeout), time.Duration(h.c.Proxy.WriteTimeout))
+	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.c.Proxy.ReadTimeout), time.Second*time.Duration(h.c.Proxy.WriteTimeout))
 	// cache type
 	switch cluster.cc.CacheType {
 	case proto.CacheTypeMemcache:
@@ -90,10 +87,13 @@ func (h *Handler) handleReader() {
 			}
 			return
 		}
-		if m, err = h.pc.Decode(); err != nil {
-			m = proto.NewMessage()
+		m, err = h.pc.Decode()
+		if err != nil {
+			fmt.Println("decode error:", err)
+			break
 		}
-		m.Add()
+
+		m.Add(1)
 		if h.msgCh.PushBack(m) == 0 {
 			m.Done()
 			return
@@ -111,10 +111,10 @@ func (h *Handler) handleReader() {
 
 func (h *Handler) dispatch(m *proto.Message) {
 	if !m.IsBatch() {
-		m.Add()
 		h.cluster.Dispatch(m)
 		return
 	}
+
 	subs := m.Batch()
 	if len(subs) == 0 {
 		if log.V(3) {
@@ -124,8 +124,8 @@ func (h *Handler) dispatch(m *proto.Message) {
 		return
 	}
 	subl := len(subs)
+	m.Add(subl)
 	for i := 0; i < subl; i++ {
-		subs[i].Add()
 		h.cluster.Dispatch(&subs[i])
 	}
 	m.Done()
@@ -149,14 +149,6 @@ func (h *Handler) handleWriter() {
 			err = nil
 			continue
 		}
-		// select {
-		// case <-h.ctx.Done():
-		// 	if log.V(3) {
-		// 		log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) context canceled", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
-		// 	}
-		// 	return
-		// default:
-		// }
 		m, ok := h.msgCh.PopFront()
 		if !ok {
 			if log.V(3) {

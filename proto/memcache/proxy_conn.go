@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 
@@ -35,6 +36,7 @@ func NewProxyConn(rw io.ReadWriter) proto.ProxyConn {
 }
 
 func (p *proxyConn) Decode() (m *proto.Message, err error) {
+	println("entry decode")
 	// new message
 	m = proto.NewMessage()
 	m.Type = proto.CacheTypeMemcache
@@ -47,7 +49,11 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	}
 	bg, ed := nextField(line)
 	lower := conv.ToLower(line[bg:ed])
-	println("cmd:", string(lower))
+	if len(lower) == 0 {
+		err = errors.Wrapf(ErrBadRequest, "MC request get bad with zero length")
+		return
+	}
+	fmt.Println("cmd:", string(lower), bg, ed, line[bg:ed], line)
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -125,7 +131,10 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		return
 	}
 	println("length:", length)
-	data, err := p.br.ReadFull(length + 2)
+	keyOffset := len(bs) - keyE
+	p.br.Advance(-keyOffset)
+	fmt.Println("need read", keyOffset+length+2)
+	data, err := p.br.ReadFull(keyOffset + length + 2)
 	if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
 		return
@@ -292,6 +301,7 @@ func nextField(bs []byte) (begin, end int) {
 }
 
 func findLength(bs []byte, cas bool) (int, error) {
+
 	pos := len(bs) - 2
 	if cas {
 		// skip cas filed
@@ -299,6 +309,11 @@ func findLength(bs []byte, cas bool) (int, error) {
 		low := revSpacIdx(bs[:high])
 		pos = low
 	}
+	if pos < 0 {
+		fmt.Println("find bytes:", bs, "find str:", string(bs))
+		return 0, ErrBadLength
+	}
+
 	up := revNoSpacIdx(bs[:pos]) + 1
 	low := revSpacIdx(bs[:up]) + 1
 	lengthBs := bs[low:up]

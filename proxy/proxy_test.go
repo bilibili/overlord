@@ -24,13 +24,14 @@ var (
 			RedisAuth:        "",
 			DialTimeout:      1000,
 			ReadTimeout:      1000,
+			NodeConnections:  10,
 			WriteTimeout:     1000,
-			PoolActive:       50,
-			PoolIdle:         10,
-			PoolIdleTimeout:  100000,
-			PoolGetWait:      true,
-			PingFailLimit:    3,
-			PingAutoEject:    false,
+			// PoolActive:       50,
+			// PoolIdle:         10,
+			// PoolIdleTimeout:  100000,
+			// PoolGetWait:      true,
+			PingFailLimit: 3,
+			PingAutoEject: false,
 			Servers: []string{
 				"127.0.0.1:11211:10",
 				// "127.0.0.1:11212:10",
@@ -84,6 +85,7 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 	if err != nil {
 		t.Errorf("net dial error:%v", err)
 	}
+	defer conn.Close()
 	br := bufio.NewReader(conn)
 	for _, cmd := range cmds {
 		t.Logf("\n\nexecute cmd %s", cmd)
@@ -113,13 +115,13 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 			}
 		}
 		t.Logf("read string:%s", bs)
-
 	}
 }
 
 func TestProxy(t *testing.T) {
 	// for i := 0; i < 100; i++ {
 	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	// testCmd(t, cmds[0], cmds[1])
 	// }
 }
 

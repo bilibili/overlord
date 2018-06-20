@@ -30,9 +30,13 @@ func NewMessage() *Message {
 	}
 }
 
+func (m *Message) Wg() *sync.WaitGroup {
+	return m.wg
+}
+
 // Add add wg.
-func (m *Message) Add() {
-	m.wg.Add(1)
+func (m *Message) Add(n int) {
+	m.wg.Add(n)
 }
 
 // Done done.
@@ -65,8 +69,14 @@ func (m *Message) Buffer() *bufio.Buffer {
 	return m.buf
 }
 
-// ResetBuffer will return the Msg data to flush and reset
-func (m *Message) ResetBuffer() {
+// ResetBuffer will reset bufio's buffer,
+// for bufio's grow
+func (m *Message) ResetBuffer(buf *bufio.Buffer) {
+	m.buf = buf
+}
+
+// Reset will return the Msg data to flush and reset
+func (m *Message) Reset() {
 	m.buf.Reset()
 }
 
@@ -75,11 +85,6 @@ func (m *Message) ReleaseBuffer() {
 	bufio.Put(m.buf)
 }
 
-// // SetRefData sets the rdata to r.refData
-// func (r *Msg) SetRefData(rdata []byte) {
-// 	r.refData = rdata
-// }
-
 // WithRequest with proto request.
 func (m *Message) WithRequest(req ...Request) {
 	m.req = req
@@ -87,21 +92,11 @@ func (m *Message) WithRequest(req ...Request) {
 
 // Request returns proto Msg.
 func (m *Message) Request() Request {
-	if len(m.req) > 0 {
+	if m.req != nil && len(m.req) > 0 {
 		return m.req[0]
 	}
 	return nil
 }
-
-// // Cmd returns proto Msg cmd.
-// func (m *Message) Cmd() string {
-// 	return m.req[0].Cmd()
-// }
-
-// // Key returns proto Msg key.
-// func (m *Message) Key() []byte {
-// 	return m.req[0].Key()
-// }
 
 // IsBatch returns whether or not batch.
 func (m *Message) IsBatch() bool {
@@ -138,50 +133,10 @@ func (m *Message) Response() [][]byte {
 	return res
 }
 
-// // Since returns the time elapsed since t.
-// func (r *Msg) Since() time.Duration {
-// 	return time.Since(r.st)
-// }
-
-// // Bytes return the real Buf data
-// func (r *Msg) Bytes() []byte {
-// 	return r.buf[:r.wpos]
-// }
-
-// // Forward wpos size
-// func (r *Msg) Forward(size int) {
-// 	r.wpos += size
-// }
-
-// // WithError with error.
-// func (r *Msg) WithError(err error) {
-// 	r.err = err
-// }
-
 // Err returns error.
 func (m *Message) Err() error {
 	return m.err
 }
-
-// type errProto struct{}
-
-// func (e *errProto) Cmd() string {
-// 	return "ErrCmd"
-// }
-// func (e *errProto) Key() []byte {
-// 	return []byte("Err")
-// }
-
-// func (e *errProto) IsBatch() bool {
-// 	return false
-// }
-// func (e *errProto) Batch() []Msg {
-// 	return nil
-// }
-
-// func (e *errProto) Merge() [][]byte {
-// 	return nil
-// }
 
 // ErrMessage return err Msg.
 func ErrMessage(err error) *Message {

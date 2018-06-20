@@ -167,8 +167,6 @@ func (c *Cluster) processWrite(ch <-chan *proto.Message, w proto.NodeConn, mCh c
 		case <-c.ctx.Done():
 			w.Close()
 			return
-		default:
-			// TODO(felix): multi
 		}
 		// now := time.Now()
 		err := w.Write(m)
@@ -188,7 +186,7 @@ func (c *Cluster) processWrite(ch <-chan *proto.Message, w proto.NodeConn, mCh c
 func (c *Cluster) processRead(r proto.NodeConn, mCh <-chan *proto.Message) {
 	for {
 		m := <-mCh
-		m.ResetBuffer()
+		m.Reset()
 		err := r.Read(m)
 		if err != nil {
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))

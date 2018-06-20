@@ -7,7 +7,7 @@ import (
 
 const (
 	maxBufferSize     = 32 * 1024 * 1024 // 32MB
-	defaultBufferSize = 64 * 1024
+	defaultBufferSize = 1024
 	growFactor        = 2
 )
 
@@ -26,13 +26,17 @@ func init() {
 	// init poll
 	pools = make([]*sync.Pool, len(sizes))
 	for idx := range pools {
-		pools[idx] = &sync.Pool{
-			New: func() interface{} {
-				return &Buffer{
-					buf: make([]byte, sizes[idx]),
-				}
-			},
-		}
+		initBufPool(idx)
+	}
+}
+
+func initBufPool(idx int) {
+	pools[idx] = &sync.Pool{
+		New: func() interface{} {
+			return &Buffer{
+				buf: make([]byte, sizes[idx]),
+			}
+		},
 	}
 }
 
@@ -43,15 +47,26 @@ type Buffer struct {
 }
 
 func (b *Buffer) grow() {
-	nb := Get(len(b.buf))
-	copy(nb.buf, b.buf) // NOTE: copy all
-	nb.r, nb.w = b.r, b.w
-	Put(b)
-	*b = *nb
+	nb := make([]byte, len(b.buf)*growFactor)
+	copy(nb, b.buf[:b.w])
+	b.buf = nb
 }
 
 func (b *Buffer) len() int {
 	return len(b.buf)
+}
+
+// Advance the rpos
+func (b *Buffer) Advance(n int) {
+	b.r += n
+	// TODO: remove check
+	if b.r < 0 {
+		panic("fail to advance")
+	}
+}
+
+func (b *Buffer) Buf() []byte {
+	return b.buf
 }
 
 func (b *Buffer) buffered() int {
