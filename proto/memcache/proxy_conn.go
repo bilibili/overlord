@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"strings"
 
@@ -36,7 +35,6 @@ func NewProxyConn(rw io.ReadWriter) proto.ProxyConn {
 }
 
 func (p *proxyConn) Decode() (m *proto.Message, err error) {
-	println("entry decode")
 	// new message
 	m = proto.NewMessage()
 	m.Type = proto.CacheTypeMemcache
@@ -53,7 +51,6 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 		err = errors.Wrapf(ErrBadRequest, "MC request get bad with zero length")
 		return
 	}
-	fmt.Println("cmd:", string(lower), bg, ed, line[bg:ed], line)
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -122,24 +119,19 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	println("key:", string(key))
 	// length
 	length, err := findLength(bs, cas)
 	if err != nil {
-		println("err:", err.Error())
 		err = errors.Wrap(err, "MC decoder while parse length")
 		return
 	}
-	println("length:", length)
 	keyOffset := len(bs) - keyE
 	p.br.Advance(-keyOffset)
-	fmt.Println("need read", keyOffset+length+2)
 	data, err := p.br.ReadFull(keyOffset + length + 2)
 	if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
 		return
 	}
-	println("data:", string(data))
 	if !bytes.HasSuffix(data, crlfBytes) {
 		err = errors.Wrap(ErrBadLength, "MC decoder data not end with CRLF")
 		return
@@ -170,7 +162,6 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			key:  ns[b:e],
 			data: crlfBytes,
 		}
-		println("key:", string(req.key))
 		rs = append(rs, req)
 		if e == len(ns)-2 {
 			break
@@ -187,7 +178,6 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	println("key:", string(key))
 	m.WithRequest(&MCRequest{
 		rTp:  reqType,
 		key:  key,
@@ -203,11 +193,9 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	println("key:", string(key))
 	ns := bs[keyE:]
 	vB, vE := nextField(ns)
 	valueBs := ns[vB:vE]
-	println("incrdect:", string(valueBs))
 	if !bytes.Equal(valueBs, oneBytes) {
 		if _, err = conv.Btoi(valueBs); err != nil {
 			err = errors.Wrapf(ErrBadRequest, "MC decoder incrDecr request parse value(%s)", valueBs)
@@ -229,11 +217,9 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	println("key:", string(key))
 	ns := bs[keyE:]
 	eB, eE := nextField(ns)
 	expBs := ns[eB:eE]
-	println("exp:", string(expBs))
 	if !bytes.Equal(expBs, zeroBytes) {
 		if _, err = conv.Btoi(expBs); err != nil {
 			err = errors.Wrapf(ErrBadRequest, "MC decoder touch request parse exptime(%s)", expBs)
@@ -257,7 +243,6 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			return
 		}
 	}
-	println("exp:", string(expBs))
 	var (
 		b, e int
 		ns   = bs[eE:]
@@ -275,7 +260,6 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			key:  ns[b:e],
 			data: expBs, // NOTE: no contains '\r\n'!!!
 		}
-		println("key:", string(req.key))
 		rs = append(rs, req)
 		if e == len(ns)-2 {
 			break
@@ -310,14 +294,12 @@ func findLength(bs []byte, cas bool) (int, error) {
 		pos = low
 	}
 	if pos < 0 {
-		fmt.Println("find bytes:", bs, "find str:", string(bs))
 		return 0, ErrBadLength
 	}
 
 	up := revNoSpacIdx(bs[:pos]) + 1
 	low := revSpacIdx(bs[:up]) + 1
 	lengthBs := bs[low:up]
-	println("lenbs:", string(lengthBs))
 	length, err := conv.Btoi(lengthBs)
 	if err != nil {
 		return -1, ErrBadLength

@@ -43,7 +43,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
 		br:      bufio.NewReader(conn, nil),
-		pinger:  newMCPinger(conn),
+		pinger:  newMCPinger(conn.Dup()),
 	}
 	return
 }

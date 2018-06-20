@@ -2,13 +2,11 @@ package memcache
 
 import (
 	errs "errors"
-	"math"
 )
 
 const (
 	delim     = '\n'
 	spaceByte = ' '
-	maxUint32 = math.MaxUint32
 )
 
 var (
@@ -135,12 +133,9 @@ var (
 // Get And Touch:
 // 	gat|gats <exptime> <key>*\r\n
 type MCRequest struct {
-	rTp   RequestType
-	key   []byte
-	data  []byte
-	batch bool
-
-	// subReq []*proto.Msg
+	rTp  RequestType
+	key  []byte
+	data []byte
 }
 
 // Cmd get Msg cmd.
@@ -153,55 +148,6 @@ func (r *MCRequest) Key() []byte {
 	return r.key
 }
 
-// // IsBatch returns whether or not batch.
-// func (r *MCRequest) IsBatch() bool {
-// 	return r.batch
-// }
-
-// // Batch returns sub MC Msg by multi key.
-// func (r *MCRequest) Batch() []proto.Message {
-// 	n := bytes.Count(r.key, spaceBytes) // NOTE: like 'a_11 a_22 a_33'
-// 	if n == 0 {
-// 		return nil
-// 	}
-// 	subs := make([]proto.Msg, n+1)
-// 	r.subReq = make([]*proto.Msg, n+1)
-// 	begin := 0
-// 	end := bytes.IndexByte(r.key, spaceByte)
-// 	for i := 0; i <= n; i++ {
-// 		subs[i] = *proto.NewMsg()
-// 		subs[i].Type = proto.CacheTypeMemcache
-// 		msg := MCMsg{
-// 			rTp:   r.rTp,
-// 			key:   r.key[begin:end],
-// 			data:  r.data,
-// 			batch: true,
-// 		}
-
-// 		subs[i].WithProto(&msg)
-// 		r.subReq[i] = &subs[i]
-// 		begin = end + 1
-// 		if i >= n-1 { // NOTE: the last sub.
-// 			end = len(r.key)
-// 		} else {
-// 			end = begin + bytes.IndexByte(r.key[end+1:], spaceByte)
-// 		}
-// 	}
-// 	return subs
-// }
-
 func (r *MCRequest) String() string {
 	return "type:" + r.rTp.String() + " key:" + string(r.key) + " data:" + string(r.data)
 }
-
-// // Merge merge subreq's response.
-// func (r *MCRequest) Merge() [][]byte {
-// 	rs := make([][]byte, len(r.subReq))
-// 	for i, sub := range r.subReq {
-// 		rs[i] = bytes.TrimSuffix(sub.Bytes(), endBytes)
-// 	}
-// 	if _, ok := withDataMsgTypes[r.rTp]; ok {
-// 		rs = append(rs, endBytes)
-// 	}
-// 	return rs
-// }

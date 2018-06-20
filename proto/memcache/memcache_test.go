@@ -91,7 +91,7 @@ package memcache_test
 // 	dto := time.Duration(1000) * time.Millisecond
 // 	rto := time.Duration(1000) * time.Millisecond
 // 	wto := time.Duration(1000) * time.Millisecond
-// 	c, _ := libnet.DialWithTimeout("127.0.0.1:11210", dto, rto, wto)
+// 	c := libnet.DialWithTimeout("127.0.0.1:11210", dto, rto, wto)
 // 	return c
 // }
 

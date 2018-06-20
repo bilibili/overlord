@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const defaultPingBufferSize = 32
+
 type mcPinger struct {
 	conn   *libnet.Conn
 	bw     *bufio.Writer
@@ -17,12 +19,11 @@ type mcPinger struct {
 	closed int32
 }
 
-func newMCPinger(conn *libnet.Conn) *mcPinger {
-	nc := conn.Dup()
+func newMCPinger(nc *libnet.Conn) *mcPinger {
 	return &mcPinger{
 		conn: nc,
 		bw:   bufio.NewWriter(nc),
-		br:   bufio.NewReader(nc, nil),
+		br:   bufio.NewReader(nc, bufio.Get(defaultPingBufferSize)),
 	}
 }
 
