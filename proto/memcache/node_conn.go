@@ -108,13 +108,10 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 	}
 	n.br.Advance(-len(bs)) // NOTE: for response bytes
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
-		// m.ResetBuffer(n.br.Buffer())
-		// m.Buffer().Advance(-len(bs))
 		return
 	}
 	if bytes.Equal(bs, endBytes) {
 		stat.Miss(n.cluster, n.addr)
-		// m.ResetBuffer(n.br.Buffer())
 		return
 	}
 	stat.Hit(n.cluster, n.addr)
@@ -130,9 +127,6 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 	n.br.Advance(-rlen) // NOTE: for response bytes
-	// m.ResetBuffer(n.br.Buffer())
-	// m.Buffer().Advance(-len(bs))
-	// m.Buffer().Advance(-rlen)
 	return
 }
 

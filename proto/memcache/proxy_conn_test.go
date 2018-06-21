@@ -5,6 +5,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/felixhao/overlord/proto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +41,6 @@ func TestLegalKeyOk(t *testing.T) {
 }
 
 func TestProxyConnDecodeOk(t *testing.T) {
-
 	ts := []struct {
 		Name string
 		Data string
@@ -118,6 +118,59 @@ func TestProxyConnDecodeOk(t *testing.T) {
 				assert.Equal(t, tt.Key, string(m.Request().Key()))
 				assert.Equal(t, tt.Cmd, m.Request().Cmd())
 			}
+		})
+	}
+}
+
+func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
+	conn := _createConn([]byte(req))
+	p := NewProxyConn(conn)
+	m, err := p.Decode()
+	assert.NoError(t, err)
+	var subs []proto.Message
+	if m.IsBatch() {
+		subs = m.Batch()
+	} else {
+		subs = []proto.Message{*m}
+	}
+	for idx, resp := range resps {
+		nc := _createNodeConn(resp)
+		err := nc.Read(&subs[idx])
+		assert.NoError(t, err)
+	}
+
+	return m
+}
+
+func TestProxyConnEncodeOk(t *testing.T) {
+	ts := []struct {
+		Name   string
+		Req    string
+		Resp   [][]byte
+		Except string
+	}{
+		{Name: "SetOk", Req: "set mykey 0 0 1\r\na\r\n", Resp: [][]byte{[]byte("STORED\r\n")}, Except: "STORED\r\n"},
+		{Name: "GetOk", Req: "get mykey\r\n", Resp: [][]byte{[]byte("VALUE 0 2\r\nab\r\nEND\r\n")}, Except: "VALUE 0 2\r\nab\r\nEND\r\n"},
+		{Name: "GetMultiOk", Req: "get mykey yourkey\r\n",
+			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("VALUE yourkey 0 3\r\ncde\r\nEND\r\n")},
+			Except: "VALUE mykey 0 2\r\nab\r\nVALUE yourkey 0 3\r\ncde\r\nEND\r\n"},
+		{Name: "GetMultiMissOk", Req: "get mykey 0 0 1\r\na\r\n",
+			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("END\r\n")},
+			Except: "VALUE mykey 0 2\r\nab\r\nEND\r\n"},
+	}
+
+	for _, tt := range ts {
+		t.Run(tt.Name, func(t *testing.T) {
+			conn := _createConn(nil)
+			p := NewProxyConn(conn)
+			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
+			err := p.Encode(msg)
+			assert.NoError(t, err)
+			c := conn.Conn.(*mockConn)
+			buf := make([]byte, 1024)
+			size, err := c.wbuf.Read(buf)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.Except, string(buf[:size]))
 		})
 	}
 }

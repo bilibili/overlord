@@ -55,7 +55,7 @@ func TestNodeConnWriteOk(t *testing.T) {
 	}
 
 	for _, tt := range ts {
-		t.Run(fmt.Sprintf("_%sOk", tt.rtype), func(subt *testing.T) {
+		t.Run(fmt.Sprintf("%sOk", tt.rtype), func(subt *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn(nil)
 
@@ -111,6 +111,7 @@ func TestNodeConnReadClosed(t *testing.T) {
 	nc := _createNodeConn(nil)
 
 	err := nc.Close()
+	assert.NoError(t, err)
 	assert.True(t, nc.Closed())
 	err = nc.Read(req)
 	assert.Error(t, err)
@@ -129,7 +130,7 @@ func TestNodeConnReadOk(t *testing.T) {
 		{
 			suffix: "404",
 			rtype:  RequestTypeGet, key: "mykey", data: " \r\n",
-			cData: "END\r\n", except: "",
+			cData: "END\r\n", except: "END\r\n",
 		},
 		{
 			suffix: "Ok",
@@ -144,7 +145,7 @@ func TestNodeConnReadOk(t *testing.T) {
 	}
 	for _, tt := range ts {
 
-		t.Run(fmt.Sprintf("_%s%s", tt.rtype, tt.suffix), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s%s", tt.rtype, tt.suffix), func(t *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn([]byte(tt.cData))
 			err := nc.Read(req)

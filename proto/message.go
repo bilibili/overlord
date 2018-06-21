@@ -24,7 +24,8 @@ type Message struct {
 // NewMessage will create new message object
 func NewMessage() *Message {
 	return &Message{
-		wg:  &sync.WaitGroup{},
+		wg: &sync.WaitGroup{},
+		// TODO: get with suitable length
 		buf: bufio.Get(0),
 		st:  time.Now(),
 	}
@@ -64,12 +65,6 @@ func (m *Message) Wait() {
 func (m *Message) Buffer() *bufio.Buffer {
 	return m.buf
 }
-
-// ResetBuffer will reset bufio's buffer,
-// for bufio's grow
-// func (m *Message) ResetBuffer(buf *bufio.Buffer) {
-// 	m.buf = buf
-// }
 
 // Reset will return the Msg data to flush and reset
 func (m *Message) Reset() {

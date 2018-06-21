@@ -90,33 +90,37 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
 		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
-			p.bw.WriteString(serverErrorPrefix)
+			_ = p.bw.WriteString(serverErrorPrefix)
 		}
-		p.bw.WriteString(se)
-		p.bw.Write(crlfBytes)
+		_ = p.bw.WriteString(se)
+		_ = p.bw.Write(crlfBytes)
 	} else {
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
-			p.bw.WriteString(serverErrorPrefix)
-			p.bw.WriteString(ErrAssertMsg.Error())
-			p.bw.Write(crlfBytes)
+			_ = p.bw.WriteString(serverErrorPrefix)
+			_ = p.bw.WriteString(ErrAssertMsg.Error())
+			_ = p.bw.Write(crlfBytes)
 		} else {
 			res := m.Response()
 			_, ok := withValueTypes[mcr.rTp]
 			trimEnd := ok && m.IsBatch()
 			for _, bs := range res {
 				if trimEnd {
-					bs = bytes.TrimRight(bs, endString)
+					bs = bytes.TrimSuffix(bs, endBytes)
 				}
-				p.bw.Write(bs)
+				if len(bs) == 0 {
+					continue
+				}
+				_ = p.bw.Write(bs)
 			}
 			if trimEnd {
-				p.bw.Write(endBytes)
+				_ = p.bw.Write(endBytes)
 			}
 		}
 	}
-	if fe := p.bw.Flush(); fe != nil {
-		err = errors.Wrap(fe, "MC Encoder encode response flush bytes")
+
+	if err = p.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
 	}
 	return
 }
