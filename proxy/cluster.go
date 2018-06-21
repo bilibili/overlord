@@ -174,13 +174,13 @@ func (c *Cluster) processWrite(ch <-chan *proto.Message, w proto.NodeConn, mCh c
 		}
 		// now := time.Now()
 		err := w.Write(m)
-		// stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
+		// prom.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
 		if err != nil {
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			if log.V(1) {
 				// log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
 			}
-			// stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
+			// prom.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
 			continue
 		}
 		mCh <- m
@@ -197,7 +197,7 @@ func (c *Cluster) processRead(r proto.NodeConn, mCh <-chan *proto.Message) {
 			if log.V(1) {
 				// log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
 			}
-			// stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
+			// prom.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
 			continue
 		}
 		m.Done()

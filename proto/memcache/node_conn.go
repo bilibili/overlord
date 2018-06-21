@@ -8,7 +8,7 @@ import (
 
 	"github.com/felixhao/overlord/lib/bufio"
 	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/lib/stat"
+	"github.com/felixhao/overlord/lib/prom"
 	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
@@ -111,10 +111,10 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 	if bytes.Equal(bs, endBytes) {
-		stat.Miss(n.cluster, n.addr)
+		prom.Miss(n.cluster, n.addr)
 		return
 	}
-	stat.Hit(n.cluster, n.addr)
+	prom.Hit(n.cluster, n.addr)
 	// value length
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {

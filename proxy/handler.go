@@ -10,7 +10,7 @@ import (
 
 	"github.com/felixhao/overlord/lib/log"
 	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/lib/stat"
+	"github.com/felixhao/overlord/lib/prom"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -59,7 +59,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		panic(proto.ErrNoSupportCacheType)
 	}
 	h.msgCh = proto.NewMsgChanBuffer(messageChanBuffer)
-	stat.ConnIncr(cluster.cc.Name)
+	prom.ConnIncr(cluster.cc.Name)
 	return
 }
 
@@ -160,7 +160,7 @@ func (h *Handler) handleWriter() {
 		err = h.pc.Encode(m)
 		m.ReleaseBuffer()
 
-		// stat.ProxyTime(h.cluster.cc.Name, m.Cmd(), int64(req.Since()/time.Microsecond))
+		// prom.ProxyTime(h.cluster.cc.Name, m.Cmd(), int64(req.Since()/time.Microsecond))
 	}
 }
 
@@ -181,6 +181,6 @@ func (h *Handler) closeWithError(err error) {
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
 		}
-		stat.ConnDecr(h.cluster.cc.Name)
+		prom.ConnDecr(h.cluster.cc.Name)
 	}
 }
