@@ -12,7 +12,8 @@ type Message struct {
 	Type CacheType
 	wg   *sync.WaitGroup
 
-	buf *bufio.Buffer
+	reqBuf  *bufio.Buffer
+	respBuf *bufio.Buffer
 
 	req  []Request
 	subs []Message
@@ -26,8 +27,10 @@ func NewMessage() *Message {
 	return &Message{
 		wg: &sync.WaitGroup{},
 		// TODO: get with suitable length
-		buf: bufio.Get(0),
-		st:  time.Now(),
+		reqBuf:  bufio.Get(0),
+		respBuf: bufio.Get(0),
+
+		st: time.Now(),
 	}
 }
 
@@ -88,19 +91,20 @@ func (m *Message) Wait() {
 	m.wg.Wait()
 }
 
-// Buffer return req buffer.
-func (m *Message) Buffer() *bufio.Buffer {
-	return m.buf
+// ReqBuffer return req buffer.
+func (m *Message) ReqBuffer() *bufio.Buffer {
+	return m.reqBuf
 }
 
-// Reset will return the Msg data to flush and reset
-func (m *Message) Reset() {
-	m.buf.Reset()
+// RespBuffer will return request buffer
+func (m *Message) RespBuffer() *bufio.Buffer {
+	return m.respBuf
 }
 
 // ReleaseBuffer will return the Msg data to flush and reset
 func (m *Message) ReleaseBuffer() {
-	bufio.Put(m.buf)
+	bufio.Put(m.reqBuf)
+	bufio.Put(m.respBuf)
 }
 
 // WithRequest with proto request.
@@ -140,13 +144,14 @@ func (m *Message) Batch() []Message {
 
 // Response return all response bytes.
 func (m *Message) Response() [][]byte {
+	// TODO(wayslog): set Read/Write timer after merge
 	if !m.IsBatch() {
-		return [][]byte{m.buf.Bytes()}
+		return [][]byte{m.respBuf.Bytes()}
 	}
 	slen := len(m.subs)
 	res := make([][]byte, slen)
 	for i := 0; i < slen; i++ {
-		res[i] = (&m.subs[i]).buf.Bytes()
+		res[i] = (&m.subs[i]).respBuf.Bytes()
 	}
 	return res
 }

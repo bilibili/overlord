@@ -41,6 +41,10 @@ func (r *Reader) Buffer() *Buffer {
 
 // ResetBuffer reset buf.
 func (r *Reader) ResetBuffer(b *Buffer) {
+	if b == nil {
+		r.b = b
+		return
+	}
 	b.Reset()
 	n := 0
 	if r.b != nil {

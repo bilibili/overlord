@@ -188,7 +188,7 @@ func (c *Cluster) processWrite(addr string, ch <-chan *proto.Message, w proto.No
 func (c *Cluster) processRead(addr string, r proto.NodeConn, mCh <-chan *proto.Message) {
 	for {
 		m := <-mCh
-		m.Reset()
+		m.RespBuffer().Reset()
 		err := r.Read(m)
 		now := time.Now()
 		if err != nil {

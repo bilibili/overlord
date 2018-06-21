@@ -89,12 +89,13 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 
 // Read reads response bytes from server node.
 func (n *nodeConn) Read(m *proto.Message) (err error) {
+	defer n.br.ResetBuffer(nil)
 	if n.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
 	// TODO: this read was only support read one key's result
-	n.br.ResetBuffer(m.Buffer())
+	n.br.ResetBuffer(m.RespBuffer())
 
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
@@ -116,6 +117,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 	}
 	prom.Hit(n.cluster, n.addr)
 	// value length
+	// fmt.Printf("baka m.Cmd:%s m.Key:%s and bs:%s\r\n", m.Request().Cmd(), string(m.Request().Key()), bs)
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
