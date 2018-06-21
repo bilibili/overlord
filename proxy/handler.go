@@ -118,7 +118,7 @@ func (h *Handler) dispatch(m *proto.Message) {
 	subs := m.Batch()
 	if len(subs) == 0 {
 		if log.V(3) {
-			// log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), req.Key())
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), m.Request().Key())
 		}
 		m.Done()
 		return
@@ -160,7 +160,7 @@ func (h *Handler) handleWriter() {
 		err = h.pc.Encode(m)
 		m.ReleaseBuffer()
 
-		// prom.ProxyTime(h.cluster.cc.Name, m.Cmd(), int64(req.Since()/time.Microsecond))
+		prom.ProxyTime(h.cluster.cc.Name, m.Request().Cmd(), int64(m.TotalDur()/time.Microsecond))
 	}
 }
 
@@ -177,7 +177,7 @@ func (h *Handler) closeWithError(err error) {
 		h.err = err
 		h.cancel()
 		h.msgCh.Close()
-		h.conn.Close()
+		_ = h.conn.Close()
 		if log.V(3) {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
 		}

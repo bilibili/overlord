@@ -72,7 +72,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		conn, err := l.Accept()
 		if err != nil {
 			if conn != nil {
-				conn.Close()
+				_ = conn.Close()
 			}
 			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", cc.Name, cc.ListenAddr, err)
 			continue
@@ -84,12 +84,12 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				case proto.CacheTypeMemcache:
 					encoder := memcache.NewProxyConn(conn)
 					m := proto.ErrMessage(ErrProxyMoreMaxConns)
-					encoder.Encode(m)
-					conn.Close()
+					_ = encoder.Encode(m)
+					_ = conn.Close()
 				case proto.CacheTypeRedis:
 					// TODO(felix): support redis.
 				default:
-					conn.Close()
+					_ = conn.Close()
 				}
 				if log.V(3) {
 					log.Warnf("proxy accept connection count(%d) more than max(%d)", conns, p.c.Proxy.MaxConnections)
@@ -110,7 +110,7 @@ func (p *Proxy) Close() error {
 	}
 	p.cancel()
 	for _, cluster := range p.clusters {
-		cluster.Close()
+		_ = cluster.Close()
 	}
 	return nil
 }

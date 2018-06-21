@@ -17,8 +17,8 @@ type Message struct {
 	req  []Request
 	subs []Message
 
-	st  time.Time
-	err error
+	st, wt, rt, et time.Time
+	err            error
 }
 
 // NewMessage will create new message object
@@ -31,6 +31,31 @@ func NewMessage() *Message {
 	}
 }
 
+// TotalDur will return the total duration of a command.
+func (m *Message) TotalDur() time.Duration {
+	return m.et.Sub(m.st)
+}
+
+// RemoteDur will return the remote execute time of remote mc node.
+func (m *Message) RemoteDur() time.Duration {
+	return m.rt.Sub(m.wt)
+}
+
+// SetWriteTime will set the remote duration of the command.
+func (m *Message) SetWriteTime(t time.Time) {
+	m.wt = t
+}
+
+// SetReadTime will set the remote duration of the command.
+func (m *Message) SetReadTime(t time.Time) {
+	m.rt = t
+}
+
+// setEndTime will set the remote duration of the command.
+func (m *Message) setEndTime(t time.Time) {
+	m.et = t
+}
+
 // Add add wg.
 func (m *Message) Add(n int) {
 	m.wg.Add(n)
@@ -41,6 +66,7 @@ func (m *Message) Done() {
 	if m.wg == nil {
 		panic("message waitgroup nil")
 	}
+	m.setEndTime(time.Now())
 	m.wg.Done()
 }
 
@@ -50,6 +76,7 @@ func (m *Message) DoneWithError(err error) {
 		panic("message waitgroup nil")
 	}
 	m.err = err
+	m.setEndTime(time.Now())
 	m.wg.Done()
 }
 
