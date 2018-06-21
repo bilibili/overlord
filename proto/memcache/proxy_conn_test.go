@@ -154,9 +154,12 @@ func TestProxyConnEncodeOk(t *testing.T) {
 		{Name: "GetMultiOk", Req: "get mykey yourkey\r\n",
 			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("VALUE yourkey 0 3\r\ncde\r\nEND\r\n")},
 			Except: "VALUE mykey 0 2\r\nab\r\nVALUE yourkey 0 3\r\ncde\r\nEND\r\n"},
-		{Name: "GetMultiMissOk", Req: "get mykey 0 0 1\r\na\r\n",
+		{Name: "GetMultiMissOne", Req: "get mykey 0 0 1\r\na\r\n",
 			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("END\r\n")},
 			Except: "VALUE mykey 0 2\r\nab\r\nEND\r\n"},
+		{Name: "GetMultiAllMiss", Req: "get mykey 0 0 1\r\na\r\n",
+			Resp:   [][]byte{[]byte("END\r\n"), []byte("END\r\n")},
+			Except: "END\r\n"},
 	}
 
 	for _, tt := range ts {

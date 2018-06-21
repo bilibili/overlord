@@ -6,7 +6,10 @@ import (
 )
 
 const (
-	maxBufferSize     = 32 * 1024 * 1024 // 32MB
+	// 512MB: max redis RDB object is 512MB due :https://github.com/sripathikrishnan/redis-rdb-tools/wiki/Redis-RDB-Dump-File-Format
+	// so the max RESP object length is 512MB
+	// max memcache buffer length is not longer than 512MB
+	maxBufferSize     = 512 * 1024 * 1024
 	defaultBufferSize = 1024
 	growFactor        = 2
 )
@@ -65,10 +68,6 @@ func (b *Buffer) Advance(n int) {
 	}
 }
 
-// func (b *Buffer) Buf() []byte {
-// 	return b.buf
-// }
-
 func (b *Buffer) buffered() int {
 	return b.w - b.r
 }
@@ -89,6 +88,10 @@ func Get(size int) *Buffer {
 		size = defaultBufferSize
 	}
 	i := sort.SearchInts(sizes, size)
+	if i >= len(pools) {
+		b := &Buffer{buf: make([]byte, size)}
+		return b
+	}
 	b := pools[i].Get().(*Buffer)
 	b.Reset()
 	return b
@@ -97,5 +100,7 @@ func Get(size int) *Buffer {
 // Put the data into global pool
 func Put(b *Buffer) {
 	i := sort.SearchInts(sizes, b.len())
-	pools[i].Put(b)
+	if i < len(pools) {
+		pools[i].Put(b)
+	}
 }

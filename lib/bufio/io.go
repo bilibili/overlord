@@ -45,6 +45,9 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 	n := 0
 	if r.b != nil {
 		if r.b.buffered() > 0 {
+			for b.len() < r.b.len() {
+				b.grow()
+			}
 			n = copy(b.buf, r.b.buf[r.b.r:r.b.w])
 		}
 		Put(r.b)

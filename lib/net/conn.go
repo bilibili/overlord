@@ -45,11 +45,9 @@ func (c *Conn) ReConnect() (err error) {
 	if c.addr == "" || c.closed {
 		return
 	}
-	sock, err := net.DialTimeout("tcp", c.addr, c.dialTimeout)
-	if err != nil {
-		return err
-	}
-	c.Conn = sock
+	conn := DialWithTimeout(c.addr, c.dialTimeout, c.readTimeout, c.writeTimeout)
+	c = conn
+	err = c.err
 	return
 }
 
