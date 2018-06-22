@@ -62,10 +62,10 @@ func (b *Buffer) len() int {
 // Advance the rpos
 func (b *Buffer) Advance(n int) {
 	b.r += n
-	// TODO: remove check
-	if b.r < 0 {
-		panic("fail to advance")
-	}
+	// remove check
+	// if b.r < 0 {
+	// 	panic("fail to advance")
+	// }
 }
 
 func (b *Buffer) buffered() int {
