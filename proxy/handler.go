@@ -157,9 +157,9 @@ func (h *Handler) handleWriter() {
 		}
 		m.Wait()
 		err = h.pc.Encode(m)
-		m.ReleaseBuffer()
 
 		prom.ProxyTime(h.cluster.cc.Name, m.Request().Cmd(), int64(m.TotalDur()/time.Microsecond))
+		m.ReleaseBuffer()
 	}
 }
 

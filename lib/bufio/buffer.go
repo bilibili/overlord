@@ -101,6 +101,7 @@ func Get(size int) *Buffer {
 func Put(b *Buffer) {
 	i := sort.SearchInts(sizes, b.len())
 	if i < len(pools) {
+		// b.Reset()
 		pools[i].Put(b)
 	}
 }

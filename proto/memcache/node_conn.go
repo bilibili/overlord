@@ -117,7 +117,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 	}
 	prom.Hit(n.cluster, n.addr)
 	// value length
-	// fmt.Printf("baka m.Cmd:%s m.Key:%s and bs:%s\r\n", m.Request().Cmd(), string(m.Request().Key()), bs)
+	// fmt.Printf("baka m.Cmd:%s m.Key:%s m.Key.Bytes:(%v) and bs-str:%s bs:%v\r\n", m.Request().Cmd(), m.Request().Key(), m.Request().Key(), bs, bs)
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")

@@ -55,8 +55,9 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 			}
 			n = copy(b.buf, r.b.buf[r.b.r:r.b.w])
 		}
-		Put(r.b)
+		// Put(r.b)
 	}
+	r.err = nil
 	r.b = b
 	r.b.w = n
 	r.b.r = 0
@@ -174,7 +175,7 @@ func (w *Writer) Write(p []byte) (err error) {
 		return nil
 	}
 
-	if len(w.bufs) == 10 {
+	if len(w.bufs) == 1024 {
 		w.Flush()
 	}
 	w.bufs = append(w.bufs, p)

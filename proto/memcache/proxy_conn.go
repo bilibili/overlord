@@ -49,6 +49,7 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	}
 	bg, ed := nextField(line)
 	lower := conv.ToLower(line[bg:ed])
+	// fmt.Printf("cmd:%s\n", lower)
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -132,6 +133,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, cas bool) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
+	// fmt.Printf("key:%s\n", key)
 	if !legalKey(key) {
 		err = errors.Wrap(ErrBadKey, "MC decoder storage request legal key")
 		return
@@ -170,6 +172,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 	for {
 		ns = ns[e:]
 		b, e = nextField(ns)
+		// fmt.Printf("retrieval key:%s\n", ns[b:e])
 		if !legalKey(ns[b:e]) {
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
