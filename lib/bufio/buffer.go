@@ -10,7 +10,7 @@ const (
 	// so the max RESP object length is 512MB
 	// max memcache buffer length is not longer than 512MB
 	maxBufferSize     = 512 * 1024 * 1024
-	defaultBufferSize = 1024
+	defaultBufferSize = 512
 	growFactor        = 2
 )
 

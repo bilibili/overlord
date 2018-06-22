@@ -7,6 +7,11 @@ import (
 	"github.com/felixhao/overlord/lib/bufio"
 )
 
+const (
+	defaultReqBufSize  = 512
+	defaultRespBufSize = 4096
+)
+
 // Message read from client.
 type Message struct {
 	Type CacheType
@@ -18,6 +23,7 @@ type Message struct {
 	req  []Request
 	subs []Message
 
+	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error
 }
@@ -27,8 +33,8 @@ func NewMessage() *Message {
 	return &Message{
 		wg: &sync.WaitGroup{},
 		// TODO: get with suitable length
-		reqBuf:  bufio.Get(0),
-		respBuf: bufio.Get(0),
+		reqBuf:  bufio.Get(defaultReqBufSize),
+		respBuf: bufio.Get(defaultRespBufSize),
 
 		st: time.Now(),
 	}
