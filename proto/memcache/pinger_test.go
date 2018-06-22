@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"io"
 	"net"
 	"testing"
 	"time"
@@ -81,7 +80,7 @@ func TestPingerPingEOF(t *testing.T) {
 	assert.Error(t, err)
 
 	err = errors.Cause(err)
-	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, ErrPingerPong, err)
 }
 
 func TestPingerPing100Ok(t *testing.T) {
@@ -95,7 +94,7 @@ func TestPingerPing100Ok(t *testing.T) {
 
 	err := pinger.Ping()
 	assert.Error(t, err)
-	_causeEqual(t, io.EOF, err)
+	_causeEqual(t, ErrPingerPong, err)
 }
 
 func TestPingerClosed(t *testing.T) {

@@ -51,6 +51,11 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
 		p.ccs = ccs
 		p.clusters = map[string]*Cluster{}
+
+		if len(ccs) == 0 {
+			log.Warnf("overlord will never listen on any port due to cluster is not specified")
+		}
+
 		for _, cc := range ccs {
 			go p.serve(cc)
 		}
@@ -92,7 +97,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 					_ = conn.Close()
 				}
 				if log.V(3) {
-					log.Warnf("proxy accept connection count(%d) more than max(%d)", conns, p.c.Proxy.MaxConnections)
+					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
 				}
 				continue
 			}

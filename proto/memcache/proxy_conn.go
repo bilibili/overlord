@@ -39,6 +39,9 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	// bufio reset buffer
 	p.br.ResetBuffer(m.ReqBuffer())
 	line, err := p.br.ReadUntil(delim)
+	// if the decode is all right, the line is never equals with 0
+	// but, we can assemue that some mistake makes it does.
+	// let's protected it from the satuation
 	if len(line) == 0 {
 		err = io.EOF
 		return
@@ -87,46 +90,6 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 		return m, p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	}
 	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command")
-	return
-}
-
-// Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
-	if err = m.Err(); err != nil {
-		se := errors.Cause(err).Error()
-		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
-			_ = p.bw.WriteString(serverErrorPrefix)
-		}
-		_ = p.bw.WriteString(se)
-		_ = p.bw.Write(crlfBytes)
-	} else {
-		mcr, ok := m.Request().(*MCRequest)
-		if !ok {
-			_ = p.bw.WriteString(serverErrorPrefix)
-			_ = p.bw.WriteString(ErrAssertMsg.Error())
-			_ = p.bw.Write(crlfBytes)
-		} else {
-			res := m.Response()
-			_, ok := withValueTypes[mcr.rTp]
-			trimEnd := ok && m.IsBatch()
-			for _, bs := range res {
-				if trimEnd {
-					bs = bytes.TrimSuffix(bs, endBytes)
-				}
-				if len(bs) == 0 {
-					continue
-				}
-				_ = p.bw.Write(bs)
-			}
-			if trimEnd {
-				_ = p.bw.Write(endBytes)
-			}
-		}
-	}
-
-	if err = p.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
-	}
 	return
 }
 
@@ -367,4 +330,44 @@ func revSpacIdx(bs []byte) int {
 		}
 	}
 	return -1
+}
+
+// Encode encode response and write into writer.
+func (p *proxyConn) Encode(m *proto.Message) (err error) {
+	if err = m.Err(); err != nil {
+		se := errors.Cause(err).Error()
+		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
+			_ = p.bw.WriteString(serverErrorPrefix)
+		}
+		_ = p.bw.WriteString(se)
+		_ = p.bw.Write(crlfBytes)
+	} else {
+		mcr, ok := m.Request().(*MCRequest)
+		if !ok {
+			_ = p.bw.WriteString(serverErrorPrefix)
+			_ = p.bw.WriteString(ErrAssertMsg.Error())
+			_ = p.bw.Write(crlfBytes)
+		} else {
+			res := m.Response()
+			_, ok := withValueTypes[mcr.rTp]
+			trimEnd := ok && m.IsBatch()
+			for _, bs := range res {
+				if trimEnd {
+					bs = bytes.TrimSuffix(bs, endBytes)
+				}
+				if len(bs) == 0 {
+					continue
+				}
+				_ = p.bw.Write(bs)
+			}
+			if trimEnd {
+				_ = p.bw.Write(endBytes)
+			}
+		}
+	}
+
+	if err = p.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
+	}
+	return
 }

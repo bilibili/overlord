@@ -150,7 +150,7 @@ func TestNodeConnReadOk(t *testing.T) {
 			nc := _createNodeConn([]byte(tt.cData))
 			err := nc.Read(req)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.except, string(req.ReqBuffer().Bytes()))
+			assert.Equal(t, tt.except, string(req.RespBuffer().Bytes()))
 		})
 
 	}

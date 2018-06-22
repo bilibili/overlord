@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"io"
 	"testing"
 
 	"github.com/felixhao/overlord/proto"
@@ -52,7 +51,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 		{"SetOk", "set mykey 0 0 2\r\nab\r\n", nil, "mykey", "set"},
 		{"SetBadKey", "set my" + string([]byte{0x7f}) + "key 0 0 2\r\nab\r\n", ErrBadKey, "", ""},
 		{"SetBadLength", "set mykey 0 0 abcdef\r\nab\r\n", ErrBadLength, "", ""},
-		{"SetBodyTooShort", "set mykey 0 0 2\r\na\r\n", io.EOF, "", ""},
+		{"SetBodyTooShort", "set mykey 0 0 2\r\na\r\n", nil, "mykey", "set"},
 		{"SetWithNoCRLF", "set mykey 0 0 2\r\nabba", ErrBadRequest, "", ""},
 
 		// replace
@@ -102,8 +101,8 @@ func TestProxyConnDecodeOk(t *testing.T) {
 		{"GatsMultiKeyOk", "gats 10 mykey yourkey yuki\r\n", nil, "mykey", "gats"},
 		// Not support
 		{"NotSupportCmd", "baka 10 mykey\r\n", ErrBadRequest, "", ""},
-		{"NotFullLine", "baka 10", io.EOF, "", ""},
-		{"NotFullLine", "baka 10", io.EOF, "", ""},
+		{"NotFullLine", "baka 10", ErrBadRequest, "", ""},
+		{"NotFullLine", "baka 10", ErrBadRequest, "", ""},
 	}
 
 	for _, tt := range ts {

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -77,7 +78,11 @@ func (h *Handler) handleReader() {
 		err error
 	)
 	defer func() {
-		h.closeWithError(err)
+		// EOF represent that client never write again,
+		// but server can write back data after client closed the socket.
+		if err != io.EOF {
+			h.closeWithError(err)
+		}
 	}()
 	for {
 		if h.Closed() || h.msgCh.Closed() {
