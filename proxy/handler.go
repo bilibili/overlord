@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -89,7 +88,7 @@ func (h *Handler) handleReader() {
 		}
 		m, err = h.pc.Decode()
 		if err != nil {
-			fmt.Println("decode error:", err)
+			// fmt.Println("decode error:", err)
 			break
 		}
 

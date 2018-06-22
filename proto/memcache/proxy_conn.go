@@ -39,6 +39,10 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	// bufio reset buffer
 	p.br.ResetBuffer(m.ReqBuffer())
 	line, err := p.br.ReadUntil(delim)
+	if len(line) == 0 {
+		err = io.EOF
+		return
+	}
 	if err != nil {
 		err = errors.Wrapf(err, "MC decoder while reading text line")
 		return

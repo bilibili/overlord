@@ -8,8 +8,9 @@ import (
 
 // Reader implements buffering for an io.Reader object.
 type Reader struct {
-	rd io.Reader
-	b  *Buffer
+	rd  io.Reader
+	b   *Buffer
+	err error
 }
 
 // NewReader returns a new Reader whose buffer has the default size.
@@ -19,12 +20,12 @@ func NewReader(rd io.Reader, b *Buffer) *Reader {
 
 func (r *Reader) fill() error {
 	n, err := r.rd.Read(r.b.buf[r.b.w:])
+	r.b.w += n
 	if err != nil {
+		r.err = err
 		return err
 	} else if n == 0 {
 		return io.ErrNoProgress
-	} else {
-		r.b.w += n
 	}
 	return nil
 }
@@ -68,6 +69,9 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 // it returns all the data in the buffer and the error itself (often io.EOF).
 // ReadUntil returns err != nil if and only if line does not end in delim.
 func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	for {
 		var index = bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
 		if index >= 0 {
@@ -80,7 +84,11 @@ func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
 			r.b.grow()
 		}
 		err := r.fill()
-		if err != nil {
+		if err == io.EOF {
+			data := r.b.buf[r.b.r:r.b.w]
+			r.b.r = r.b.w
+			return data, nil
+		} else if err != nil {
 			return nil, err
 		}
 	}
@@ -96,6 +104,9 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 	if n == 0 {
 		return nil, nil
 	}
+	if r.err != nil {
+		return nil, r.err
+	}
 	for {
 		if r.b.buffered() >= n {
 			bs := r.b.buf[r.b.r : r.b.r+n]
@@ -106,7 +117,12 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 		if maxCanRead < n {
 			r.b.grow()
 		}
-		if err := r.fill(); err != nil && err != io.ErrNoProgress {
+		err := r.fill()
+		if err == io.EOF {
+			data := r.b.buf[r.b.r:r.b.w]
+			r.b.r = r.b.w
+			return data, nil
+		} else if err != nil {
 			return nil, err
 		}
 	}
