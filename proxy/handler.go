@@ -117,7 +117,7 @@ func (h *Handler) dispatch(m *proto.Message) {
 	subs := m.Batch()
 	if len(subs) == 0 {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), m.Request().Key())
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), m.Request().Cmd()+string(m.Request().Key()))
 		}
 		m.Done()
 		return
