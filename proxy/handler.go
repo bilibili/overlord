@@ -93,20 +93,14 @@ func (h *Handler) handleReader() {
 		}
 		m, err = h.pc.Decode()
 		if err != nil {
-			// fmt.Println("decode error:", err)
-			break
-		}
-
-		m.Add(1)
-		if h.msgCh.PushBack(m) == 0 {
-			m.Done()
-			return
-		}
-		if err != nil {
-			m.DoneWithError(err)
 			if log.V(1) {
 				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
 			}
+			return
+		}
+		m.Add(1) // NOTE: must front msgCh.PushBack
+		if h.msgCh.PushBack(m) == 0 {
+			m.Done()
 			return
 		}
 		h.dispatch(m)
@@ -118,7 +112,7 @@ func (h *Handler) dispatch(m *proto.Message) {
 		h.cluster.Dispatch(m)
 		return
 	}
-
+	// batch
 	subs := m.Batch()
 	if len(subs) == 0 {
 		if log.V(3) {
@@ -162,7 +156,7 @@ func (h *Handler) handleWriter() {
 		}
 		m.Wait()
 		err = h.pc.Encode(m)
-
+		m.SetEndTime(time.Now())
 		prom.ProxyTime(h.cluster.cc.Name, m.Request().Cmd(), int64(m.TotalDur()/time.Microsecond))
 		m.ReleaseBuffer()
 	}
@@ -175,16 +169,13 @@ func (h *Handler) Closed() bool {
 
 func (h *Handler) closeWithError(err error) {
 	if atomic.CompareAndSwapInt32(&h.closed, handlerOpening, handlerClosed) {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler start close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
-		}
 		h.err = err
 		h.cancel()
 		h.msgCh.Close()
 		_ = h.conn.Close()
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler end close", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
-		}
 		prom.ConnDecr(h.cluster.cc.Name)
+		if log.V(3) {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+		}
 	}
 }

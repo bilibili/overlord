@@ -53,14 +53,14 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 			for b.len() < r.b.buffered() {
 				b.grow()
 			}
-			n = copy(b.buf, r.b.buf[r.b.r:r.b.w])
+			n = copy(b.buf[b.w:], r.b.buf[r.b.r:r.b.w])
+			b.w += n
 		}
-		// Put(r.b)
 	}
 	r.err = nil
 	r.b = b
-	r.b.w = n
-	r.b.r = 0
+	r.b.r = b.r
+	r.b.w = b.w
 }
 
 // ReadUntil reads until the first occurrence of delim in the input,
@@ -85,11 +85,12 @@ func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
 			r.b.grow()
 		}
 		err := r.fill()
-		if err == io.EOF {
+		if err == io.EOF && r.b.buffered() > 0 {
 			data := r.b.buf[r.b.r:r.b.w]
 			r.b.r = r.b.w
 			return data, nil
 		} else if err != nil {
+			r.err = err
 			return nil, err
 		}
 	}
@@ -102,7 +103,7 @@ func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
 // ReadFull returns ErrUnexpectedEOF.
 // On return, n == len(buf) if and only if err == nil.
 func (r *Reader) ReadFull(n int) ([]byte, error) {
-	if n == 0 {
+	if n <= 0 {
 		return nil, nil
 	}
 	if r.err != nil {
@@ -119,11 +120,12 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 			r.b.grow()
 		}
 		err := r.fill()
-		if err == io.EOF {
+		if err == io.EOF && r.b.buffered() > 0 {
 			data := r.b.buf[r.b.r:r.b.w]
 			r.b.r = r.b.w
 			return data, nil
 		} else if err != nil {
+			r.err = err
 			return nil, err
 		}
 	}

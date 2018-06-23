@@ -15,7 +15,7 @@ var (
 	oneBytes   = []byte{'1'}
 	crlfBytes  = []byte("\r\n")
 	endBytes   = []byte("END\r\n")
-	// storedBytes    = []byte("STORED\r\n")
+	// storedBytes = []byte("STORED\r\n")
 	// notStoredBytes = []byte("NOT_STORED\r\n")
 	// existsBytes    = []byte("EXISTS\r\n")
 	// notFoundBytes  = []byte("NOT_FOUND\r\n")
@@ -146,6 +146,11 @@ func (r *MCRequest) Cmd() string {
 // Key get Msg key.
 func (r *MCRequest) Key() []byte {
 	return r.key
+}
+
+// Resp get response data.
+func (r *MCRequest) Resp() []byte {
+	return r.data
 }
 
 func (r *MCRequest) String() string {

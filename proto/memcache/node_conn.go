@@ -18,10 +18,6 @@ const (
 	handlerClosed  = int32(1)
 )
 
-const ping = "set _ping 0 0 4\r\npong\r\n"
-
-var pong = []byte("STORED\r\n")
-
 type nodeConn struct {
 	cluster string
 	addr    string
@@ -53,7 +49,6 @@ func (n *nodeConn) Ping() (err error) {
 		err = io.EOF
 		return
 	}
-
 	err = n.pinger.Ping()
 	return
 }
@@ -82,21 +77,19 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 	}
 	if err = n.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
-		return
 	}
 	return
 }
 
 // Read reads response bytes from server node.
 func (n *nodeConn) Read(m *proto.Message) (err error) {
-	defer n.br.ResetBuffer(nil)
 	if n.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
 	// TODO: this read was only support read one key's result
 	n.br.ResetBuffer(m.RespBuffer())
-
+	// request
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
@@ -107,7 +100,8 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.Wrap(err, "MC Handler handle read response bytes")
 		return
 	}
-	n.br.Advance(-len(bs)) // NOTE: for response bytes
+	// n.br.Advance(-len(bs)) // NOTE: for response bytes
+	mcr.data = bs
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
 		return
 	}
@@ -117,18 +111,19 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 	}
 	prom.Hit(n.cluster, n.addr)
 	// value length
-	// fmt.Printf("baka m.Cmd:%s m.Key:%s m.Key.Bytes:(%v) and bs-str:%s bs:%v\r\n", m.Request().Cmd(), m.Request().Key(), m.Request().Key(), bs, bs)
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
+	n.br.Advance(-len(bs))
 	rlen := len(bs) + length + 2 + len(endBytes)
-	if _, err = n.br.ReadFull(rlen); err != nil {
+	if bs, err = n.br.ReadFull(rlen); err != nil {
 		err = errors.Wrap(err, "MC Handler while reading length full data")
 		return
 	}
-	n.br.Advance(-rlen) // NOTE: for response bytes
+	// n.br.Advance(-rlen) // NOTE: for response bytes
+	mcr.data = bs
 	return
 }
 

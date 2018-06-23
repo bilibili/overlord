@@ -6,7 +6,6 @@ import (
 
 // errors
 var (
-	// ErrMoreData           = errs.New("need more data")
 	ErrNoSupportCacheType = errs.New("unsupported cache type")
 )
 
@@ -24,9 +23,7 @@ const (
 type Request interface {
 	Cmd() string
 	Key() []byte
-	// IsBatch() bool
-	// Batch() []Message
-	// Merge() [][]byte
+	Resp() []byte
 }
 
 // ProxyConn decode bytes from client and encode write to conn.
@@ -39,13 +36,6 @@ type ProxyConn interface {
 type NodeConn interface {
 	Write(*Message) error
 	Read(*Message) error
-	Close() error
-
 	Ping() error
+	Close() error
 }
-
-// Pinger ping node connection.
-// type Pinger interface {
-// 	Ping() error
-// 	Close() error
-// }

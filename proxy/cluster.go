@@ -49,9 +49,9 @@ func newChannel(n int32) *channel {
 	return &channel{cnt: n, chs: chs}
 }
 
-func (c *channel) push(req *proto.Message) {
+func (c *channel) push(m *proto.Message) {
 	i := atomic.AddInt32(&c.idx, 1)
-	c.chs[i%c.cnt] <- req
+	c.chs[i%c.cnt] <- m
 }
 
 // Cluster is cache cluster.
@@ -62,12 +62,10 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring  *hashkit.HashRing
-	alias bool
-	// nodeConn  map[string]proto.NodeConn
+	ring      *hashkit.HashRing
+	alias     bool
 	nodeAlias map[string]string
-	// nodePing  map[string]*pinger
-	nodeCh map[string]*channel
+	nodeCh    map[string]*channel
 
 	lock   sync.Mutex
 	closed bool
@@ -91,9 +89,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	} else {
 		ring.Init(addrs, ws)
 	}
-	// nm := map[string]proto.NodeConn{}
 	am := map[string]string{}
-	// pm := map[string]*pinger{}
 	cm := map[string]*channel{}
 	// for addrs
 	for i := range addrs {
@@ -153,7 +149,7 @@ func (c *Cluster) process(rc *channel, addr string) {
 		go func(i int32) {
 			ch := rc.chs[i]
 			w := newNodeConn(c.cc, addr)
-			mCh := make(chan *proto.Message, 1024)
+			mCh := make(chan *proto.Message)
 			go c.processWrite(addr, ch, w, mCh)
 			go c.processRead(addr, w, mCh)
 		}(i)
@@ -169,10 +165,8 @@ func (c *Cluster) processWrite(addr string, ch <-chan *proto.Message, w proto.No
 			w.Close()
 			return
 		}
-		now := time.Now()
-		m.SetWriteTime(now)
+		m.SetWriteTime(time.Now())
 		err := w.Write(m)
-		prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(time.Since(now)/time.Microsecond))
 		if err != nil {
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			if log.V(1) {
@@ -190,16 +184,16 @@ func (c *Cluster) processRead(addr string, r proto.NodeConn, mCh <-chan *proto.M
 		m := <-mCh
 		m.RespBuffer().Reset()
 		err := r.Read(m)
-		now := time.Now()
+		m.SetReadTime(time.Now())
 		if err != nil {
-			m.SetReadTime(now)
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			log.V(1).Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
+			if log.V(1) {
+				log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
+			}
 			prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
 			continue
 		}
-
-		m.SetReadTime(now)
+		prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
 		m.Done()
 	}
 }
@@ -212,7 +206,6 @@ func (c *Cluster) processPing(p *pinger) {
 			return
 		default:
 		}
-
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
 			p.retries = 0

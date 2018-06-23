@@ -15,6 +15,12 @@
 			"revisionTime": "2016-08-04T10:47:26Z"
 		},
 		{
+			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
+			"revisionTime": "2018-02-21T22:46:20Z"
+		},
+		{
 			"checksumSHA1": "WX1+2gktHcBmE9MGwFSGs7oqexU=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
@@ -31,6 +37,12 @@
 			"path": "github.com/pkg/errors",
 			"revision": "30136e27e2ac8d167177e8a583aa4c3fea5be833",
 			"revisionTime": "2018-01-27T01:58:12Z"
+		},
+		{
+			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
+			"revisionTime": "2016-01-10T10:55:54Z"
 		},
 		{
 			"checksumSHA1": "I87tkF1e/hrl4d/XIKFfkPRq1ww=",
@@ -91,6 +103,12 @@
 			"path": "github.com/prometheus/procfs/xfs",
 			"revision": "d274e363d5759d1c916232217be421f1cc89c5fe",
 			"revisionTime": "2018-02-28T15:07:32Z"
+		},
+		{
+			"checksumSHA1": "c6pbpF7eowwO59phRTpF8cQ80Z0=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
+			"revisionTime": "2018-05-06T18:05:49Z"
 		}
 	],
 	"rootPath": "github.com/felixhao/overlord"

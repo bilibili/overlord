@@ -74,12 +74,9 @@ func (b *Buffer) buffered() int {
 
 // Reset reset buffer.
 func (b *Buffer) Reset() {
+	// b.buf = b.buf[:0]
+	// b.buf = b.buf[:cap(b.buf)]
 	b.r, b.w = 0, 0
-}
-
-// Bytes return unread bytes.
-func (b *Buffer) Bytes() []byte {
-	return b.buf[b.r:b.w]
 }
 
 // Get the data buffer
@@ -101,7 +98,6 @@ func Get(size int) *Buffer {
 func Put(b *Buffer) {
 	i := sort.SearchInts(sizes, b.len())
 	if i < len(pools) {
-		// b.Reset()
 		pools[i].Put(b)
 	}
 }

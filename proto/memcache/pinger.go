@@ -9,7 +9,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultPingBufferSize = 32
+const (
+	pingBufferSize = 32
+	ping           = "set _ping 0 0 4\r\npong\r\n"
+)
+
+var pong = []byte("STORED\r\n")
 
 type mcPinger struct {
 	conn   *libnet.Conn
@@ -22,7 +27,7 @@ func newMCPinger(nc *libnet.Conn) *mcPinger {
 	return &mcPinger{
 		conn: nc,
 		bw:   bufio.NewWriter(nc),
-		br:   bufio.NewReader(nc, bufio.Get(defaultPingBufferSize)),
+		br:   bufio.NewReader(nc, bufio.Get(pingBufferSize)),
 	}
 }
 

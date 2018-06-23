@@ -20,8 +20,9 @@ type Message struct {
 	reqBuf  *bufio.Buffer
 	respBuf *bufio.Buffer
 
-	req  []Request
-	subs []Message
+	req      []Request
+	subs     []Message
+	subResps [][]byte
 
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
@@ -60,13 +61,16 @@ func (m *Message) SetReadTime(t time.Time) {
 	m.rt = t
 }
 
-// setEndTime will set the remote duration of the command.
-func (m *Message) setEndTime(t time.Time) {
+// SetEndTime will set the remote duration of the command.
+func (m *Message) SetEndTime(t time.Time) {
 	m.et = t
 }
 
 // Add add wg.
 func (m *Message) Add(n int) {
+	if m.wg == nil {
+		panic("message waitgroup nil")
+	}
 	m.wg.Add(n)
 }
 
@@ -75,7 +79,6 @@ func (m *Message) Done() {
 	if m.wg == nil {
 		panic("message waitgroup nil")
 	}
-	m.setEndTime(time.Now())
 	m.wg.Done()
 }
 
@@ -85,7 +88,6 @@ func (m *Message) DoneWithError(err error) {
 		panic("message waitgroup nil")
 	}
 	m.err = err
-	m.setEndTime(time.Now())
 	m.wg.Done()
 }
 
@@ -111,6 +113,9 @@ func (m *Message) RespBuffer() *bufio.Buffer {
 func (m *Message) ReleaseBuffer() {
 	bufio.Put(m.reqBuf)
 	bufio.Put(m.respBuf)
+	for i := 0; i < len(m.subs); i++ {
+		(&m.subs[i]).ReleaseBuffer()
+	}
 }
 
 // WithRequest with proto request.
@@ -152,12 +157,12 @@ func (m *Message) Batch() []Message {
 func (m *Message) Response() [][]byte {
 	// TODO(wayslog): set Read/Write timer after merge
 	if !m.IsBatch() {
-		return [][]byte{m.respBuf.Bytes()}
+		return [][]byte{m.req[0].Resp()}
 	}
-	slen := len(m.subs)
+	slen := len(m.req)
 	res := make([][]byte, slen)
 	for i := 0; i < slen; i++ {
-		res[i] = (&m.subs[i]).respBuf.Bytes()
+		res[i] = m.req[i].Resp()
 	}
 	return res
 }

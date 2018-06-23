@@ -39,20 +39,12 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 	// bufio reset buffer
 	p.br.ResetBuffer(m.ReqBuffer())
 	line, err := p.br.ReadUntil(delim)
-	// if the decode is all right, the line is never equals with 0
-	// but, we can assemue that some mistake makes it does.
-	// let's protected it from the satuation
-	if len(line) == 0 {
-		err = io.EOF
-		return
-	}
 	if err != nil {
 		err = errors.Wrapf(err, "MC decoder while reading text line")
 		return
 	}
 	bg, ed := nextField(line)
 	lower := conv.ToLower(line[bg:ed])
-	// fmt.Printf("cmd:%s\n", lower)
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -96,7 +88,6 @@ func (p *proxyConn) Decode() (m *proto.Message, err error) {
 func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, cas bool) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
-	// fmt.Printf("key:%s\n", key)
 	if !legalKey(key) {
 		err = errors.Wrap(ErrBadKey, "MC decoder storage request legal key")
 		return
@@ -135,7 +126,6 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 	for {
 		ns = ns[e:]
 		b, e = nextField(ns)
-		// fmt.Printf("retrieval key:%s\n", ns[b:e])
 		if !legalKey(ns[b:e]) {
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
@@ -268,20 +258,21 @@ func nextField(bs []byte) (begin, end int) {
 }
 
 func findLength(bs []byte, cas bool) (int, error) {
-	pos := len(bs) - 2
+	pos := len(bs) - 2 // NOTE: trim right "\r\n"
+	ns := bs[:pos]
 	if cas {
 		// skip cas filed
-		high := revNoSpacIdx(bs[:pos])
-		low := revSpacIdx(bs[:high])
-		pos = low
+		si := revSpacIdx(ns)
+		if si == -1 {
+			return -1, ErrBadLength
+		}
+		ns = ns[:si]
 	}
-	if pos < 0 {
-		return 0, ErrBadLength
+	low := revSpacIdx(ns) + 1
+	if low == 0 {
+		return -1, ErrBadLength
 	}
-	up := revNoSpacIdx(bs[:pos]) + 1
-	low := revSpacIdx(bs[:up]) + 1
-	lengthBs := bs[low:up]
-	length, err := conv.Btoi(lengthBs)
+	length, err := conv.Btoi(ns[low:])
 	if err != nil {
 		return -1, ErrBadLength
 	}
@@ -312,15 +303,6 @@ func noSpaceIdx(bs []byte) int {
 		}
 	}
 	return len(bs)
-}
-
-func revNoSpacIdx(bs []byte) int {
-	for i := len(bs) - 1; i > -1; i-- {
-		if bs[i] != spaceByte {
-			return i
-		}
-	}
-	return -1
 }
 
 func revSpacIdx(bs []byte) int {
@@ -365,7 +347,6 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			}
 		}
 	}
-
 	if err = p.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
 	}
