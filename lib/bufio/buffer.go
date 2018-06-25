@@ -49,6 +49,11 @@ type Buffer struct {
 	r, w int
 }
 
+// Bytes return the bytes readed
+func (b *Buffer) Bytes() []byte {
+	return b.buf[b.r:b.w]
+}
+
 func (b *Buffer) grow() {
 	nb := make([]byte, len(b.buf)*growFactor)
 	copy(nb, b.buf[:b.w])
@@ -66,6 +71,15 @@ func (b *Buffer) Advance(n int) {
 	// if b.r < 0 {
 	// 	panic("fail to advance")
 	// }
+}
+
+func (b *Buffer) shrink() {
+	if b.r == 0 {
+		return
+	}
+	copy(b.buf, b.buf[b.r:b.w])
+	b.w -= b.r
+	b.r = 0
 }
 
 func (b *Buffer) buffered() int {

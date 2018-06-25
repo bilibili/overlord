@@ -88,7 +88,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 	// TODO: this read was only support read one key's result
-	n.br.ResetBuffer(m.RespBuffer())
+	n.br.ResetBuffer(m.Buffer())
 	// request
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {

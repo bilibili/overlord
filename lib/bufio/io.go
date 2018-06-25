@@ -1,9 +1,15 @@
 package bufio
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"net"
+)
+
+// ErrProxy
+var (
+	ErrBufferFull = bufio.ErrBufferFull
 )
 
 // Reader implements buffering for an io.Reader object.
@@ -40,6 +46,51 @@ func (r *Reader) Buffer() *Buffer {
 	return r.b
 }
 
+// Read will trying to read until the buffer is full
+func (r *Reader) Read() error {
+	if r.err != nil {
+		return r.err
+	}
+
+	if r.b.buffered() == r.b.len() {
+		r.b.grow()
+	}
+
+	if r.b.w == r.b.len() {
+		r.b.shrink()
+	}
+
+	if err := r.fill(); err != io.EOF {
+		return err
+	}
+	return nil
+}
+
+// ReadSlice will read until the delim or return ErrBufferFull.
+// It never contains any I/O operation
+func (r *Reader) ReadSlice(delim byte) (data []byte, err error) {
+	idx := bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
+	if idx == -1 {
+		err = ErrBufferFull
+		return
+	}
+	data = r.b.buf[r.b.r : r.b.r+idx+1]
+	r.b.r += idx + 1
+	return
+}
+
+// ReadExact will read n size bytes or return ErrBufferFull.
+// It never contains any I/O operation
+func (r *Reader) ReadExact(n int) (data []byte, err error) {
+	if r.b.buffered() < n {
+		err = ErrBufferFull
+		return
+	}
+	data = r.b.buf[r.b.r : r.b.r+n]
+	r.b.r += n
+	return
+}
+
 // ResetBuffer reset buf.
 func (r *Reader) ResetBuffer(b *Buffer) {
 	if b == nil {
@@ -47,7 +98,7 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 		return
 	}
 	b.Reset()
-	n := 0
+	var n int
 	if r.b != nil {
 		if r.b.buffered() > 0 {
 			for b.len() < r.b.buffered() {

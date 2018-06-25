@@ -2,9 +2,7 @@ package proxy
 
 import (
 	"context"
-	"io"
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -13,7 +11,6 @@ import (
 	"github.com/felixhao/overlord/lib/prom"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -23,12 +20,17 @@ const (
 	messageChanBuffer = 1024 // TODO(felix): config???
 )
 
+// variables need to change
+var (
+	// TODO: config and optimus
+	MaxConcurrent = 32
+)
+
 // Handler handle conn.
 type Handler struct {
 	c      *Config
 	ctx    context.Context
 	cancel context.CancelFunc
-	once   sync.Once
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -66,44 +68,72 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 // Handle reads Msg from client connection and dispatchs Msg back to cache servers,
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
-	h.once.Do(func() {
-		go h.handleWriter()
-		go h.handleReader()
-	})
-}
-
-func (h *Handler) handleReader() {
 	var (
-		m   *proto.Message
-		err error
+		messages  = proto.GetMsgSlice(MaxConcurrent)
+		err       error
+		completed bool
+		count     int
 	)
-	defer func() {
-		// EOF represent that client never write again,
-		// but server can write back data after client closed the socket.
-		if err != io.EOF {
-			h.closeWithError(err)
-		}
-	}()
+
+	defer func(err error) {
+		h.closeWithError(err)
+	}(err)
+
 	for {
-		if h.Closed() || h.msgCh.Closed() {
-			if log.V(3) {
-				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler closed", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
+		// if completed, we need not to read but
+		// just need to parse with buffered.
+		if !completed {
+			// 0. read it first
+			err = h.pc.Read()
+			if err != nil {
+				return
 			}
-			return
 		}
-		m, err = h.pc.Decode()
-		if err != nil {
-			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) decode error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+		// 1. read until limit or error
+		idx := 0
+		for ; idx < MaxConcurrent; idx++ {
+			completed, err = h.pc.Decode(messages[idx])
+			if err != nil {
+				return
 			}
-			return
+
+			messages[idx].MarkStart()
+			// 不完整的buffer，则发送当前所有的msg到后台执行
+			if !completed {
+				messages[idx].Reset()
+				break
+			}
 		}
-		m.Add(1) // NOTE: must front msgCh.PushBack
-		if h.msgCh.PushBack(m) == 0 {
-			m.Done()
-			return
+
+		// set count
+		count = idx + 1
+		if !completed {
+			count--
 		}
-		h.dispatch(m)
+
+		// 2. send to cluster
+		for i := 0; i < count; i++ {
+			msg := messages[i]
+			msg.Add(1)
+			h.dispatch(msg)
+		}
+		// 3. wait to done
+		for i := 0; i < count; i++ {
+			msg := messages[i]
+			msg.Wait()
+			// 3.5. write back client
+			err = h.pc.Encode(msg)
+			if err != nil {
+				return
+			}
+			msg.MarkEnd()
+			msg.ReleaseSubs()
+			prom.ProxyTime(h.cluster.cc.Name, msg.Request().Cmd(), int64(msg.TotalDur()/time.Microsecond))
+		}
+		// 4. release resource
+		for i := 0; i < count; i++ {
+			messages[i].Reset()
+		}
 	}
 }
 
@@ -127,39 +157,6 @@ func (h *Handler) dispatch(m *proto.Message) {
 		h.cluster.Dispatch(&subs[i])
 	}
 	m.Done()
-}
-
-func (h *Handler) handleWriter() {
-	var err error
-	defer func() {
-		h.closeWithError(err)
-	}()
-	for {
-		// NOTE: no check handler closed, ensure that reqCh pop finished.
-		if err != nil {
-			rerr := errors.Cause(err)
-			if ne, ok := rerr.(net.Error); ok && (ne.Timeout() || !ne.Temporary()) {
-				if log.V(1) {
-					log.Errorf("cluster(%s) addr(%s) remoteAddr(%s) handler writer error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
-				}
-				return
-			}
-			err = nil
-			continue
-		}
-		m, ok := h.msgCh.PopFront()
-		if !ok {
-			if log.V(3) {
-				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg chan pop not ok", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr())
-			}
-			return
-		}
-		m.Wait()
-		err = h.pc.Encode(m)
-		m.SetEndTime(time.Now())
-		prom.ProxyTime(h.cluster.cc.Name, m.Request().Cmd(), int64(m.TotalDur()/time.Microsecond))
-		m.ReleaseBuffer()
-	}
 }
 
 // Closed return handler whether or not closed.

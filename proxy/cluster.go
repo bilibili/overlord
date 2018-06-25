@@ -149,24 +149,22 @@ func (c *Cluster) process(rc *channel, addr string) {
 		go func(i int32) {
 			ch := rc.chs[i]
 			w := newNodeConn(c.cc, addr)
-			mCh := make(chan *proto.Message)
-			go c.processWrite(addr, ch, w, mCh)
-			go c.processRead(addr, w, mCh)
+			c.processIO(addr, ch, w)
 		}(i)
 	}
 }
 
-func (c *Cluster) processWrite(addr string, ch <-chan *proto.Message, w proto.NodeConn, mCh chan<- *proto.Message) {
+func (c *Cluster) processIO(addr string, ch <-chan *proto.Message, nc proto.NodeConn) {
 	for {
 		var m *proto.Message
 		select {
 		case m = <-ch:
 		case <-c.ctx.Done():
-			w.Close()
+			nc.Close()
 			return
 		}
-		m.SetWriteTime(time.Now())
-		err := w.Write(m)
+
+		err := c.processWrite(nc, m)
 		if err != nil {
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			if log.V(1) {
@@ -175,16 +173,7 @@ func (c *Cluster) processWrite(addr string, ch <-chan *proto.Message, w proto.No
 			prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
 			continue
 		}
-		mCh <- m
-	}
-}
-
-func (c *Cluster) processRead(addr string, r proto.NodeConn, mCh <-chan *proto.Message) {
-	for {
-		m := <-mCh
-		m.RespBuffer().Reset()
-		err := r.Read(m)
-		m.SetReadTime(time.Now())
+		err = c.processRead(nc, m)
 		if err != nil {
 			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			if log.V(1) {
@@ -196,6 +185,17 @@ func (c *Cluster) processRead(addr string, r proto.NodeConn, mCh <-chan *proto.M
 		prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
 		m.Done()
 	}
+}
+
+func (c *Cluster) processWrite(w proto.NodeConn, m *proto.Message) error {
+	m.MarkWrite()
+	return w.Write(m)
+}
+
+func (c *Cluster) processRead(r proto.NodeConn, m *proto.Message) error {
+	err := r.Read(m)
+	m.MarkRead()
+	return err
 }
 
 func (c *Cluster) processPing(p *pinger) {
