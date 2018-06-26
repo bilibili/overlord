@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"io"
 	"net"
+
+	libnet "github.com/felixhao/overlord/lib/net"
 )
 
 // ErrProxy
@@ -189,14 +191,14 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 // Flush method to guarantee all data has been forwarded to
 // the underlying io.Writer.
 type Writer struct {
-	wr   io.Writer
+	wr   *libnet.Conn
 	bufs net.Buffers
 
 	err error
 }
 
 // NewWriter returns a new Writer whose buffer has the default size.
-func NewWriter(wr io.Writer) *Writer {
+func NewWriter(wr *libnet.Conn) *Writer {
 	return &Writer{wr: wr, bufs: net.Buffers(make([][]byte, 0, 128))}
 }
 
@@ -208,7 +210,7 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	_, err := w.bufs.WriteTo(w.wr)
+	_, err := w.wr.Writev(&w.bufs)
 	if err != nil {
 		w.err = err
 	}

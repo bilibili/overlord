@@ -5,8 +5,10 @@ import (
 	errs "errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -87,7 +89,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				// cache type
 				switch cc.CacheType {
 				case proto.CacheTypeMemcache:
-					encoder := memcache.NewProxyConn(conn)
+					encoder := memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 					m := proto.ErrMessage(ErrProxyMoreMaxConns)
 					_ = encoder.Encode(m)
 					_ = conn.Close()

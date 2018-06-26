@@ -11,7 +11,7 @@ func TestBufferGrowOk(t *testing.T) {
 	b.grow()
 	assert.Equal(t, 0, b.r)
 	assert.Equal(t, 0, b.w)
-	assert.Len(t, b.buf, 2048)
+	assert.Len(t, b.buf, defaultBufferSize*2)
 	assert.Equal(t, len(b.buf), b.len())
 }
 

@@ -2,11 +2,11 @@ package memcache
 
 import (
 	"bytes"
-	"io"
 	"strings"
 
 	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/lib/conv"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
@@ -25,7 +25,7 @@ type proxyConn struct {
 }
 
 // NewProxyConn new a memcache decoder and encode.
-func NewProxyConn(rw io.ReadWriter) proto.ProxyConn {
+func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	p := &proxyConn{
 		// TODO: optimus zero
 		br:        bufio.NewReader(rw, bufio.Get(1024)),
