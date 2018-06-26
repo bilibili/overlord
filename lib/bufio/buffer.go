@@ -20,7 +20,8 @@ var (
 )
 
 func init() {
-	sizes = make([]int, maxBufferSize/defaultBufferSize/growFactor)
+
+	sizes = make([]int, 0)
 	threshold := defaultBufferSize
 	for threshold <= maxBufferSize {
 		sizes = append(sizes, threshold)

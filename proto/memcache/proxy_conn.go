@@ -74,9 +74,9 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		return
 	}
 	bg, ed := nextField(line)
-	lower := conv.ToLower(line[bg:ed])
+	conv.UpdateToLower(line[bg:ed])
 	// fmt.Printf("cmd lower is :%s\n", strconv.Quote(string(line[bg:ed])))
-	switch string(lower) {
+	switch string(line[bg:ed]) {
 	// Storage commands:
 	case "set":
 		return p.decodeStorage(m, line[ed:], RequestTypeSet, false)
