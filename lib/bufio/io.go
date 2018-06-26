@@ -73,6 +73,7 @@ func (r *Reader) Read() error {
 func (r *Reader) ReadSlice(delim byte) (data []byte, err error) {
 	idx := bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
 	if idx == -1 {
+		data = nil
 		err = ErrBufferFull
 		return
 	}
@@ -210,6 +211,7 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
+	// fmt.Printf("buffers:%v\n", w.bufs)
 	_, err := w.wr.Writev(&w.bufs)
 	if err != nil {
 		w.err = err

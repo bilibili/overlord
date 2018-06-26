@@ -78,6 +78,7 @@ func NewMessage() *Message {
 
 // Reset will clean the msg
 func (m *Message) Reset() {
+	m.buf.Reset()
 	m.Type = CacheTypeUnknown
 	m.req = m.req[:0]
 	m.subs = m.subs[:0]

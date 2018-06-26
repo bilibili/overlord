@@ -75,6 +75,7 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	}
 	bg, ed := nextField(line)
 	lower := conv.ToLower(line[bg:ed])
+	// fmt.Printf("cmd lower is :%s\n", strconv.Quote(string(line[bg:ed])))
 	switch string(lower) {
 	// Storage commands:
 	case "set":
@@ -132,6 +133,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
 	data, err := p.br.ReadExact(keyOffset + length + 2)
 	if err == bufio.ErrBufferFull {
+		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.String())))
 		return
 	} else if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
