@@ -71,18 +71,18 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 func (h *Handler) Handle() {
 	var (
 		messages = proto.GetMsgSlice(defaultConcurrent)
+		msgs     []*proto.Message
 		err      error
 	)
 
-	defer func(err error) {
+	defer func() {
 		h.closeWithError(err)
-	}(err)
+	}()
 
 	for {
 		// 1. read until limit or error
-		msgs, derr := h.pc.Decode(messages)
-		if derr != nil {
-			err = derr
+		msgs, err = h.pc.Decode(messages)
+		if err != nil {
 			return
 		}
 
