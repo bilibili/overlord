@@ -69,6 +69,10 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 // Handle reads Msg from client connection and dispatchs Msg back to cache servers,
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
+	go h.handle()
+}
+
+func (h *Handler) handle() {
 	var (
 		messages = proto.GetMsgSlice(defaultConcurrent)
 		msgs     []*proto.Message
