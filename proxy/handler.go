@@ -22,8 +22,9 @@ const (
 
 // variables need to change
 var (
-	// TODO: config and optimus
-	MaxConcurrent = 32
+	// TODO: config and reduce to small
+	defaultConcurrent = 16
+	maxConcurrent     = 64
 )
 
 // Handler handle conn.
@@ -69,10 +70,8 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
 	var (
-		messages  = proto.GetMsgSlice(MaxConcurrent)
-		err       error
-		completed bool
-		count     int
+		messages = proto.GetMsgSlice(defaultConcurrent)
+		err      error
 	)
 
 	defer func(err error) {
@@ -80,46 +79,20 @@ func (h *Handler) Handle() {
 	}(err)
 
 	for {
-		// if completed, we need not to read but
-		// just need to parse with buffered.
-		if !completed {
-			// 0. read it first
-			err = h.pc.Read()
-			if err != nil {
-				return
-			}
-		}
 		// 1. read until limit or error
-		idx := 0
-		for ; idx < MaxConcurrent; idx++ {
-			completed, err = h.pc.Decode(messages[idx])
-			if err != nil {
-				return
-			}
-
-			messages[idx].MarkStart()
-			// 不完整的buffer，则发送当前所有的msg到后台执行
-			if !completed {
-				messages[idx].Reset()
-				break
-			}
-		}
-
-		// set count
-		count = idx + 1
-		if !completed {
-			count--
+		msgs, derr := h.pc.Decode(messages)
+		if derr != nil {
+			err = derr
+			return
 		}
 
 		// 2. send to cluster
-		for i := 0; i < count; i++ {
-			msg := messages[i]
+		for _, msg := range msgs {
 			msg.Add(1)
 			h.dispatch(msg)
 		}
 		// 3. wait to done
-		for i := 0; i < count; i++ {
-			msg := messages[i]
+		for _, msg := range msgs {
 			msg.Wait()
 			// 3.5. write back client
 			err = h.pc.Encode(msg)
@@ -131,10 +104,18 @@ func (h *Handler) Handle() {
 			prom.ProxyTime(h.cluster.cc.Name, msg.Request().Cmd(), int64(msg.TotalDur()/time.Microsecond))
 		}
 		// 4. release resource
-		for i := 0; i < count; i++ {
-			messages[i].Reset()
+		for _, msg := range msgs {
+			msg.Reset()
 		}
+
+		// 5. reset MaxConcurrent
+		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
+}
+
+func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
+	// TODO: change the msgs by BatchSize
+	return msgs
 }
 
 func (h *Handler) dispatch(m *proto.Message) {

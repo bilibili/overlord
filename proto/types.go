@@ -28,8 +28,7 @@ type Request interface {
 
 // ProxyConn decode bytes from client and encode write to conn.
 type ProxyConn interface {
-	Read() error
-	Decode(msg *Message) (completed bool, err error)
+	Decode([]*Message) ([]*Message, error)
 	Encode(msg *Message) error
 }
 

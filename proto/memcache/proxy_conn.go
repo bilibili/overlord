@@ -19,36 +19,49 @@ const (
 )
 
 type proxyConn struct {
-	br *bufio.Reader
-	bw *bufio.Writer
+	br        *bufio.Reader
+	bw        *bufio.Writer
+	completed bool
 }
 
 // NewProxyConn new a memcache decoder and encode.
 func NewProxyConn(rw io.ReadWriter) proto.ProxyConn {
 	p := &proxyConn{
 		// TODO: optimus zero
-		br: bufio.NewReader(rw, bufio.Get(1024)),
-		bw: bufio.NewWriter(rw),
+		br:        bufio.NewReader(rw, bufio.Get(1024)),
+		bw:        bufio.NewWriter(rw),
+		completed: true,
 	}
 	return p
 }
 
-func (p *proxyConn) Read() error {
-	return p.br.Read()
-}
-
-func (p *proxyConn) Decode(msg *proto.Message) (completed bool, err error) {
-	// set msg type
-	msg.Type = proto.CacheTypeMemcache
-	// decode
-	err = p.decode(msg)
-	if err == bufio.ErrBufferFull {
-		completed = false
-		err = nil
-	} else {
-		completed = true
+func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
+	var err error
+	// if completed, means that we have parsed all the buffered
+	// if not completed, we need only to parse the buffered message
+	if p.completed {
+		err = p.br.Read()
+		if err != nil {
+			return nil, err
+		}
 	}
-	return
+
+	for i := range msgs {
+		p.completed = false
+		// set msg type
+		msgs[i].Type = proto.CacheTypeMemcache
+		// decode
+		err = p.decode(msgs[i])
+		if err == bufio.ErrBufferFull {
+			p.completed = true
+			msgs[i].Reset()
+			return msgs[:i], nil
+		} else if err != nil {
+			msgs[i].Reset()
+			return msgs[:i], err
+		}
+	}
+	return msgs, nil
 }
 
 func (p *proxyConn) decode(m *proto.Message) (err error) {

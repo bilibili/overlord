@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,8 +28,18 @@ func GetMsg() *Message {
 }
 
 // GetMsgSlice alloc a slice to the message
-func GetMsgSlice(n int) []*Message {
-	msgs := make([]*Message, n)
+func GetMsgSlice(n int, caps ...int) []*Message {
+	largs := len(caps)
+	if largs > 1 {
+		panic(fmt.Sprintf("optional argument except 1, but get %d", largs))
+	}
+
+	var msgs []*Message
+	if largs == 0 {
+		msgs = make([]*Message, n)
+	} else {
+		msgs = make([]*Message, n, caps[0])
+	}
 	for idx := range msgs {
 		msgs[idx] = GetMsg()
 	}
