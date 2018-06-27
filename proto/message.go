@@ -21,10 +21,20 @@ var msgPool = &sync.Pool{
 		return NewMessage()
 	},
 }
+var msgPoolWithWG = &sync.Pool{
+	New: func() interface{} {
+		return NewMessageWithWG()
+	},
+}
 
 // GetMsg get the msg from pool
 func GetMsg() *Message {
 	return msgPool.Get().(*Message)
+}
+
+// GetMsgWithWG get the msg from pool with waitgroup.
+func GetMsgWithWG() *Message {
+	return msgPoolWithWG.Get().(*Message)
 }
 
 // GetMsgSlice alloc a slice to the message
@@ -41,7 +51,7 @@ func GetMsgSlice(n int, caps ...int) []*Message {
 		msgs = make([]*Message, n, caps[0])
 	}
 	for idx := range msgs {
-		msgs[idx] = GetMsg()
+		msgs[idx] = GetMsgWithWG()
 	}
 	return msgs
 }
@@ -49,6 +59,11 @@ func GetMsgSlice(n int, caps ...int) []*Message {
 // PutMsg Release Msg
 func PutMsg(msg *Message) {
 	msgPool.Put(msg)
+}
+
+// PutMsgWithWG Release Msg with waitgroup.
+func PutMsgWithWG(msg *Message) {
+	msgPoolWithWG.Put(msg)
 }
 
 // Message read from client.
@@ -67,8 +82,17 @@ type Message struct {
 	err            error
 }
 
-// NewMessage will create new message object
+// NewMessage will create new message object.
+// this will be used be sub msg req.
 func NewMessage() *Message {
+	return &Message{
+		// TODO: get with suitable length
+		buf: bufio.Get(defaultRespBufSize),
+	}
+}
+
+// NewMessageWithWG will create new message object with waitgroup.
+func NewMessageWithWG() *Message {
 	return &Message{
 		wg: &sync.WaitGroup{},
 		// TODO: get with suitable length
