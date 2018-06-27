@@ -87,6 +87,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
+	defer n.br.ResetBuffer(nil)
 	// TODO: this read was only support read one key's result
 	n.br.ResetBuffer(m.Buffer())
 	// request
