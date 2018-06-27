@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"io"
 	"net"
 	"sync/atomic"
 	"time"
@@ -139,7 +140,7 @@ func (h *Handler) dispatch(m *proto.Message) {
 	subl := len(subs)
 	m.Add(subl)
 	for i := 0; i < subl; i++ {
-		h.cluster.Dispatch(&subs[i])
+		h.cluster.Dispatch(subs[i])
 	}
 	m.Done()
 }
@@ -157,7 +158,9 @@ func (h *Handler) closeWithError(err error) {
 		_ = h.conn.Close()
 		prom.ConnDecr(h.cluster.cc.Name)
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+			if err != io.EOF {
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+			}
 		}
 	}
 }

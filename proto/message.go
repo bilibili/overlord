@@ -59,7 +59,7 @@ type Message struct {
 	buf *bufio.Buffer
 
 	req      []Request
-	subs     []Message
+	subs     []*Message
 	subResps [][]byte
 
 	// Start Time, Write Time, ReadTime, EndTime
@@ -80,8 +80,8 @@ func NewMessage() *Message {
 func (m *Message) Reset() {
 	m.buf.Reset()
 	m.Type = CacheTypeUnknown
-	m.req = m.req[:0]
-	m.subs = m.subs[:0]
+	m.req = nil
+	m.subs = nil
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
@@ -158,7 +158,7 @@ func (m *Message) Buffer() *bufio.Buffer {
 // ReleaseSubs will return the Msg data to flush and reset
 func (m *Message) ReleaseSubs() {
 	for i := range m.subs {
-		sub := &m.subs[i]
+		sub := m.subs[i]
 		sub.Reset()
 		PutMsg(sub)
 	}
@@ -183,14 +183,14 @@ func (m *Message) IsBatch() bool {
 }
 
 // Batch returns sub Msg if is batch.
-func (m *Message) Batch() []Message {
+func (m *Message) Batch() []*Message {
 	slen := len(m.req)
 	if slen == 0 {
 		return nil
 	}
-	subs := make([]Message, slen)
+	subs := make([]*Message, slen)
 	for i := 0; i < slen; i++ {
-		subs[i] = *GetMsg()
+		subs[i] = GetMsg()
 		subs[i].Type = m.Type
 		subs[i].WithRequest(m.req[i])
 		subs[i].wg = m.wg
