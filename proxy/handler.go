@@ -24,7 +24,7 @@ const (
 // variables need to change
 var (
 	// TODO: config and reduce to small
-	defaultConcurrent = 16
+	defaultConcurrent = 2
 	maxConcurrent     = 64
 )
 
@@ -124,6 +124,12 @@ func (h *Handler) handle() {
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
 	// TODO: change the msgs by BatchSize
+	lm := len(msgs)
+	if lm < maxConcurrent && lm == lastCount {
+		for i := 0; i < lm; i++ {
+			msgs = append(msgs, proto.GetMsgWithWG())
+		}
+	}
 	return msgs
 }
 
