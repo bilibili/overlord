@@ -99,11 +99,9 @@ func (h *Handler) handle() {
 		// 2. send to cluster
 		h.cluster.DispatchBatch(mbatch, msgs)
 		// 3. wait to done
-		// fmt.Println("baka")
 		for _, mb := range mbatch {
 			mb.Wait()
 		}
-		// fmt.Println("baka")
 
 		// 4. encode
 		for _, msg := range msgs {
