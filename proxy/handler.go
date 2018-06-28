@@ -25,7 +25,7 @@ const (
 var (
 	// TODO: config and reduce to small
 	defaultConcurrent = 2
-	maxConcurrent     = 64
+	maxConcurrent     = 1024
 )
 
 // Handler handle conn.
@@ -76,6 +76,7 @@ func (h *Handler) Handle() {
 func (h *Handler) handle() {
 	var (
 		messages = proto.GetMsgSlice(defaultConcurrent)
+		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.cc.Servers))
 		msgs     []*proto.Message
 		err      error
 	)
@@ -83,7 +84,7 @@ func (h *Handler) handle() {
 	defer func() {
 		for _, msg := range messages {
 			msg.Reset()
-			proto.PutMsgWithWG(msg)
+			proto.PutMsg(msg)
 		}
 		h.closeWithError(err)
 	}()
@@ -96,14 +97,16 @@ func (h *Handler) handle() {
 		}
 
 		// 2. send to cluster
-		for _, msg := range msgs {
-			msg.Add(1)
-			h.dispatch(msg)
-		}
+		h.cluster.DispatchBatch(mbatch, msgs)
 		// 3. wait to done
+		// fmt.Println("baka")
+		for _, mb := range mbatch {
+			mb.Wait()
+		}
+		// fmt.Println("baka")
+
+		// 4. encode
 		for _, msg := range msgs {
-			msg.Wait()
-			// 3.5. write back client
 			err = h.pc.Encode(msg)
 			if err != nil {
 				return
@@ -112,9 +115,13 @@ func (h *Handler) handle() {
 			msg.ReleaseSubs()
 			prom.ProxyTime(h.cluster.cc.Name, msg.Request().Cmd(), int64(msg.TotalDur()/time.Microsecond))
 		}
+
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
+		}
+		for _, mb := range mbatch {
+			mb.Reset()
 		}
 
 		// 5. reset MaxConcurrent
@@ -127,32 +134,10 @@ func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*pr
 	lm := len(msgs)
 	if lm < maxConcurrent && lm == lastCount {
 		for i := 0; i < lm; i++ {
-			msgs = append(msgs, proto.GetMsgWithWG())
+			msgs = append(msgs, proto.GetMsg())
 		}
 	}
 	return msgs
-}
-
-func (h *Handler) dispatch(m *proto.Message) {
-	if !m.IsBatch() {
-		h.cluster.Dispatch(m)
-		return
-	}
-	// batch
-	subs := m.Batch()
-	if len(subs) == 0 {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) Msg(%s) batch return zero subs", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), m.Request().Cmd()+string(m.Request().Key()))
-		}
-		m.Done()
-		return
-	}
-	subl := len(subs)
-	m.Add(subl)
-	for i := 0; i < subl; i++ {
-		h.cluster.Dispatch(subs[i])
-	}
-	m.Done()
 }
 
 // Closed return handler whether or not closed.

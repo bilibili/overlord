@@ -14,10 +14,8 @@ import (
 	"github.com/felixhao/overlord/lib/conv"
 	"github.com/felixhao/overlord/lib/hashkit"
 	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/prom"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
-	"github.com/pkg/errors"
 )
 
 // cluster errors
@@ -35,21 +33,21 @@ type pinger struct {
 	retries int
 }
 
-type channel struct {
+type batchChanel struct {
 	idx int32
 	cnt int32
-	chs []chan *proto.Message
+	chs []chan *proto.MsgBatch
 }
 
-func newChannel(n int32) *channel {
-	chs := make([]chan *proto.Message, n)
+func newBatchChanel(n int32) *batchChanel {
+	chs := make([]chan *proto.MsgBatch, n)
 	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.Message, 1)
+		chs[i] = make(chan *proto.MsgBatch, 1)
 	}
-	return &channel{cnt: n, chs: chs}
+	return &batchChanel{cnt: n, chs: chs}
 }
 
-func (c *channel) push(m *proto.Message) {
+func (c *batchChanel) push(m *proto.MsgBatch) {
 	i := atomic.AddInt32(&c.idx, 1)
 	c.chs[i%c.cnt] <- m
 }
@@ -65,7 +63,9 @@ type Cluster struct {
 	ring      *hashkit.HashRing
 	alias     bool
 	nodeAlias map[string]string
-	nodeCh    map[string]*channel
+
+	nodeMap  map[string]int
+	nodeChan map[int]*batchChanel
 
 	lock   sync.Mutex
 	closed bool
@@ -90,49 +90,131 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		ring.Init(addrs, ws)
 	}
 	am := map[string]string{}
-	cm := map[string]*channel{}
-	// for addrs
+	// cm := map[string]*channel{}
+
+	nodeChan := make(map[int]*batchChanel)
+	nodeMap := make(map[string]int)
 	for i := range addrs {
-		node := addrs[i]
 		if alias {
-			node = ans[i]
+			addrs[i] = ans[i]
 			am[ans[i]] = addrs[i]
 		}
-		rc := newChannel(cc.NodeConnections)
-		cm[node] = rc
-		go c.process(rc, addrs[i])
-
+		nbc := newBatchChanel(cc.NodeConnections)
+		go c.processBatch(nbc, addrs[i])
+		nodeChan[i] = nbc
+		nodeMap[addrs[i]] = i
 	}
+	c.nodeChan = nodeChan
+	c.nodeMap = nodeMap
 	c.ring = ring
-	c.alias = alias
 	c.nodeAlias = am
-	c.nodeCh = cm
 	if c.cc.PingAutoEject {
 		go c.startPinger(c.cc, addrs, ws)
 	}
 	return
 }
 
-// Dispatch dispatchs Msg.
-func (c *Cluster) Dispatch(m *proto.Message) {
-	// hash
-	node, ok := c.hash(m.Request().Key())
+func (c *Cluster) calculateBatchIndex(key []byte) int {
+	node, ok := c.hash(key)
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, m.Request().Key())
+			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, key)
 		}
-		m.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg hash"))
-		return
+		return -1
 	}
-	rc, ok := c.nodeCh[node]
-	if !ok {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) Msg(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), node)
+	return c.nodeMap[node]
+}
+
+// DispatchBatch delivers all the messages to batch execute by hash
+func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
+	// TODO: dynamic update mbs by add or remove nodes
+	var (
+		bidx int
+	)
+
+	for _, msg := range slice {
+		if msg.IsBatch() {
+			for _, sub := range msg.Batch() {
+				bidx = c.calculateBatchIndex(sub.Request().Key())
+				mbs[bidx].AddMsg(sub)
+			}
+		} else {
+			bidx = c.calculateBatchIndex(msg.Request().Key())
+			mbs[bidx].AddMsg(msg)
 		}
-		m.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch Msg node chan"))
-		return
 	}
-	rc.push(m)
+
+	c.deliver(mbs)
+}
+
+func (c *Cluster) deliver(mbs []*proto.MsgBatch) {
+	for i := range mbs {
+		if mbs[i].Count() != 0 {
+			mbs[i].Add(1)
+		}
+	}
+
+	for i := range mbs {
+		if mbs[i].Count() != 0 {
+			c.nodeChan[i].push(mbs[i])
+		}
+	}
+
+}
+
+func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
+	for i := int32(0); i < nbc.cnt; i++ {
+		go func(i int32) {
+			ch := nbc.chs[i]
+			w := newNodeConn(c.cc, addr)
+			c.processBatchIO(addr, ch, w)
+		}(i)
+	}
+}
+
+func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	for {
+		var mb *proto.MsgBatch
+		select {
+		case mb = <-ch:
+		case <-c.ctx.Done():
+			nc.Close()
+			return
+		}
+
+		err := c.processWriteBatch(nc, mb)
+		if err != nil {
+			// req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
+			// if log.V(1) {
+			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
+			// }
+			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
+			continue
+		}
+		err = c.processReadBatch(nc, mb)
+		if err != nil {
+			// m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
+			// if log.V(1) {
+			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
+			// }
+			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
+			continue
+		}
+		// prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
+		mb.Done()
+	}
+
+}
+
+func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
+	// rb.MarkWrite()
+	return w.WriteBatch(mb)
+}
+
+func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
+	err := r.ReadBatch(mb)
+	// m.MarkRead()
+	return err
 }
 
 func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
@@ -142,60 +224,6 @@ func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
 		p := &pinger{ping: nc, node: addr, weight: w}
 		go c.processPing(p)
 	}
-}
-
-func (c *Cluster) process(rc *channel, addr string) {
-	for i := int32(0); i < rc.cnt; i++ {
-		go func(i int32) {
-			ch := rc.chs[i]
-			w := newNodeConn(c.cc, addr)
-			c.processIO(addr, ch, w)
-		}(i)
-	}
-}
-
-func (c *Cluster) processIO(addr string, ch <-chan *proto.Message, nc proto.NodeConn) {
-	for {
-		var m *proto.Message
-		select {
-		case m = <-ch:
-		case <-c.ctx.Done():
-			nc.Close()
-			return
-		}
-
-		err := c.processWrite(nc, m)
-		if err != nil {
-			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			}
-			prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
-			continue
-		}
-		err = c.processRead(nc, m)
-		if err != nil {
-			m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			if log.V(1) {
-				log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			}
-			prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
-			continue
-		}
-		prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
-		m.Done()
-	}
-}
-
-func (c *Cluster) processWrite(w proto.NodeConn, m *proto.Message) error {
-	m.MarkWrite()
-	return w.Write(m)
-}
-
-func (c *Cluster) processRead(r proto.NodeConn, m *proto.Message) error {
-	err := r.Read(m)
-	m.MarkRead()
-	return err
 }
 
 func (c *Cluster) processPing(p *pinger) {

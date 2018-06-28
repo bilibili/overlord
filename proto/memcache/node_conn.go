@@ -53,8 +53,32 @@ func (n *nodeConn) Ping() (err error) {
 	return
 }
 
-// Write write request data into server node.
-func (n *nodeConn) Write(m *proto.Message) (err error) {
+func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+	var (
+		m   *proto.Message
+		idx int
+	)
+	for {
+		m = mb.Nth(idx)
+		if m == nil {
+			break
+		}
+		err = n.write(m)
+		if err != nil {
+			m.DoneWithError(err)
+			return err
+		}
+		m.MarkWrite()
+		idx++
+	}
+
+	if err = n.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
+	}
+	return
+}
+
+func (n *nodeConn) write(m *proto.Message) (err error) {
 	if n.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
@@ -75,56 +99,98 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		_ = n.bw.Write(mcr.key)
 		_ = n.bw.Write(mcr.data)
 	}
-	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
-	}
 	return
 }
 
-// Read reads response bytes from server node.
-func (n *nodeConn) Read(m *proto.Message) (err error) {
+func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	if n.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
 	defer n.br.ResetBuffer(nil)
 	// TODO: this read was only support read one key's result
-	n.br.ResetBuffer(m.Buffer())
-	// request
-	mcr, ok := m.Request().(*MCRequest)
+	n.br.ResetBuffer(mb.Buffer())
+
+	var (
+		size   int
+		cursor int
+		nth    int
+		m      *proto.Message
+
+		mcr *MCRequest
+		ok  bool
+	)
+	m = mb.Nth(nth)
+	mcr, ok = m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-	bs, err := n.br.ReadUntil(delim)
-	if err != nil {
-		err = errors.Wrap(err, "MC Handler handle read response bytes")
-		return
+
+	for {
+		err = n.br.Read()
+		if err != nil {
+			err = errors.Wrap(err, "node conn while read")
+			return
+		}
+
+		size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
+		if err == bufio.ErrBufferFull {
+			err = nil
+			continue
+		} else if err != nil {
+			return
+		}
+		m.MarkRead()
+
+		cursor += size
+		nth++
+
+		m = mb.Nth(nth)
+		if m == nil {
+			return
+		}
+		mcr, ok = m.Request().(*MCRequest)
+		if !ok {
+			err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
+			return
+		}
 	}
-	// n.br.Advance(-len(bs)) // NOTE: for response bytes
+}
+
+func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
+	// TODO: 是当扩容的时候,这个地方其实是有多次copy问题的
+	// 应该改改形式改成不需要多次copy
+	pos := bytes.IndexByte(data, delim)
+	if pos == -1 {
+		return 0, bufio.ErrBufferFull
+	}
+
+	bs := data[:pos+1]
+	size = len(bs)
 	mcr.data = bs
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
 		return
 	}
+
 	if bytes.Equal(bs, endBytes) {
 		prom.Miss(n.cluster, n.addr)
 		return
 	}
 	prom.Hit(n.cluster, n.addr)
-	// value length
+
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
-	n.br.Advance(-len(bs))
-	rlen := len(bs) + length + 2 + len(endBytes)
-	if bs, err = n.br.ReadFull(rlen); err != nil {
-		err = errors.Wrap(err, "MC Handler while reading length full data")
-		return
+
+	size += length + 2 + len(endBytes)
+	if len(data) < size {
+		return 0, bufio.ErrBufferFull
 	}
-	// n.br.Advance(-rlen) // NOTE: for response bytes
-	mcr.data = bs
+
+	mcr.data = data[:size]
 	return
 }
 

@@ -34,8 +34,9 @@ type ProxyConn interface {
 
 // NodeConn handle Msg to backend cache server and read response.
 type NodeConn interface {
-	Write(*Message) error
-	Read(*Message) error
+	WriteBatch(*MsgBatch) error
+	ReadBatch(*MsgBatch) error
+
 	Ping() error
 	Close() error
 }

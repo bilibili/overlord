@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxBuffered = 32
+	maxBuffered = 64
 )
 
 // ErrProxy
