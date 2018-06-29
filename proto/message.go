@@ -4,16 +4,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/felixhao/overlord/lib/bufio"
-)
-
-const (
-	defaultRespBufSize = 4096
-)
-
-var (
-	defaultTime = time.Now()
 )
 
 var msgPool = &sync.Pool{
@@ -21,20 +11,10 @@ var msgPool = &sync.Pool{
 		return NewMessage()
 	},
 }
-var msgPoolWithWG = &sync.Pool{
-	New: func() interface{} {
-		return NewMessageWithWG()
-	},
-}
 
 // GetMsg get the msg from pool
 func GetMsg() *Message {
 	return msgPool.Get().(*Message)
-}
-
-// GetMsgWithWG get the msg from pool with waitgroup.
-func GetMsgWithWG() *Message {
-	return msgPoolWithWG.Get().(*Message)
 }
 
 // GetMsgSlice alloc a slice to the message
@@ -51,7 +31,7 @@ func GetMsgSlice(n int, caps ...int) []*Message {
 		msgs = make([]*Message, n, caps[0])
 	}
 	for idx := range msgs {
-		msgs[idx] = GetMsgWithWG()
+		msgs[idx] = GetMsg()
 	}
 	return msgs
 }
@@ -61,17 +41,9 @@ func PutMsg(msg *Message) {
 	msgPool.Put(msg)
 }
 
-// PutMsgWithWG Release Msg with waitgroup.
-func PutMsgWithWG(msg *Message) {
-	msgPoolWithWG.Put(msg)
-}
-
 // Message read from client.
 type Message struct {
 	Type CacheType
-	wg   *sync.WaitGroup
-
-	buf *bufio.Buffer
 
 	req      []Request
 	subs     []*Message
@@ -85,24 +57,11 @@ type Message struct {
 // NewMessage will create new message object.
 // this will be used be sub msg req.
 func NewMessage() *Message {
-	return &Message{
-		// TODO: get with suitable length
-		buf: bufio.Get(defaultRespBufSize),
-	}
-}
-
-// NewMessageWithWG will create new message object with waitgroup.
-func NewMessageWithWG() *Message {
-	return &Message{
-		wg: &sync.WaitGroup{},
-		// TODO: get with suitable length
-		buf: bufio.Get(defaultRespBufSize),
-	}
+	return &Message{}
 }
 
 // Reset will clean the msg
 func (m *Message) Reset() {
-	m.buf.Reset()
 	m.Type = CacheTypeUnknown
 	m.req = nil
 	m.subs = nil
@@ -141,42 +100,9 @@ func (m *Message) MarkEnd() {
 	m.et = time.Now()
 }
 
-// Add add wg.
-func (m *Message) Add(n int) {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Add(n)
-}
-
-// Done done.
-func (m *Message) Done() {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Done()
-}
-
 // DoneWithError done with error.
 func (m *Message) DoneWithError(err error) {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
 	m.err = err
-	m.wg.Done()
-}
-
-// Wait wait group.
-func (m *Message) Wait() {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Wait()
-}
-
-// Buffer will return request buffer
-func (m *Message) Buffer() *bufio.Buffer {
-	return m.buf
 }
 
 // ReleaseSubs will return the Msg data to flush and reset
@@ -217,10 +143,15 @@ func (m *Message) Batch() []*Message {
 		subs[i] = GetMsg()
 		subs[i].Type = m.Type
 		subs[i].WithRequest(m.req[i])
-		subs[i].wg = m.wg
+		// subs[i].wg = m.wg
 	}
 	m.subs = subs
 	return subs
+}
+
+// BatchReq returns the m.req field
+func (m *Message) BatchReq() []Request {
+	return m.req
 }
 
 // Response return all response bytes.
