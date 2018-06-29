@@ -57,7 +57,6 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
-
 		for _, cc := range ccs {
 			go p.serve(cc)
 		}
