@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxBuffered = 64
+	maxBuffered = 512
 )
 
 // ErrProxy
@@ -216,7 +216,6 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	// fmt.Printf("buffers:%v\n", w.bufs)
 	nbufs := net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&nbufs)
 	if err != nil {
@@ -239,7 +238,7 @@ func (w *Writer) Write(p []byte) (err error) {
 	}
 
 	if len(w.bufs) == maxBuffered {
-		w.Flush()
+		_ = w.Flush()
 	}
 	w.bufs[w.cursor] = p
 	w.cursor = (w.cursor + 1) % maxBuffered

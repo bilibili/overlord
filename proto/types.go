@@ -29,7 +29,7 @@ type Request interface {
 // ProxyConn decode bytes from client and encode write to conn.
 type ProxyConn interface {
 	Decode([]*Message) ([]*Message, error)
-	Encode(msg *Message) error
+	Encode([]*Message) error
 }
 
 // NodeConn handle Msg to backend cache server and read response.

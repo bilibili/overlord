@@ -98,24 +98,27 @@ func (h *Handler) handle() {
 
 		// 2. send to cluster
 		h.cluster.DispatchBatch(mbatch, msgs)
-		// 3. wait to done
+
+		// 3. wait for done
 		for _, mb := range mbatch {
 			mb.Wait()
 		}
 
 		// 4. encode
+		err = h.pc.Encode(msgs)
+
+		if err != nil {
+			return
+		}
+
 		for _, msg := range msgs {
-			err = h.pc.Encode(msg)
-			if err != nil {
-				return
-			}
 			msg.MarkEnd()
-			msg.ReleaseSubs()
 			prom.ProxyTime(h.cluster.cc.Name, msg.Request().Cmd(), int64(msg.TotalDur()/time.Microsecond))
 		}
 
-		// 4. release resource
+		// 5. release resource
 		for _, msg := range msgs {
+			msg.ReleaseSubs()
 			msg.Reset()
 		}
 		for _, mb := range mbatch {

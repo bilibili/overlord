@@ -91,7 +91,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				case proto.CacheTypeMemcache:
 					encoder := memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 					m := proto.ErrMessage(ErrProxyMoreMaxConns)
-					_ = encoder.Encode(m)
+					_ = encoder.Encode([]*proto.Message{m})
 					_ = conn.Close()
 				case proto.CacheTypeRedis:
 					// TODO(felix): support redis.
