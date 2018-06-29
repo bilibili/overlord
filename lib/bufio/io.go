@@ -207,6 +207,7 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 // the underlying io.Writer.
 type Writer struct {
 	wr     *libnet.Conn
+	bufsp  net.Buffers
 	bufs   [][]byte
 	cursor int
 
@@ -243,13 +244,12 @@ func (w *Writer) Flush() error {
 	if w.cursor == 0 {
 		return nil
 	}
-
 	if w.cursor == 1 {
 		return w.flushFirstBuf()
 	}
 
-	nbufs := net.Buffers(w.bufs[:w.cursor])
-	_, err := w.wr.Writev(&nbufs)
+	w.bufsp = net.Buffers(w.bufs[:w.cursor])
+	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
 		w.err = err
 	}
@@ -274,6 +274,8 @@ func (w *Writer) Write(p []byte) (err error) {
 	} else {
 		w.bufs[w.cursor] = p
 	}
+	w.bufs[w.cursor] = p
+	w.cursor = (w.cursor + 1) % maxBuffered
 	w.cursor++
 	return nil
 }
