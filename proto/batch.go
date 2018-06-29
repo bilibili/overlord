@@ -104,3 +104,10 @@ func (m *MsgBatch) Add(n int) {
 func (m *MsgBatch) Wait() {
 	m.wg.Wait()
 }
+
+func MergeBatchSize(mbs []*MsgBatch) (size int) {
+	for _, mb := range mbs {
+		size += mb.Count()
+	}
+	return
+}

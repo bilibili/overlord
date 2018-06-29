@@ -5,6 +5,7 @@ import (
 	"context"
 	errs "errors"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +23,10 @@ import (
 var (
 	ErrClusterServerFormat = errs.New("cluster servers format error")
 	ErrClusterHashNoNode   = errs.New("cluster hash no hit node")
+)
+
+var (
+	maxMergeBatchSize = 16
 )
 
 type pinger struct {
@@ -173,16 +178,32 @@ func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
 }
 
 func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	var (
+		mbs = make([]*proto.MsgBatch, maxMergeBatchSize)
+		idx = 0
+	)
+
+	ticker := time.NewTicker(time.Millisecond * 10)
 	for {
 		var mb *proto.MsgBatch
 		select {
 		case mb = <-ch:
+			mbs[idx] = mb
+			idx++
 		case <-c.ctx.Done():
 			nc.Close()
 			return
+		case <-ticker.C:
+		}
+		if idx == 0 {
+			runtime.Gosched()
+			continue
 		}
 
-		err := c.processWriteBatch(nc, mb)
+		if mb != nil && idx != len(mbs) {
+			continue
+		}
+		err := c.mergeWrite(nc, mbs[:idx+1])
 		if err != nil {
 			// req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			// if log.V(1) {
@@ -191,7 +212,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
 			continue
 		}
-		err = c.processReadBatch(nc, mb)
+		err = c.mergeRead(nc, mbs[:idx+1])
 		if err != nil {
 			// m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			// if log.V(1) {
@@ -201,20 +222,27 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			continue
 		}
 		// prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
-		mb.Done()
+		for _, mb := range mbs {
+			mb.Done()
+		}
+		idx = 0
 	}
 
 }
 
-func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
-	// rb.MarkWrite()
-	return w.WriteBatch(mb)
+func (c *Cluster) mergeWrite(nc proto.NodeConn, mbs []*proto.MsgBatch) error {
+	for _, mb := range mbs {
+		err := nc.WriteBatch(mb)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nc.Flush()
 }
 
-func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
-	err := r.ReadBatch(mb)
-	// m.MarkRead()
-	return err
+func (c *Cluster) mergeRead(nc proto.NodeConn, mbs []*proto.MsgBatch) error {
+	return nc.ReadMBatch(mbs)
 }
 
 func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {

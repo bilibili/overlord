@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	handlerOpening = int32(0)
-	handlerClosed  = int32(1)
+	handlerOpening     = int32(0)
+	handlerClosed      = int32(1)
+	defaultRespBufSize = 4 * 1024
 )
 
 type nodeConn struct {
@@ -37,7 +38,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		addr:    addr,
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(defaultRespBufSize)),
 		pinger:  newMCPinger(conn.Dup()),
 	}
 	return
@@ -54,6 +55,10 @@ func (n *nodeConn) Ping() (err error) {
 }
 
 func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+	if n.Closed() {
+		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
+		return
+	}
 	var (
 		m   *proto.Message
 		idx int
@@ -71,18 +76,14 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		m.MarkWrite()
 		idx++
 	}
-
-	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
-	}
 	return
 }
 
+func (n *nodeConn) Flush() error {
+	return n.bw.Flush()
+}
+
 func (n *nodeConn) write(m *proto.Message) (err error) {
-	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
-		return
-	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
@@ -102,60 +103,96 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 	return
 }
 
-func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
-	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
-		return
-	}
-	defer n.br.ResetBuffer(nil)
-	// TODO: this read was only support read one key's result
-	n.br.ResetBuffer(mb.Buffer())
-
+func (n *nodeConn) ReadMBatch(mbs []*proto.MsgBatch) (err error) {
 	var (
 		size   int
 		cursor int
 		nth    int
+		mnth   int
 		m      *proto.Message
 
-		mcr *MCRequest
-		ok  bool
+		mcr    *MCRequest
+		ok     bool
+		mbsLen = len(mbs)
+
+		batchSize = proto.MergeBatchSize(mbs)
+		divider   = make([]int, batchSize+1)
+		mcrs      = make([]*MCRequest, batchSize)
+		last      = 1
 	)
-	m = mb.Nth(nth)
-	mcr, ok = m.Request().(*MCRequest)
-	if !ok {
-		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
-		return
-	}
 
 	for {
+		if mnth == mbsLen {
+			break
+		}
+
 		err = n.br.Read()
 		if err != nil {
 			err = errors.Wrap(err, "node conn while read")
 			return
 		}
-
-		size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-		if err == bufio.ErrBufferFull {
-			err = nil
-			continue
-		} else if err != nil {
-			return
+		// get the nth m of mnth mb
+		for {
+			m = mbs[mnth].Nth(nth)
+			if m == nil {
+				mnth++
+				nth = 0
+				continue
+			}
+			break
 		}
-		m.MarkRead()
 
-		cursor += size
-		nth++
-
-		m = mb.Nth(nth)
-		if m == nil {
-			return
-		}
 		mcr, ok = m.Request().(*MCRequest)
 		if !ok {
 			err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 			return
 		}
+		mcrs[last] = mcr
+
+		size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
+		if err == bufio.ErrBufferFull {
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		cursor += size
+		divider[last] = cursor
+		last++
+		nth++
 	}
+
+	n.fullFillMsgs(divider, mbs, mcrs)
+	return
+}
+
+func (n *nodeConn) fullFillMsgs(divider []int, mbs []*proto.MsgBatch, mcrs []*MCRequest) {
+	var last int
+	for _, mb := range mbs {
+		beg := divider[last]
+		last += mb.Count()
+		end := divider[last]
+		_ = n.br.CopyTo(mb.Buffer(), end-beg)
+	}
+
+	var (
+		mnth   = 0
+		offset = 0
+		data   []byte
+		i      = 0
+	)
+	for mnth != len(mbs) {
+		data = mbs[mnth].Buffer().Bytes()
+		begin, end := divider[i]-offset, divider[i+1]-offset
+
+		if begin >= len(data) {
+			offset += len(data)
+			mnth++
+			continue
+		}
+		mcrs[i].data = data[begin:end]
+	}
+
 }
 
 func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {

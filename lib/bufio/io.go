@@ -52,6 +52,16 @@ func (r *Reader) Buffer() *Buffer {
 	return r.b
 }
 
+func (r *Reader) CopyTo(b *Buffer, n int) error {
+	for b.len() < n {
+		b.grow()
+	}
+
+	copy(b.buf[b.w:], r.b.buf[b.r:b.r+n])
+	r.b.r += n
+	return nil
+}
+
 // Read will trying to read until the buffer is full
 func (r *Reader) Read() error {
 	if r.err != nil {
@@ -208,14 +218,36 @@ func NewWriter(wr *libnet.Conn) *Writer {
 	return &Writer{wr: wr, bufs: make([][]byte, maxBuffered)}
 }
 
+func (w *Writer) flushFirstBuf() error {
+	lb := len(w.bufs[0])
+	for {
+		if lb == 0 {
+			break
+		}
+		n, err := w.wr.Write(w.bufs[0])
+		if err != nil {
+			return err
+		}
+		lb -= n
+	}
+
+	w.cursor = 0
+	return nil
+}
+
 // Flush writes any buffered data to the underlying io.Writer.
 func (w *Writer) Flush() error {
 	if w.err != nil {
 		return w.err
 	}
-	if len(w.bufs) == 0 {
+	if w.cursor == 0 {
 		return nil
 	}
+
+	if w.cursor == 1 {
+		return w.flushFirstBuf()
+	}
+
 	nbufs := net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&nbufs)
 	if err != nil {
@@ -237,11 +269,12 @@ func (w *Writer) Write(p []byte) (err error) {
 		return nil
 	}
 
-	if len(w.bufs) == maxBuffered {
-		_ = w.Flush()
+	if len(w.bufs) == w.cursor {
+		w.bufs = append(w.bufs, p)
+	} else {
+		w.bufs[w.cursor] = p
 	}
-	w.bufs[w.cursor] = p
-	w.cursor = (w.cursor + 1) % maxBuffered
+	w.cursor++
 	return nil
 }
 
