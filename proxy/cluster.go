@@ -203,7 +203,12 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		if mb != nil && idx != len(mbs) {
 			continue
 		}
-		err := c.mergeWrite(nc, mbs[:idx+1])
+
+		if idx != len(mbs) {
+			idx++
+		}
+
+		err := c.mergeWrite(nc, mbs[:idx])
 		if err != nil {
 			// req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			// if log.V(1) {
@@ -212,7 +217,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
 			continue
 		}
-		err = c.mergeRead(nc, mbs[:idx+1])
+		err = c.mergeRead(nc, mbs[:idx])
 		if err != nil {
 			// m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
 			// if log.V(1) {
