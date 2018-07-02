@@ -64,7 +64,7 @@ func NewMessage() *Message {
 // Reset will clean the msg
 func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
-	m.req = nil
+	m.req = m.req[:0]
 	m.subs = nil
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
@@ -119,8 +119,8 @@ func (m *Message) ReleaseSubs() {
 }
 
 // WithRequest with proto request.
-func (m *Message) WithRequest(req ...Request) {
-	m.req = req
+func (m *Message) WithRequest(req Request) {
+	m.req = append(m.req, req)
 }
 
 // Request returns proto Msg.
