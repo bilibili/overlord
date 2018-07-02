@@ -58,6 +58,7 @@ func (r *Reader) CopyTo(b *Buffer, n int) error {
 	}
 
 	copy(b.buf[b.w:], r.b.buf[b.r:b.r+n])
+	b.w += n
 	r.b.r += n
 	return nil
 }

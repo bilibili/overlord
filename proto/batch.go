@@ -120,9 +120,7 @@ func MergeBatchSize(mbs []*MsgBatch) (size int) {
 func Flatten(b []*MsgBatch) []*Message {
 	var collection = make([]*Message, 0)
 	for _, batch := range b {
-		for _, msg := range batch.Msgs() {
-			collection = append(collection, msg)
-		}
+		collection = append(collection, batch.Msgs()...)
 	}
 	return collection
 }

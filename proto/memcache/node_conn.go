@@ -178,7 +178,7 @@ func (n *nodeConn) fullFillMsgs(marks []int, mbs []*proto.MsgBatch, msgs []*prot
 			cursor = 0
 		}
 
-		mcr, _ := msgs[idx].Request().(*MCRequest)
+		mcr, _ := msgs[i].Request().(*MCRequest)
 		mcr.data = mbs[idx].Buffer().Bytes()[cursor : cursor+marks[i]]
 		cursor += marks[i]
 	}

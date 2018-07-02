@@ -155,11 +155,6 @@ func (c *Cluster) deliver(mbs []*proto.MsgBatch) {
 	for i := range mbs {
 		if mbs[i].Count() != 0 {
 			mbs[i].Add(1)
-		}
-	}
-
-	for i := range mbs {
-		if mbs[i].Count() != 0 {
 			c.nodeChan[i].push(mbs[i])
 		}
 	}
