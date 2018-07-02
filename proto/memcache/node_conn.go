@@ -134,26 +134,29 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			return
 		}
 
-		size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-		if err == bufio.ErrBufferFull {
-			err = nil
-			continue
-		} else if err != nil {
-			return
-		}
-		m.MarkRead()
+		for {
+			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
+			// fmt.Println("size:", size, " err:", err)
+			if err == bufio.ErrBufferFull {
+				err = nil
+				break
+			} else if err != nil {
+				return
+			}
+			m.MarkRead()
 
-		cursor += size
-		nth++
+			cursor += size
+			nth++
 
-		m = mb.Nth(nth)
-		if m == nil {
-			return
-		}
-		mcr, ok = m.Request().(*MCRequest)
-		if !ok {
-			err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
-			return
+			m = mb.Nth(nth)
+			if m == nil {
+				return
+			}
+			mcr, ok = m.Request().(*MCRequest)
+			if !ok {
+				err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
+				return
+			}
 		}
 	}
 }
@@ -165,6 +168,7 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if pos == -1 {
 		return 0, bufio.ErrBufferFull
 	}
+	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 
 	bs := data[:pos+1]
 	size = len(bs)
