@@ -59,22 +59,13 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
-	var (
-		m   *proto.Message
-		idx int
-	)
-	for {
-		m = mb.Nth(idx)
-		if m == nil {
-			break
-		}
+	for _, m := range mb.Msgs() {
 		err = n.write(m)
 		if err != nil {
 			m.DoneWithError(err)
 			return err
 		}
 		m.MarkWrite()
-		idx++
 	}
 	return
 }
@@ -117,8 +108,6 @@ func (n *nodeConn) ReadMBatch(mbs []*proto.MsgBatch) (err error) {
 	idx := 0
 out:
 	for {
-		// TODO: 是当扩容的时候,这个地方其实是有多次copy问题的
-		// 应该改改形式改成不需要多次copy
 		err = n.br.Read()
 		if err != nil {
 			return
@@ -129,14 +118,12 @@ out:
 			if idx >= len(msgs) {
 				break out
 			}
-			// fmt.Printf("Read:%s\n", strconv.Quote(string(n.br.Buffer().Bytes())))
 			mcr, ok = msgs[idx].Request().(*MCRequest)
 			if !ok {
 				err = ErrAssertMsg
 				return
 			}
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-			// fmt.Printf("size:%d err:%v\n", size, err)
 			if err == bufio.ErrBufferFull {
 				break inner
 			} else if err != nil {
@@ -155,9 +142,6 @@ out:
 func (n *nodeConn) copyToBuffer(marks []int, mbs []*proto.MsgBatch) {
 	var last int
 	for _, mb := range mbs {
-		// if last >= len(marks) || mb.Count()+last > len(marks) {
-		// 	fmt.Printf("last:%d marks:%v mbs:%v bytes:%s\n", last, marks, mbs, strconv.Quote(string(n.br.Buffer().Bytes())))
-		// }
 		rg := sum(marks[last : mb.Count()+last])
 		last += mb.Count()
 		_ = n.br.CopyTo(mb.Buffer(), rg)

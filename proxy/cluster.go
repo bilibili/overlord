@@ -175,6 +175,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 	var (
 		mbs = make([]*proto.MsgBatch, maxMergeBatchSize)
 		idx = 0
+		err error
 	)
 
 	// ticker := time.NewTicker(time.Millisecond * 10)
@@ -185,7 +186,10 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			mbs[idx] = mb
 			idx++
 			if idx == maxMergeBatchSize {
-				_ = c.mergeIO(nc, mbs)
+				err = c.mergeIO(nc, mbs[:idx])
+				if err != nil {
+					log.Infof("merge IO error:%v", err)
+				}
 				idx = 0
 			}
 		case <-c.ctx.Done():
@@ -194,7 +198,10 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		default:
 		}
 		if idx > 0 {
-			_ = c.mergeIO(nc, mbs[:idx])
+			err = c.mergeIO(nc, mbs[:idx])
+			if err != nil {
+				log.Infof("merge IO error:%v", err)
+			}
 			idx = 0
 			continue
 		}
