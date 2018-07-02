@@ -88,7 +88,7 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
 		return
 	}
-	_ = n.bw.WriteString(mcr.rTp.String())
+	_ = n.bw.Write(mcr.rTp.Bytes())
 	_ = n.bw.Write(spaceBytes)
 	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
 		_ = n.bw.Write(mcr.data) // NOTE: exp time

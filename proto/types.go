@@ -21,7 +21,7 @@ const (
 
 // Request request interface.
 type Request interface {
-	Cmd() string
+	Cmd() []byte
 	Key() []byte
 	Resp() []byte
 	Put()

@@ -2,6 +2,7 @@ package memcache
 
 import (
 	errs "errors"
+	"fmt"
 	"sync"
 )
 
@@ -27,38 +28,39 @@ var (
 // RequestType is the protocol-agnostic identifier for the command
 type RequestType byte
 
-func (rt RequestType) String() string {
+// Bytes get reqtype bytes.
+func (rt RequestType) Bytes() []byte {
 	switch rt {
 	case RequestTypeSet:
-		return "set"
+		return []byte("set")
 	case RequestTypeAdd:
-		return "add"
+		return []byte("add")
 	case RequestTypeReplace:
-		return "replace"
+		return []byte("replace")
 	case RequestTypeAppend:
-		return "append"
+		return []byte("append")
 	case RequestTypePrepend:
-		return "prepend"
+		return []byte("prepend")
 	case RequestTypeCas:
-		return "cas"
+		return []byte("cas")
 	case RequestTypeGet:
-		return "get"
+		return []byte("get")
 	case RequestTypeGets:
-		return "gets"
+		return []byte("gets")
 	case RequestTypeDelete:
-		return "delete"
+		return []byte("delete")
 	case RequestTypeIncr:
-		return "incr"
+		return []byte("incr")
 	case RequestTypeDecr:
-		return "decr"
+		return []byte("decr")
 	case RequestTypeTouch:
-		return "touch"
+		return []byte("touch")
 	case RequestTypeGat:
-		return "gat"
+		return []byte("gat")
 	case RequestTypeGats:
-		return "gats"
+		return []byte("gats")
 	}
-	return "unknown"
+	return []byte("unknown")
 }
 
 // all memcache Msg type
@@ -164,8 +166,8 @@ func (r *MCRequest) Put() {
 }
 
 // Cmd get Msg cmd.
-func (r *MCRequest) Cmd() string {
-	return r.rTp.String()
+func (r *MCRequest) Cmd() []byte {
+	return r.rTp.Bytes()
 }
 
 // Key get Msg key.
@@ -179,5 +181,5 @@ func (r *MCRequest) Resp() []byte {
 }
 
 func (r *MCRequest) String() string {
-	return "type:" + r.rTp.String() + " key:" + string(r.key) + " data:" + string(r.data)
+	return fmt.Sprintf("type: %s key:%s data %s", r.rTp.Bytes(), r.key, r.data)
 }

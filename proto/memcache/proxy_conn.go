@@ -133,7 +133,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
 	data, err := p.br.ReadExact(keyOffset + length + 2)
 	if err == bufio.ErrBufferFull {
-		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.String())))
+		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.Bytes())))
 		return
 	} else if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
@@ -143,11 +143,11 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.Wrap(ErrBadRequest, "MC decoder data not end with CRLF")
 		return
 	}
-	m.WithRequest(&MCRequest{
-		rTp:  mtype,
-		key:  key,
-		data: data,
-	})
+	req := GetReq()
+	req.rTp = mtype
+	req.key = key
+	req.data = data
+	m.WithRequest(req)
 	return
 }
 
@@ -182,11 +182,11 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	m.WithRequest(&MCRequest{
-		rTp:  reqType,
-		key:  key,
-		data: crlfBytes,
-	})
+	req := GetReq()
+	req.rTp = reqType
+	req.key = key
+	req.data = crlfBytes
+	m.WithRequest(req)
 	return
 }
 
@@ -206,11 +206,11 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 			return
 		}
 	}
-	m.WithRequest(&MCRequest{
-		rTp:  reqType,
-		key:  key,
-		data: ns,
-	})
+	req := GetReq()
+	req.rTp = reqType
+	req.key = key
+	req.data = ns
+	m.WithRequest(req)
 	return
 }
 
@@ -230,11 +230,11 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 			return
 		}
 	}
-	m.WithRequest(&MCRequest{
-		rTp:  reqType,
-		key:  key,
-		data: ns,
-	})
+	req := GetReq()
+	req.rTp = reqType
+	req.key = key
+	req.data = ns
+	m.WithRequest(req)
 	return
 }
 

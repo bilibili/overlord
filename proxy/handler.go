@@ -111,7 +111,7 @@ func (h *Handler) handle() {
 			}
 			msg.MarkEnd()
 			msg.ReleaseSubs()
-			prom.ProxyTime(h.cluster.cc.Name, msg.Request().Cmd(), int64(msg.TotalDur()/time.Microsecond))
+			prom.ProxyTime(h.cluster.cc.Name, string(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
 		}
 
 		// 4. release resource
