@@ -112,6 +112,7 @@ func (m *Message) ReleaseSubs() {
 		sub := m.subs[i]
 		sub.Reset()
 		PutMsg(sub)
+		m.req[i].Put()
 	}
 }
 

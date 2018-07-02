@@ -2,6 +2,7 @@ package memcache
 
 import (
 	errs "errors"
+	"sync"
 )
 
 const (
@@ -136,6 +137,27 @@ type MCRequest struct {
 	rTp  RequestType
 	key  []byte
 	data []byte
+}
+
+var msgPool = &sync.Pool{
+	New: func() interface{} {
+		return NewReq()
+	},
+}
+
+// GetReq get the msg from pool
+func GetReq() *MCRequest {
+	return msgPool.Get().(*MCRequest)
+}
+
+// NewReq return new mc req.
+func NewReq() *MCRequest {
+	return &MCRequest{}
+}
+
+// Put put req back to pool.
+func (r *MCRequest) Put() {
+	msgPool.Put(r)
 }
 
 // Cmd get Msg cmd.

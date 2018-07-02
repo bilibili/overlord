@@ -165,11 +165,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			return
 		}
 
-		req := &MCRequest{
-			rTp:  reqType,
-			key:  ns[b:e],
-			data: crlfBytes,
-		}
+		req := GetReq()
 		rs = append(rs, req)
 		if e == len(ns)-2 {
 			break
