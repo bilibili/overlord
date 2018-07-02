@@ -5,7 +5,6 @@ import (
 	"context"
 	errs "errors"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,7 +25,7 @@ var (
 )
 
 var (
-	maxMergeBatchSize = 16
+	maxMergeBatchSize = 4
 )
 
 type pinger struct {
@@ -183,56 +182,56 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		idx = 0
 	)
 
-	ticker := time.NewTicker(time.Millisecond * 10)
+	// ticker := time.NewTicker(time.Millisecond * 10)
 	for {
 		var mb *proto.MsgBatch
 		select {
 		case mb = <-ch:
 			mbs[idx] = mb
 			idx++
+			if idx == maxMergeBatchSize {
+				_ = c.mergeIO(nc, mbs)
+				idx = 0
+			}
 		case <-c.ctx.Done():
 			nc.Close()
 			return
-		case <-ticker.C:
+		default:
 		}
-		if idx == 0 {
-			runtime.Gosched()
+		if idx > 0 {
+			_ = c.mergeIO(nc, mbs[:idx])
+			idx = 0
 			continue
 		}
 
-		if mb != nil && idx != len(mbs) {
-			continue
-		}
-
-		if idx != len(mbs) {
+		select {
+		case mb = <-ch:
+			// never occur idx == maxBatchTimeoutCount
+			// beacuse that idx is 0
+			mbs[idx] = mb
 			idx++
+		case <-c.ctx.Done():
+			nc.Close()
+			return
 		}
-
-		err := c.mergeWrite(nc, mbs[:idx])
-		if err != nil {
-			// req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			// if log.V(1) {
-			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			// }
-			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
-			continue
-		}
-		err = c.mergeRead(nc, mbs[:idx])
-		if err != nil {
-			// m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			// if log.V(1) {
-			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			// }
-			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
-			continue
-		}
-		// prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
-		for _, mb := range mbs {
-			mb.Done()
-		}
-		idx = 0
 	}
 
+}
+
+func (c *Cluster) mergeIO(nc proto.NodeConn, mbs []*proto.MsgBatch) (err error) {
+	err = c.mergeWrite(nc, mbs)
+	if err != nil {
+		return
+	}
+	err = c.mergeRead(nc, mbs)
+	if err != nil {
+		return
+	}
+	// prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
+	for _, mb := range mbs {
+		mb.Done()
+	}
+	return
 }
 
 func (c *Cluster) mergeWrite(nc proto.NodeConn, mbs []*proto.MsgBatch) error {
@@ -242,7 +241,6 @@ func (c *Cluster) mergeWrite(nc proto.NodeConn, mbs []*proto.MsgBatch) error {
 			return err
 		}
 	}
-
 	return nc.Flush()
 }
 

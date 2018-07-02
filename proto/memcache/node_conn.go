@@ -16,7 +16,7 @@ import (
 const (
 	handlerOpening     = int32(0)
 	handlerClosed      = int32(1)
-	defaultRespBufSize = 4 * 1024
+	defaultRespBufSize = 1024 * 1024 // 1MB buffer
 )
 
 type nodeConn struct {
@@ -104,100 +104,87 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 }
 
 func (n *nodeConn) ReadMBatch(mbs []*proto.MsgBatch) (err error) {
+	defer n.br.Buffer().Reset()
 	var (
-		size   int
-		cursor int
-		nth    int
-		mnth   int
-		m      *proto.Message
-
 		mcr    *MCRequest
-		ok     bool
-		mbsLen = len(mbs)
-
-		batchSize = proto.MergeBatchSize(mbs)
-		divider   = make([]int, batchSize+1)
-		mcrs      = make([]*MCRequest, batchSize)
-		last      = 1
+		ok     = false
+		cursor int
+		size   int
+		msgs   = proto.Flatten(mbs)
+		marks  = make([]int, len(msgs))
 	)
 
+	idx := 0
+out:
 	for {
-		if mnth == mbsLen {
-			break
-		}
-
+		// TODO: 是当扩容的时候,这个地方其实是有多次copy问题的
+		// 应该改改形式改成不需要多次copy
 		err = n.br.Read()
 		if err != nil {
-			err = errors.Wrap(err, "node conn while read")
 			return
 		}
-		// get the nth m of mnth mb
+
+	inner:
 		for {
-			m = mbs[mnth].Nth(nth)
-			if m == nil {
-				mnth++
-				nth = 0
-				continue
+			if idx >= len(msgs) {
+				break out
 			}
-			break
+			// fmt.Printf("Read:%s\n", strconv.Quote(string(n.br.Buffer().Bytes())))
+			mcr, ok = msgs[idx].Request().(*MCRequest)
+			if !ok {
+				err = ErrAssertMsg
+				return
+			}
+			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
+			// fmt.Printf("size:%d err:%v\n", size, err)
+			if err == bufio.ErrBufferFull {
+				break inner
+			} else if err != nil {
+				return err
+			}
+			cursor += size
+			marks[idx] = size
+			idx++
 		}
-
-		mcr, ok = m.Request().(*MCRequest)
-		if !ok {
-			err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
-			return
-		}
-		mcrs[last] = mcr
-
-		size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-		if err == bufio.ErrBufferFull {
-			continue
-		} else if err != nil {
-			return err
-		}
-
-		cursor += size
-		divider[last] = cursor
-		last++
-		nth++
 	}
-
-	n.fullFillMsgs(divider, mbs, mcrs)
+	n.copyToBuffer(marks, mbs)
+	n.fullFillMsgs(marks, mbs, msgs)
 	return
 }
 
-func (n *nodeConn) fullFillMsgs(divider []int, mbs []*proto.MsgBatch, mcrs []*MCRequest) {
+func (n *nodeConn) copyToBuffer(marks []int, mbs []*proto.MsgBatch) {
 	var last int
 	for _, mb := range mbs {
-		beg := divider[last]
+		// if last >= len(marks) || mb.Count()+last > len(marks) {
+		// 	fmt.Printf("last:%d marks:%v mbs:%v bytes:%s\n", last, marks, mbs, strconv.Quote(string(n.br.Buffer().Bytes())))
+		// }
+		rg := sum(marks[last : mb.Count()+last])
 		last += mb.Count()
-		end := divider[last]
-		_ = n.br.CopyTo(mb.Buffer(), end-beg)
+		_ = n.br.CopyTo(mb.Buffer(), rg)
 	}
+}
 
+func (n *nodeConn) fullFillMsgs(marks []int, mbs []*proto.MsgBatch, msgs []*proto.Message) {
 	var (
-		mnth   = 0
-		offset = 0
-		data   []byte
-		i      = 0
+		idx    int
+		base   int
+		cursor int
 	)
-	for mnth != len(mbs) {
-		data = mbs[mnth].Buffer().Bytes()
-		begin, end := divider[i]-offset, divider[i+1]-offset
 
-		if begin >= len(data) {
-			offset += len(data)
-			mnth++
-			continue
+	for i := range msgs {
+		if i+1-base > mbs[idx].Count() {
+			idx++
+			base += mbs[idx].Count()
+			cursor = 0
 		}
-		mcrs[i].data = data[begin:end]
-	}
 
+		mcr, _ := msgs[idx].Request().(*MCRequest)
+		mcr.data = mbs[idx].Buffer().Bytes()[cursor : cursor+marks[i]]
+		cursor += marks[i]
+	}
 }
 
 func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
-	// TODO: 是当扩容的时候,这个地方其实是有多次copy问题的
-	// 应该改改形式改成不需要多次copy
 	pos := bytes.IndexByte(data, delim)
 	if pos == -1 {
 		return 0, bufio.ErrBufferFull
@@ -243,4 +230,12 @@ func (n *nodeConn) Close() error {
 
 func (n *nodeConn) Closed() bool {
 	return atomic.LoadInt32(&n.closed) == handlerClosed
+}
+
+func sum(vals []int) int {
+	var sum int
+	for _, v := range vals {
+		sum += v
+	}
+	return sum
 }

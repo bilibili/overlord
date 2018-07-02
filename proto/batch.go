@@ -69,6 +69,11 @@ func (m *MsgBatch) AddMsg(msg *Message) {
 	m.count++
 }
 
+// Msgs returns all buffered msg
+func (m *MsgBatch) Msgs() []*Message {
+	return m.msgs[:m.count]
+}
+
 func (m *MsgBatch) Count() int {
 	return m.count
 }
@@ -110,4 +115,14 @@ func MergeBatchSize(mbs []*MsgBatch) (size int) {
 		size += mb.Count()
 	}
 	return
+}
+
+func Flatten(b []*MsgBatch) []*Message {
+	var collection = make([]*Message, 0)
+	for _, batch := range b {
+		for _, msg := range batch.Msgs() {
+			collection = append(collection, msg)
+		}
+	}
+	return collection
 }

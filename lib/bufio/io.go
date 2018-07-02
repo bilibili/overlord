@@ -247,7 +247,6 @@ func (w *Writer) Flush() error {
 	if w.cursor == 1 {
 		return w.flushFirstBuf()
 	}
-
 	w.bufsp = net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
