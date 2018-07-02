@@ -161,14 +161,14 @@ func (m *Message) BatchReq() []Request {
 // Response return all response bytes.
 func (m *Message) Response() [][]byte {
 	if !m.IsBatch() {
-		return [][]byte{m.req[0].Resp()}
+		m.subResps = append(m.subResps, m.req[0].Resp())
+	} else {
+		slen := len(m.req)
+		for i := 0; i < slen; i++ {
+			m.subResps = append(m.subResps, m.req[i].Resp())
+		}
 	}
-	slen := len(m.req)
-	res := make([][]byte, slen)
-	for i := 0; i < slen; i++ {
-		res[i] = m.req[i].Resp()
-	}
-	return res
+	return m.subResps
 }
 
 // Err returns error.
