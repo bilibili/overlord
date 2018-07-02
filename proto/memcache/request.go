@@ -12,11 +12,26 @@ const (
 )
 
 var (
-	spaceBytes = []byte{' '}
-	zeroBytes  = []byte{'0'}
-	oneBytes   = []byte{'1'}
-	crlfBytes  = []byte("\r\n")
-	endBytes   = []byte("END\r\n")
+	spaceBytes   = []byte{' '}
+	zeroBytes    = []byte{'0'}
+	oneBytes     = []byte{'1'}
+	crlfBytes    = []byte("\r\n")
+	endBytes     = []byte("END\r\n")
+	setBytes     = []byte("set")
+	addBytes     = []byte("add")
+	replaceBytes = []byte("replace")
+	appendBytes  = []byte("append")
+	prependBytes = []byte("prepend")
+	casBytes     = []byte("cas")
+	getBytes     = []byte("get")
+	getsBytes    = []byte("gets")
+	deleteBytes  = []byte("delete")
+	incrBytes    = []byte("incr")
+	decrBytes    = []byte("decr")
+	touchBytes   = []byte("touch")
+	gatBytes     = []byte("gat")
+	gatsBytes    = []byte("gats")
+	unknownBytes = []byte("unknown")
 	// storedBytes = []byte("STORED\r\n")
 	// notStoredBytes = []byte("NOT_STORED\r\n")
 	// existsBytes    = []byte("EXISTS\r\n")
@@ -32,35 +47,35 @@ type RequestType byte
 func (rt RequestType) Bytes() []byte {
 	switch rt {
 	case RequestTypeSet:
-		return []byte("set")
+		return setBytes
 	case RequestTypeAdd:
-		return []byte("add")
+		return addBytes
 	case RequestTypeReplace:
-		return []byte("replace")
+		return replaceBytes
 	case RequestTypeAppend:
-		return []byte("append")
+		return appendBytes
 	case RequestTypePrepend:
-		return []byte("prepend")
+		return prependBytes
 	case RequestTypeCas:
-		return []byte("cas")
+		return casBytes
 	case RequestTypeGet:
-		return []byte("get")
+		return getBytes
 	case RequestTypeGets:
-		return []byte("gets")
+		return getsBytes
 	case RequestTypeDelete:
-		return []byte("delete")
+		return deleteBytes
 	case RequestTypeIncr:
-		return []byte("incr")
+		return incrBytes
 	case RequestTypeDecr:
-		return []byte("decr")
+		return decrBytes
 	case RequestTypeTouch:
-		return []byte("touch")
+		return touchBytes
 	case RequestTypeGat:
-		return []byte("gat")
+		return gatBytes
 	case RequestTypeGats:
-		return []byte("gats")
+		return gatsBytes
 	}
-	return []byte("unknown")
+	return unknownBytes
 }
 
 // all memcache Msg type
