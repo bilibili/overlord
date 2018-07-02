@@ -112,6 +112,8 @@ func (m *Message) ReleaseSubs() {
 		sub := m.subs[i]
 		sub.Reset()
 		PutMsg(sub)
+	}
+	for i := range m.req {
 		m.req[i].Put()
 	}
 }
