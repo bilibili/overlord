@@ -47,6 +47,7 @@ type Message struct {
 	wg   *sync.WaitGroup
 
 	req      []Request
+	reqn     int
 	subs     []*Message
 	subResps [][]byte
 
@@ -112,14 +113,20 @@ func (m *Message) ReleaseSubs() {
 		sub := m.subs[i]
 		sub.Reset()
 	}
-	for i := range m.req {
-		m.req[i].Put()
+	m.reqn = 0
+}
+func (m *Message) GetRequest() (req Request) {
+	if m.reqn < len(m.req) {
+		req = m.req[m.reqn]
+		m.reqn++
 	}
+	return
 }
 
 // WithRequest with proto request.
 func (m *Message) WithRequest(req Request) {
 	m.req = append(m.req, req)
+	m.reqn++
 }
 
 // Request returns proto Msg.
@@ -132,12 +139,12 @@ func (m *Message) Request() Request {
 
 // IsBatch returns whether or not batch.
 func (m *Message) IsBatch() bool {
-	return len(m.req) > 1
+	return m.reqn > 1
 }
 
 // Batch returns sub Msg if is batch.
 func (m *Message) Batch() []*Message {
-	slen := len(m.req)
+	slen := m.reqn
 	if slen == 0 {
 		return nil
 	}
