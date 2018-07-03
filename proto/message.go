@@ -65,7 +65,7 @@ func NewMessage() *Message {
 func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
 	m.req = m.req[:0]
-	m.subs = m.subs[:0]
+	//	m.subs = m.subs[:0]
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
@@ -111,7 +111,6 @@ func (m *Message) ReleaseSubs() {
 	for i := range m.subs {
 		sub := m.subs[i]
 		sub.Reset()
-		PutMsg(sub)
 	}
 	for i := range m.req {
 		m.req[i].Put()
@@ -142,14 +141,25 @@ func (m *Message) Batch() []*Message {
 	if slen == 0 {
 		return nil
 	}
-	for i := 0; i < slen; i++ {
-		msg := GetMsg()
-		msg.Type = m.Type
-		msg.WithRequest(m.req[i])
-		m.subs = append(m.subs, msg)
+	var min int
+	if len(m.subs) > slen {
+		min = slen
+	} else {
+		min = len(m.subs)
+	}
+	for i := 0; i < min; i++ {
+		m.subs[i].Type = m.Type
+		m.subs[i].WithRequest(m.req[i])
 		// subs[i].wg = m.wg
 	}
-	return m.subs
+	delta := slen - len(m.subs)
+	for i := 0; i < delta; i++ {
+		msg := GetMsg()
+		msg.Type = m.Type
+		msg.WithRequest(m.req[min+i])
+		m.subs = append(m.subs, msg)
+	}
+	return m.subs[:slen]
 }
 
 // BatchReq returns the m.req field
