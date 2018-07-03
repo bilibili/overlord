@@ -55,11 +55,11 @@ func TestNodeConnWriteOk(t *testing.T) {
 	}
 
 	for _, tt := range ts {
-		t.Run(fmt.Sprintf("%sOk", tt.rtype), func(subt *testing.T) {
+		t.Run(fmt.Sprintf("%v Ok", tt.rtype), func(subt *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn(nil)
 
-			err := nc.Write(req)
+			err := nc.write(req)
 			assert.NoError(t, err)
 
 			m, ok := nc.conn.Conn.(*mockConn)
@@ -79,7 +79,7 @@ func TestNodeConnWriteClosed(t *testing.T) {
 	err := nc.Close()
 	assert.NoError(t, err)
 	assert.True(t, nc.Closed())
-	err = nc.Write(req)
+	err = nc.write(req)
 	assert.Error(t, err)
 	_causeEqual(t, ErrClosed, err)
 	assert.NoError(t, nc.Close())
@@ -88,8 +88,8 @@ func TestNodeConnWriteClosed(t *testing.T) {
 type mockReq struct {
 }
 
-func (*mockReq) Cmd() string {
-	return ""
+func (*mockReq) Cmd() []byte {
+	return []byte("")
 }
 
 func (*mockReq) Key() []byte {
@@ -100,12 +100,15 @@ func (*mockReq) Resp() []byte {
 	return nil
 }
 
+func (*mockReq) Put() {
+
+}
 func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
 	nc := _createNodeConn(nil)
 	req.WithRequest(&mockReq{})
 
-	err := nc.Write(req)
+	err := nc.write(req)
 	assert.Error(t, err)
 	_causeEqual(t, ErrAssertMsg, err)
 }
@@ -117,7 +120,9 @@ func TestNodeConnReadClosed(t *testing.T) {
 	err := nc.Close()
 	assert.NoError(t, err)
 	assert.True(t, nc.Closed())
-	err = nc.Read(req)
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+	err = nc.ReadBatch(batch)
 	assert.Error(t, err)
 	_causeEqual(t, ErrClosed, err)
 }
@@ -149,10 +154,12 @@ func TestNodeConnReadOk(t *testing.T) {
 	}
 	for _, tt := range ts {
 
-		t.Run(fmt.Sprintf("%s%s", tt.rtype, tt.suffix), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v%s", tt.rtype, tt.suffix), func(t *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn([]byte(tt.cData))
-			err := nc.Read(req)
+			batch := proto.NewMsgBatch()
+			batch.AddMsg(req)
+			err := nc.ReadBatch(batch)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.except, string(req.Request().Resp()))
 		})
@@ -164,7 +171,9 @@ func TestNodeConnAssertError(t *testing.T) {
 	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
 	nc := _createNodeConn(nil)
 	req.WithRequest(&mockReq{})
-	err := nc.Read(req)
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+	err := nc.ReadBatch(batch)
 	_causeEqual(t, ErrAssertMsg, err)
 }
 

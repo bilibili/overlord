@@ -28,7 +28,7 @@ var _allReqTypes = []RequestType{
 func TestRequestTypeString(t *testing.T) {
 	reg := regexp.MustCompile(`[a-z]+`)
 	for _, rtype := range _allReqTypes {
-		assert.True(t, reg.MatchString(rtype.String()))
+		assert.True(t, reg.Match(rtype.Bytes()))
 	}
 }
 

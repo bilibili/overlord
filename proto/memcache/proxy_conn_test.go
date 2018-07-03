@@ -135,13 +135,17 @@ func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
 
 	if !m.IsBatch() {
 		nc := _createNodeConn(resps[0])
-		err := nc.Read(m)
+		batch := proto.NewMsgBatch()
+		batch.AddMsg(m)
+		err := nc.ReadBatch(batch)
 		assert.NoError(t, err)
 	} else {
 		subs := m.Batch()
 		for idx, resp := range resps {
 			nc := _createNodeConn(resp)
-			err := nc.Read(&subs[idx])
+			batch := proto.NewMsgBatch()
+			batch.AddMsg(subs[idx])
+			err := nc.ReadBatch(batch)
 			assert.NoError(t, err)
 		}
 	}
