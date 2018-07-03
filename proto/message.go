@@ -65,7 +65,8 @@ func NewMessage() *Message {
 // Reset will clean the msg
 func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
-	m.req = m.req[:0]
+	m.reqn = 0
+	//	m.req = m.req[:0]
 	//	m.subs = m.subs[:0]
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
