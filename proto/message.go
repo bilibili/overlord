@@ -65,7 +65,7 @@ func NewMessage() *Message {
 func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
 	m.req = m.req[:0]
-	m.subs = nil
+	m.subs = m.subs[:0]
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
@@ -142,15 +142,14 @@ func (m *Message) Batch() []*Message {
 	if slen == 0 {
 		return nil
 	}
-	subs := make([]*Message, slen)
 	for i := 0; i < slen; i++ {
-		subs[i] = GetMsg()
-		subs[i].Type = m.Type
-		subs[i].WithRequest(m.req[i])
+		msg := GetMsg()
+		msg.Type = m.Type
+		msg.WithRequest(m.req[i])
+		m.subs = append(m.subs, msg)
 		// subs[i].wg = m.wg
 	}
-	m.subs = subs
-	return subs
+	return m.subs
 }
 
 // BatchReq returns the m.req field
