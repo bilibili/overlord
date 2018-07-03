@@ -82,9 +82,8 @@ func (h *Handler) handle() {
 	)
 
 	defer func() {
-		for _, msg := range messages {
-			msg.Reset()
-			proto.PutMsg(msg)
+		for _, msg := range msgs {
+			msg.Clear()
 		}
 		h.closeWithError(err)
 	}()

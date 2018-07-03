@@ -73,6 +73,27 @@ func (m *Message) Reset() {
 	m.err = nil
 }
 
+// clear will clean the msg
+func (m *Message) Clear() {
+	m.Type = CacheTypeUnknown
+	m.reqn = 0
+	//	m.req = m.req[:0]
+	//	m.subs = m.subs[:0]
+	m.subResps = m.subResps[:0]
+	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
+	m.err = nil
+	for _, r := range m.req {
+		r.Put()
+	}
+	m.req = nil
+	for _, s := range m.subs {
+		s.Clear()
+		PutMsg(s)
+	}
+	m.subs = nil
+	PutMsg(m)
+}
+
 // TotalDur will return the total duration of a command.
 func (m *Message) TotalDur() time.Duration {
 	return m.et.Sub(m.st)
@@ -118,6 +139,7 @@ func (m *Message) ReleaseSubs() {
 }
 func (m *Message) GetRequest() (req Request) {
 	if m.reqn < len(m.req) {
+		//	fmt.Println("get msg", m.reqn, len(m.req))
 		req = m.req[m.reqn]
 		m.reqn++
 	}
@@ -128,6 +150,12 @@ func (m *Message) GetRequest() (req Request) {
 func (m *Message) WithRequest(req Request) {
 	m.req = append(m.req, req)
 	m.reqn++
+}
+
+func (m *Message) setRequest(req Request) {
+	m.req = m.req[:0]
+	m.reqn = 0
+	m.WithRequest(req)
 }
 
 // Request returns proto Msg.
@@ -157,14 +185,14 @@ func (m *Message) Batch() []*Message {
 	}
 	for i := 0; i < min; i++ {
 		m.subs[i].Type = m.Type
-		m.subs[i].WithRequest(m.req[i])
+		m.subs[i].setRequest(m.req[i])
 		// subs[i].wg = m.wg
 	}
 	delta := slen - len(m.subs)
 	for i := 0; i < delta; i++ {
 		msg := GetMsg()
 		msg.Type = m.Type
-		msg.WithRequest(m.req[min+i])
+		msg.setRequest(m.req[min+i])
 		m.subs = append(m.subs, msg)
 	}
 	return m.subs[:slen]
