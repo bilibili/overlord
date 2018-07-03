@@ -196,5 +196,5 @@ func (r *MCRequest) Resp() []byte {
 }
 
 func (r *MCRequest) String() string {
-	return fmt.Sprintf("type: %s key:%s data %s", r.rTp.Bytes(), r.key, r.data)
+	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.Bytes(), r.key, r.data)
 }

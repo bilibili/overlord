@@ -60,6 +60,7 @@ func TestNodeConnWriteOk(t *testing.T) {
 			nc := _createNodeConn(nil)
 
 			err := nc.write(req)
+			nc.bw.Flush()
 			assert.NoError(t, err)
 
 			m, ok := nc.conn.Conn.(*mockConn)
@@ -104,11 +105,11 @@ func (*mockReq) Put() {
 
 }
 func TestNodeConnWriteTypeAssertFail(t *testing.T) {
-	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
+	req := proto.NewMessage()
 	nc := _createNodeConn(nil)
 	req.WithRequest(&mockReq{})
-
 	err := nc.write(req)
+	nc.bw.Flush()
 	assert.Error(t, err)
 	_causeEqual(t, ErrAssertMsg, err)
 }
@@ -168,8 +169,8 @@ func TestNodeConnReadOk(t *testing.T) {
 }
 
 func TestNodeConnAssertError(t *testing.T) {
-	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
 	nc := _createNodeConn(nil)
+	req := proto.NewMessage()
 	req.WithRequest(&mockReq{})
 	batch := proto.NewMsgBatch()
 	batch.AddMsg(req)
