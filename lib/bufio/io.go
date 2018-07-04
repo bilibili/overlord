@@ -53,11 +53,16 @@ func (r *Reader) Buffer() *Buffer {
 }
 
 func (r *Reader) CopyTo(b *Buffer, n int) error {
+	b.Reset()
 	for b.len() < n {
 		b.grow()
 	}
 
-	copy(b.buf[b.w:], r.b.buf[b.r:b.r+n])
+	if r.b.r+n > r.b.w {
+		panic("bad copy")
+	}
+
+	copy(b.buf[b.w:b.w+n], r.b.buf[b.r:b.r+n])
 	b.w += n
 	r.b.r += n
 	return nil

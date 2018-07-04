@@ -106,17 +106,15 @@ func (n *nodeConn) ReadMBatch(mbs []*proto.MsgBatch) (err error) {
 	)
 
 	idx := 0
-out:
 	for {
 		err = n.br.Read()
 		if err != nil {
 			return
 		}
 
-	inner:
 		for {
 			if idx >= len(msgs) {
-				break out
+				goto cpybuf
 			}
 			mcr, ok = msgs[idx].Request().(*MCRequest)
 			if !ok {
@@ -125,7 +123,7 @@ out:
 			}
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
-				break inner
+				break
 			} else if err != nil {
 				return err
 			}
@@ -134,6 +132,8 @@ out:
 			idx++
 		}
 	}
+
+cpybuf:
 	n.copyToBuffer(marks, mbs)
 	n.fullFillMsgs(marks, mbs, msgs)
 	return
@@ -150,21 +150,17 @@ func (n *nodeConn) copyToBuffer(marks []int, mbs []*proto.MsgBatch) {
 
 func (n *nodeConn) fullFillMsgs(marks []int, mbs []*proto.MsgBatch, msgs []*proto.Message) {
 	var (
-		idx    int
-		base   int
-		cursor int
+		last int
 	)
-
-	for i := range msgs {
-		if i+1-base > mbs[idx].Count() {
-			idx++
-			base += mbs[idx].Count()
-			cursor = 0
+	for _, mb := range mbs {
+		count := mb.Count()
+		cursor := 0
+		for i := last; i < last+count; i++ {
+			mcr, _ := msgs[i].Request().(*MCRequest)
+			mcr.data = mb.Buffer().Bytes()[cursor : cursor+marks[i]]
+			cursor += marks[i]
 		}
-
-		mcr, _ := msgs[i].Request().(*MCRequest)
-		mcr.data = mbs[idx].Buffer().Bytes()[cursor : cursor+marks[i]]
-		cursor += marks[i]
+		last += count
 	}
 }
 

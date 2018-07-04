@@ -192,6 +192,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 				}
 				idx = 0
 			}
+			continue
 		case <-c.ctx.Done():
 			nc.Close()
 			return

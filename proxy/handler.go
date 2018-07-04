@@ -117,12 +117,12 @@ func (h *Handler) handle() {
 		}
 
 		// 5. release resource
-		for _, msg := range msgs {
-			msg.ReleaseSubs()
-			msg.Reset()
+		for idx := range msgs {
+			msgs[idx].ReleaseSubs()
+			msgs[idx].Reset()
 		}
-		for _, mb := range mbatch {
-			mb.Reset()
+		for idx := range mbatch {
+			mbatch[idx].Reset()
 		}
 
 		// 5. reset MaxConcurrent
