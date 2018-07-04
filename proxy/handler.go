@@ -127,7 +127,7 @@ func (h *Handler) handle() {
 }
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
-	// TODO: change the msgs by BatchSize
+	// TODO: change the msgs by lastCount trending
 	lm := len(msgs)
 	if lm < maxConcurrent && lm == lastCount {
 		for i := 0; i < lm; i++ {

@@ -38,7 +38,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
 		br:      bufio.NewReader(conn, nil),
-		pinger:  newMCPinger(conn.Dup()),
+		pinger:  newMCPinger(conn),
 	}
 	return
 }
@@ -108,7 +108,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		return
 	}
 	defer n.br.ResetBuffer(nil)
-	// TODO: this read was only support read one key's result
 	n.br.ResetBuffer(mb.Buffer())
 
 	var (
@@ -161,8 +160,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
-	// TODO: 是当扩容的时候,这个地方其实是有多次copy问题的
-	// 应该改改形式改成不需要多次copy
 	pos := bytes.IndexByte(data, delim)
 	if pos == -1 {
 		return 0, bufio.ErrBufferFull

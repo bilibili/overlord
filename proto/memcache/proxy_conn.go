@@ -143,7 +143,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.Wrap(ErrBadRequest, "MC decoder data not end with CRLF")
 		return
 	}
-	req := m.GetRequest()
+	req := m.NextReq()
 	if req == nil {
 		req := GetReq()
 		req.rTp = mtype
@@ -171,7 +171,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
 		}
-		req := m.GetRequest()
+		req := m.NextReq()
 		if req == nil {
 			req := GetReq()
 			req.rTp = reqType

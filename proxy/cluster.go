@@ -61,9 +61,7 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring      *hashkit.HashRing
-	alias     bool
-	nodeAlias map[string]string
+	ring *hashkit.HashRing
 
 	nodeMap  map[string]int
 	nodeChan map[int]*batchChanel
@@ -77,29 +75,21 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c = &Cluster{cc: cc}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	// parse
-	addrs, ws, ans, alias, err := parseServers(cc.Servers)
+	// NOTICE: alias feature has been removed because unnecessary.
+	addrs, ws, _, _, err := parseServers(cc.Servers)
 	if err != nil {
 		panic(err)
 	}
 	if len(cc.HashTag) == 2 {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
+
 	ring := hashkit.Ketama()
-	if alias {
-		ring.Init(ans, ws)
-	} else {
-		ring.Init(addrs, ws)
-	}
-	am := map[string]string{}
-	// cm := map[string]*channel{}
+	ring.Init(addrs, ws)
 
 	nodeChan := make(map[int]*batchChanel)
 	nodeMap := make(map[string]int)
 	for i := range addrs {
-		if alias {
-			addrs[i] = ans[i]
-			am[ans[i]] = addrs[i]
-		}
 		nbc := newBatchChanel(cc.NodeConnections)
 		go c.processBatch(nbc, addrs[i])
 		nodeChan[i] = nbc
@@ -108,7 +98,6 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeChan = nodeChan
 	c.nodeMap = nodeMap
 	c.ring = ring
-	c.nodeAlias = am
 	if c.cc.PingAutoEject {
 		go c.startPinger(c.cc, addrs, ws)
 	}
@@ -128,7 +117,7 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 
 // DispatchBatch delivers all the messages to batch execute by hash
 func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
-	// TODO: dynamic update mbs by add or remove nodes
+	// TODO: dynamic update mbs by add more than configrured nodes
 	var (
 		bidx int
 	)
@@ -152,15 +141,9 @@ func (c *Cluster) deliver(mbs []*proto.MsgBatch) {
 	for i := range mbs {
 		if mbs[i].Count() != 0 {
 			mbs[i].Add(1)
-		}
-	}
-
-	for i := range mbs {
-		if mbs[i].Count() != 0 {
 			c.nodeChan[i].push(mbs[i])
 		}
 	}
-
 }
 
 func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
@@ -194,6 +177,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
+
 		err = c.processReadBatch(nc, mb)
 		if err != nil {
 			err = errors.Wrap(err, "Cluster batch read")

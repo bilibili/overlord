@@ -136,11 +136,14 @@ func (m *Message) ReleaseSubs() {
 	}
 	m.reqn = 0
 }
-func (m *Message) GetRequest() (req Request) {
+
+// NextReq will iterator itself until nil.
+func (m *Message) NextReq() (req Request) {
 	if m.reqn < len(m.req) {
 		req = m.req[m.reqn]
 		m.reqn++
 	}
+	m.reqn = 0
 	return
 }
 
@@ -194,11 +197,6 @@ func (m *Message) Batch() []*Message {
 		m.subs = append(m.subs, msg)
 	}
 	return m.subs[:slen]
-}
-
-// BatchReq returns the m.req field
-func (m *Message) BatchReq() []Request {
-	return m.req
 }
 
 // Response return all response bytes.
