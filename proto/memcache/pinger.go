@@ -1,109 +1,63 @@
 package memcache
 
 import (
-	"bufio"
 	"bytes"
-	"net"
 	"sync/atomic"
-	"time"
 
-	"github.com/felixhao/overlord/proto"
+	"github.com/felixhao/overlord/lib/bufio"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/pkg/errors"
 )
 
 const (
-	pingerOpening = int32(0)
-	pingerClosed  = int32(1)
+	pingBufferSize = 32
+	ping           = "set _ping 0 0 4\r\npong\r\n"
 )
 
-type pinger struct {
-	conn net.Conn
-	br   *bufio.Reader
+var pong = []byte("STORED\r\n")
 
-	addr         string
-	dialTimeout  time.Duration
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-
+type mcPinger struct {
+	conn   *libnet.Conn
+	bw     *bufio.Writer
+	br     *bufio.Reader
 	closed int32
 }
 
-// NewPinger returns pinger.
-func NewPinger(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (p proto.Pinger) {
-	per := &pinger{
-		addr:         addr,
-		dialTimeout:  dialTimeout,
-		readTimeout:  readTimeout,
-		writeTimeout: writeTimeout,
+func newMCPinger(nc *libnet.Conn) *mcPinger {
+	return &mcPinger{
+		conn: nc,
+		bw:   bufio.NewWriter(nc),
+		br:   bufio.NewReader(nc, bufio.Get(pingBufferSize)),
 	}
-	per.reconn()
-	p = per
-	return
 }
 
-func (p *pinger) reconn() error {
-	conn, err := net.DialTimeout("tcp", p.addr, p.dialTimeout)
-	if err != nil {
-		return err
-	}
-	p.conn = conn
-	if p.br != nil {
-		p.br.Reset(conn)
-	} else {
-		p.br = bufio.NewReader(conn)
-	}
-	return nil
-}
-
-func (p *pinger) Ping() (err error) {
-	if p.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Pinger Ping")
+func (m *mcPinger) Ping() (err error) {
+	if atomic.LoadInt32(&m.closed) == handlerClosed {
+		err = ErrPingerPong
 		return
 	}
-	defer func() {
-		if err != nil {
-			p.reconn()
-		}
-	}()
-	const (
-		ping = "set ping 0 0 4\r\npong\r\n"
-		pong = "STORED\r\n"
-	)
-	if p.conn == nil {
-		if err = p.reconn(); err != nil {
-			return
-		}
-	}
-	if p.writeTimeout > 0 {
-		p.conn.SetWriteDeadline(time.Now().Add(p.writeTimeout))
-	}
-	if _, err = p.conn.Write([]byte(ping)); err != nil {
-		err = errors.Wrap(err, "MC Pinger ping flush bytes")
+	if err = m.bw.WriteString(ping); err != nil {
+		err = errors.Wrap(err, "MC ping write")
 		return
 	}
-	if p.readTimeout > 0 {
-		p.conn.SetReadDeadline(time.Now().Add(p.readTimeout))
-	}
-	bs, err := p.br.ReadSlice(delim)
-	if err != nil {
-		err = errors.Wrap(err, "MC Pinger ping read response bytes")
+	if err = m.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-	if !bytes.Equal([]byte(pong), bs) {
-		err = errors.Wrap(ErrPingerPong, "MC Pinger ping check response bytes")
+	var b []byte
+	if b, err = m.br.ReadUntil(delim); err != nil {
+		err = errors.Wrap(err, "MC ping read response")
+		return
+	}
+	if !bytes.Equal(b, pong) {
+		err = ErrPingerPong
 	}
 	return
 }
 
-func (p *pinger) Close() error {
-	if atomic.CompareAndSwapInt32(&p.closed, handlerOpening, handlerClosed) {
-		if p.conn != nil {
-			return p.conn.Close()
-		}
+func (m *mcPinger) Close() error {
+	if atomic.CompareAndSwapInt32(&m.closed, handlerOpening, handlerClosed) {
+		return m.conn.Close()
 	}
 	return nil
-}
-
-func (p *pinger) Closed() bool {
-	return atomic.LoadInt32(&p.closed) == handlerClosed
 }

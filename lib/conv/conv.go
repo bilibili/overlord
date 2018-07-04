@@ -1,32 +1,16 @@
 package conv
 
 import (
-	"bytes"
 	"strconv"
 )
 
 const (
-	minItoa = -128
-	maxItoa = 1024 * 1024
-
 	maxCmdLen = 64
 )
 
 var (
-	itoaOffset [maxItoa - minItoa + 1]uint32
-	itoaBuffer string
-
 	charmap [256]byte
 )
-
-func init() {
-	var b bytes.Buffer
-	for i := range itoaOffset {
-		itoaOffset[i] = uint32(b.Len())
-		b.WriteString(strconv.Itoa(i + minItoa))
-	}
-	itoaBuffer = b.String()
-}
 
 func init() {
 	for i := range charmap {
@@ -40,20 +24,7 @@ func init() {
 	}
 }
 
-// Itoa returns the string representation of i.
-func Itoa(i int64) string {
-	if i >= minItoa && i <= maxItoa {
-		beg := itoaOffset[i-minItoa]
-		if i == maxItoa {
-			return itoaBuffer[beg:]
-		}
-		end := itoaOffset[i-minItoa+1]
-		return itoaBuffer[beg:end]
-	}
-	return strconv.FormatInt(i, 10)
-}
-
-// Btoi returns the corresponding value i.
+// btoi returns the corresponding value i.
 func Btoi(b []byte) (int64, error) {
 	if len(b) != 0 && len(b) < 10 {
 		var neg, i = false, 0
@@ -82,6 +53,15 @@ func Btoi(b []byte) (int64, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// UpdateToLower will convert to lower case
+func UpdateToLower(src []byte) {
+	for i := range src {
+		if c := charmap[src[i]]; c != 0 {
+			src[i] = c
+		}
+	}
 }
 
 // ToLower returns a copy of the string s with all Unicode letters mapped to their lower case.

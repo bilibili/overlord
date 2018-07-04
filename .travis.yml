@@ -1,9 +1,8 @@
 language: go
 
 go:
-  - 1.7.x
-  - 1.8.x
   - 1.9.x
+  - 1.10.x
 
 go_import_path: github.com/felixhao/overlord
 
@@ -23,5 +22,4 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
-  - cd proxy
-  - go test -run=TestProxy
+  - bash ci/test.sh

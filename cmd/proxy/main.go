@@ -11,7 +11,7 @@ import (
 	"syscall"
 
 	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/stat"
+	"github.com/felixhao/overlord/lib/prom"
 	"github.com/felixhao/overlord/proxy"
 )
 
@@ -75,7 +75,7 @@ func main() {
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)
 		if c.Proxy.UseMetrics {
-			stat.Init()
+			prom.Init()
 		}
 	}
 	// new proxy

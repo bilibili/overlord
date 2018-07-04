@@ -5,8 +5,10 @@ import (
 	errs "errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -51,6 +53,10 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
 		p.ccs = ccs
 		p.clusters = map[string]*Cluster{}
+
+		if len(ccs) == 0 {
+			log.Warnf("overlord will never listen on any port due to cluster is not specified")
+		}
 		for _, cc := range ccs {
 			go p.serve(cc)
 		}
@@ -72,7 +78,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		conn, err := l.Accept()
 		if err != nil {
 			if conn != nil {
-				conn.Close()
+				_ = conn.Close()
 			}
 			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", cc.Name, cc.ListenAddr, err)
 			continue
@@ -82,18 +88,17 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				// cache type
 				switch cc.CacheType {
 				case proto.CacheTypeMemcache:
-					encoder := memcache.NewEncoder(conn)
-					resp := &proto.Response{}
-					resp.WithError(ErrProxyMoreMaxConns)
-					encoder.Encode(resp)
-					conn.Close()
+					encoder := memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+					m := proto.ErrMessage(ErrProxyMoreMaxConns)
+					_ = encoder.Encode(m)
+					_ = conn.Close()
 				case proto.CacheTypeRedis:
 					// TODO(felix): support redis.
 				default:
-					conn.Close()
+					_ = conn.Close()
 				}
 				if log.V(3) {
-					log.Warnf("proxy accept connection count(%d) more than max(%d)", conns, p.c.Proxy.MaxConnections)
+					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
 				}
 				continue
 			}
@@ -111,7 +116,7 @@ func (p *Proxy) Close() error {
 	}
 	p.cancel()
 	for _, cluster := range p.clusters {
-		cluster.Close()
+		_ = cluster.Close()
 	}
 	return nil
 }

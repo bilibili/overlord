@@ -12,17 +12,11 @@ import (
 
 	"github.com/felixhao/overlord/lib/backoff"
 	"github.com/felixhao/overlord/lib/conv"
-	"github.com/felixhao/overlord/lib/ketama"
+	"github.com/felixhao/overlord/lib/hashkit"
 	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/pool"
-	"github.com/felixhao/overlord/lib/stat"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
-)
-
-const (
-	hashRingSpots = 255
 )
 
 // cluster errors
@@ -32,7 +26,7 @@ var (
 )
 
 type pinger struct {
-	ping   proto.Pinger
+	ping   proto.NodeConn
 	node   string
 	weight int
 
@@ -40,23 +34,23 @@ type pinger struct {
 	retries int
 }
 
-type channel struct {
+type batchChanel struct {
 	idx int32
 	cnt int32
-	chs []chan *proto.Request
+	chs []chan *proto.MsgBatch
 }
 
-func newChannel(n int32) *channel {
-	chs := make([]chan *proto.Request, n)
+func newBatchChanel(n int32) *batchChanel {
+	chs := make([]chan *proto.MsgBatch, n)
 	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.Request, requestChanBuffer)
+		chs[i] = make(chan *proto.MsgBatch, 1)
 	}
-	return &channel{cnt: n, chs: chs}
+	return &batchChanel{cnt: n, chs: chs}
 }
 
-func (c *channel) push(req *proto.Request) {
+func (c *batchChanel) push(m *proto.MsgBatch) {
 	i := atomic.AddInt32(&c.idx, 1)
-	c.chs[i%c.cnt] <- req
+	c.chs[i%c.cnt] <- m
 }
 
 // Cluster is cache cluster.
@@ -67,12 +61,10 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring      *ketama.HashRing
-	alias     bool
-	nodePool  map[string]*pool.Pool
-	nodeAlias map[string]string
-	nodePing  map[string]*pinger
-	nodeCh    map[string]*channel
+	ring *hashkit.HashRing
+
+	nodeMap  map[string]int
+	nodeChan map[int]*batchChanel
 
 	lock   sync.Mutex
 	closed bool
@@ -83,107 +75,166 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c = &Cluster{cc: cc}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	// parse
-	addrs, ws, ans, alias, err := parseServers(cc.Servers)
+	// NOTICE: alias feature has been removed because unnecessary.
+	addrs, ws, _, _, err := parseServers(cc.Servers)
 	if err != nil {
 		panic(err)
 	}
 	if len(cc.HashTag) == 2 {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
-	ring := ketama.NewRing(hashRingSpots)
-	if alias {
-		ring.Init(ans, ws)
-	} else {
-		ring.Init(addrs, ws)
-	}
-	nm := map[string]*pool.Pool{}
-	am := map[string]string{}
-	pm := map[string]*pinger{}
-	cm := map[string]*channel{}
-	// for addrs
+
+	ring := hashkit.Ketama()
+	ring.Init(addrs, ws)
+
+	nodeChan := make(map[int]*batchChanel)
+	nodeMap := make(map[string]int)
 	for i := range addrs {
-		node := addrs[i]
-		if alias {
-			node = ans[i]
-			am[ans[i]] = addrs[i]
-		}
-		nm[node] = newPool(cc, addrs[i])
-		pm[node] = &pinger{ping: newPinger(cc, addrs[i]), node: node, weight: ws[i]}
-		rc := newChannel(int32(cc.PoolActive))
-		cm[node] = rc
-		go c.process(node, rc)
+		nbc := newBatchChanel(cc.NodeConnections)
+		go c.processBatch(nbc, addrs[i])
+		nodeChan[i] = nbc
+		nodeMap[addrs[i]] = i
 	}
+	c.nodeChan = nodeChan
+	c.nodeMap = nodeMap
 	c.ring = ring
-	c.alias = alias
-	c.nodePool = nm
-	c.nodeAlias = am
-	c.nodePing = pm
-	c.nodeCh = cm
-	// auto eject
-	if cc.PingAutoEject {
-		go c.keepAlive()
+	if c.cc.PingAutoEject {
+		go c.startPinger(c.cc, addrs, ws)
 	}
 	return
 }
 
-// Dispatch dispatchs request.
-func (c *Cluster) Dispatch(req *proto.Request) {
-	// hash
-	node, ok := c.hash(req.Key())
+func (c *Cluster) calculateBatchIndex(key []byte) int {
+	node, ok := c.hash(key)
 	if !ok {
 		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) request(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, req.Key())
+			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, key)
 		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request hash"))
-		return
+		return -1
 	}
-	rc, ok := c.nodeCh[node]
-	if !ok {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) request(%s) node(%s) have not Chan", c.cc.Name, c.cc.ListenAddr, req.Key(), node)
-		}
-		req.DoneWithError(errors.Wrap(ErrClusterHashNoNode, "Cluster Dispatch dispatch request node chan"))
-		return
-	}
-	rc.push(req)
+	return c.nodeMap[node]
 }
 
-func (c *Cluster) process(node string, rc *channel) {
-	for i := int32(0); i < rc.cnt; i++ {
-		go func(i int32) {
-			ch := rc.chs[i]
-			hdl, herr := c.get(node)
-			for {
-				var req *proto.Request
-				select {
-				case req = <-ch:
-				case <-c.ctx.Done():
-					return
-				}
-				if herr != nil {
-					req.DoneWithError(errors.Wrap(herr, "Cluster process get handler"))
-					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) cluster process init error:%+v", c.cc.Name, c.cc.ListenAddr, herr)
-					}
-					hdl, herr = c.get(node)
-					continue
-				}
-				now := time.Now()
-				resp, err := hdl.Handle(req)
-				stat.HandleTime(c.cc.Name, node, req.Cmd(), int64(time.Since(now)/time.Microsecond))
-				if err != nil {
-					c.put(node, hdl, err)
-					hdl, herr = c.get(node)
-					req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-					if log.V(1) {
-						log.Errorf("cluster(%s) addr(%s) request(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, req.Key(), err)
-					}
-					stat.ErrIncr(c.cc.Name, node, req.Cmd(), errors.Cause(err).Error())
-					continue
-				}
-				req.Done(resp)
+// DispatchBatch delivers all the messages to batch execute by hash
+func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
+	// TODO: dynamic update mbs by add more than configrured nodes
+	var (
+		bidx int
+	)
+
+	for _, msg := range slice {
+		if msg.IsBatch() {
+			for _, sub := range msg.Batch() {
+				bidx = c.calculateBatchIndex(sub.Request().Key())
+				mbs[bidx].AddMsg(sub)
 			}
+		} else {
+			bidx = c.calculateBatchIndex(msg.Request().Key())
+			mbs[bidx].AddMsg(msg)
+		}
+	}
+
+	c.deliver(mbs)
+}
+
+func (c *Cluster) deliver(mbs []*proto.MsgBatch) {
+	for i := range mbs {
+		if mbs[i].Count() != 0 {
+			mbs[i].Add(1)
+			c.nodeChan[i].push(mbs[i])
+		}
+	}
+}
+
+func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
+	for i := int32(0); i < nbc.cnt; i++ {
+		go func(i int32) {
+			ch := nbc.chs[i]
+			w := newNodeConn(c.cc, addr)
+			c.processBatchIO(addr, ch, w)
 		}(i)
+	}
+}
+
+func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	for {
+		var mb *proto.MsgBatch
+		select {
+		case mb = <-ch:
+		case <-c.ctx.Done():
+			err := nc.Close()
+			if err != nil {
+				if log.V(1) {
+					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
+				}
+			}
+			return
+		}
+
+		err := c.processWriteBatch(nc, mb)
+		if err != nil {
+			err = errors.Wrap(err, "Cluster batch write")
+			mb.BatchDoneWithError(c.cc.Name, addr, err)
+			continue
+		}
+
+		err = c.processReadBatch(nc, mb)
+		if err != nil {
+			err = errors.Wrap(err, "Cluster batch read")
+			mb.BatchDoneWithError(c.cc.Name, addr, err)
+			continue
+		}
+		mb.BatchDone(c.cc.Name, addr)
+	}
+}
+
+func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
+	return w.WriteBatch(mb)
+}
+
+func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
+	err := r.ReadBatch(mb)
+	return err
+}
+
+func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
+	for idx, addr := range addrs {
+		w := ws[idx]
+		nc := newNodeConn(cc, addr)
+		p := &pinger{ping: nc, node: addr, weight: w}
+		go c.processPing(p)
+	}
+}
+
+func (c *Cluster) processPing(p *pinger) {
+	del := false
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
+		if err := p.ping.Ping(); err != nil {
+			p.failure++
+			p.retries = 0
+		} else {
+			p.failure = 0
+			if del {
+				c.ring.AddNode(p.node, p.weight)
+				del = false
+			}
+		}
+		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
+			c.ring.DelNode(p.node)
+			del = true
+		}
+		select {
+		case <-time.After(backoff.Backoff(p.retries)):
+			p.retries++
+			continue
+		case <-c.ctx.Done():
+			return
+		}
 	}
 }
 
@@ -204,33 +255,6 @@ func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	return
 }
 
-// get returns proto handler by node name.
-func (c *Cluster) get(node string) (h proto.Handler, err error) {
-	p, ok := c.nodePool[node]
-	if !ok {
-		err = ErrClusterHashNoNode
-		return
-	}
-	tmp := p.Get()
-	if h, ok = tmp.(proto.Handler); !ok {
-		err = ErrClusterHashNoNode
-	}
-	return
-}
-
-// put puts proto handler into pool by node name.
-func (c *Cluster) put(node string, h proto.Handler, err error) {
-	p, ok := c.nodePool[node]
-	if !ok {
-		return
-	}
-	conn, ok := h.(pool.Conn)
-	if !ok {
-		return
-	}
-	p.Put(conn, err != nil)
-}
-
 // Close closes resources.
 func (c *Cluster) Close() error {
 	c.lock.Lock()
@@ -239,45 +263,7 @@ func (c *Cluster) Close() error {
 		return nil
 	}
 	c.closed = true
-	for _, p := range c.nodePing {
-		p.ping.Close()
-	}
-	for _, p := range c.nodePool {
-		p.Close()
-	}
 	return nil
-}
-
-func (c *Cluster) keepAlive() {
-	var period = func(p *pinger) {
-		del := false
-		for {
-			if err := p.ping.Ping(); err != nil {
-				p.failure++
-				p.retries = 0
-			} else {
-				p.failure = 0
-				if del {
-					c.ring.AddNode(p.node, p.weight)
-				}
-			}
-			if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
-				c.ring.DelNode(p.node)
-				del = true
-			}
-			select {
-			case <-time.After(backoff.Backoff(p.retries)):
-				p.retries++
-				continue
-			case <-c.ctx.Done():
-				return
-			}
-		}
-	}
-	// keepalive
-	for _, p := range c.nodePing {
-		period(p)
-	}
 }
 
 func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias bool, err error) {
@@ -319,35 +305,15 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 	return
 }
 
-func newPool(cc *ClusterConfig, addr string) *pool.Pool {
-	var dial *pool.PoolOption
+func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	dto := time.Duration(cc.DialTimeout) * time.Millisecond
 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
-		dial = pool.PoolDial(memcache.Dial(cc.Name, addr, dto, rto, wto))
+		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
-		// TODO(felix): support redis
-	default:
-		panic(proto.ErrNoSupportCacheType)
-	}
-	act := pool.PoolActive(cc.PoolActive)
-	idle := pool.PoolIdle(cc.PoolIdle)
-	idleTo := pool.PoolIdleTimeout(time.Duration(cc.PoolIdleTimeout) * time.Millisecond)
-	wait := pool.PoolWait(cc.PoolGetWait)
-	return pool.NewPool(dial, act, idle, idleTo, wait)
-}
-
-func newPinger(cc *ClusterConfig, addr string) proto.Pinger {
-	dto := time.Duration(cc.DialTimeout) * time.Millisecond
-	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
-	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
-		return memcache.NewPinger(addr, dto, rto, wto)
-	case proto.CacheTypeRedis:
-		// TODO(felix): support redis
+	// TODO(felix): support redis
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}

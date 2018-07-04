@@ -1,4 +1,4 @@
-package stat
+package prom
 
 import (
 	"net/http"

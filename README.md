@@ -38,15 +38,11 @@ echo -e "get a_11\r" | nc 127.0.0.1 21211
 # END
 ```
 
-Congratulations! You've just ran the overlord proxy.
+Congratulations! You've just run the overlord proxy.
 
 ## Architecture
 
 ![arch](doc/images/overlord_arch.png)
-
-## Benchmark
-
-* [1.0.0](doc/benchmark/1.0.0/benchmark.md)
 
 ## Features
 
@@ -55,6 +51,7 @@ Congratulations! You've just ran the overlord proxy.
 - [x] connection pool for reduce number to backend caching servers
 - [x] keepalive & failover
 - [x] hash tag: specify the part of the key used for hashing
+- [x] promethues stat metrics support
 - [ ] cache backup
 - [ ] hot reload: add/remove cluster/node...
 - [ ] QoS: limit/breaker...
