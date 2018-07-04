@@ -15,10 +15,6 @@ const (
 	defaultMsgBatchSize = 2
 )
 
-var (
-	defaultTime = time.Now()
-)
-
 var msgBatchPool = &sync.Pool{
 	New: func() interface{} {
 		return &MsgBatch{

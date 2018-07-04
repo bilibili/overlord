@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+var (
+	defaultTime = time.Now()
+)
+
 var msgPool = &sync.Pool{
 	New: func() interface{} {
 		return NewMessage()
@@ -23,7 +27,6 @@ func GetMsgSlice(n int, caps ...int) []*Message {
 	if largs > 1 {
 		panic(fmt.Sprintf("optional argument except 1, but get %d", largs))
 	}
-
 	var msgs []*Message
 	if largs == 0 {
 		msgs = make([]*Message, n)
@@ -65,8 +68,6 @@ func NewMessage() *Message {
 func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
 	m.reqn = 0
-	//	m.req = m.req[:0]
-	//	m.subs = m.subs[:0]
 	m.subResps = m.subResps[:0]
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
@@ -74,13 +75,8 @@ func (m *Message) Reset() {
 
 // Clear will clean the msg
 func (m *Message) Clear() {
-	m.Type = CacheTypeUnknown
-	m.reqn = 0
-	//	m.req = m.req[:0]
-	//	m.subs = m.subs[:0]
-	m.subResps = m.subResps[:0]
-	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
-	m.err = nil
+	m.Reset()
+	// put pool
 	for _, r := range m.req {
 		r.Put()
 	}
@@ -187,7 +183,6 @@ func (m *Message) Batch() []*Message {
 	for i := 0; i < min; i++ {
 		m.subs[i].Type = m.Type
 		m.subs[i].setRequest(m.req[i])
-		// subs[i].wg = m.wg
 	}
 	delta := slen - len(m.subs)
 	for i := 0; i < delta; i++ {
@@ -201,13 +196,8 @@ func (m *Message) Batch() []*Message {
 
 // Response return all response bytes.
 func (m *Message) Response() [][]byte {
-	if !m.IsBatch() {
-		m.subResps = append(m.subResps, m.req[0].Resp())
-	} else {
-		slen := len(m.req)
-		for i := 0; i < slen; i++ {
-			m.subResps = append(m.subResps, m.req[i].Resp())
-		}
+	for i := 0; i < m.reqn; i++ {
+		m.subResps = append(m.subResps, m.req[i].Resp())
 	}
 	return m.subResps
 }

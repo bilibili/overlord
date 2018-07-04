@@ -167,22 +167,6 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 	return
 }
 
-func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
-	req := m.NextReq()
-	if req == nil {
-		req := GetReq()
-		req.rTp = rtype
-		req.key = key
-		req.data = data
-		m.WithRequest(req)
-	} else {
-		mcreq := req.(*MCRequest)
-		mcreq.rTp = rtype
-		mcreq.key = key
-		mcreq.data = data
-	}
-}
-
 func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
@@ -260,6 +244,22 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 		}
 	}
 	return
+}
+
+func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
+	req := m.NextReq()
+	if req == nil {
+		req := GetReq()
+		req.rTp = rtype
+		req.key = key
+		req.data = data
+		m.WithRequest(req)
+	} else {
+		mcreq := req.(*MCRequest)
+		mcreq.rTp = rtype
+		mcreq.key = key
+		mcreq.data = data
+	}
 }
 
 func nextField(bs []byte) (begin, end int) {
