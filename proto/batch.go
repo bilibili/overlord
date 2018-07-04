@@ -5,6 +5,9 @@ import (
 	"time"
 
 	"github.com/felixhao/overlord/lib/bufio"
+	"github.com/felixhao/overlord/lib/log"
+	"github.com/felixhao/overlord/lib/prom"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -69,6 +72,7 @@ func (m *MsgBatch) AddMsg(msg *Message) {
 	m.count++
 }
 
+// Count returns the count of the batch size
 func (m *MsgBatch) Count() int {
 	return m.count
 }
@@ -97,10 +101,37 @@ func (m *MsgBatch) Reset() {
 	m.buf.Reset()
 }
 
+// Add adds n for WaitGroup
 func (m *MsgBatch) Add(n int) {
 	m.wg.Add(n)
 }
 
+// Wait waits until all the message was done
 func (m *MsgBatch) Wait() {
 	m.wg.Wait()
+}
+
+// Msgs returns a slice of Msg
+func (m *MsgBatch) Msgs() []*Message {
+	return m.msgs[:m.count]
+}
+
+// BatchDone will set done and report prom HandleTime.
+func (m *MsgBatch) BatchDone(cluster, addr string) {
+	for _, msg := range m.Msgs() {
+		prom.HandleTime(cluster, addr, string(msg.Request().Cmd()), int64(msg.RemoteDur()/time.Microsecond))
+	}
+	m.Done()
+}
+
+// BatchDoneWithError will set done with error and report prom ErrIncr.
+func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
+	for _, msg := range m.Msgs() {
+		msg.DoneWithError(err)
+		if log.V(1) {
+			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
+		}
+		prom.ErrIncr(cluster, addr, string(msg.Request().Cmd()), errors.Cause(err).Error())
+	}
+	m.Done()
 }

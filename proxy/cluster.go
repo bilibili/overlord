@@ -16,6 +16,7 @@ import (
 	"github.com/felixhao/overlord/lib/log"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
+	"github.com/pkg/errors"
 )
 
 // cluster errors
@@ -178,42 +179,37 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		select {
 		case mb = <-ch:
 		case <-c.ctx.Done():
-			nc.Close()
+			err := nc.Close()
+			if err != nil {
+				if log.V(1) {
+					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
+				}
+			}
 			return
 		}
 
 		err := c.processWriteBatch(nc, mb)
 		if err != nil {
-			// req.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			// if log.V(1) {
-			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			// }
-			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
+			err = errors.Wrap(err, "Cluster batch write")
+			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
 		err = c.processReadBatch(nc, mb)
 		if err != nil {
-			// m.DoneWithError(errors.Wrap(err, "Cluster process handle"))
-			// if log.V(1) {
-			// 	log.Errorf("cluster(%s) addr(%s) Msg(%s) cluster process handle error:%+v", c.cc.Name, c.cc.ListenAddr, m.Request().Key(), err)
-			// }
-			// prom.ErrIncr(c.cc.Name, addr, m.Request().Cmd(), errors.Cause(err).Error())
+			err = errors.Wrap(err, "Cluster batch read")
+			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
-		// prom.HandleTime(c.cc.Name, addr, m.Request().Cmd(), int64(m.RemoteDur()/time.Microsecond))
-		mb.Done()
+		mb.BatchDone(c.cc.Name, addr)
 	}
-
 }
 
 func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
-	// rb.MarkWrite()
 	return w.WriteBatch(mb)
 }
 
 func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
 	err := r.ReadBatch(mb)
-	// m.MarkRead()
 	return err
 }
 

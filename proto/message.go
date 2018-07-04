@@ -44,7 +44,6 @@ func PutMsg(msg *Message) {
 // Message read from client.
 type Message struct {
 	Type CacheType
-	wg   *sync.WaitGroup
 
 	req      []Request
 	reqn     int

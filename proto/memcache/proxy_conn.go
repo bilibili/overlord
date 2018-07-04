@@ -60,6 +60,7 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 			msgs[i].Reset()
 			return msgs[:i], err
 		}
+		msgs[i].MarkStart()
 	}
 	return msgs, nil
 }
