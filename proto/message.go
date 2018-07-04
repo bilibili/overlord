@@ -177,12 +177,7 @@ func (m *Message) Batch() []*Message {
 	if slen == 0 {
 		return nil
 	}
-	var min int
-	if len(m.subs) > slen {
-		min = slen
-	} else {
-		min = len(m.subs)
-	}
+	var min = minInt(len(m.subs), slen)
 	for i := 0; i < min; i++ {
 		m.subs[i].Type = m.Type
 		m.subs[i].setRequest(m.req[i])
@@ -219,4 +214,11 @@ func (m *Message) Err() error {
 // ErrMessage return err Msg.
 func ErrMessage(err error) *Message {
 	return &Message{err: err}
+}
+
+func minInt(a, b int) int {
+	if a > b {
+		return b
+	}
+	return a
 }
