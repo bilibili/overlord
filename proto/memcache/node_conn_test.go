@@ -89,6 +89,10 @@ func TestNodeConnWriteClosed(t *testing.T) {
 type mockReq struct {
 }
 
+func (*mockReq) CmdString() string {
+	return ""
+}
+
 func (*mockReq) Cmd() []byte {
 	return []byte("")
 }

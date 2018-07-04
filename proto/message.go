@@ -72,7 +72,7 @@ func (m *Message) Reset() {
 	m.err = nil
 }
 
-// clear will clean the msg
+// Clear will clean the msg
 func (m *Message) Clear() {
 	m.Type = CacheTypeUnknown
 	m.reqn = 0

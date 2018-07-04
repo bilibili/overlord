@@ -12,11 +12,12 @@ const (
 )
 
 var (
-	spaceBytes   = []byte{' '}
-	zeroBytes    = []byte{'0'}
-	oneBytes     = []byte{'1'}
-	crlfBytes    = []byte("\r\n")
-	endBytes     = []byte("END\r\n")
+	spaceBytes = []byte{' '}
+	zeroBytes  = []byte{'0'}
+	oneBytes   = []byte{'1'}
+	crlfBytes  = []byte("\r\n")
+	endBytes   = []byte("END\r\n")
+
 	setBytes     = []byte("set")
 	addBytes     = []byte("add")
 	replaceBytes = []byte("replace")
@@ -40,8 +41,60 @@ var (
 	// touchedBytes   = []byte("TOUCHED\r\n")
 )
 
+const (
+	setString     = "set"
+	addString     = "add"
+	replaceString = "replace"
+	appendString  = "append"
+	prependString = "prepend"
+	casString     = "cas"
+	getString     = "get"
+	getsString    = "gets"
+	deleteString  = "delete"
+	incrString    = "incr"
+	decrString    = "decr"
+	touchString   = "touch"
+	gatString     = "gat"
+	gatsString    = "gats"
+	unknownString = "unknown"
+)
+
 // RequestType is the protocol-agnostic identifier for the command
 type RequestType byte
+
+func (rt RequestType) String() string {
+	switch rt {
+	case RequestTypeSet:
+		return setString
+	case RequestTypeAdd:
+		return addString
+	case RequestTypeReplace:
+		return replaceString
+	case RequestTypeAppend:
+		return appendString
+	case RequestTypePrepend:
+		return prependString
+	case RequestTypeCas:
+		return casString
+	case RequestTypeGet:
+		return getString
+	case RequestTypeGets:
+		return getsString
+	case RequestTypeDelete:
+		return deleteString
+	case RequestTypeIncr:
+		return incrString
+	case RequestTypeDecr:
+		return decrString
+	case RequestTypeTouch:
+		return touchString
+	case RequestTypeGat:
+		return gatString
+	case RequestTypeGats:
+		return gatsString
+	}
+	return unknownString
+}
 
 // Bytes get reqtype bytes.
 func (rt RequestType) Bytes() []byte {
@@ -178,6 +231,11 @@ func (r *MCRequest) Put() {
 	r.rTp = RequestTypeUnknown
 	r.key = nil
 	msgPool.Put(r)
+}
+
+// CmdString will return string of cmd for prom report
+func (r *MCRequest) CmdString() string {
+	return r.rTp.String()
 }
 
 // Cmd get Msg cmd.
