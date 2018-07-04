@@ -143,7 +143,6 @@ func (m *Message) NextReq() (req Request) {
 		req = m.req[m.reqn]
 		m.reqn++
 	}
-	m.reqn = 0
 	return
 }
 
