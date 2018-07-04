@@ -139,7 +139,6 @@ func (m *Message) ReleaseSubs() {
 }
 func (m *Message) GetRequest() (req Request) {
 	if m.reqn < len(m.req) {
-		//	fmt.Println("get msg", m.reqn, len(m.req))
 		req = m.req[m.reqn]
 		m.reqn++
 	}

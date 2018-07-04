@@ -217,9 +217,6 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	// fmt.Printf("buffers:%v\n", w.bufs)
-	//	nbufs := net.Buffers(w.bufs[:w.cursor])
-	//	_, err := w.wr.Writev(&w.bufs)
 	w.bufsp = net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
@@ -244,7 +241,6 @@ func (w *Writer) Write(p []byte) (err error) {
 	if len(w.bufs) == maxBuffered {
 		w.Flush()
 	}
-	//fmt.Printf("len %p %v %v %v", w.bufs, len(w.bufs), cap(w.bufs), w.cursor)
 	w.bufs[w.cursor] = p
 	w.cursor = (w.cursor + 1) % maxBuffered
 	return nil

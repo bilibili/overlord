@@ -136,7 +136,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-			// fmt.Println("size:", size, " err:", err)
 			if err == bufio.ErrBufferFull {
 				err = nil
 				break
@@ -168,7 +167,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if pos == -1 {
 		return 0, bufio.ErrBufferFull
 	}
-	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 
 	bs := data[:pos+1]
 	size = len(bs)
