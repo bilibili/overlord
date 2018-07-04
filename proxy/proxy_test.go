@@ -120,7 +120,7 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 	}
 }
 
-func TestProxy(t *testing.T) {
+func TestProxyFull(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
 	}
@@ -141,6 +141,7 @@ func TestProxyWithAssert(t *testing.T) {
 		{Name: "GetMultiMissOneOk", Line: 5, Cmd: "get a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1\r\n1\r\n", "VALUE a_22 0 4\r\nhalo\r\n", "END\r\n"}},
 		{Name: "GetsOneOk", Line: 3, Cmd: "gets a_11\r\n", Except: []string{"VALUE a_11 0 1 ", "\r\n1\r\nEND\r\n"}},
 		{Name: "GetMultiCasMissOneOk", Line: 5, Cmd: "gets a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "VALUE a_22 0 4", "\r\nhalo\r\n", "END\r\n"}},
+		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
 
 	for i := 0; i < 100; i++ {

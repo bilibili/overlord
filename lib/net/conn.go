@@ -101,7 +101,7 @@ func (c *Conn) Close() error {
 	return nil
 }
 
-// writeBuffers impl the net.buffersWriter to support writev
-func (c *Conn) writeBuffers(buf *net.Buffers) (int64, error) {
+// Writev impl the net.buffersWriter to support writev
+func (c *Conn) Writev(buf *net.Buffers) (int64, error) {
 	return buf.WriteTo(c.Conn)
 }

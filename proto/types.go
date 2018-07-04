@@ -28,14 +28,18 @@ type Request interface {
 
 // ProxyConn decode bytes from client and encode write to conn.
 type ProxyConn interface {
-	Decode() (*Message, error)
-	Encode(*Message) error
+	Decode([]*Message) ([]*Message, error)
+	Encode([]*Message) error
 }
 
 // NodeConn handle Msg to backend cache server and read response.
 type NodeConn interface {
-	Write(*Message) error
-	Read(*Message) error
+	WriteBatch(*MsgBatch) error
+	Flush() error
+
+	// ReadBatch(*MsgBatch) error
+	ReadMBatch([]*MsgBatch) error
+
 	Ping() error
 	Close() error
 }

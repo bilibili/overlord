@@ -170,3 +170,27 @@ func TestConnWriteReConnect(t *testing.T) {
 		assert.Error(t, err)
 	}
 }
+
+func TestConnWriteBuffersOk(t *testing.T) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	l, err := net.ListenTCP("tcp", addr)
+	assert.NoError(t, err)
+	laddr := l.Addr()
+	go func() {
+		defer l.Close()
+		buf := make([]byte, 1024)
+		for {
+			sock, err := l.Accept()
+			assert.NoError(t, err)
+			n, err := sock.Read(buf)
+			assert.NoError(t, err)
+			assert.NotZero(t, n)
+		}
+	}()
+	conn := DialWithTimeout(laddr.String(), time.Second, time.Second, time.Second)
+	buffers := net.Buffers([][]byte{[]byte("baka"), []byte("qiu")})
+	n, err := conn.Writev(&buffers)
+	assert.NoError(t, err)
+	assert.Equal(t, 7, int(n))
+}

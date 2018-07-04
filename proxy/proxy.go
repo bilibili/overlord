@@ -5,8 +5,10 @@ import (
 	errs "errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/felixhao/overlord/lib/log"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/felixhao/overlord/proto"
 	"github.com/felixhao/overlord/proto/memcache"
 	"github.com/pkg/errors"
@@ -55,7 +57,6 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
-
 		for _, cc := range ccs {
 			go p.serve(cc)
 		}
@@ -87,9 +88,9 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				// cache type
 				switch cc.CacheType {
 				case proto.CacheTypeMemcache:
-					encoder := memcache.NewProxyConn(conn)
+					encoder := memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 					m := proto.ErrMessage(ErrProxyMoreMaxConns)
-					_ = encoder.Encode(m)
+					_ = encoder.Encode([]*proto.Message{m})
 					_ = conn.Close()
 				case proto.CacheTypeRedis:
 					// TODO(felix): support redis.

@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	handlerOpening = int32(0)
-	handlerClosed  = int32(1)
+	handlerOpening     = int32(0)
+	handlerClosed      = int32(1)
+	defaultRespBufSize = 1024 * 1024 // 1MB buffer
 )
 
 type nodeConn struct {
@@ -37,7 +38,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		addr:    addr,
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(defaultRespBufSize)),
 		pinger:  newMCPinger(conn.Dup()),
 	}
 	return
@@ -53,12 +54,27 @@ func (n *nodeConn) Ping() (err error) {
 	return
 }
 
-// Write write request data into server node.
-func (n *nodeConn) Write(m *proto.Message) (err error) {
+func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	if n.Closed() {
 		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
 		return
 	}
+	for _, m := range mb.Msgs() {
+		err = n.write(m)
+		if err != nil {
+			m.DoneWithError(err)
+			return err
+		}
+		m.MarkWrite()
+	}
+	return
+}
+
+func (n *nodeConn) Flush() error {
+	return n.bw.Flush()
+}
+
+func (n *nodeConn) write(m *proto.Message) (err error) {
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
@@ -75,55 +91,110 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		_ = n.bw.Write(mcr.key)
 		_ = n.bw.Write(mcr.data)
 	}
-	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Handler handle flush Msg bytes")
-	}
 	return
 }
 
-// Read reads response bytes from server node.
-func (n *nodeConn) Read(m *proto.Message) (err error) {
-	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Handler handle Msg")
-		return
+func (n *nodeConn) ReadMBatch(mbs []*proto.MsgBatch) (err error) {
+	defer n.br.Buffer().Reset()
+	var (
+		mcr    *MCRequest
+		ok     = false
+		cursor int
+		size   int
+		msgs   = proto.Flatten(mbs)
+		marks  = make([]int, len(msgs))
+	)
+
+	idx := 0
+	for {
+		err = n.br.Read()
+		if err != nil {
+			return
+		}
+
+		for {
+			if idx >= len(msgs) {
+				goto cpybuf
+			}
+			mcr, ok = msgs[idx].Request().(*MCRequest)
+			if !ok {
+				err = ErrAssertMsg
+				return
+			}
+			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
+			if err == bufio.ErrBufferFull {
+				break
+			} else if err != nil {
+				return err
+			}
+			cursor += size
+			marks[idx] = size
+			idx++
+		}
 	}
-	// TODO: this read was only support read one key's result
-	n.br.ResetBuffer(m.RespBuffer())
-	// request
-	mcr, ok := m.Request().(*MCRequest)
-	if !ok {
-		err = errors.Wrap(ErrAssertMsg, "MC Handler handle assert MCMsg")
-		return
+
+cpybuf:
+	n.copyToBuffer(marks, mbs)
+	n.fullFillMsgs(marks, mbs, msgs)
+	return
+}
+
+func (n *nodeConn) copyToBuffer(marks []int, mbs []*proto.MsgBatch) {
+	var last int
+	for _, mb := range mbs {
+		rg := sum(marks[last : mb.Count()+last])
+		last += mb.Count()
+		_ = n.br.CopyTo(mb.Buffer(), rg)
 	}
-	bs, err := n.br.ReadUntil(delim)
-	if err != nil {
-		err = errors.Wrap(err, "MC Handler handle read response bytes")
-		return
+}
+
+func (n *nodeConn) fullFillMsgs(marks []int, mbs []*proto.MsgBatch, msgs []*proto.Message) {
+	var (
+		last int
+	)
+	for _, mb := range mbs {
+		count := mb.Count()
+		cursor := 0
+		for i := last; i < last+count; i++ {
+			mcr, _ := msgs[i].Request().(*MCRequest)
+			mcr.data = mb.Buffer().Bytes()[cursor : cursor+marks[i]]
+			cursor += marks[i]
+		}
+		last += count
 	}
-	// n.br.Advance(-len(bs)) // NOTE: for response bytes
+}
+
+func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
+	pos := bytes.IndexByte(data, delim)
+	if pos == -1 {
+		return 0, bufio.ErrBufferFull
+	}
+
+	bs := data[:pos+1]
+	size = len(bs)
 	mcr.data = bs
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
 		return
 	}
+
 	if bytes.Equal(bs, endBytes) {
 		prom.Miss(n.cluster, n.addr)
 		return
 	}
 	prom.Hit(n.cluster, n.addr)
-	// value length
+
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
-	n.br.Advance(-len(bs))
-	rlen := len(bs) + length + 2 + len(endBytes)
-	if bs, err = n.br.ReadFull(rlen); err != nil {
-		err = errors.Wrap(err, "MC Handler while reading length full data")
-		return
+
+	size += length + 2 + len(endBytes)
+	if len(data) < size {
+		return 0, bufio.ErrBufferFull
 	}
-	// n.br.Advance(-rlen) // NOTE: for response bytes
-	mcr.data = bs
+
+	mcr.data = data[:size]
 	return
 }
 
@@ -139,4 +210,12 @@ func (n *nodeConn) Close() error {
 
 func (n *nodeConn) Closed() bool {
 	return atomic.LoadInt32(&n.closed) == handlerClosed
+}
+
+func sum(vals []int) int {
+	var sum int
+	for _, v := range vals {
+		sum += v
+	}
+	return sum
 }

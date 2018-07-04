@@ -96,6 +96,10 @@ func (*mockReq) Key() []byte {
 	return []byte{}
 }
 
+func (*mockReq) Resp() []byte {
+	return nil
+}
+
 func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
 	nc := _createNodeConn(nil)
@@ -150,7 +154,7 @@ func TestNodeConnReadOk(t *testing.T) {
 			nc := _createNodeConn([]byte(tt.cData))
 			err := nc.Read(req)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.except, string(req.RespBuffer().Bytes()))
+			assert.Equal(t, tt.except, string(req.Request().Resp()))
 		})
 
 	}

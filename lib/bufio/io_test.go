@@ -50,19 +50,19 @@ func TestReaderResetBuffer(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func TestWriterWriteOk(t *testing.T) {
-	data := "Bilibili 干杯 - ( ゜- ゜)つロ"
-	buf := bytes.NewBuffer([]byte{})
-	w := NewWriter(buf)
-	err := w.Write([]byte(data))
-	assert.NoError(t, err)
+// func TestWriterWriteOk(t *testing.T) {
+// 	data := "Bilibili 干杯 - ( ゜- ゜)つロ"
+// 	buf := bytes.NewBuffer([]byte{})
+// 	w := NewWriter(buf)
+// 	err := w.Write([]byte(data))
+// 	assert.NoError(t, err)
 
-	err = w.Write([]byte(data))
-	assert.NoError(t, err)
+// 	err = w.Write([]byte(data))
+// 	assert.NoError(t, err)
 
-	err = w.WriteString(data)
-	assert.NoError(t, err)
+// 	err = w.WriteString(data)
+// 	assert.NoError(t, err)
 
-	err = w.Flush()
-	assert.NoError(t, err)
-}
+// 	err = w.Flush()
+// 	assert.NoError(t, err)
+// }

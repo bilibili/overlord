@@ -1,27 +1,52 @@
 package proto
 
 import (
+	"fmt"
 	"sync"
 	"time"
-
-	"github.com/felixhao/overlord/lib/bufio"
 )
 
-const (
-	defaultReqBufSize  = 512
-	defaultRespBufSize = 4096
-)
+var msgPool = &sync.Pool{
+	New: func() interface{} {
+		return NewMessage()
+	},
+}
+
+// GetMsg get the msg from pool
+func GetMsg() *Message {
+	return msgPool.Get().(*Message)
+}
+
+// GetMsgSlice alloc a slice to the message
+func GetMsgSlice(n int, caps ...int) []*Message {
+	largs := len(caps)
+	if largs > 1 {
+		panic(fmt.Sprintf("optional argument except 1, but get %d", largs))
+	}
+
+	var msgs []*Message
+	if largs == 0 {
+		msgs = make([]*Message, n)
+	} else {
+		msgs = make([]*Message, n, caps[0])
+	}
+	for idx := range msgs {
+		msgs[idx] = GetMsg()
+	}
+	return msgs
+}
+
+// PutMsg Release Msg
+func PutMsg(msg *Message) {
+	msgPool.Put(msg)
+}
 
 // Message read from client.
 type Message struct {
 	Type CacheType
-	wg   *sync.WaitGroup
-
-	reqBuf  *bufio.Buffer
-	respBuf *bufio.Buffer
 
 	req      []Request
-	subs     []Message
+	subs     []*Message
 	subResps [][]byte
 
 	// Start Time, Write Time, ReadTime, EndTime
@@ -29,16 +54,20 @@ type Message struct {
 	err            error
 }
 
-// NewMessage will create new message object
+// NewMessage will create new message object.
+// this will be used be sub msg req.
 func NewMessage() *Message {
-	return &Message{
-		wg: &sync.WaitGroup{},
-		// TODO: get with suitable length
-		reqBuf:  bufio.Get(defaultReqBufSize),
-		respBuf: bufio.Get(defaultRespBufSize),
+	return &Message{}
+}
 
-		st: time.Now(),
-	}
+// Reset will clean the msg
+func (m *Message) Reset() {
+	m.Type = CacheTypeUnknown
+	m.req = nil
+	m.subs = nil
+	m.subResps = m.subResps[:0]
+	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
+	m.err = nil
 }
 
 // TotalDur will return the total duration of a command.
@@ -51,70 +80,37 @@ func (m *Message) RemoteDur() time.Duration {
 	return m.rt.Sub(m.wt)
 }
 
-// SetWriteTime will set the remote duration of the command.
-func (m *Message) SetWriteTime(t time.Time) {
-	m.wt = t
+// MarkStart will set the start time of the command to now.
+func (m *Message) MarkStart() {
+	m.st = time.Now()
 }
 
-// SetReadTime will set the remote duration of the command.
-func (m *Message) SetReadTime(t time.Time) {
-	m.rt = t
+// MarkWrite will set the write time of the command to now.
+func (m *Message) MarkWrite() {
+	m.wt = time.Now()
 }
 
-// SetEndTime will set the remote duration of the command.
-func (m *Message) SetEndTime(t time.Time) {
-	m.et = t
+// MarkRead will set the read time of the command to now.
+func (m *Message) MarkRead() {
+	m.rt = time.Now()
 }
 
-// Add add wg.
-func (m *Message) Add(n int) {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Add(n)
-}
-
-// Done done.
-func (m *Message) Done() {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Done()
+// MarkEnd will set the end time of the command to now.
+func (m *Message) MarkEnd() {
+	m.et = time.Now()
 }
 
 // DoneWithError done with error.
 func (m *Message) DoneWithError(err error) {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
 	m.err = err
-	m.wg.Done()
 }
 
-// Wait wait group.
-func (m *Message) Wait() {
-	if m.wg == nil {
-		panic("message waitgroup nil")
-	}
-	m.wg.Wait()
-}
-
-// ReqBuffer return req buffer.
-func (m *Message) ReqBuffer() *bufio.Buffer {
-	return m.reqBuf
-}
-
-// RespBuffer will return request buffer
-func (m *Message) RespBuffer() *bufio.Buffer {
-	return m.respBuf
-}
-
-// ReleaseBuffer will return the Msg data to flush and reset
-func (m *Message) ReleaseBuffer() {
-	bufio.Put(m.reqBuf)
-	bufio.Put(m.respBuf)
-	for i := 0; i < len(m.subs); i++ {
-		(&m.subs[i]).ReleaseBuffer()
+// ReleaseSubs will return the Msg data to flush and reset
+func (m *Message) ReleaseSubs() {
+	for i := range m.subs {
+		sub := m.subs[i]
+		sub.Reset()
+		PutMsg(sub)
 	}
 }
 
@@ -137,25 +133,29 @@ func (m *Message) IsBatch() bool {
 }
 
 // Batch returns sub Msg if is batch.
-func (m *Message) Batch() []Message {
+func (m *Message) Batch() []*Message {
 	slen := len(m.req)
 	if slen == 0 {
 		return nil
 	}
-	subs := make([]Message, slen)
+	subs := make([]*Message, slen)
 	for i := 0; i < slen; i++ {
-		subs[i] = *NewMessage()
+		subs[i] = GetMsg()
 		subs[i].Type = m.Type
 		subs[i].WithRequest(m.req[i])
-		subs[i].wg = m.wg
+		// subs[i].wg = m.wg
 	}
 	m.subs = subs
 	return subs
 }
 
+// BatchReq returns the m.req field
+func (m *Message) BatchReq() []Request {
+	return m.req
+}
+
 // Response return all response bytes.
 func (m *Message) Response() [][]byte {
-	// TODO(wayslog): set Read/Write timer after merge
 	if !m.IsBatch() {
 		return [][]byte{m.req[0].Resp()}
 	}

@@ -2,11 +2,11 @@ package memcache
 
 import (
 	"bytes"
-	"io"
 	"strings"
 
 	"github.com/felixhao/overlord/lib/bufio"
 	"github.com/felixhao/overlord/lib/conv"
+	libnet "github.com/felixhao/overlord/lib/net"
 	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
@@ -19,67 +19,98 @@ const (
 )
 
 type proxyConn struct {
-	br *bufio.Reader
-	bw *bufio.Writer
+	br        *bufio.Reader
+	bw        *bufio.Writer
+	completed bool
 }
 
 // NewProxyConn new a memcache decoder and encode.
-func NewProxyConn(rw io.ReadWriter) proto.ProxyConn {
+func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	p := &proxyConn{
-		br: bufio.NewReader(rw, nil),
-		bw: bufio.NewWriter(rw),
+		// TODO: optimus zero
+		br:        bufio.NewReader(rw, bufio.Get(1024)),
+		bw:        bufio.NewWriter(rw),
+		completed: true,
 	}
 	return p
 }
 
-func (p *proxyConn) Decode() (m *proto.Message, err error) {
-	// new message
-	m = proto.NewMessage()
-	m.Type = proto.CacheTypeMemcache
+func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
+	var err error
+	// if completed, means that we have parsed all the buffered
+	// if not completed, we need only to parse the buffered message
+	if p.completed {
+		err = p.br.Read()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for i := range msgs {
+		p.completed = false
+		// set msg type
+		msgs[i].Type = proto.CacheTypeMemcache
+		// decode
+		err = p.decode(msgs[i])
+		if err == bufio.ErrBufferFull {
+			p.completed = true
+			msgs[i].Reset()
+			return msgs[:i], nil
+		} else if err != nil {
+			msgs[i].Reset()
+			return msgs[:i], err
+		}
+	}
+	return msgs, nil
+}
+
+func (p *proxyConn) decode(m *proto.Message) (err error) {
 	// bufio reset buffer
-	p.br.ResetBuffer(m.ReqBuffer())
-	line, err := p.br.ReadUntil(delim)
-	if err != nil {
+	line, err := p.br.ReadSlice(delim)
+	if err == bufio.ErrBufferFull {
+		return
+	} else if err != nil {
 		err = errors.Wrapf(err, "MC decoder while reading text line")
 		return
 	}
 	bg, ed := nextField(line)
-	lower := conv.ToLower(line[bg:ed])
-	switch string(lower) {
+	conv.UpdateToLower(line[bg:ed])
+	// fmt.Printf("cmd lower is :%s\n", strconv.Quote(string(line[bg:ed])))
+	switch string(line[bg:ed]) {
 	// Storage commands:
 	case "set":
-		return m, p.decodeStorage(m, line[ed:], RequestTypeSet, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeSet, false)
 	case "add":
-		return m, p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
 	case "replace":
-		return m, p.decodeStorage(m, line[ed:], RequestTypeReplace, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeReplace, false)
 	case "append":
-		return m, p.decodeStorage(m, line[ed:], RequestTypeAppend, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeAppend, false)
 	case "prepend":
-		return m, p.decodeStorage(m, line[ed:], RequestTypePrepend, false)
+		return p.decodeStorage(m, line[ed:], RequestTypePrepend, false)
 	case "cas":
-		return m, p.decodeStorage(m, line[ed:], RequestTypeCas, true)
+		return p.decodeStorage(m, line[ed:], RequestTypeCas, true)
 	// Retrieval commands:
 	case "get":
-		return m, p.decodeRetrieval(m, line[ed:], RequestTypeGet)
+		return p.decodeRetrieval(m, line[ed:], RequestTypeGet)
 	case "gets":
-		return m, p.decodeRetrieval(m, line[ed:], RequestTypeGets)
+		return p.decodeRetrieval(m, line[ed:], RequestTypeGets)
 	// Deletion
 	case "delete":
-		return m, p.decodeDelete(m, line[ed:], RequestTypeDelete)
+		return p.decodeDelete(m, line[ed:], RequestTypeDelete)
 	// Increment/Decrement:
 	case "incr":
-		return m, p.decodeIncrDecr(m, line[ed:], RequestTypeIncr)
+		return p.decodeIncrDecr(m, line[ed:], RequestTypeIncr)
 	case "decr":
-		return m, p.decodeIncrDecr(m, line[ed:], RequestTypeDecr)
+		return p.decodeIncrDecr(m, line[ed:], RequestTypeDecr)
 	// Touch:
 	case "touch":
-		return m, p.decodeTouch(m, line[ed:], RequestTypeTouch)
+		return p.decodeTouch(m, line[ed:], RequestTypeTouch)
 	// Get And Touch:
 	case "gat":
-		return m, p.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
+		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
 	case "gats":
-		return m, p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
+		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	}
 	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command")
 	return
@@ -100,8 +131,11 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	}
 	keyOffset := len(bs) - keyE
 	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
-	data, err := p.br.ReadFull(keyOffset + length + 2)
-	if err != nil {
+	data, err := p.br.ReadExact(keyOffset + length + 2)
+	if err == bufio.ErrBufferFull {
+		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.String())))
+		return
+	} else if err != nil {
 		err = errors.Wrap(err, "MC decoder while read data by length")
 		return
 	}
@@ -130,6 +164,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
 		}
+
 		req := &MCRequest{
 			rTp:  reqType,
 			key:  ns[b:e],
@@ -140,6 +175,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			break
 		}
 	}
+
 	m.WithRequest(rs...)
 	return
 }
@@ -315,7 +351,22 @@ func revSpacIdx(bs []byte) int {
 }
 
 // Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
+func (p *proxyConn) Encode(msgs []*proto.Message) (err error) {
+	for _, msg := range msgs {
+		err = p.encodeMsg(msg)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err = p.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
+	}
+
+	return
+}
+
+func (p *proxyConn) encodeMsg(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
 		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
@@ -323,32 +374,32 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		}
 		_ = p.bw.WriteString(se)
 		_ = p.bw.Write(crlfBytes)
+		return
+	}
+
+	mcr, ok := m.Request().(*MCRequest)
+	if !ok {
+		_ = p.bw.WriteString(serverErrorPrefix)
+		_ = p.bw.WriteString(ErrAssertMsg.Error())
+		_ = p.bw.Write(crlfBytes)
 	} else {
-		mcr, ok := m.Request().(*MCRequest)
-		if !ok {
-			_ = p.bw.WriteString(serverErrorPrefix)
-			_ = p.bw.WriteString(ErrAssertMsg.Error())
-			_ = p.bw.Write(crlfBytes)
-		} else {
-			res := m.Response()
-			_, ok := withValueTypes[mcr.rTp]
-			trimEnd := ok && m.IsBatch()
-			for _, bs := range res {
-				if trimEnd {
-					bs = bytes.TrimSuffix(bs, endBytes)
-				}
-				if len(bs) == 0 {
-					continue
-				}
-				_ = p.bw.Write(bs)
-			}
+		res := m.Response()
+		_, ok := withValueTypes[mcr.rTp]
+		trimEnd := ok && m.IsBatch()
+		for _, bs := range res {
 			if trimEnd {
-				_ = p.bw.Write(endBytes)
+				bs = bytes.TrimSuffix(bs, endBytes)
 			}
+			if len(bs) == 0 {
+				continue
+			}
+			_ = p.bw.Write(bs)
+		}
+		if trimEnd {
+			_ = p.bw.Write(endBytes)
 		}
 	}
-	if err = p.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
-	}
+
 	return
+
 }

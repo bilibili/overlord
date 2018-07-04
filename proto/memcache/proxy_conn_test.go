@@ -21,12 +21,6 @@ func TestFindLengthGetsResponseOk(t *testing.T) {
 	assert.Equal(t, 11, i)
 }
 
-func TestFindLengthTooSmallErrBadLength(t *testing.T) {
-	i, err := findLength([]byte("1"), false)
-	assert.Equal(t, 0, i)
-	assert.Equal(t, ErrBadLength, err)
-}
-
 func TestFindLengthParseLengthError(t *testing.T) {
 	i, err := findLength([]byte("VALUE 0 abcdefghich@asaeaw\r\n"), false)
 	assert.Error(t, err)
@@ -103,21 +97,28 @@ func TestProxyConnDecodeOk(t *testing.T) {
 		{"GatsMultiKeyOk", "gats 10 mykey yourkey yuki\r\n", nil, "mykey", "gats"},
 		// Not support
 		{"NotSupportCmd", "baka 10 mykey\r\n", ErrBadRequest, "", ""},
-		{"NotFullLine", "baka 10", ErrBadRequest, "", ""},
-		{"NotFullLine", "baka 10", ErrBadRequest, "", ""},
+		// {"NotFullLine", "baka 10", ErrBadRequest, "", ""},
 	}
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
 			conn := _createConn([]byte(tt.Data))
 			p := NewProxyConn(conn)
-			m, err := p.Decode()
+			mlist := proto.GetMsgSlice(2)
+
+			msgs, err := p.Decode(mlist)
+
 			if tt.Err != nil {
 				_causeEqual(t, tt.Err, err)
 			} else {
-				assert.NotNil(t, m)
-				assert.Equal(t, tt.Key, string(m.Request().Key()))
-				assert.Equal(t, tt.Cmd, m.Request().Cmd())
+				assert.NoError(t, err)
+				if err != nil {
+					m := msgs[0]
+					assert.NotNil(t, m)
+					assert.NotNil(t, m.Request())
+					assert.Equal(t, tt.Key, string(m.Request().Key()))
+					assert.Equal(t, tt.Cmd, m.Request().Cmd())
+				}
 			}
 		})
 	}
@@ -126,18 +127,23 @@ func TestProxyConnDecodeOk(t *testing.T) {
 func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
 	conn := _createConn([]byte(req))
 	p := NewProxyConn(conn)
-	m, err := p.Decode()
+	mlist := proto.GetMsgSlice(2)
+
+	_, err := p.Decode(mlist)
 	assert.NoError(t, err)
-	var subs []proto.Message
-	if m.IsBatch() {
-		subs = m.Batch()
-	} else {
-		subs = []proto.Message{*m}
-	}
-	for idx, resp := range resps {
-		nc := _createNodeConn(resp)
-		err := nc.Read(&subs[idx])
+	m := mlist[0]
+
+	if !m.IsBatch() {
+		nc := _createNodeConn(resps[0])
+		err := nc.Read(m)
 		assert.NoError(t, err)
+	} else {
+		subs := m.Batch()
+		for idx, resp := range resps {
+			nc := _createNodeConn(resp)
+			err := nc.Read(&subs[idx])
+			assert.NoError(t, err)
+		}
 	}
 
 	return m
@@ -155,10 +161,12 @@ func TestProxyConnEncodeOk(t *testing.T) {
 		{Name: "GetMultiOk", Req: "get mykey yourkey\r\n",
 			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("VALUE yourkey 0 3\r\ncde\r\nEND\r\n")},
 			Except: "VALUE mykey 0 2\r\nab\r\nVALUE yourkey 0 3\r\ncde\r\nEND\r\n"},
-		{Name: "GetMultiMissOne", Req: "get mykey 0 0 1\r\na\r\n",
-			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("END\r\n")},
+
+		{Name: "GetMultiMissOne", Req: "get mykey a key baka\r\n",
+			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), endBytes, endBytes, endBytes},
 			Except: "VALUE mykey 0 2\r\nab\r\nEND\r\n"},
-		{Name: "GetMultiAllMiss", Req: "get mykey 0 0 1\r\na\r\n",
+
+		{Name: "GetMultiAllMiss", Req: "get nokey1 nokey\r\n",
 			Resp:   [][]byte{[]byte("END\r\n"), []byte("END\r\n")},
 			Except: "END\r\n"},
 	}
