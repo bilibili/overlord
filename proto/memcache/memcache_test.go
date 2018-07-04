@@ -1,1 +1,0 @@
-package memcache_test
