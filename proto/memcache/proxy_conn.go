@@ -143,19 +143,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.Wrap(ErrBadRequest, "MC decoder data not end with CRLF")
 		return
 	}
-	req := m.NextReq()
-	if req == nil {
-		req := GetReq()
-		req.rTp = mtype
-		req.key = key
-		req.data = data
-		m.WithRequest(req)
-	} else {
-		mcreq := req.(*MCRequest)
-		mcreq.rTp = mtype
-		mcreq.key = key
-		mcreq.data = data
-	}
+	p.withReq(m, mtype, key, data)
 	return
 }
 
@@ -171,24 +159,28 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
 		}
-		req := m.NextReq()
-		if req == nil {
-			req := GetReq()
-			req.rTp = reqType
-			req.key = ns[b:e]
-			req.data = crlfBytes
-			m.WithRequest(req)
-		} else {
-			mcreq := req.(*MCRequest)
-			mcreq.rTp = reqType
-			mcreq.key = ns[b:e]
-			mcreq.data = crlfBytes
-		}
+		p.withReq(m, reqType, ns[b:e], crlfBytes)
 		if e == len(ns)-2 {
 			break
 		}
 	}
 	return
+}
+
+func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
+	req := m.NextReq()
+	if req == nil {
+		req := GetReq()
+		req.rTp = rtype
+		req.key = key
+		req.data = data
+		m.WithRequest(req)
+	} else {
+		mcreq := req.(*MCRequest)
+		mcreq.rTp = rtype
+		mcreq.key = key
+		mcreq.data = data
+	}
 }
 
 func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestType) (err error) {
@@ -198,11 +190,7 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
 		return
 	}
-	req := GetReq()
-	req.rTp = reqType
-	req.key = key
-	req.data = crlfBytes
-	m.WithRequest(req)
+	p.withReq(m, reqType, key, crlfBytes)
 	return
 }
 
@@ -222,11 +210,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 			return
 		}
 	}
-	req := GetReq()
-	req.rTp = reqType
-	req.key = key
-	req.data = ns
-	m.WithRequest(req)
+	p.withReq(m, reqType, key, ns)
 	return
 }
 
@@ -246,11 +230,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 			return
 		}
 	}
-	req := GetReq()
-	req.rTp = reqType
-	req.key = key
-	req.data = ns
-	m.WithRequest(req)
+	p.withReq(m, reqType, key, ns)
 	return
 }
 
@@ -274,11 +254,7 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
 		}
-		req := GetReq()
-		req.rTp = reqType
-		req.key = ns[b:e]
-		req.data = expBs // NOTE: no contains '\r\n'!!!
-		m.WithRequest(req)
+		p.withReq(m, reqType, ns[b:e], expBs)
 		if e == len(ns)-2 {
 			break
 		}
