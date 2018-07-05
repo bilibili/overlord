@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/felixhao/overlord/lib/backoff"
+	"overlord/lib/backoff"
 )
 
 func TestBackoff(t *testing.T) {

@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/felixhao/overlord/proto"
+	"overlord/proto"
+
 	"github.com/stretchr/testify/assert"
 )
 

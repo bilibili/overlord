@@ -4,9 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/felixhao/overlord/lib/bufio"
-	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/prom"
+	"overlord/lib/bufio"
+	"overlord/lib/log"
+	"overlord/lib/prom"
+
 	"github.com/pkg/errors"
 )
 

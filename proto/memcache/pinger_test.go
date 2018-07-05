@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	libnet "github.com/felixhao/overlord/lib/net"
+	libnet "overlord/lib/net"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )

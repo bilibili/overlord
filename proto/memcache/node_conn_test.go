@@ -8,8 +8,9 @@ import (
 
 	"net"
 
-	"github.com/felixhao/overlord/lib/bufio"
-	"github.com/felixhao/overlord/proto"
+	"overlord/lib/bufio"
+	"overlord/proto"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )

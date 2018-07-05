@@ -10,9 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/lib/prom"
-	"github.com/felixhao/overlord/proxy"
+	"overlord/lib/log"
+	"overlord/lib/prom"
+	"overlord/proxy"
 )
 
 const (

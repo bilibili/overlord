@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/felixhao/overlord/lib/hashkit"
+	"overlord/lib/hashkit"
 )
 
 var (

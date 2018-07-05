@@ -6,10 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/felixhao/overlord/lib/bufio"
-	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/lib/prom"
-	"github.com/felixhao/overlord/proto"
+	"overlord/lib/bufio"
+	libnet "overlord/lib/net"
+	"overlord/lib/prom"
+	"overlord/proto"
+
 	"github.com/pkg/errors"
 )
 
