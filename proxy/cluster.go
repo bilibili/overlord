@@ -63,7 +63,9 @@ type Cluster struct {
 
 	ring *hashkit.HashRing
 
+	alias    bool
 	nodeMap  map[string]int
+	aliasMap map[string]int
 	nodeChan map[int]*batchChanel
 
 	lock   sync.Mutex
@@ -75,26 +77,37 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c = &Cluster{cc: cc}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	// parse
-	// NOTICE: alias feature has been removed because unnecessary.
-	addrs, ws, _, _, err := parseServers(cc.Servers)
+	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
 		panic(err)
 	}
 	if len(cc.HashTag) == 2 {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
+	c.alias = alias
 
 	ring := hashkit.Ketama()
-	ring.Init(addrs, ws)
+	if c.alias {
+		ring.Init(ans, ws)
+	} else {
+		ring.Init(addrs, ws)
+	}
 
 	nodeChan := make(map[int]*batchChanel)
 	nodeMap := make(map[string]int)
+	aliasMap := make(map[string]int)
+
 	for i := range addrs {
 		nbc := newBatchChanel(cc.NodeConnections)
 		go c.processBatch(nbc, addrs[i])
 		nodeChan[i] = nbc
 		nodeMap[addrs[i]] = i
+		if c.alias {
+			aliasMap[ans[i]] = i
+		}
 	}
+
+	c.aliasMap = aliasMap
 	c.nodeChan = nodeChan
 	c.nodeMap = nodeMap
 	c.ring = ring
@@ -111,6 +124,9 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, key)
 		}
 		return -1
+	}
+	if c.alias {
+		return c.aliasMap[node]
 	}
 	return c.nodeMap[node]
 }
