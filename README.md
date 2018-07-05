@@ -30,9 +30,9 @@ go build
 #### Test
 
 ```shell
-echo -e "set a_11 0 0 5\r\nhello\r" | nc 127.0.0.1 21211
+echo -e "set a_11 0 0 5\r\nhello\r\n" | nc 127.0.0.1 21211
 # STORED
-echo -e "get a_11\r" | nc 127.0.0.1 21211
+echo -e "get a_11\r\n" | nc 127.0.0.1 21211
 # VALUE a_11 0 5
 # hello
 # END

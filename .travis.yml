@@ -10,8 +10,6 @@ services:
   - memcached
 
 install:
-  - go get github.com/BurntSushi/toml
-  - go get github.com/pkg/errors
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
 
@@ -22,4 +20,8 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
-  - bash ci/test.sh
+  - cd cmd/proxy
+  - go build
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
