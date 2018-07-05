@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/felixhao/overlord/lib/log"
+	"overlord/lib/log"
 )
 
 const (

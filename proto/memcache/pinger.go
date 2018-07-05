@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"sync/atomic"
 
-	"github.com/felixhao/overlord/lib/bufio"
-	libnet "github.com/felixhao/overlord/lib/net"
+	"overlord/lib/bufio"
+	libnet "overlord/lib/net"
+
 	"github.com/pkg/errors"
 )
 

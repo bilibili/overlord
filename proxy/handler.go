@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/felixhao/overlord/lib/log"
-	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/lib/prom"
-	"github.com/felixhao/overlord/proto"
-	"github.com/felixhao/overlord/proto/memcache"
+	"overlord/lib/log"
+	libnet "overlord/lib/net"
+	"overlord/lib/prom"
+	"overlord/proto"
+	"overlord/proto/memcache"
 )
 
 const (

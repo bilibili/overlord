@@ -10,13 +10,14 @@ It is inspired by Twemproxy,Codis.
 #### Download
 
 ```go
-go get github.com/felixhao/overlord
+cd $GOPATH/src
+git clone https://github.com/felixhao/overlord.git
 ```
 
 #### Build
 
 ```shell
-cd $GOPATH/github.com/felixhao/overlord/cmd/proxy
+cd $GOPATH/src/overlord/cmd/proxy
 go build
 ```
 

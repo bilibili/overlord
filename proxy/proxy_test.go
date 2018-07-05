@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/proto"
-	"github.com/felixhao/overlord/proxy"
+	libnet "overlord/lib/net"
+	"overlord/proto"
+	"overlord/proxy"
+
 	"github.com/stretchr/testify/assert"
 )
 

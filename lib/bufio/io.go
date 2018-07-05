@@ -6,7 +6,7 @@ import (
 	"io"
 	"net"
 
-	libnet "github.com/felixhao/overlord/lib/net"
+	libnet "overlord/lib/net"
 )
 
 const (

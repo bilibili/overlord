@@ -1,8 +1,9 @@
 package proxy
 
 import (
+	"overlord/proto"
+
 	"github.com/BurntSushi/toml"
-	"github.com/felixhao/overlord/proto"
 	"github.com/pkg/errors"
 )
 

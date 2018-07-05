@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/felixhao/overlord/lib/backoff"
-	"github.com/felixhao/overlord/lib/conv"
-	"github.com/felixhao/overlord/lib/hashkit"
-	"github.com/felixhao/overlord/lib/log"
-	"github.com/felixhao/overlord/proto"
-	"github.com/felixhao/overlord/proto/memcache"
+	"overlord/lib/backoff"
+	"overlord/lib/conv"
+	"overlord/lib/hashkit"
+	"overlord/lib/log"
+	"overlord/proto"
+	"overlord/proto/memcache"
 	"github.com/pkg/errors"
 )
 

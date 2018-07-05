@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/felixhao/overlord/lib/bufio"
-	"github.com/felixhao/overlord/lib/conv"
-	libnet "github.com/felixhao/overlord/lib/net"
-	"github.com/felixhao/overlord/proto"
+	"overlord/lib/bufio"
+	"overlord/lib/conv"
+	libnet "overlord/lib/net"
+	"overlord/proto"
+
 	"github.com/pkg/errors"
 )
 
