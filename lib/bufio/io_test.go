@@ -16,12 +16,30 @@ func _genData() []byte {
 	return bts
 }
 
+func TestReaderRead(t *testing.T) {
+	bts := _genData()
+
+	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
+	err := b.Read()
+	assert.NoError(t, err)
+}
+
 func TestReaderReadUntil(t *testing.T) {
 	bts := _genData()
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
 	data, err := b.ReadUntil(fbyte)
 	assert.NoError(t, err)
 	assert.Len(t, data, 5*3*100)
+}
+
+func TestReaderReadSlice(t *testing.T) {
+	bts := _genData()
+
+	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
+	b.Read()
+	data, err := b.ReadSlice('c')
+	assert.NoError(t, err)
+	assert.Len(t, data, 3)
 }
 
 func TestReaderReadFull(t *testing.T) {
@@ -31,6 +49,16 @@ func TestReaderReadFull(t *testing.T) {
 	data, err := b.ReadFull(1200)
 	assert.NoError(t, err)
 	assert.Len(t, data, 1200)
+}
+
+func TestReaderReadExact(t *testing.T) {
+	bts := _genData()
+
+	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
+	b.Read()
+	data, err := b.ReadExact(5)
+	assert.NoError(t, err)
+	assert.Len(t, data, 5)
 }
 
 func TestReaderResetBuffer(t *testing.T) {
