@@ -20,6 +20,7 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
+  - ./codecov.sh
   - cd cmd/proxy
   - go build
 
