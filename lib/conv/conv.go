@@ -64,6 +64,21 @@ func UpdateToLower(src []byte) {
 	}
 }
 
+const (
+	step       = byte('a') - byte('A')
+	lowerBegin = byte('a')
+	lowerEnd   = byte('z')
+)
+
+// UpdateToUpper will convert to lower case
+func UpdateToUpper(src []byte) {
+	for i := range src {
+		if src[i] < lowerBegin || src[i] > lowerEnd {
+			src[i] -= step
+		}
+	}
+}
+
 // ToLower returns a copy of the string s with all Unicode letters mapped to their lower case.
 func ToLower(src []byte) []byte {
 	var lower [maxCmdLen]byte
