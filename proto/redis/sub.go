@@ -4,21 +4,12 @@ import "errors"
 import "bytes"
 
 const (
-	parityBit int = 0x0000000000000001
+	parityBit int = 1
 )
 
 // errors
 var (
-	ErrBadCommandSize = errors.New("wrong command format")
-)
-
-var (
-	robjGet = newRespBulk([]byte("get"))
-
-	cmdMSetBytes   = []byte("MSET")
-	cmdMGetBytes   = []byte("MGET")
-	cmdDelBytes    = []byte("DEL")
-	cmdExistsBytes = []byte("EXITS")
+	ErrBadCommandSize = errors.New("wrong Mset arguments number")
 )
 
 func isEven(v int) bool {
@@ -26,7 +17,10 @@ func isEven(v int) bool {
 }
 
 func isComplex(cmd []byte) bool {
-	return bytes.Equal(cmd, cmdMSetBytes) || bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdDelBytes) || bytes.Equal(cmd, cmdExistsBytes)
+	return bytes.Equal(cmd, cmdMSetBytes) ||
+		bytes.Equal(cmd, cmdMGetBytes) ||
+		bytes.Equal(cmd, cmdDelBytes) ||
+		bytes.Equal(cmd, cmdExistsBytes)
 }
 
 func newSubCmd(robj *resp) ([]*Command, error) {
@@ -48,7 +42,7 @@ func subCmdMset(robj *resp) ([]*Command, error) {
 		cmdObj.replace(0, robjGet)
 		cmdObj.replace(1, robj.nth(i*2+1))
 		cmdObj.replace(2, robj.nth(i*2+2))
-		cmds[i] = newCommand(cmdObj)
+		cmds[i] = newCommandWithMergeType(cmdObj, MergeTypeOk)
 	}
 	return cmds, nil
 }

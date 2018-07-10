@@ -1,6 +1,9 @@
 package redis
 
-import "strconv"
+import (
+	"strconv"
+	"sync"
+)
 
 // respType is the type of redis resp
 type respType = byte
@@ -14,6 +17,14 @@ const (
 	respArray  respType = '*'
 )
 
+var (
+	respPool = sync.Pool{
+		New: func() interface{} {
+			return &resp{}
+		},
+	}
+)
+
 // resp is a redis resp protocol item.
 type resp struct {
 	rtype respType
@@ -23,61 +34,45 @@ type resp struct {
 	array []*resp
 }
 
+func newRespInt(val int) *resp {
+	s := strconv.Itoa(val)
+	return newRespPlain(respInt, []byte(s))
+}
+
 func newRespBulk(data []byte) *resp {
-	return &resp{
-		rtype: respBulk,
-		data:  data,
-		array: nil,
-	}
+	return newRespPlain(respBulk, data)
 }
 
 func newRespPlain(rtype respType, data []byte) *resp {
-	return &resp{
-		rtype: rtype,
-		data:  data,
-		array: nil,
-	}
+	robj := respPool.Get().(*resp)
+	robj.rtype = rtype
+	robj.data = data
+	robj.array = nil
+	return robj
 }
 
-func newRespString(val string) *resp {
-	return &resp{
-		rtype: respString,
-		data:  []byte(val),
-		array: nil,
-	}
+func newRespString(val []byte) *resp {
+	return newRespPlain(respString, val)
 }
 
 func newRespNull(rtype respType) *resp {
-	return &resp{
-		rtype: rtype,
-		data:  nil,
-		array: nil,
-	}
+	return newRespPlain(rtype, nil)
 }
 
 func newRespArray(resps []*resp) *resp {
-	return &resp{
-		rtype: respArray,
-		data:  nil,
-		array: resps,
-	}
+	robj := respPool.Get().(*resp)
+	robj.rtype = respArray
+	robj.data = nil
+	robj.array = resps
+	return robj
 }
 
 func newRespArrayWithCapcity(length int) *resp {
-	return &resp{
-		rtype: respArray,
-		data:  nil,
-		array: make([]*resp, length),
-	}
-}
-
-func newRespInt(val int) *resp {
-	s := strconv.Itoa(val)
-	return &resp{
-		rtype: respInt,
-		data:  []byte(s),
-		array: nil,
-	}
+	robj := respPool.Get().(*resp)
+	robj.rtype = respArray
+	robj.data = nil
+	robj.array = make([]*resp, length)
+	return robj
 }
 
 func (r *resp) nth(pos int) *resp {

@@ -1,16 +1,34 @@
 package redis
 
 import (
+	stderrs "errors"
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
+	libnet "overlord/lib/net"
 	"overlord/proto"
+
+	"github.com/pkg/errors"
+)
+
+var (
+	ErrBadAssert = stderrs.New("bad assert for redis")
 )
 
 type redisConn struct {
-	br        bufio.Reader
-	completed bool
+	br *bufio.Reader
+	bw *bufio.Writer
 
-	bw bufio.Writer
+	completed bool
+}
+
+// NewProxyConn creates new redis Encoder and Decoder.
+func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
+	r := &redisConn{
+		br:        bufio.NewReader(conn, bufio.Get(1024)),
+		bw:        bufio.NewWriter(conn),
+		completed: true,
+	}
+	return r
 }
 
 func (rc *redisConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
@@ -128,11 +146,50 @@ func (rc *redisConn) decodeArray(size int, lineSize int) (*resp, error) {
 	return robj, nil
 }
 
-func (rc *redisConn) Encode(msg *proto.Message) error {
-	return nil
-}
-
 func decodeInt(data []byte) (int, error) {
 	i, err := conv.Btoi(data)
 	return int(i), err
+}
+
+func (rc *redisConn) Encode(msg *proto.Message) (err error) {
+	if err = rc.encode(msg); err != nil {
+		err = errors.Wrap(err, "Redis Encoder encode")
+		return
+	}
+
+	if err = rc.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "Redis Encoder flush response")
+	}
+	return
+}
+
+func (rc *redisConn) encode(msg *proto.Message) (err error) {
+	if err = msg.Err(); err != nil {
+		return rc.encodeError(err)
+	}
+
+	// TODO: need to change message response way
+	// replyList := msg.Response()
+	// cmd, ok := msg.Request().(*Command)
+	// if !ok {
+	// 	err = errors.Wrwap(ErrBadAssert, "Redis encode type assert")
+	// }
+
+	return nil
+}
+
+func (rc *redisConn) mergeReply() (n int, data [][]byte) {
+	return
+}
+
+func (rc *redisConn) encodeReply(reply *resp) error {
+	return nil
+}
+
+func (rc *redisConn) encodeError(err error) error {
+	se := errors.Cause(err).Error()
+	_ = rc.bw.Write([]byte{respError})
+	_ = rc.bw.WriteString(se)
+	_ = rc.bw.Write(crlfBytes)
+	return nil
 }
