@@ -48,10 +48,10 @@ func PutMsg(msg *Message) {
 type Message struct {
 	Type CacheType
 
-	req  []Request
-	reqn int
-	subs []*Message
-
+	req      []Request
+	reqn     int
+	subs     []*Message
+	subResps [][]byte
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error
@@ -192,6 +192,14 @@ func (m *Message) Batch() []*Message {
 		m.subs = append(m.subs, msg)
 	}
 	return m.subs[:slen]
+}
+
+func (m *Message) AddSubResps(items ...[]byte) {
+	m.subResps = append(m.subResps, items...)
+}
+
+func (m *Message) Subs() []*Message {
+	return m.subs[:m.reqn]
 }
 
 // Err returns error.

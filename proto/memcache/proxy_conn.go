@@ -20,7 +20,8 @@ const (
 )
 
 var (
-	serverErrorBytes = []byte(serverErrorPrefix)
+	serverErrorBytes       = []byte(serverErrorPrefix)
+	serverErrorPrefixBytes = []byte("SERVER_ERROR ")
 )
 
 type proxyConn struct {
