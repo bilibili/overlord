@@ -5,24 +5,20 @@ import (
 	"overlord/proto"
 )
 
-// merger is the merge caller, but it never store any state.
-type merger struct{}
-
-// NewMerger will create new mc merger
-func NewMerger() proto.Merger {
-	return &merger{}
-}
-
 // Merge the response and set the response into subResps
-func (r *merger) Merge(m *proto.Message) error {
+func (*proxyConn) Merge(m *proto.Message) error {
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		m.AddSubResps(serverErrorPrefixBytes, []byte(ErrAssertMsg.Error()), crlfBytes)
 		return nil
 	}
+	if !m.IsBatch() {
+		m.AddSubResps(mcr.data)
+		return nil
+	}
 
 	_, withValue := withValueTypes[mcr.rTp]
-	trimEnd := withValue && m.IsBatch()
+	trimEnd := withValue
 	for _, sub := range m.Subs() {
 		submcr := sub.Request().(*MCRequest)
 		bs := submcr.data

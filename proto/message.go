@@ -194,12 +194,19 @@ func (m *Message) Batch() []*Message {
 	return m.subs[:slen]
 }
 
+// AddSubResps appends all items into subResps
 func (m *Message) AddSubResps(items ...[]byte) {
 	m.subResps = append(m.subResps, items...)
 }
 
+// Subs returns all the sub messages.
 func (m *Message) Subs() []*Message {
 	return m.subs[:m.reqn]
+}
+
+// SubResps returns the response bytes buffer.
+func (m *Message) SubResps() [][]byte {
+	return m.subResps
 }
 
 // Err returns error.
