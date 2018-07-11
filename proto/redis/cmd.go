@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	// "crc"
+	"bytes"
 )
 
 var (
@@ -97,7 +98,13 @@ func (c *Command) Cmd() []byte {
 
 // Key impl the proto.protoRequest and get the Key of redis
 func (c *Command) Key() []byte {
-	return c.respObj.nth(1).data
+	var data = c.respObj.nth(1).data
+	var pos int
+	if c.respObj.rtype == respBulk {
+		pos = bytes.Index(data, crlfBytes) + 2
+	}
+	// pos is never empty
+	return data[pos:]
 }
 
 // Put the resource back to pool
@@ -106,5 +113,5 @@ func (c *Command) Put() {
 
 // Resp return the response bytes of resp
 func (c *Command) Resp() []byte {
-	return []byte{}
+	return nil
 }

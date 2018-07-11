@@ -179,6 +179,7 @@ func getMergeType(cmd []byte) MergeType {
 	if bytes.Equal(cmd, cmdMSetBytes) {
 		return MergeTypeOk
 	}
+
 	if bytes.Equal(cmd, cmdExistsBytes) || bytes.Equal(cmd, cmdDelBytes) {
 		return MergeTypeCount
 	}

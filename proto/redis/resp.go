@@ -18,6 +18,18 @@ const (
 )
 
 var (
+	respStringBytes = []byte("+")
+	respErrorBytes  = []byte("-")
+	respIntBytes    = []byte(":")
+	respBulkBytes   = []byte("$")
+	respArrayBytes  = []byte("*")
+
+	respNullBytes = []byte("-1\r\n")
+
+	okBytes = []byte("OK")
+)
+
+var (
 	respPool = sync.Pool{
 		New: func() interface{} {
 			return &resp{}

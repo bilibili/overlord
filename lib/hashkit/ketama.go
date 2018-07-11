@@ -40,7 +40,7 @@ type HashRing struct {
 }
 
 // Ketama new a hash ring with ketama consistency.
-// Default hash: sha1
+// Default hash: fnv1a64
 func Ketama() (h *HashRing) {
 	h = new(HashRing)
 	h.hash = NewFnv1a64().fnv1a64
