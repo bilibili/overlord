@@ -20,11 +20,6 @@ const (
 	CacheTypeRedis          CacheType = "redis"
 )
 
-// Merger will merge the Request with special protocol
-type Merger interface {
-	Merge(*Message) error
-}
-
 // Request request interface.
 type Request interface {
 	CmdString() string

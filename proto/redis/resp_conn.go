@@ -53,8 +53,8 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 	return
 }
 
-// decodecount will copy the buffer and copy the buffer into MsgBatch
-func (rc *respConn) decodecount(n int) (resps []*resp, err error) {
+// decodeCount will trying to parse the buffer until meet the count.
+func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
 	var (
 		robj  *resp
 		begin = rc.br.Mark()
