@@ -13,6 +13,7 @@ func TestBufferGrowOk(t *testing.T) {
 	assert.Equal(t, 0, b.w)
 	assert.Len(t, b.buf, defaultBufferSize*2)
 	assert.Equal(t, len(b.buf), b.len())
+	Put(b)
 }
 
 func TestBuffer(t *testing.T) {
@@ -23,6 +24,7 @@ func TestBuffer(t *testing.T) {
 	assert.Len(t, b.Bytes(), 1)
 	b.Reset()
 	assert.Len(t, b.Bytes(), 0)
+	Put(b)
 }
 
 func TestGetOk(t *testing.T) {
@@ -34,6 +36,7 @@ func TestGetOk(t *testing.T) {
 
 	b = Get(maxBufferSize + 1)
 	assert.Len(t, b.buf, maxBufferSize+1)
+	Put(b)
 }
 
 func TestBufferAdvance(t *testing.T) {
@@ -41,4 +44,15 @@ func TestBufferAdvance(t *testing.T) {
 	b.r += 100
 	b.Advance(-10)
 	assert.Equal(t, 90, b.r)
+	Put(b)
+}
+
+func TestBufferShrink(t *testing.T) {
+	b := Get(defaultBufferSize)
+	copy(b.buf, []byte("abcde"))
+	b.r += 3
+	b.w += 5
+	b.shrink()
+	assert.Equal(t, []byte("de"), b.Bytes())
+	Put(b)
 }

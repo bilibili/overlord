@@ -20,7 +20,6 @@ var (
 )
 
 func init() {
-
 	sizes = make([]int, 0)
 	threshold := defaultBufferSize
 	for threshold <= maxBufferSize {

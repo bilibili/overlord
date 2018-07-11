@@ -2,6 +2,7 @@ package bufio
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	libnet "overlord/lib/net"
@@ -19,12 +20,32 @@ func _genData() []byte {
 	return bts
 }
 
+func TestReaderAdvance(t *testing.T) {
+	bts := _genData()
+
+	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
+	b.Read()
+	b.ReadExact(5)
+	b.Advance(5)
+
+	buf := b.Buffer()
+	assert.NotNil(t, buf)
+
+	assert.Len(t, buf.Bytes(), 502)
+	b.Advance(-10)
+	assert.Len(t, buf.Bytes(), 512)
+}
+
 func TestReaderRead(t *testing.T) {
 	bts := _genData()
 
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
 	err := b.Read()
 	assert.NoError(t, err)
+
+	b.err = errors.New("some error")
+	err = b.Read()
+	assert.EqualError(t, err, "some error")
 }
 
 func TestReaderReadUntil(t *testing.T) {
@@ -33,6 +54,10 @@ func TestReaderReadUntil(t *testing.T) {
 	data, err := b.ReadUntil(fbyte)
 	assert.NoError(t, err)
 	assert.Len(t, data, 5*3*100)
+
+	b.err = errors.New("some error")
+	_, err = b.ReadUntil(fbyte)
+	assert.EqualError(t, err, "some error")
 }
 
 func TestReaderReadSlice(t *testing.T) {
@@ -43,6 +68,9 @@ func TestReaderReadSlice(t *testing.T) {
 	data, err := b.ReadSlice('c')
 	assert.NoError(t, err)
 	assert.Len(t, data, 3)
+
+	_, err = b.ReadSlice('\n')
+	assert.EqualError(t, err, "bufio: buffer full")
 }
 
 func TestReaderReadFull(t *testing.T) {
@@ -52,6 +80,10 @@ func TestReaderReadFull(t *testing.T) {
 	data, err := b.ReadFull(1200)
 	assert.NoError(t, err)
 	assert.Len(t, data, 1200)
+
+	b.err = errors.New("some error")
+	_, err = b.ReadFull(1)
+	assert.EqualError(t, err, "some error")
 }
 
 func TestReaderReadExact(t *testing.T) {
@@ -62,6 +94,9 @@ func TestReaderReadExact(t *testing.T) {
 	data, err := b.ReadExact(5)
 	assert.NoError(t, err)
 	assert.Len(t, data, 5)
+
+	_, err = b.ReadExact(5 * 3 * 100)
+	assert.EqualError(t, err, "bufio: buffer full")
 }
 
 func TestReaderResetBuffer(t *testing.T) {
@@ -79,6 +114,10 @@ func TestReaderResetBuffer(t *testing.T) {
 	_, err = b.ReadFull(300)
 	assert.Error(t, err)
 	assert.Equal(t, io.EOF, err)
+
+	b.ResetBuffer(nil)
+	buf := b.Buffer()
+	assert.Nil(t, buf)
 }
 
 type mockAddr string
@@ -136,7 +175,11 @@ func TestWriterWriteOk(t *testing.T) {
 
 	conn := _createConn(nil)
 	w := NewWriter(conn)
-	err := w.Write([]byte(data))
+
+	err := w.Flush()
+	assert.NoError(t, err)
+
+	err = w.Write([]byte(data))
 	assert.NoError(t, err)
 
 	err = w.Write([]byte(data))
@@ -147,4 +190,10 @@ func TestWriterWriteOk(t *testing.T) {
 
 	err = w.Flush()
 	assert.NoError(t, err)
+
+	w.err = errors.New("some error")
+	err = w.Write([]byte(data))
+	assert.EqualError(t, err, "some error")
+	err = w.Flush()
+	assert.EqualError(t, err, "some error")
 }

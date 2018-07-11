@@ -41,11 +41,30 @@ func TestLog(t *testing.T) {
 	log.DefaultVerboseLevel = 3
 	if log.V(5) {
 		log.Info("this cannot be print")
+		log.Infof("this cannot be print:%s", "yeah")
+		log.Warn("this cannot be print")
+		log.Warnf("this cannot be print:%s", "yeah")
+		log.Error("this cannot be print")
+		log.Errorf("this cannot be print:%s", "yeah")
 	}
 	if log.V(2) {
 		log.Info("this will be printing1")
+		log.Infof("this will be printing1:%s", "yeah")
+		log.Warn("this will be printing1")
+		log.Warnf("this will be printing1:%s", "yeah")
+		log.Error("this will be printing1")
+		log.Errorf("this will be printing1:%s", "yeah")
 	}
 	log.V(3).Info("this will be printing2")
+	log.V(3).Infof("this will be printing2:%s", "yeah")
+	log.V(3).Warn("this will be printing2")
+	log.V(3).Warnf("this will be printing2:%s", "yeah")
+	log.V(3).Error("this will be printing2")
+	log.V(3).Errorf("this will be printing2:%s", "yeah")
 
 	log.Errorf("stack:%+v", errors.New("this is a error"))
+
+	if err := log.Close(); err != nil {
+		t.Error(err)
+	}
 }
