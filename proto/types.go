@@ -14,9 +14,10 @@ type CacheType string
 
 // Cache type: memcache or redis.
 const (
-	CacheTypeUnknown  CacheType = "unknown"
-	CacheTypeMemcache CacheType = "memcache"
-	CacheTypeRedis    CacheType = "redis"
+	CacheTypeUnknown        CacheType = "unknown"
+	CacheTypeMemcache       CacheType = "memcache"
+	CacheTypeMemcacheBinary CacheType = "memcache_binary"
+	CacheTypeRedis          CacheType = "redis"
 )
 
 // Request request interface.

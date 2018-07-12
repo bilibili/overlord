@@ -116,7 +116,7 @@ func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	err := nc.write(req)
 	nc.bw.Flush()
 	assert.Error(t, err)
-	_causeEqual(t, ErrAssertMsg, err)
+	_causeEqual(t, ErrAssertReq, err)
 }
 
 func TestNodeConnReadClosed(t *testing.T) {
@@ -180,7 +180,7 @@ func TestNodeConnAssertError(t *testing.T) {
 	batch := proto.NewMsgBatch()
 	batch.AddMsg(req)
 	err := nc.ReadBatch(batch)
-	_causeEqual(t, ErrAssertMsg, err)
+	_causeEqual(t, ErrAssertReq, err)
 }
 
 func TestNocdConnPingOk(t *testing.T) {

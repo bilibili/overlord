@@ -8,7 +8,7 @@ hash_distribution = "ketama"
 # A two character string that specifies the part of the key used for hashing. Eg "{}".
 hash_tag = ""
 # cache type: memcache | redis
-cache_type = "memcache"
+cache_type = "memcache_binary"
 # proxy listen proto: tcp | unix
 listen_proto = "tcp"
 # proxy listen addr: tcp addr | unix sock path

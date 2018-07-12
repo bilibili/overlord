@@ -19,6 +19,10 @@ const (
 	serverErrorPrefix = "SERVER_ERROR "
 )
 
+var (
+	serverErrorBytes = []byte(serverErrorPrefix)
+)
+
 type proxyConn struct {
 	br        *bufio.Reader
 	bw        *bufio.Writer
@@ -340,15 +344,15 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
 		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
-			_ = p.bw.WriteString(serverErrorPrefix)
+			_ = p.bw.Write(serverErrorBytes)
 		}
-		_ = p.bw.WriteString(se)
+		_ = p.bw.Write([]byte(se))
 		_ = p.bw.Write(crlfBytes)
 	} else {
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
-			_ = p.bw.WriteString(serverErrorPrefix)
-			_ = p.bw.WriteString(ErrAssertMsg.Error())
+			_ = p.bw.Write(serverErrorBytes)
+			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
 			_ = p.bw.Write(crlfBytes)
 		} else {
 			res := m.Response()

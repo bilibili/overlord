@@ -1,4 +1,4 @@
-package memcache
+package binary
 
 import (
 	"bytes"
@@ -12,11 +12,6 @@ import (
 
 const (
 	pingBufferSize = 32
-)
-
-var (
-	ping = []byte("set _ping 0 0 4\r\npong\r\n")
-	pong = []byte("STORED\r\n")
 )
 
 type mcPinger struct {
@@ -39,20 +34,29 @@ func (m *mcPinger) Ping() (err error) {
 		err = ErrPingerPong
 		return
 	}
-	if err = m.bw.Write(ping); err != nil {
-		err = errors.Wrap(err, "MC ping write")
-		return
-	}
+	_ = m.bw.Write(magicReqBytes)  // NOTE: magic
+	_ = m.bw.Write(noopBytes)      // NOTE: cmd
+	_ = m.bw.Write(zeroTwoBytes)   // NOTE: key len
+	_ = m.bw.Write(zeroBytes)      // NOTE: extra len
+	_ = m.bw.Write(zeroBytes)      // NOTE: data type
+	_ = m.bw.Write(zeroBytes)      // NOTE: vbucket
+	_ = m.bw.Write(zeroFourBytes)  // NOTE: total body
+	_ = m.bw.Write(zeroFourBytes)  // NOTE: opaque
+	_ = m.bw.Write(zeroEightBytes) // NOTE: cas
 	if err = m.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-	var b []byte
-	if b, err = m.br.ReadUntil(delim); err != nil {
-		err = errors.Wrap(err, "MC ping read response")
+	if err = m.br.Read(); err != nil {
+		err = errors.Wrap(err, "MC ping read")
 		return
 	}
-	if !bytes.Equal(b, pong) {
+	head, err := m.br.ReadExact(requestHeaderLen)
+	if err != nil {
+		err = errors.Wrap(err, "MC ping read exact")
+		return
+	}
+	if !bytes.Equal(head[6:8], zeroTwoBytes) {
 		err = ErrPingerPong
 	}
 	return

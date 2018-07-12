@@ -59,6 +59,7 @@ func (b *Buffer) grow() {
 	nb := make([]byte, len(b.buf)*growFactor)
 	copy(nb, b.buf[:b.w])
 	b.buf = nb
+	// NOTE: old buf cannot put into pool, maybe some slice point mem. Wait GC!!!
 }
 
 func (b *Buffer) len() int {

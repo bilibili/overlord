@@ -1,8 +1,9 @@
-package memcache
+package binary
 
 import (
 	"bytes"
 	"io"
+	"overlord/lib/conv"
 	"sync/atomic"
 	"time"
 
@@ -74,30 +75,34 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	}
 
 	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Writer handle flush Msg bytes")
+		err = errors.Wrap(err, "MC Writer flush message bytes")
 	}
 	return
 }
 
 func (n *nodeConn) write(m *proto.Message) (err error) {
 	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Writer handle Msg")
+		err = errors.Wrap(ErrClosed, "MC Writer write")
 		return
 	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Writer handle assert request")
+		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
 		return
 	}
+	_ = n.bw.Write(magicReqBytes)
+	if mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetKQ {
+		mcr.rTp = RequestTypeGetK
+	}
 	_ = n.bw.Write(mcr.rTp.Bytes())
-	_ = n.bw.Write(spaceBytes)
-	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
-		_ = n.bw.Write(mcr.data) // NOTE: exp time
-		_ = n.bw.Write(spaceBytes)
-		_ = n.bw.Write(mcr.key)
-		_ = n.bw.Write(crlfBytes)
-	} else {
-		_ = n.bw.Write(mcr.key)
+	_ = n.bw.Write(mcr.keyLen)
+	_ = n.bw.Write(mcr.extraLen)
+	_ = n.bw.Write(zeroBytes)
+	_ = n.bw.Write(zeroTwoBytes)
+	_ = n.bw.Write(mcr.bodyLen)
+	_ = n.bw.Write(mcr.opaque)
+	_ = n.bw.Write(mcr.cas)
+	if !bytes.Equal(mcr.bodyLen, zeroFourBytes) {
 		_ = n.bw.Write(mcr.data)
 	}
 	return
@@ -128,7 +133,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	for {
 		err = n.br.Read()
 		if err != nil {
-			err = errors.Wrap(err, "MC Reader node conn while read")
+			err = errors.Wrap(err, "MC Reader while read")
 			return
 		}
 		for {
@@ -158,36 +163,31 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
-	pos := bytes.IndexByte(data, delim)
-	if pos == -1 {
+	if len(data) < requestHeaderLen {
 		return 0, bufio.ErrBufferFull
 	}
-
-	bs := data[:pos+1]
-	size = len(bs)
-	mcr.data = bs
-	if _, ok := withValueTypes[mcr.rTp]; !ok {
-		return
-	}
-
-	if bytes.Equal(bs, endBytes) {
-		prom.Miss(n.cluster, n.addr)
-		return
-	}
-	prom.Hit(n.cluster, n.addr)
-
-	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
+	parseHeader(data[0:requestHeaderLen], mcr)
+	bl, err := conv.Btoi(mcr.bodyLen)
 	if err != nil {
-		err = errors.Wrap(err, "MC Handler while parse length")
+		err = errors.Wrap(ErrBadResponse, "MC Reader bad body length")
 		return
 	}
-
-	size += length + 2 + len(endBytes)
-	if len(data) < size {
+	if bl == 0 {
+		if mcr.rTp == RequestTypeGetK {
+			prom.Miss(n.cluster, n.addr)
+		}
+		size = requestHeaderLen
+		return
+	}
+	if len(data[requestHeaderLen:]) < int(bl) {
 		return 0, bufio.ErrBufferFull
 	}
+	size = requestHeaderLen + int(bl)
+	mcr.data = data[requestHeaderLen : requestHeaderLen+bl]
 
-	mcr.data = data[:size]
+	if mcr.rTp == RequestTypeGetK {
+		prom.Hit(n.cluster, n.addr)
+	}
 	return
 }
 

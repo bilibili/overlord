@@ -245,11 +245,3 @@ func (w *Writer) Write(p []byte) (err error) {
 	w.cursor = (w.cursor + 1) % maxBuffered
 	return nil
 }
-
-// WriteString writes a string.
-// It returns the number of bytes written.
-// If the count is less than len(s), it also returns an error explaining
-// why the write is short.
-func (w *Writer) WriteString(s string) (err error) {
-	return w.Write([]byte(s))
-}
