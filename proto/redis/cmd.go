@@ -47,15 +47,15 @@ type Command struct {
 // example:
 //     NewCommand("GET", "mykey")
 //     NewCommand("MGET", "mykey", "yourkey")
-// func NewCommand(cmd string, args ...string) *Command {
-// 	respObj := newRespArrayWithCapcity(len(args) + 1)
-// 	respObj.replace(0, newRespBulk([]byte(cmd)))
-// 	maxLen := len(args) + 1
-// 	for i := 1; i < maxLen; i++ {
-// 		respObj.replace(i, newRespBulk([]byte(args[i-1])))
-// 	}
-// 	return newCommand(respObj)
-// }
+func NewCommand(cmd string, args ...string) *Command {
+	respObj := newRespArrayWithCapcity(len(args) + 1)
+	respObj.replace(0, newRespBulk([]byte(cmd)))
+	maxLen := len(args) + 1
+	for i := 1; i < maxLen; i++ {
+		respObj.replace(i, newRespBulk([]byte(args[i-1])))
+	}
+	return newCommand(respObj)
+}
 
 func newCommand(robj *resp) *Command {
 	r := &Command{respObj: robj}
