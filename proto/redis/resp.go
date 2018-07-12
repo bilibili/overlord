@@ -117,11 +117,3 @@ func (r *resp) slice() []*resp {
 func (r *resp) Len() int {
 	return len(r.array)
 }
-
-func (r *resp) String() string {
-	if r.rtype == respString || r.rtype == respBulk {
-		return string(r.data)
-	}
-	// TODO(wayslog): 实现其他的命令的 string
-	return ""
-}

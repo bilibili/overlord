@@ -68,25 +68,6 @@ func newCommandWithMergeType(robj *resp, mtype MergeType) *Command {
 	return &Command{respObj: robj, mergeType: mtype}
 }
 
-// Slot will caculate the redis crc and return the slot value
-func (c *Command) Slot() int {
-	// TODO:CRC16
-	// keyData := rr.respObj.nth(1).data
-
-	// // support HashTag
-	// idx := bytes.IndexByte(keyData, '{')
-	// if idx != -1 {
-	// 	eidx := bytes.IndexByte(keyData, '}')
-	// 	if eidx > idx {
-	// 		// matched
-	// 		keyData = keyData[idx+1 : eidx]
-	// 	}
-	// }
-	// crcVal := crc.Crc16(string(keyData))
-	// return int(crcVal) & SlotShiled
-	return 0
-}
-
 // CmdString get the cmd
 func (c *Command) CmdString() string {
 	return strings.ToUpper(c.respObj.nth(0).String())

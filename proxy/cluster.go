@@ -338,5 +338,4 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
-	return nil
 }
