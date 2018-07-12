@@ -17,6 +17,7 @@ import (
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
+	"overlord/proto/redis"
 
 	"github.com/pkg/errors"
 )
@@ -63,7 +64,7 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring *hashkit.HashRing
+	ring hashkit.Ring
 
 	alias    bool
 	nodeMap  map[string]int
@@ -88,7 +89,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	}
 	c.alias = alias
 
-	ring := hashkit.Ketama()
+	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
 	if c.alias {
 		ring.Init(ans, ws)
 	} else {
@@ -269,7 +270,7 @@ func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	if len(realKey) == 0 {
 		realKey = key
 	}
-	node, ok = c.ring.Hash(realKey)
+	node, ok = c.ring.GetNode(realKey)
 	return
 }
 
@@ -333,7 +334,7 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case proto.CacheTypeMemcacheBinary:
 		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
-	// TODO(felix): support redis
+		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}

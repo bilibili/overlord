@@ -36,7 +36,8 @@ func newRedisClusterRing() Ring {
 
 func (s *slotsMap) Init(masters []string, args ...[]int) {
 	s.lock.Lock()
-	s.masters = masters
+	s.masters = make([]string, len(masters))
+	copy(s.masters, masters)
 	for i := range s.masters {
 		for _, slot := range args[i] {
 			s.slots[slot] = i

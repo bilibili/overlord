@@ -4,6 +4,7 @@ import (
 	libnet "overlord/lib/net"
 	"overlord/proto"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -12,19 +13,28 @@ const (
 )
 
 type nodeConn struct {
-	rc    *respConn
-	conn  *libnet.Conn
-	p     *pinger
-	state uint32
+	cluster string
+	addr    string
+	conn    *libnet.Conn
+	rc      *respConn
+	p       *pinger
+	state   uint32
 }
 
 // NewNodeConn create the node conn from proxy to redis
-func NewNodeConn(conn *libnet.Conn) proto.NodeConn {
+func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (nc proto.NodeConn) {
+	conn := libnet.DialWithTimeout(addr, dialTimeout, readTimeout, writeTimeout)
+	return newNodeConn(cluster, addr, conn)
+}
+
+func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	return &nodeConn{
-		rc:    newRespConn(conn),
-		conn:  conn,
-		p:     newPinger(conn),
-		state: closed,
+		cluster: cluster,
+		addr:    addr,
+		rc:      newRespConn(conn),
+		conn:    conn,
+		p:       newPinger(conn),
+		state:   closed,
 	}
 }
 
