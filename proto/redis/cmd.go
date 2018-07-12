@@ -2,6 +2,7 @@ package redis
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	// "crc"
 	"bytes"
@@ -68,7 +69,7 @@ func newCommandWithMergeType(robj *resp, mtype MergeType) *Command {
 }
 
 // Slot will caculate the redis crc and return the slot value
-func (rr *Command) Slot() int {
+func (c *Command) Slot() int {
 	// TODO:CRC16
 	// keyData := rr.respObj.nth(1).data
 
@@ -111,7 +112,36 @@ func (c *Command) Key() []byte {
 func (c *Command) Put() {
 }
 
-// Resp return the response bytes of resp
-func (c *Command) Resp() []byte {
-	return nil
+// IsRedirect check if response type is Redis Error
+// and payload was prefix with "ASK" && "MOVED"
+func (c *Command) IsRedirect() bool {
+	if c.respObj.rtype != respError {
+		return false
+	}
+	if c.respObj.data == nil {
+		return false
+	}
+
+	return bytes.HasPrefix(c.respObj.data, movedBytes) ||
+		bytes.HasPrefix(c.respObj.data, askBytes)
+}
+
+// RedirectTriple will check and send back by is
+// first return variable which was called as redirectType maybe return ASK or MOVED
+// second is the slot of redirect
+// third is the redirect addr
+// last is the error when parse the redirect body
+func (c *Command) RedirectTriple() (redirect string, slot int, addr string, err error) {
+	fields := strings.Fields(string(c.respObj.data))
+	if len(fields) != 3 {
+		err = ErrRedirectBadFormat
+		return
+	}
+	redirect = fields[0]
+	addr = fields[2]
+	ival, parseErr := strconv.Atoi(fields[1])
+
+	slot = ival
+	err = parseErr
+	return
 }
