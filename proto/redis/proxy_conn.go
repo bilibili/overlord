@@ -135,6 +135,7 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 		}
 		sum += int(ival)
 	}
+	reply = newRespInt(sum)
 	return
 }
 

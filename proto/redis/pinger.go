@@ -30,9 +30,10 @@ type pinger struct {
 
 func newPinger(conn *libnet.Conn) *pinger {
 	return &pinger{
-		conn: conn,
-		br:   bufio.NewReader(conn, bufio.Get(64)),
-		bw:   bufio.NewWriter(conn),
+		conn:  conn,
+		br:    bufio.NewReader(conn, bufio.Get(64)),
+		bw:    bufio.NewWriter(conn),
+		state: opened,
 	}
 }
 
@@ -49,9 +50,16 @@ func (p *pinger) ping() (err error) {
 	if err != nil {
 		return
 	}
-	if bytes.Equal(data, pongBytes) {
+	if !bytes.Equal(data, pongBytes) {
 		err = ErrBadPong
 		return
 	}
 	return
+}
+
+func (p *pinger) Close() error {
+	if atomic.CompareAndSwapUint32(&p.state, opened, closed) {
+		return p.conn.Close()
+	}
+	return nil
 }

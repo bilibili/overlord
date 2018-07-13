@@ -2,6 +2,7 @@ package redis
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	// "crc"
@@ -18,10 +19,10 @@ var (
 var (
 	robjGet = newRespBulk([]byte("get"))
 
-	cmdMSetBytes   = []byte("MSET")
-	cmdMGetBytes   = []byte("MGET")
-	cmdDelBytes    = []byte("DEL")
-	cmdExistsBytes = []byte("EXITS")
+	cmdMSetBytes   = []byte("4\r\nMSET")
+	cmdMGetBytes   = []byte("4\r\nMGET")
+	cmdDelBytes    = []byte("3\r\nDEL")
+	cmdExistsBytes = []byte("5\r\nEXITS")
 )
 
 // errors
@@ -47,14 +48,17 @@ type Command struct {
 // NewCommand will create new command by given args
 // example:
 //     NewCommand("GET", "mykey")
-//     NewCommand("MGET", "mykey", "yourkey")
+//     NewCommand("CLUSTER", "NODES")
 func NewCommand(cmd string, args ...string) *Command {
 	respObj := newRespArrayWithCapcity(len(args) + 1)
 	respObj.replace(0, newRespBulk([]byte(cmd)))
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
-		respObj.replace(i, newRespBulk([]byte(args[i-1])))
+		data := args[i-1]
+		line := fmt.Sprintf("%d\r\n%s", len(data), data)
+		respObj.replace(i, newRespBulk([]byte(line)))
 	}
+	respObj.data = []byte(strconv.Itoa(len(args) + 1))
 	return newCommand(respObj)
 }
 
@@ -82,10 +86,10 @@ func (c *Command) Cmd() []byte {
 func (c *Command) Key() []byte {
 	var data = c.respObj.nth(1).data
 	var pos int
-	if c.respObj.rtype == respBulk {
+	if c.respObj.nth(1).rtype == respBulk {
 		pos = bytes.Index(data, crlfBytes) + 2
 	}
-	// pos is never empty
+	// pos is never lower than 0
 	return data[pos:]
 }
 
@@ -96,15 +100,15 @@ func (c *Command) Put() {
 // IsRedirect check if response type is Redis Error
 // and payload was prefix with "ASK" && "MOVED"
 func (c *Command) IsRedirect() bool {
-	if c.respObj.rtype != respError {
+	if c.reply.rtype != respError {
 		return false
 	}
-	if c.respObj.data == nil {
+	if c.reply.data == nil {
 		return false
 	}
 
-	return bytes.HasPrefix(c.respObj.data, movedBytes) ||
-		bytes.HasPrefix(c.respObj.data, askBytes)
+	return bytes.HasPrefix(c.reply.data, movedBytes) ||
+		bytes.HasPrefix(c.reply.data, askBytes)
 }
 
 // RedirectTriple will check and send back by is
@@ -113,7 +117,7 @@ func (c *Command) IsRedirect() bool {
 // third is the redirect addr
 // last is the error when parse the redirect body
 func (c *Command) RedirectTriple() (redirect string, slot int, addr string, err error) {
-	fields := strings.Fields(string(c.respObj.data))
+	fields := strings.Fields(string(c.reply.data))
 	if len(fields) != 3 {
 		err = ErrRedirectBadFormat
 		return

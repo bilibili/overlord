@@ -1,7 +1,9 @@
 package redis
 
-import "errors"
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 const (
 	parityBit int = 1
@@ -50,9 +52,7 @@ func subCmdMset(robj *resp) ([]*Command, error) {
 func subCmdByKeys(robj *resp) ([]*Command, error) {
 	cmds := make([]*Command, robj.Len()-1)
 	for i, sub := range robj.slice()[1:] {
-		cmdObj := newRespArrayWithCapcity(2)
-		cmdObj.replace(0, robj.nth(0))
-		cmdObj.replace(1, sub)
+		cmdObj := newRespArray([]*resp{robj.nth(0), sub})
 		cmds[i] = newCommand(cmdObj)
 	}
 	return cmds, nil

@@ -74,7 +74,7 @@ func newRespNull(rtype respType) *resp {
 func newRespArray(resps []*resp) *resp {
 	robj := respPool.Get().(*resp)
 	robj.rtype = respArray
-	robj.data = nil
+	robj.data = []byte(strconv.Itoa(len(resps)))
 	robj.array = resps
 	return robj
 }
@@ -116,4 +116,12 @@ func (r *resp) slice() []*resp {
 // Len represent the respArray type's length
 func (r *resp) Len() int {
 	return len(r.array)
+}
+
+func (r *resp) String() string {
+	if r.rtype == respArray {
+		return ""
+	}
+
+	return string(r.data)
 }

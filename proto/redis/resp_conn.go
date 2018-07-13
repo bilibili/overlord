@@ -93,7 +93,6 @@ func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
 func (rc *respConn) decodeResp() (robj *resp, err error) {
 	var (
 		line []byte
-		size int
 	)
 	line, err = rc.br.ReadLine()
 	if err != nil {
@@ -104,46 +103,58 @@ func (rc *respConn) decodeResp() (robj *resp, err error) {
 	switch rtype {
 	case respString, respInt, respError:
 		// decocde use one line to parse
-		robj = rc.decodePlain(rtype, line)
+		robj = rc.decodePlain(line)
 	case respBulk:
 		// decode bulkString
-		size, err = decodeInt(line[1 : len(line)-2])
-		if err != nil {
-			return
-		}
-		robj, err = rc.decodeBulk(size, len(line))
+		// fmt.Printf("line:%s\n", strconv.Quote(string(line)))
+		robj, err = rc.decodeBulk(line)
 	case respArray:
-		size, err = decodeInt(line[1 : len(line)-2])
-		if err != nil {
-			return
-		}
-		robj, err = rc.decodeArray(size, len(line))
+		robj, err = rc.decodeArray(line)
 	}
 	return
 }
 
-func (rc *respConn) decodePlain(rtype byte, line []byte) *resp {
-	return newRespPlain(rtype, line[0:len(line)-2])
+func (rc *respConn) decodePlain(line []byte) *resp {
+	return newRespPlain(line[0], line[1:len(line)-2])
 }
 
-func (rc *respConn) decodeBulk(size, lineSize int) (*resp, error) {
+func (rc *respConn) decodeBulk(line []byte) (*resp, error) {
+	lineSize := len(line)
+	sizeBytes := line[1 : lineSize-2]
+	// fmt.Printf("size:%s\n", strconv.Quote(string(sizeBytes)))
+	size, err := decodeInt(sizeBytes)
+	if err != nil {
+		return nil, err
+	}
+
 	if size == -1 {
 		return newRespNull(respBulk), nil
 	}
-	data, err := rc.br.ReadExact(size + 2)
+
+	rc.br.Advance(-(lineSize - 1))
+	fullDataSize := lineSize - 1 + size + 2
+	data, err := rc.br.ReadExact(fullDataSize)
+	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 	if err == bufio.ErrBufferFull {
-		rc.br.Advance(-(lineSize + size + 2))
+		rc.br.Advance(-1)
+		return nil, err
 	} else if err != nil {
 		return nil, err
 	}
 	return newRespBulk(data[:len(data)-2]), nil
 }
 
-func (rc *respConn) decodeArray(size int, lineSize int) (*resp, error) {
+func (rc *respConn) decodeArray(line []byte) (*resp, error) {
+	lineSize := len(line)
+	size, err := decodeInt(line[1 : lineSize-2])
+	if err != nil {
+		return nil, err
+	}
 	if size == -1 {
 		return newRespNull(respArray), nil
 	}
 	robj := newRespArrayWithCapcity(size)
+	robj.data = line[1 : lineSize-2]
 	mark := rc.br.Mark()
 	for i := 0; i < size; i++ {
 		sub, err := rc.decodeResp()
@@ -253,6 +264,5 @@ func (rc *respConn) encodeArray(robj *resp) (err error) {
 			return
 		}
 	}
-
 	return
 }
