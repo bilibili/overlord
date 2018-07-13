@@ -2,8 +2,8 @@ package binary
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
-	"overlord/lib/conv"
 	"sync/atomic"
 	"time"
 
@@ -73,7 +73,6 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		m.MarkWrite()
 		idx++
 	}
-
 	if err = n.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Writer flush message bytes")
 	}
@@ -91,10 +90,12 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 		return
 	}
 	_ = n.bw.Write(magicReqBytes)
-	if mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetKQ {
-		mcr.rTp = RequestTypeGetK
+
+	cmd := mcr.rTp
+	if cmd == RequestTypeGetQ || cmd == RequestTypeGetKQ {
+		cmd = RequestTypeGetK
 	}
-	_ = n.bw.Write(mcr.rTp.Bytes())
+	_ = n.bw.Write(cmd.Bytes())
 	_ = n.bw.Write(mcr.keyLen)
 	_ = n.bw.Write(mcr.extraLen)
 	_ = n.bw.Write(zeroBytes)
@@ -166,14 +167,11 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < requestHeaderLen {
 		return 0, bufio.ErrBufferFull
 	}
-	parseHeader(data[0:requestHeaderLen], mcr)
-	bl, err := conv.Btoi(mcr.bodyLen)
-	if err != nil {
-		err = errors.Wrap(ErrBadResponse, "MC Reader bad body length")
-		return
-	}
+	parseHeader(data[0:requestHeaderLen], mcr, false)
+
+	bl := binary.BigEndian.Uint32(mcr.bodyLen)
 	if bl == 0 {
-		if mcr.rTp == RequestTypeGetK {
+		if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetK || mcr.rTp == RequestTypeGetKQ {
 			prom.Miss(n.cluster, n.addr)
 		}
 		size = requestHeaderLen
@@ -185,7 +183,7 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	size = requestHeaderLen + int(bl)
 	mcr.data = data[requestHeaderLen : requestHeaderLen+bl]
 
-	if mcr.rTp == RequestTypeGetK {
+	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetK || mcr.rTp == RequestTypeGetKQ {
 		prom.Hit(n.cluster, n.addr)
 	}
 	return

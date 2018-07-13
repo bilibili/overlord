@@ -34,23 +34,20 @@ func (m *mcPinger) Ping() (err error) {
 		err = ErrPingerPong
 		return
 	}
-	_ = m.bw.Write(magicReqBytes)  // NOTE: magic
-	_ = m.bw.Write(noopBytes)      // NOTE: cmd
-	_ = m.bw.Write(zeroTwoBytes)   // NOTE: key len
-	_ = m.bw.Write(zeroBytes)      // NOTE: extra len
-	_ = m.bw.Write(zeroBytes)      // NOTE: data type
-	_ = m.bw.Write(zeroBytes)      // NOTE: vbucket
-	_ = m.bw.Write(zeroFourBytes)  // NOTE: total body
-	_ = m.bw.Write(zeroFourBytes)  // NOTE: opaque
-	_ = m.bw.Write(zeroEightBytes) // NOTE: cas
+	_ = m.bw.Write(magicReqBytes)
+	_ = m.bw.Write(noopBytes)
+	_ = m.bw.Write(zeroTwoBytes)
+	_ = m.bw.Write(zeroBytes)
+	_ = m.bw.Write(zeroBytes)
+	_ = m.bw.Write(zeroTwoBytes)
+	_ = m.bw.Write(zeroFourBytes)
+	_ = m.bw.Write(zeroFourBytes)
+	_ = m.bw.Write(zeroEightBytes)
 	if err = m.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-	if err = m.br.Read(); err != nil {
-		err = errors.Wrap(err, "MC ping read")
-		return
-	}
+	err = m.br.Read()
 	head, err := m.br.ReadExact(requestHeaderLen)
 	if err != nil {
 		err = errors.Wrap(err, "MC ping read exact")

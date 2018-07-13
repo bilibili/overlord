@@ -167,7 +167,10 @@ func TestNodeConnReadOk(t *testing.T) {
 			batch.AddMsg(req)
 			err := nc.ReadBatch(batch)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.except, string(req.Request().Resp()))
+
+			mcr, ok := req.Request().(*MCRequest)
+			assert.Equal(t, true, ok)
+			assert.Equal(t, tt.except, string(mcr.data))
 		})
 
 	}

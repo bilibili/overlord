@@ -2,9 +2,9 @@ package binary
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/binary"
+
 	"overlord/lib/bufio"
-	"overlord/lib/conv"
 	libnet "overlord/lib/net"
 	"overlord/proto"
 
@@ -43,7 +43,6 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 			return nil, err
 		}
 	}
-
 	for i := range msgs {
 		p.completed = false
 		// set msg type
@@ -64,6 +63,7 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 }
 
 func (p *proxyConn) decode(m *proto.Message) (err error) {
+NEXTGET:
 	// bufio reset buffer
 	head, err := p.br.ReadExact(requestHeaderLen)
 	if err == bufio.ErrBufferFull {
@@ -72,83 +72,44 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		err = errors.Wrap(err, "MC decoder while reading text line")
 		return
 	}
-	fmt.Printf("wocaoa(%v)\n", head[0])
 	req := p.request(m)
-	parseHeader(head, req)
+	parseHeader(head, req, true)
 	if err != nil {
 		err = errors.Wrap(err, "MC decoder while parse header")
 		return
 	}
 	switch req.rTp {
-	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace,
+	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace, RequestTypeGet, RequestTypeGetK,
 		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend, RequestTypeTouch, RequestTypeGat:
-		return p.decodeCommon(m, req)
-	// Retrieval commands:
-	case RequestTypeGet, RequestTypeGetK, RequestTypeGetQ, RequestTypeGetKQ:
-		return p.decodeRetrieval(m, req)
+		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
+			p.br.Advance(-requestHeaderLen)
+			return
+		}
+		return
+	case RequestTypeGetQ, RequestTypeGetKQ:
+		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
+			p.br.Advance(-requestHeaderLen)
+			return
+		}
+		goto NEXTGET
 	}
-	fmt.Printf("unsupport command(%x)\n", req.rTp)
 	err = errors.Wrap(ErrBadRequest, "MC decoder unsupport command")
 	return
 }
 
 func (p *proxyConn) decodeCommon(m *proto.Message, req *MCRequest) (err error) {
-	bl, err := conv.Btoi(req.bodyLen)
-	if err != nil {
-		err = errors.Wrap(ErrBadLength, "MC decodeCommon body length")
-		return
-	}
+	bl := binary.BigEndian.Uint32(req.bodyLen)
 	body, err := p.br.ReadExact(int(bl))
-	if err != nil {
+	if err == bufio.ErrBufferFull {
+		return
+	} else if err != nil {
 		err = errors.Wrap(err, "MC decodeCommon read exact body")
 		return
 	}
-	el, err := conv.Btoi(req.extraLen)
-	if err != nil {
-		err = errors.Wrap(err, "MC decodeCommon conv extra length")
-		return
-	}
-	kl, err := conv.Btoi(req.keyLen)
-	if err != nil {
-		err = errors.Wrap(err, "MC decodeCommon conv key length")
-		return
-	}
-	req.key = body[el : el+kl]
+	el := uint8(req.extraLen[0])
+	kl := binary.BigEndian.Uint16(req.keyLen)
+	req.key = body[int(el) : int(el)+int(kl)]
 	req.data = body
-	return
-}
-
-func (p *proxyConn) decodeRetrieval(m *proto.Message, req *MCRequest) (err error) {
-	for req.rTp == RequestTypeGetQ || req.rTp == RequestTypeGetKQ {
-		var kl int64
-		if kl, err = conv.Btoi(req.keyLen); err != nil {
-			err = errors.Wrap(err, "MC decodeRetrieval conv keyq length")
-			return
-		}
-		if req.key, err = p.br.ReadExact(int(kl)); err != nil {
-			err = errors.Wrap(err, "MC decodeRetrieval read exact keyq")
-			return
-		}
-		req.data = req.key
-		req = p.request(m)
-	}
-	if req.rTp == RequestTypeGet || req.rTp == RequestTypeGetK {
-		var kl int64
-		if kl, err = conv.Btoi(req.keyLen); err != nil {
-			err = errors.Wrap(err, "MC decodeRetrieval conv key length")
-			return
-		}
-		if req.key, err = p.br.ReadExact(int(kl)); err != nil {
-			err = errors.Wrap(err, "MC decodeRetrieval read exact key")
-			return
-		}
-		req.data = req.key
-		return
-	}
-	// no idea... this is a problem though.
-	// unexpected patterns shouldn't come over the wire, so maybe it will
-	// be OK to simply discount this situation. Probably not.
-	err = errors.Wrap(ErrBadRequest, "MC decodeRetrieval unsupport command")
 	return
 }
 
@@ -161,9 +122,11 @@ func (p *proxyConn) request(m *proto.Message) *MCRequest {
 	return req.(*MCRequest)
 }
 
-func parseHeader(bs []byte, req *MCRequest) {
+func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 	req.magic = bs[0]
-	req.rTp = RequestType(bs[1])
+	if isDecode {
+		req.rTp = RequestType(bs[1])
+	}
 	req.keyLen = bs[2:4]
 	req.extraLen = bs[4:5]
 	req.bodyLen = bs[8:12]
@@ -173,26 +136,30 @@ func parseHeader(bs []byte, req *MCRequest) {
 
 // Encode encode response and write into writer.
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
-	_ = p.bw.Write(magicReqBytes) // NOTE: magic
-	mcr, ok := m.Request().(*MCRequest)
-	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Encoder assert request")
-		return
-	}
-	_ = p.bw.Write(mcr.rTp.Bytes())
-	_ = p.bw.Write(mcr.keyLen)
-	_ = p.bw.Write(mcr.extraLen)
-	_ = p.bw.Write(zeroBytes)
-	if err = m.Err(); err != nil {
-		_ = p.bw.Write(resopnseStatusInternalErrBytes)
-	} else {
-		_ = p.bw.Write(zeroTwoBytes)
-	}
-	_ = p.bw.Write(mcr.bodyLen)
-	_ = p.bw.Write(mcr.opaque)
-	_ = p.bw.Write(mcr.cas)
-	if err == nil && !bytes.Equal(mcr.bodyLen, zeroTwoBytes) {
-		_ = p.bw.Write(mcr.data)
+	reqs := m.Requests()
+	for _, req := range reqs {
+		mcr, ok := req.(*MCRequest)
+		if !ok {
+			err = errors.Wrap(ErrAssertReq, "MC Encoder assert request")
+			return
+		}
+		_ = p.bw.Write(magicRespBytes) // NOTE: magic
+		_ = p.bw.Write(mcr.rTp.Bytes())
+		_ = p.bw.Write(mcr.keyLen)
+		_ = p.bw.Write(mcr.extraLen)
+		_ = p.bw.Write(zeroBytes)
+		if err = m.Err(); err != nil {
+			_ = p.bw.Write(resopnseStatusInternalErrBytes)
+		} else {
+			_ = p.bw.Write(zeroTwoBytes)
+		}
+		_ = p.bw.Write(mcr.bodyLen)
+		_ = p.bw.Write(mcr.opaque)
+		_ = p.bw.Write(mcr.cas)
+
+		if err == nil && !bytes.Equal(mcr.bodyLen, zeroFourBytes) {
+			_ = p.bw.Write(mcr.data)
+		}
 	}
 	if err = p.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Encoder encode response flush bytes")

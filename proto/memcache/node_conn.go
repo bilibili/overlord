@@ -81,12 +81,12 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 
 func (n *nodeConn) write(m *proto.Message) (err error) {
 	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Writer handle Msg")
+		err = errors.Wrap(ErrClosed, "MC Writer conn closed")
 		return
 	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Writer handle assert request")
+		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
 		return
 	}
 	_ = n.bw.Write(mcr.rTp.Bytes())
@@ -120,9 +120,10 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		ok  bool
 	)
 	m = mb.Nth(nth)
+
 	mcr, ok = m.Request().(*MCRequest)
 	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Reader assert request")
+		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
 		return
 	}
 	for {
@@ -148,9 +149,10 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			if m == nil {
 				return
 			}
+
 			mcr, ok = m.Request().(*MCRequest)
 			if !ok {
-				err = errors.Wrap(ErrAssertReq, "MC Reader assert request")
+				err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
 				return
 			}
 		}

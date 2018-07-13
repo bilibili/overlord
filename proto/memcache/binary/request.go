@@ -13,6 +13,7 @@ const (
 
 var (
 	magicReqBytes  = []byte{0x80}
+	magicRespBytes = []byte{0x81}
 	zeroBytes      = []byte{0x00}
 	zeroTwoBytes   = []byte{0x00, 0x00}
 	zeroFourBytes  = []byte{0x00, 0x00, 0x00, 0x00}
@@ -265,12 +266,12 @@ type MCRequest struct {
 	rTp      RequestType
 	keyLen   []byte
 	extraLen []byte
-	// DataType        uint8  // Always 0
-	// VBucket         uint16 // Not used
+	// dataType []byte // Always 0
+	// vBucket  []byte // Not used
 	status  []byte // response status
 	bodyLen []byte
-	opaque  []byte // Echoed to the client
-	cas     []byte // Unused in current implementation
+	opaque  []byte
+	cas     []byte
 
 	key  []byte
 	data []byte
@@ -294,9 +295,15 @@ func NewReq() *MCRequest {
 
 // Put put req back to pool.
 func (r *MCRequest) Put() {
-	r.data = nil
 	r.rTp = RequestTypeUnknown
+	r.keyLen = nil
+	r.extraLen = nil
+	r.status = nil
+	r.bodyLen = nil
+	r.opaque = nil
+	r.cas = nil
 	r.key = nil
+	r.data = nil
 	msgPool.Put(r)
 }
 
@@ -313,11 +320,6 @@ func (r *MCRequest) Cmd() []byte {
 // Key get Msg key.
 func (r *MCRequest) Key() []byte {
 	return r.key
-}
-
-// Resp get response data.
-func (r *MCRequest) Resp() []byte {
-	return r.data
 }
 
 func (r *MCRequest) String() string {

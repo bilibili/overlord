@@ -349,27 +349,26 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		_ = p.bw.Write([]byte(se))
 		_ = p.bw.Write(crlfBytes)
 	} else {
-		mcr, ok := m.Request().(*MCRequest)
-		if !ok {
-			_ = p.bw.Write(serverErrorBytes)
-			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-			_ = p.bw.Write(crlfBytes)
-		} else {
-			res := m.Response()
-			_, ok := withValueTypes[mcr.rTp]
-			trimEnd := ok && m.IsBatch()
-			for _, bs := range res {
-				if trimEnd {
-					bs = bytes.TrimSuffix(bs, endBytes)
+		var bs []byte
+		reqs := m.Requests()
+		for _, req := range reqs {
+			mcr, ok := req.(*MCRequest)
+			if !ok {
+				_ = p.bw.Write(serverErrorBytes)
+				_ = p.bw.Write([]byte(ErrAssertReq.Error()))
+				_ = p.bw.Write(crlfBytes)
+			} else {
+				if m.IsBatch() {
+					bs = bytes.TrimSuffix(mcr.data, endBytes)
 				}
 				if len(bs) == 0 {
 					continue
 				}
 				_ = p.bw.Write(bs)
 			}
-			if trimEnd {
-				_ = p.bw.Write(endBytes)
-			}
+		}
+		if m.IsBatch() {
+			_ = p.bw.Write(endBytes)
 		}
 	}
 	if err = p.bw.Flush(); err != nil {

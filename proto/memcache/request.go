@@ -247,11 +247,6 @@ func (r *MCRequest) Key() []byte {
 	return r.key
 }
 
-// Resp get response data.
-func (r *MCRequest) Resp() []byte {
-	return r.data
-}
-
 func (r *MCRequest) String() string {
 	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.Bytes(), r.key, r.data)
 }
