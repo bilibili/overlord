@@ -1,7 +1,9 @@
 package redis
 
 import (
+	"bytes"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -118,10 +120,29 @@ func (r *resp) Len() int {
 	return len(r.array)
 }
 
+// String was only for debug
 func (r *resp) String() string {
 	if r.rtype == respArray {
-		return ""
+		var sb strings.Builder
+		sb.Write([]byte("["))
+		for _, sub := range r.array[:len(r.array)-1] {
+			sb.WriteString(sub.String())
+			sb.WriteString(", ")
+		}
+		sb.WriteString(r.array[len(r.array)-1].String())
+		sb.Write([]byte("]"))
+		sb.WriteString("\n")
+		return sb.String()
 	}
 
-	return string(r.data)
+	return strconv.Quote(string(r.data))
+}
+
+func (r *resp) bytes() []byte {
+	var data = r.data
+	var pos int
+	if r.rtype == respBulk {
+		pos = bytes.Index(data, crlfBytes) + 2
+	}
+	return data[pos:]
 }

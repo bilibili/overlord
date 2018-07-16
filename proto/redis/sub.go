@@ -41,9 +41,10 @@ func subCmdMset(robj *resp) ([]*Command, error) {
 	cmds := make([]*Command, mid)
 	for i := 0; i < mid; i++ {
 		cmdObj := newRespArrayWithCapcity(3)
-		cmdObj.replace(0, robjGet)
+		cmdObj.replace(0, robjMSet)
 		cmdObj.replace(1, robj.nth(i*2+1))
 		cmdObj.replace(2, robj.nth(i*2+2))
+		cmdObj.data = cmdMSetLenBytes
 		cmds[i] = newCommandWithMergeType(cmdObj, MergeTypeOk)
 	}
 	return cmds, nil

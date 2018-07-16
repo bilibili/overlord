@@ -34,7 +34,7 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 	if rc.completed {
 		err = rc.br.Read()
 		if err != nil {
-			return nil, err
+			return
 		}
 		rc.completed = false
 	}

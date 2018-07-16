@@ -11,12 +11,19 @@ import (
 	"overlord/lib/prom"
 	"overlord/proto"
 
+	stderr "errors"
+
 	"github.com/pkg/errors"
 )
 
 const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
+)
+
+// errors
+var (
+	ErrNotImpl = stderr.New("i am groot")
 )
 
 type nodeConn struct {
@@ -205,4 +212,10 @@ func (n *nodeConn) Close() error {
 
 func (n *nodeConn) Closed() bool {
 	return atomic.LoadInt32(&n.closed) == handlerClosed
+}
+
+// FetchSlots was not supported in mc.
+func (nc *nodeConn) FetchSlots() (ndoes []string, slots [][]int, err error) {
+	err = ErrNotImpl
+	return
 }

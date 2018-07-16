@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	errs "errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -31,7 +32,7 @@ var (
 type pinger struct {
 	ping   proto.NodeConn
 	node   string
-	weight int
+	weight []int
 
 	failure int
 	retries int
@@ -71,6 +72,8 @@ type Cluster struct {
 	aliasMap map[string]int
 	nodeChan map[int]*batchChanel
 
+	syncConn proto.NodeConn
+
 	lock   sync.Mutex
 	closed bool
 }
@@ -90,10 +93,22 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.alias = alias
 
 	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	if c.alias {
-		ring.Init(ans, ws)
-	} else {
-		ring.Init(addrs, ws)
+
+	if cc.CacheType == proto.CacheTypeMemcache {
+		if c.alias {
+			ring.Init(ans, ws)
+		} else {
+			ring.Init(addrs, ws)
+		}
+	} else if cc.CacheType == proto.CacheTypeRedis {
+		sc := newNodeConn(cc, addrs[0])
+		nodes, slots, err := sc.FetchSlots()
+		fmt.Println(nodes, len(nodes))
+		if err != nil {
+			panic(err)
+		}
+		addrs = nodes
+		ring.Init(nodes, slots...)
 	}
 
 	nodeChan := make(map[int]*batchChanel)
@@ -115,7 +130,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeMap = nodeMap
 	c.ring = ring
 	if c.cc.PingAutoEject {
-		go c.startPinger(c.cc, addrs, ws)
+		// go c.startPinger(c.cc, addrs, ws)
 	}
 	return
 }
@@ -216,7 +231,7 @@ func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
 	return err
 }
 
-func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
+func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws [][]int) {
 	for idx, addr := range addrs {
 		w := ws[idx]
 		nc := newNodeConn(cc, addr)
@@ -239,7 +254,7 @@ func (c *Cluster) processPing(p *pinger) {
 		} else {
 			p.failure = 0
 			if del {
-				c.ring.AddNode(p.node, p.weight)
+				c.ring.AddNode(p.node, p.weight...)
 				del = false
 			}
 		}

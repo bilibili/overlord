@@ -80,7 +80,7 @@ func (h *Handler) Handle() {
 func (h *Handler) handle() {
 	var (
 		messages = proto.GetMsgSlice(defaultConcurrent)
-		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.cc.Servers))
+		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.nodeMap))
 		msgs     []*proto.Message
 		err      error
 	)

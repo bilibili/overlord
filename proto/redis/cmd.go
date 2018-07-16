@@ -17,13 +17,15 @@ var (
 )
 
 var (
-	robjGet = newRespBulk([]byte("3\r\nGET"))
+	robjGet  = newRespBulk([]byte("3\r\nGET"))
+	robjMSet = newRespBulk([]byte("4\r\nMSET"))
 
-	cmdMSetBytes   = []byte("4\r\nMSET")
-	cmdMGetBytes   = []byte("4\r\nMGET")
-	cmdGetBytes    = []byte("3\r\nGET")
-	cmdDelBytes    = []byte("3\r\nDEL")
-	cmdExistsBytes = []byte("5\r\nEXITS")
+	cmdMSetLenBytes = []byte("3")
+	cmdMSetBytes    = []byte("4\r\nMSET")
+	cmdMGetBytes    = []byte("4\r\nMGET")
+	cmdGetBytes     = []byte("3\r\nGET")
+	cmdDelBytes     = []byte("3\r\nDEL")
+	cmdExistsBytes  = []byte("5\r\nEXITS")
 )
 
 // errors
@@ -75,7 +77,7 @@ func newCommandWithMergeType(robj *resp, mtype MergeType) *Command {
 
 // CmdString get the cmd
 func (c *Command) CmdString() string {
-	return strings.ToUpper(c.respObj.nth(0).String())
+	return strings.ToUpper(string(c.respObj.nth(0).data))
 }
 
 // Cmd get the cmd

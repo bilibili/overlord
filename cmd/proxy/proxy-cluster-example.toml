@@ -2,13 +2,13 @@
 # This be used to specify the name of cache cluster.
 name = "test-cluster"
 # The name of the hash function. Possible values are: sha1.
-hash_method = "sha1"
+hash_method = "crc16"
 # The key distribution mode. Possible values are: ketama.
-hash_distribution = "ketama"
+hash_distribution = "redis_cluster"
 # A two character string that specifies the part of the key used for hashing. Eg "{}".
 hash_tag = ""
 # cache type: memcache | redis
-cache_type = "memcache"
+cache_type = "redis"
 # proxy listen proto: tcp | unix
 listen_proto = "tcp"
 # proxy listen addr: tcp addr | unix sock path
@@ -29,5 +29,5 @@ ping_fail_limit = 3
 ping_auto_eject = true
 # A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
-    "127.0.0.1:11211:10",
+    "127.0.0.1:7000:1",
 ]

@@ -30,20 +30,18 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 }
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
-	var (
-		rs  []*resp
-		err error
-	)
-	rs, err = pc.rc.decodeMax(len(msgs))
+	rs, err := pc.rc.decodeMax(len(msgs))
 	if err != nil {
 		return msgs, err
 	}
 	for i, r := range rs {
 		msgs[i].Type = proto.CacheTypeRedis
 		msgs[i].MarkStart()
+
 		err = pc.decodeToMsg(r, msgs[i])
 		if err != nil {
 			msgs[i].Reset()
+			return nil, err
 		}
 	}
 	return msgs[:len(rs)], nil
@@ -57,12 +55,26 @@ func (pc *proxyConn) decodeToMsg(robj *resp, msg *proto.Message) (err error) {
 			return
 		}
 		for _, cmd := range cmds {
-			msg.WithRequest(cmd)
+			pc.withReq(msg, cmd)
+			// msg.WithRequest(cmd)
 		}
 	} else {
-		msg.WithRequest(newCommand(robj))
+		pc.withReq(msg, newCommand(robj))
+		// msg.WithRequest(newCommand(robj))
 	}
 	return
+}
+
+func (pc *proxyConn) withReq(m *proto.Message, cmd *Command) {
+	req := m.NextReq()
+	if req == nil {
+		m.WithRequest(cmd)
+	} else {
+		reqCmd := req.(*Command)
+		reqCmd.respObj = cmd.respObj
+		reqCmd.mergeType = cmd.mergeType
+		reqCmd.reply = cmd.reply
+	}
 }
 
 func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
@@ -118,6 +130,12 @@ func (pc *proxyConn) merge(msg *proto.Message) (*resp, error) {
 }
 
 func (pc *proxyConn) mergeOk(msg *proto.Message) (*resp, error) {
+	for _, sub := range msg.Subs() {
+		if err := sub.Err(); err != nil {
+			cmd := sub.Request().(*Command)
+			return newRespPlain(respError, cmd.reply.data), nil
+		}
+	}
 	return newRespString(okBytes), nil
 }
 

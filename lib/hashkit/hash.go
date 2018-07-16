@@ -1,5 +1,6 @@
 package hashkit
 
+// constants defines
 const (
 	HashMethodFnv1a = "fnv1a_64"
 )

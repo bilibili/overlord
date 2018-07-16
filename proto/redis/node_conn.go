@@ -88,3 +88,42 @@ func (nc *nodeConn) Close() error {
 	}
 	return nil
 }
+
+var (
+	robjCluterNodes = newRespArray([]*resp{
+		newRespBulk([]byte("7\r\nCLUSTER")),
+		newRespBulk([]byte("5\r\nNODES")),
+	})
+)
+
+func (nc *nodeConn) FetchSlots() (nodes []string, slots [][]int, err error) {
+	err = nc.rc.encode(robjCluterNodes)
+	if err != nil {
+		return
+	}
+	err = nc.rc.Flush()
+	if err != nil {
+		return
+	}
+	rs, err := nc.rc.decodeCount(1)
+	if err != nil {
+		return
+	}
+	robj := rs[0]
+	ns, err := ParseSlots(robj)
+	if err != nil {
+		return
+	}
+
+	cns := ns.GetNodes()
+	nodes = make([]string, 0)
+	slots = make([][]int, 0)
+	for _, node := range cns {
+		if node.Role() == roleMaster {
+			nodes = append(nodes, node.Addr())
+			slots = append(slots, node.Slots())
+		}
+	}
+
+	return
+}
