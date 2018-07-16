@@ -17,10 +17,11 @@ var (
 )
 
 var (
-	robjGet = newRespBulk([]byte("get"))
+	robjGet = newRespBulk([]byte("3\r\nGET"))
 
 	cmdMSetBytes   = []byte("4\r\nMSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
+	cmdGetBytes    = []byte("3\r\nGET")
 	cmdDelBytes    = []byte("3\r\nDEL")
 	cmdExistsBytes = []byte("5\r\nEXITS")
 )

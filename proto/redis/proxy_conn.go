@@ -6,6 +6,8 @@ import (
 	libnet "overlord/lib/net"
 	"overlord/proto"
 
+	"strconv"
+
 	"github.com/pkg/errors"
 )
 
@@ -141,7 +143,8 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
 	reply = newRespArrayWithCapcity(len(msg.Subs()))
-	for i, sub := range msg.Subs() {
+	subs := msg.Subs()
+	for i, sub := range subs {
 		subcmd, ok := sub.Request().(*Command)
 		if !ok {
 			err = pc.encodeError(ErrBadAssert)
@@ -152,7 +155,7 @@ func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
 		}
 		reply.replace(i, subcmd.reply)
 	}
-
+	reply.data = []byte(strconv.Itoa(len(subs)))
 	return
 }
 
