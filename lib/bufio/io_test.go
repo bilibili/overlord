@@ -142,9 +142,6 @@ func TestWriterWriteOk(t *testing.T) {
 	err = w.Write([]byte(data))
 	assert.NoError(t, err)
 
-	err = w.WriteString(data)
-	assert.NoError(t, err)
-
 	err = w.Flush()
 	assert.NoError(t, err)
 }

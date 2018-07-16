@@ -358,8 +358,11 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 				_ = p.bw.Write([]byte(ErrAssertReq.Error()))
 				_ = p.bw.Write(crlfBytes)
 			} else {
-				if m.IsBatch() {
+				_, ok := withValueTypes[mcr.rTp]
+				if ok && m.IsBatch() {
 					bs = bytes.TrimSuffix(mcr.data, endBytes)
+				} else {
+					bs = mcr.data
 				}
 				if len(bs) == 0 {
 					continue
