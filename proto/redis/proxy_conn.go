@@ -56,11 +56,9 @@ func (pc *proxyConn) decodeToMsg(robj *resp, msg *proto.Message) (err error) {
 		}
 		for _, cmd := range cmds {
 			pc.withReq(msg, cmd)
-			// msg.WithRequest(cmd)
 		}
 	} else {
 		pc.withReq(msg, newCommand(robj))
-		// msg.WithRequest(newCommand(robj))
 	}
 	return
 }

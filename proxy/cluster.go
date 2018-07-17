@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	errs "errors"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -92,23 +91,29 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	}
 	c.alias = alias
 
+	var wlist [][]int
 	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-
 	if cc.CacheType == proto.CacheTypeMemcache {
 		if c.alias {
 			ring.Init(ans, ws)
 		} else {
 			ring.Init(addrs, ws)
 		}
+		wlist = make([][]int, len(ws))
+		for i, w := range ws {
+			wlist[i] = []int{w}
+		}
 	} else if cc.CacheType == proto.CacheTypeRedis {
 		sc := newNodeConn(cc, addrs[0])
 		nodes, slots, err := sc.FetchSlots()
-		fmt.Println(nodes, len(nodes))
+		// fmt.Println(nodes, len(nodes))
 		if err != nil {
 			panic(err)
 		}
 		addrs = nodes
 		ring.Init(nodes, slots...)
+		c.syncConn = sc
+		wlist = slots
 	}
 
 	nodeChan := make(map[int]*batchChanel)
@@ -130,7 +135,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeMap = nodeMap
 	c.ring = ring
 	if c.cc.PingAutoEject {
-		// go c.startPinger(c.cc, addrs, ws)
+		go c.startPinger(c.cc, addrs, wlist)
 	}
 	return
 }
