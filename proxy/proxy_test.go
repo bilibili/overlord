@@ -3,6 +3,7 @@ package proxy_test
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"net"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ import (
 var (
 	ccs = []*proxy.ClusterConfig{
 		&proxy.ClusterConfig{
-			Name:             "test-cluster",
+			Name:             "mc-cluster",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
@@ -29,12 +30,29 @@ var (
 			ReadTimeout:      1000,
 			NodeConnections:  10,
 			WriteTimeout:     1000,
-			// PoolActive:       50,
-			// PoolIdle:         10,
-			// PoolIdleTimeout:  100000,
-			// PoolGetWait:      true,
-			PingFailLimit: 3,
-			PingAutoEject: false,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
+			Servers: []string{
+				"127.0.0.1:11211:10",
+				// "127.0.0.1:11212:10",
+				// "127.0.0.1:11213:10",
+			},
+		},
+		&proxy.ClusterConfig{
+			Name:             "mcbin-cluster",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("memcache_binary"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:21212",
+			RedisAuth:        "",
+			DialTimeout:      1000,
+			ReadTimeout:      1000,
+			NodeConnections:  10,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
 			Servers: []string{
 				"127.0.0.1:11211:10",
 				// "127.0.0.1:11212:10",
@@ -66,6 +84,35 @@ var (
 		[]byte("gats 123456 a_11\r\n"),
 		[]byte("gats 123456 a_11 a_22 a_33\r\n"),
 		[]byte("noexist a_11\r\n"),
+	}
+
+	cmdBins = [][]byte{
+		[]byte{
+			0x80,       // magic
+			0x01,       // cmd
+			0x00, 0x03, // key len
+			0x08,       // extra len
+			0x00,       // data type
+			0x00, 0x00, // vbucket
+			0x00, 0x00, 0x00, 0x10, // body len
+			0x00, 0x00, 0x00, 0x00, // opaque
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // extra: flags, expiration
+			0x41, 0x42, 0x43, // key: ABC
+			0x41, 0x42, 0x43, 0x44, 0x45, // value: ABCDE
+		},
+		[]byte{
+			0x80,       // magic
+			0x0c,       // cmd
+			0x00, 0x03, // key len
+			0x00,       // extra len
+			0x00,       // data type
+			0x00, 0x00, // vbucket
+			0x00, 0x00, 0x00, 0x03, // body len
+			0x00, 0x00, 0x00, 0x00, // opaque
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+			0x41, 0x42, 0x43, // key: ABC
+		},
 	}
 )
 
@@ -117,13 +164,52 @@ func testCmd(t testing.TB, cmds ...[]byte) {
 				bs = append(bs, bs2...)
 			}
 		}
-		// t.Logf("read string:%s", bs)
+	}
+}
+
+func testCmdBin(t testing.TB, cmds ...[]byte) {
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:21212", time.Second)
+	if err != nil {
+		t.Errorf("net dial error:%v", err)
+	}
+	defer conn.Close()
+	br := bufio.NewReader(conn)
+	for _, cmd := range cmds {
+		conn.SetWriteDeadline(time.Now().Add(time.Second))
+		if _, err := conn.Write(cmd); err != nil {
+			t.Errorf("conn write cmd:%s error:%v", cmd, err)
+		}
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		bs := make([]byte, 24)
+		if n, err := br.Read(bs); err != nil || n != 24 {
+			t.Errorf("conn read cmd:%x error:%s resp:%x", cmd[1], err, bs)
+			continue
+		}
+		if bytes.Equal(bs[6:8], []byte{0x00, 0x01}) {
+			// key not found
+			continue
+		}
+		if !bytes.Equal(bs[6:8], []byte{0x00, 0x00}) {
+			t.Errorf("conn error:%s %s", bs, cmd)
+			continue
+		}
+		bl := binary.BigEndian.Uint32(bs[8:12])
+		if bl > 0 {
+			body := make([]byte, bl)
+			n, err := br.Read(body)
+			if err != nil {
+				t.Errorf("conn read body error: %v", err)
+			} else if n != int(bl) {
+				t.Errorf("conn read body size(%d) not equal(%d)", n, bl)
+			}
+		}
 	}
 }
 
 func TestProxyFull(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+		testCmdBin(t, cmdBins[0], cmdBins[1])
 	}
 }
 
@@ -178,6 +264,7 @@ func BenchmarkCmdSet(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			testCmd(b, cmds[0])
+			testCmdBin(b, cmdBins[0])
 		}
 	})
 }
@@ -186,6 +273,7 @@ func BenchmarkCmdGet(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			testCmd(b, cmds[1])
+			testCmdBin(b, cmdBins[1])
 		}
 	})
 }

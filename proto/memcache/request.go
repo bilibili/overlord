@@ -182,11 +182,10 @@ var (
 	// serving the client (this shouldn't normally happen), the server will
 	// close the connection after sending the error line. This is the only
 	// case in which the server closes a connection to a client.
-	ErrClosed         = errs.New("SERVER_ERROR connection closed")
-	ErrPingerPong     = errs.New("SERVER_ERROR Pinger pong unexpected")
-	ErrAssertMsg      = errs.New("SERVER_ERROR assert MC Msg not ok")
-	ErrAssertResponse = errs.New("SERVER_ERROR assert MC response not ok")
-	ErrBadResponse    = errs.New("SERVER_ERROR bad response")
+	ErrClosed      = errs.New("SERVER_ERROR connection closed")
+	ErrPingerPong  = errs.New("SERVER_ERROR Pinger pong unexpected")
+	ErrAssertReq   = errs.New("SERVER_ERROR assert request not ok")
+	ErrBadResponse = errs.New("SERVER_ERROR bad response")
 )
 
 // MCRequest is the mc client Msg type and data.
@@ -246,11 +245,6 @@ func (r *MCRequest) Cmd() []byte {
 // Key get Msg key.
 func (r *MCRequest) Key() []byte {
 	return r.key
-}
-
-// Resp get response data.
-func (r *MCRequest) Resp() []byte {
-	return r.data
 }
 
 func (r *MCRequest) String() string {

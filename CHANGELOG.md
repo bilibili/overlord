@@ -1,6 +1,9 @@
 # Overlord
 
-## Version 1.0
+## Version 1.1.0
+1. add memcache binary protocol support.
+
+## Version 1.0.0
 1. compitable consist hash with twemproxy.
 2. reduce object alloc (by using Pool).
 3. recycle using of request and response memory.
