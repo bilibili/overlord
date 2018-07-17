@@ -11,7 +11,7 @@ import (
 	libnet "overlord/lib/net"
 	"overlord/proto"
 	"overlord/proto/memcache"
-	bnr "overlord/proto/memcache/binary"
+	mcbin "overlord/proto/memcache/binary"
 
 	"github.com/pkg/errors"
 )
@@ -95,7 +95,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 					_ = encoder.Encode(m)
 					_ = conn.Close()
 				case proto.CacheTypeMemcacheBinary:
-					encoder := bnr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+					encoder := mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 					m := proto.ErrMessage(ErrProxyMoreMaxConns)
 					_ = encoder.Encode(m)
 					_ = conn.Close()
