@@ -93,7 +93,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 
 	var wlist [][]int
 	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	if cc.CacheType == proto.CacheTypeMemcache {
+	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary {
 		if c.alias {
 			ring.Init(ans, ws)
 		} else {
@@ -114,6 +114,8 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		ring.Init(nodes, slots...)
 		c.syncConn = sc
 		wlist = slots
+	} else {
+		panic("unsupported protocol")
 	}
 
 	nodeChan := make(map[int]*batchChanel)

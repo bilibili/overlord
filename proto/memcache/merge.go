@@ -9,7 +9,7 @@ import (
 func (*proxyConn) Merge(m *proto.Message) error {
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
-		m.AddSubResps(serverErrorPrefixBytes, []byte(ErrAssertMsg.Error()), crlfBytes)
+		m.AddSubResps(serverErrorPrefixBytes, []byte(ErrAssertReq.Error()), crlfBytes)
 		return nil
 	}
 	if !m.IsBatch() {
