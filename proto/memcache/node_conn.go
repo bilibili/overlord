@@ -194,7 +194,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < size {
 		return 0, bufio.ErrBufferFull
 	}
-
 	mcr.data = data[:size]
 	return
 }

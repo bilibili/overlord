@@ -69,6 +69,7 @@ func (m *Message) Reset() {
 	m.reqn = 0
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
+	m.subResps = m.subResps[:0]
 }
 
 // Clear will clean the msg
