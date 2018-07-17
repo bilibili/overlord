@@ -22,6 +22,7 @@ const (
 
 var (
 	version  bool
+	check    bool
 	logStd   bool
 	logFile  string
 	logVl    int
@@ -50,6 +51,7 @@ var usage = func() {
 
 func init() {
 	flag.Usage = usage
+	flag.BoolVar(&check, "t", false, "conf file check")
 	flag.BoolVar(&version, "v", false, "print version.")
 	flag.BoolVar(&logStd, "std", false, "log will printing into stdout.")
 	flag.BoolVar(&debug, "debug", false, "debug model, will open stdout log. high priority than conf.debug.")
@@ -65,6 +67,10 @@ func main() {
 	flag.Parse()
 	if version {
 		fmt.Printf("overlord version %s\n", VERSION)
+		os.Exit(0)
+	}
+	if check {
+		parseConfig()
 		os.Exit(0)
 	}
 	c, ccs := parseConfig()
