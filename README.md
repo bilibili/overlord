@@ -1,4 +1,8 @@
-# Overlord [![Build Status](https://travis-ci.org/felixhao/overlord.svg?branch=master)](https://travis-ci.org/felixhao/overlord) [![GoDoc](http://godoc.org/github.com/felixhao/overlord/proxy?status.svg)](http://godoc.org/github.com/felixhao/overlord/proxy) [![codecov](https://codecov.io/gh/felixhao/overlord/branch/master/graph/badge.svg)](https://codecov.io/gh/felixhao/overlord)
+# Overlord 
+[![Build Status](https://travis-ci.org/felixhao/overlord.svg?branch=master)](https://travis-ci.org/felixhao/overlord) 
+[![GoDoc](http://godoc.org/github.com/felixhao/overlord/proxy?status.svg)](http://godoc.org/github.com/felixhao/overlord/proxy) 
+[![codecov](https://codecov.io/gh/felixhao/overlord/branch/master/graph/badge.svg)](https://codecov.io/gh/felixhao/overlord)
+[![Go Report Card](https://goreportcard.com/badge/github.com/felixhao/overlord)](https://goreportcard.com/report/github.com/felixhao/overlord)
 
 
 Overlord is a proxy based high performance Memcached and Redis solution written in Go.  
