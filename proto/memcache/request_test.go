@@ -41,4 +41,10 @@ func TestMCRequestFuncsOk(t *testing.T) {
 	assert.Equal(t, []byte("get"), req.Cmd())
 	assert.Equal(t, "abc", string(req.Key()))
 	assert.Equal(t, "type:get key:abc data:\r\n", req.String())
+
+	req.Put()
+
+	assert.Equal(t, RequestTypeUnknown, req.rTp)
+	assert.Nil(t, req.key)
+	assert.Nil(t, req.data)
 }

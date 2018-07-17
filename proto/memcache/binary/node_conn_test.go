@@ -80,6 +80,37 @@ func TestNodeConnWriteOk(t *testing.T) {
 	}
 }
 
+func TestNodeConnBatchWriteOk(t *testing.T) {
+	ts := []struct {
+		name   string
+		req    []byte
+		except []byte
+	}{
+		{name: "get", req: getTestData, except: getTestData},
+		{name: "set", req: setTestData, except: setTestData},
+	}
+
+	for _, tt := range ts {
+		t.Run(tt.name, func(subt *testing.T) {
+			req := _createReqMsg(tt.req)
+			nc := _createNodeConn(nil)
+			batch := proto.NewMsgBatch()
+			batch.AddMsg(req)
+
+			err := nc.WriteBatch(batch)
+			assert.NoError(t, err)
+
+			m, ok := nc.conn.Conn.(*mockConn)
+			assert.True(t, ok)
+
+			buf := make([]byte, 1024)
+			size, err := m.wbuf.Read(buf)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.except, buf[:size])
+		})
+	}
+}
+
 func TestNodeConnWriteClosed(t *testing.T) {
 	req := _createReqMsg(getTestData)
 	nc := _createNodeConn(nil)

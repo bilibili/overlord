@@ -74,6 +74,45 @@ func TestNodeConnWriteOk(t *testing.T) {
 	}
 }
 
+func TestNodeConnWriteBatchOk(t *testing.T) {
+	ts := []struct {
+		rtype  RequestType
+		key    string
+		data   string
+		except string
+	}{
+		{
+			rtype: RequestTypeGet, key: "mykey", data: "\r\n",
+			except: "get mykey\r\n",
+		},
+		{
+			rtype: RequestTypeSet, key: "mykey", data: " 0 0 1\r\nb\r\n",
+			except: "set mykey 0 0 1\r\nb\r\n",
+		},
+	}
+	for _, tt := range ts {
+
+		t.Run(fmt.Sprintf("%v ok", tt.rtype), func(t *testing.T) {
+			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
+			nc := _createNodeConn(nil)
+			batch := proto.NewMsgBatch()
+			batch.AddMsg(req)
+
+			err := nc.WriteBatch(batch)
+			assert.NoError(t, err)
+
+			c, ok := nc.conn.Conn.(*mockConn)
+			assert.True(t, ok)
+
+			buf := make([]byte, 1024)
+			size, err := c.wbuf.Read(buf)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.except, string(buf[:size]))
+		})
+
+	}
+}
+
 func TestNodeConnWriteClosed(t *testing.T) {
 	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
 	nc := _createNodeConn(nil)
@@ -143,17 +182,17 @@ func TestNodeConnReadOk(t *testing.T) {
 	}{
 		{
 			suffix: "404",
-			rtype:  RequestTypeGet, key: "mykey", data: " \r\n",
+			rtype:  RequestTypeGet, key: "mykey", data: "\r\n",
 			cData: "END\r\n", except: "END\r\n",
 		},
 		{
 			suffix: "Ok",
-			rtype:  RequestTypeGet, key: "mykey", data: " \r\n",
+			rtype:  RequestTypeGet, key: "mykey", data: "\r\n",
 			cData: "VALUE mykey 0 1\r\na\r\nEND\r\n", except: "VALUE mykey 0 1\r\na\r\nEND\r\n",
 		},
 		{
 			suffix: "Ok",
-			rtype:  RequestTypeSet, key: "mykey", data: "0 0 1\r\nb\r\n",
+			rtype:  RequestTypeSet, key: "mykey", data: " 0 0 1\r\nb\r\n",
 			cData: "STORED\r\n", except: "STORED\r\n",
 		},
 	}
