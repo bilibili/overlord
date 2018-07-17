@@ -45,6 +45,7 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) error {
 			m.DoneWithError(err)
 			return err
 		}
+		m.MarkWrite()
 	}
 	err := nc.rc.Flush()
 	return err
@@ -74,6 +75,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) error {
 			return ErrBadAssert
 		}
 		cmd.reply = resps[i]
+		m.MarkRead()
 	}
 	return nil
 }

@@ -42,6 +42,7 @@ func (s *slotsMap) Init(masters []string, args ...[]int) {
 		for _, slot := range args[i] {
 			s.slots[slot] = i
 		}
+		s.searchIndex[i] = args[i]
 	}
 	s.lock.Unlock()
 }

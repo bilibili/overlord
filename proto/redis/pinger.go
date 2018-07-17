@@ -46,6 +46,10 @@ func (p *pinger) ping() (err error) {
 	if err != nil {
 		return
 	}
+	err = p.bw.Flush()
+	if err != nil {
+		return err
+	}
 	data, err := p.br.ReadUntil(lfByte)
 	if err != nil {
 		return

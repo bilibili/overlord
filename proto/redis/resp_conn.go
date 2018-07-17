@@ -48,6 +48,7 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 		} else if err != nil {
 			return
 		}
+
 		resps = append(resps, robj)
 	}
 	return
@@ -160,7 +161,7 @@ func (rc *respConn) decodeArray(line []byte) (*resp, error) {
 		sub, err := rc.decodeResp()
 		if err != nil {
 			rc.br.AdvanceTo(mark)
-			rc.br.Advance(lineSize)
+			rc.br.Advance(-lineSize)
 			return nil, err
 		}
 		robj.replace(i, sub)

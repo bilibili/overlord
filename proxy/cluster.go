@@ -256,6 +256,7 @@ func (c *Cluster) processPing(p *pinger) {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
 			p.retries = 0
+			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 		} else {
 			p.failure = 0
 			if del {
