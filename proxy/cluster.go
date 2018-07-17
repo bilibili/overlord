@@ -16,6 +16,8 @@ import (
 	"overlord/lib/log"
 	"overlord/proto"
 	"overlord/proto/memcache"
+	mcbin "overlord/proto/memcache/binary"
+
 	"github.com/pkg/errors"
 )
 
@@ -328,6 +330,8 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
 		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
+	case proto.CacheTypeMemcacheBinary:
+		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
 	// TODO(felix): support redis
 	default:

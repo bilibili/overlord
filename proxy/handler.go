@@ -12,6 +12,7 @@ import (
 	"overlord/lib/prom"
 	"overlord/proto"
 	"overlord/proto/memcache"
+	mcbin "overlord/proto/memcache/binary"
 )
 
 const (
@@ -57,6 +58,8 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	switch cluster.cc.CacheType {
 	case proto.CacheTypeMemcache:
 		h.pc = memcache.NewProxyConn(h.conn)
+	case proto.CacheTypeMemcacheBinary:
+		h.pc = mcbin.NewProxyConn(h.conn)
 	case proto.CacheTypeRedis:
 		// TODO(felix): support redis.
 	default:

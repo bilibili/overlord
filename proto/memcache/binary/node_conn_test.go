@@ -1,7 +1,7 @@
-package memcache
+package binary
 
 import (
-	"fmt"
+	"encoding/binary"
 	"io"
 	"net"
 	"testing"
@@ -27,11 +27,18 @@ func _createNodeConn(data []byte) *nodeConn {
 	return nc
 }
 
-func _createReqMsg(rtype RequestType, key, data []byte) *proto.Message {
-	mc := &MCRequest{
-		rTp:  rtype,
-		key:  key,
-		data: data,
+func _createReqMsg(bin []byte) *proto.Message {
+	mc := &MCRequest{}
+	parseHeader(bin, mc, true)
+
+	bl := int(binary.BigEndian.Uint32(mc.bodyLen))
+	el := int(uint8(mc.extraLen[0]))
+	kl := int(binary.BigEndian.Uint16(mc.keyLen))
+	if kl > 0 {
+		mc.key = bin[24+el : 24+el+kl]
+	}
+	if bl > 0 {
+		mc.data = bin[24:]
 	}
 	pm := proto.NewMessage()
 	pm.WithRequest(mc)
@@ -45,22 +52,21 @@ func _causeEqual(t *testing.T, except, actual error) {
 
 func TestNodeConnWriteOk(t *testing.T) {
 	ts := []struct {
-		rtype  RequestType
-		key    string
-		data   string
-		except string
+		name   string
+		req    []byte
+		except []byte
 	}{
-		{rtype: RequestTypeSet, key: "mykey", data: " 0 0 1\r\na\r\n", except: "set mykey 0 0 1\r\na\r\n"},
-		{rtype: RequestTypeGat, key: "mykey", data: "1024", except: "gat 1024 mykey\r\n"},
+		{name: "get", req: getTestData, except: getTestData},
+		{name: "set", req: setTestData, except: setTestData},
 	}
 
 	for _, tt := range ts {
-		t.Run(fmt.Sprintf("%v Ok", tt.rtype), func(subt *testing.T) {
-			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
+		t.Run(tt.name, func(subt *testing.T) {
+			req := _createReqMsg(tt.req)
 			nc := _createNodeConn(nil)
-
-			err := nc.write(req)
-			nc.bw.Flush()
+			batch := proto.NewMsgBatch()
+			batch.AddMsg(req)
+			err := nc.WriteBatch(batch)
 			assert.NoError(t, err)
 
 			m, ok := nc.conn.Conn.(*mockConn)
@@ -69,31 +75,24 @@ func TestNodeConnWriteOk(t *testing.T) {
 			buf := make([]byte, 1024)
 			size, err := m.wbuf.Read(buf)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.except, string(buf[:size]))
+			assert.Equal(t, tt.except, buf[:size])
 		})
 	}
 }
 
-func TestNodeConnWriteBatchOk(t *testing.T) {
+func TestNodeConnBatchWriteOk(t *testing.T) {
 	ts := []struct {
-		rtype  RequestType
-		key    string
-		data   string
-		except string
+		name   string
+		req    []byte
+		except []byte
 	}{
-		{
-			rtype: RequestTypeGet, key: "mykey", data: "\r\n",
-			except: "get mykey\r\n",
-		},
-		{
-			rtype: RequestTypeSet, key: "mykey", data: " 0 0 1\r\nb\r\n",
-			except: "set mykey 0 0 1\r\nb\r\n",
-		},
+		{name: "get", req: getTestData, except: getTestData},
+		{name: "set", req: setTestData, except: setTestData},
 	}
-	for _, tt := range ts {
 
-		t.Run(fmt.Sprintf("%v ok", tt.rtype), func(t *testing.T) {
-			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
+	for _, tt := range ts {
+		t.Run(tt.name, func(subt *testing.T) {
+			req := _createReqMsg(tt.req)
 			nc := _createNodeConn(nil)
 			batch := proto.NewMsgBatch()
 			batch.AddMsg(req)
@@ -101,20 +100,19 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 			err := nc.WriteBatch(batch)
 			assert.NoError(t, err)
 
-			c, ok := nc.conn.Conn.(*mockConn)
+			m, ok := nc.conn.Conn.(*mockConn)
 			assert.True(t, ok)
 
 			buf := make([]byte, 1024)
-			size, err := c.wbuf.Read(buf)
+			size, err := m.wbuf.Read(buf)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.except, string(buf[:size]))
+			assert.Equal(t, tt.except, buf[:size])
 		})
-
 	}
 }
 
 func TestNodeConnWriteClosed(t *testing.T) {
-	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
+	req := _createReqMsg(getTestData)
 	nc := _createNodeConn(nil)
 	err := nc.Close()
 	assert.NoError(t, err)
@@ -151,14 +149,16 @@ func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	req := proto.NewMessage()
 	nc := _createNodeConn(nil)
 	req.WithRequest(&mockReq{})
-	err := nc.write(req)
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+	err := nc.WriteBatch(batch)
 	nc.bw.Flush()
 	assert.Error(t, err)
 	_causeEqual(t, ErrAssertReq, err)
 }
 
 func TestNodeConnReadClosed(t *testing.T) {
-	req := _createReqMsg(RequestTypeGet, []byte("abc"), []byte(" \r\n"))
+	req := _createReqMsg(getTestData)
 	nc := _createNodeConn(nil)
 
 	err := nc.Close()
@@ -173,33 +173,31 @@ func TestNodeConnReadClosed(t *testing.T) {
 
 func TestNodeConnReadOk(t *testing.T) {
 	ts := []struct {
-		suffix string
-		rtype  RequestType
-		key    string
-		data   string
-		cData  string
-		except string
+		name   string
+		req    []byte
+		cData  []byte
+		except []byte
 	}{
 		{
-			suffix: "404",
-			rtype:  RequestTypeGet, key: "mykey", data: "\r\n",
-			cData: "END\r\n", except: "END\r\n",
+			name:  "getmiss",
+			req:   getTestData,
+			cData: getMissRespTestData, except: getMissRespTestData,
 		},
 		{
-			suffix: "Ok",
-			rtype:  RequestTypeGet, key: "mykey", data: "\r\n",
-			cData: "VALUE mykey 0 1\r\na\r\nEND\r\n", except: "VALUE mykey 0 1\r\na\r\nEND\r\n",
+			name:  "get ok",
+			req:   getTestData,
+			cData: getRespTestData, except: getRespTestData,
 		},
 		{
-			suffix: "Ok",
-			rtype:  RequestTypeSet, key: "mykey", data: " 0 0 1\r\nb\r\n",
-			cData: "STORED\r\n", except: "STORED\r\n",
+			name:  "set ok",
+			req:   setTestData,
+			cData: setRespTestData, except: setRespTestData,
 		},
 	}
 	for _, tt := range ts {
 
-		t.Run(fmt.Sprintf("%v%s", tt.rtype, tt.suffix), func(t *testing.T) {
-			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
+		t.Run(tt.name, func(t *testing.T) {
+			req := _createReqMsg(tt.req)
 			nc := _createNodeConn([]byte(tt.cData))
 			batch := proto.NewMsgBatch()
 			batch.AddMsg(req)
@@ -208,7 +206,21 @@ func TestNodeConnReadOk(t *testing.T) {
 
 			mcr, ok := req.Request().(*MCRequest)
 			assert.Equal(t, true, ok)
-			assert.Equal(t, tt.except, string(mcr.data))
+
+			actual := append([]byte{mcr.magic}, mcr.rTp.Bytes()...)
+			actual = append(actual, mcr.keyLen...)
+			actual = append(actual, mcr.extraLen...)
+			actual = append(actual, zeroBytes...)  // datatype
+			actual = append(actual, mcr.status...) // status
+			actual = append(actual, mcr.bodyLen...)
+			actual = append(actual, mcr.opaque...)
+			actual = append(actual, mcr.cas...)
+			bl := binary.BigEndian.Uint32(mcr.bodyLen)
+			if bl > 0 {
+				actual = append(actual, mcr.data...)
+			}
+
+			assert.Equal(t, tt.except, actual)
 		})
 
 	}
@@ -225,7 +237,7 @@ func TestNodeConnAssertError(t *testing.T) {
 }
 
 func TestNocdConnPingOk(t *testing.T) {
-	nc := _createNodeConn(pong)
+	nc := _createNodeConn(pongBs)
 	err := nc.Ping()
 	assert.NoError(t, err)
 	assert.NoError(t, nc.Close())
