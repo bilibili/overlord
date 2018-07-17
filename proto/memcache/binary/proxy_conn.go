@@ -129,6 +129,9 @@ func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 	}
 	req.keyLen = bs[2:4]
 	req.extraLen = bs[4:5]
+	if !isDecode {
+		req.status = bs[6:8]
+	}
 	req.bodyLen = bs[8:12]
 	req.opaque = bs[12:16]
 	req.cas = bs[16:24]
@@ -151,7 +154,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		if err = m.Err(); err != nil {
 			_ = p.bw.Write(resopnseStatusInternalErrBytes)
 		} else {
-			_ = p.bw.Write(zeroTwoBytes)
+			_ = p.bw.Write(mcr.status)
 		}
 		_ = p.bw.Write(mcr.bodyLen)
 		_ = p.bw.Write(mcr.opaque)
