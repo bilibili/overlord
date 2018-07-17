@@ -47,13 +47,8 @@ func Ketama() (h *HashRing) {
 	return
 }
 
-// newMCRing is the ring of mc
-func newMCRing(hash func([]byte) uint) Ring {
-	return NewRingWithHash(hash)
-}
-
-// NewRingWithHash new a hash ring with a hash func.
-func NewRingWithHash(hash func([]byte) uint) (h *HashRing) {
+// newRingWithHash new a hash ring with a hash func.
+func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	h = Ketama()
 	h.hash = hash
 	return

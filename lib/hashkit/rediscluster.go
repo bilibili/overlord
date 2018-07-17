@@ -1,17 +1,10 @@
 package hashkit
 
 import (
-	"errors"
 	"sync"
 )
 
 const musk = 0x3fff
-
-// error
-var (
-	ErrWrongSlaveArgs  = errors.New("arguments a invalid")
-	ErrMasterNotExists = errors.New("master didn't exists")
-)
 
 // slotsMap is the struct of redis clusters slotsMap
 type slotsMap struct {
@@ -37,6 +30,7 @@ func newRedisClusterRing() Ring {
 func (s *slotsMap) Init(masters []string, args ...[]int) {
 	s.lock.Lock()
 	s.masters = make([]string, len(masters))
+	s.searchIndex = make([][]int, len(masters))
 	copy(s.masters, masters)
 	for i := range s.masters {
 		for _, slot := range args[i] {
@@ -63,6 +57,12 @@ func (s *slotsMap) AddNode(node string, args ...int) {
 	}
 
 	for _, slot := range args {
+		// TODO: how to remove oriVal search index quickly
+		// If not, duplicate index will occur only when get with ordered add.
+		// oriVal := s.slots[slot]
+		// if  oriVal != -1 {
+		// 	si := s.searchIndex[oriVal]
+		// }
 		s.slots[slot] = idx
 		s.searchIndex[idx] = append(s.searchIndex[idx], slot)
 	}

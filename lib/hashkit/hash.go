@@ -35,5 +35,5 @@ func NewRing(des, method string) Ring {
 	default:
 		hash = NewFnv1a64().fnv1a64
 	}
-	return newMCRing(hash)
+	return newRingWithHash(hash)
 }
