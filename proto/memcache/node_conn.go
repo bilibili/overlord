@@ -142,7 +142,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
-				err = nil
 				break
 			} else if err != nil {
 				return
@@ -215,7 +214,7 @@ func (n *nodeConn) Closed() bool {
 }
 
 // FetchSlots was not supported in mc.
-func (nc *nodeConn) FetchSlots() (ndoes []string, slots [][]int, err error) {
+func (n *nodeConn) FetchSlots() (ndoes []string, slots [][]int, err error) {
 	err = ErrNotImpl
 	return
 }

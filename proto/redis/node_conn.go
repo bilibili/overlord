@@ -75,7 +75,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) error {
 			return ErrBadAssert
 		}
 		cmd.reply = resps[i]
-		m.MarkRead()
+		msg.MarkRead()
 	}
 	return nil
 }
