@@ -4,7 +4,7 @@ name = "redis-cluster"
 # The name of the hash function. Possible values are: sha1.
 hash_method = "crc16"
 # Thhe key distribution mode. Possible values are: ketama.
-has_distribution = "redis_cluster"
+hash_distribution = "redis_cluster"
 # A two character string that specifies the part of the key used for hashing. Eg "{}".
 hash_tag = ""
 # cache type: memcache | redis
