@@ -10,14 +10,14 @@ import (
 
 func _createRespConn(data []byte) *respConn {
 	conn := _createConn(data)
-	return newRespConn(conn)
+	return newRESPConn(conn)
 }
 
 func _runDecodeResps(t *testing.T, line string, expect string, rtype respType, eErr error) {
 	rc := _createRespConn([]byte(line))
 	err := rc.br.Read()
 	if assert.NoError(t, err) {
-		robj, err := rc.decodeResp()
+		robj, err := rc.decodeRESP()
 		if eErr == nil {
 			if assert.NoError(t, err) {
 				if expect == "" {
@@ -36,7 +36,7 @@ func _runDecodeResps(t *testing.T, line string, expect string, rtype respType, e
 	}
 }
 
-func TestDecodeResp(t *testing.T) {
+func TestDecodeRESP(t *testing.T) {
 	tslist := []struct {
 		Name   string
 		Input  string
@@ -107,23 +107,23 @@ func TestEncodeResp(t *testing.T) {
 		Robj   *resp
 		Expect string
 	}{
-		{Name: "IntOk", Robj: newRespInt(1024), Expect: ":1024\r\n"},
-		{Name: "StringOk", Robj: newRespString([]byte("baka")), Expect: "+baka\r\n"},
-		{Name: "ErrorOk", Robj: newRespPlain(respError, []byte("kaba")), Expect: "-kaba\r\n"},
+		{Name: "IntOk", Robj: newRESPInt(1024), Expect: ":1024\r\n"},
+		{Name: "StringOk", Robj: newRESPString([]byte("baka")), Expect: "+baka\r\n"},
+		{Name: "ErrorOk", Robj: newRESPPlain(respError, []byte("kaba")), Expect: "-kaba\r\n"},
 
-		{Name: "BulkOk", Robj: newRespBulk([]byte("4\r\nkaba")), Expect: "$4\r\nkaba\r\n"},
-		{Name: "BulkNullOk", Robj: newRespNull(respBulk), Expect: "$-1\r\n"},
+		{Name: "BulkOk", Robj: newRESPBulk([]byte("4\r\nkaba")), Expect: "$4\r\nkaba\r\n"},
+		{Name: "BulkNullOk", Robj: newRESPNull(respBulk), Expect: "$-1\r\n"},
 
-		{Name: "ArrayNullOk", Robj: newRespNull(respArray), Expect: "*-1\r\n"},
+		{Name: "ArrayNullOk", Robj: newRESPNull(respArray), Expect: "*-1\r\n"},
 		{Name: "ArrayOk",
-			Robj:   newRespArray([]*resp{newRespBulk([]byte("2\r\nka")), newRespString([]byte("baka"))}),
+			Robj:   newRESPArray([]*resp{newRESPBulk([]byte("2\r\nka")), newRESPString([]byte("baka"))}),
 			Expect: "*2\r\n$2\r\nka\r\n+baka\r\n"},
 	}
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
 			sock, buf := _createDownStreamConn()
-			conn := newRespConn(sock)
+			conn := newRESPConn(sock)
 			// err := conn.encode(newRespInt(1024))
 			err := conn.encode(tt.Robj)
 			assert.NoError(t, err)

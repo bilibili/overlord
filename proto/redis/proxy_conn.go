@@ -24,7 +24,7 @@ type proxyConn struct {
 // NewProxyConn creates new redis Encoder and Decoder.
 func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 	r := &proxyConn{
-		rc: newRespConn(conn),
+		rc: newRESPConn(conn),
 	}
 	return r
 }
@@ -131,10 +131,10 @@ func (pc *proxyConn) mergeOk(msg *proto.Message) (*resp, error) {
 	for _, sub := range msg.Subs() {
 		if err := sub.Err(); err != nil {
 			cmd := sub.Request().(*Command)
-			return newRespPlain(respError, cmd.reply.data), nil
+			return newRESPPlain(respError, cmd.reply.data), nil
 		}
 	}
-	return newRespString(okBytes), nil
+	return newRESPString(okBytes), nil
 }
 
 func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
@@ -153,12 +153,12 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 		}
 		sum += int(ival)
 	}
-	reply = newRespInt(sum)
+	reply = newRESPInt(sum)
 	return
 }
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
-	reply = newRespArrayWithCapcity(len(msg.Subs()))
+	reply = newRESPArrayWithCapcity(len(msg.Subs()))
 	subs := msg.Subs()
 	for i, sub := range subs {
 		subcmd, ok := sub.Request().(*Command)
@@ -187,6 +187,6 @@ func (pc *proxyConn) getBatchMergeType(msg *proto.Message) (mtype MergeType, err
 
 func (pc *proxyConn) encodeError(err error) error {
 	se := errors.Cause(err).Error()
-	robj := newRespPlain(respError, []byte(se))
+	robj := newRESPPlain(respError, []byte(se))
 	return pc.rc.encode(robj)
 }

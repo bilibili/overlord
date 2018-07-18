@@ -31,7 +31,7 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	return &nodeConn{
 		cluster: cluster,
 		addr:    addr,
-		rc:      newRespConn(conn),
+		rc:      newRESPConn(conn),
 		conn:    conn,
 		p:       newPinger(conn),
 		state:   closed,
@@ -92,9 +92,9 @@ func (nc *nodeConn) Close() error {
 }
 
 var (
-	robjCluterNodes = newRespArray([]*resp{
-		newRespBulk([]byte("7\r\nCLUSTER")),
-		newRespBulk([]byte("5\r\nNODES")),
+	robjCluterNodes = newRESPArray([]*resp{
+		newRESPBulk([]byte("7\r\nCLUSTER")),
+		newRESPBulk([]byte("5\r\nNODES")),
 	})
 )
 

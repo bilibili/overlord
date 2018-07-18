@@ -153,7 +153,7 @@ func TestParseSlotsOk(t *testing.T) {
 }
 
 func TestParseSlotsFromReplyOk(t *testing.T) {
-	rs := newRespBulk([]byte(clusterNodesData))
+	rs := newRESPBulk([]byte(clusterNodesData))
 	ns, err := ParseSlots(rs)
 	assert.NoError(t, err)
 	assert.NotNil(t, ns)

@@ -40,32 +40,32 @@ func TestEncodeCmdOk(t *testing.T) {
 	}{
 		{
 			Name:   "MergeJoinOk",
-			Reps:   []*resp{newRespBulk([]byte("3\r\nabc")), newRespNull(respBulk)},
-			Obj:    newRespArray([]*resp{newRespBulk([]byte("4\r\nMGET")), newRespBulk([]byte("3\r\nABC")), newRespBulk([]byte("3\r\nxnc"))}),
+			Reps:   []*resp{newRESPBulk([]byte("3\r\nabc")), newRESPNull(respBulk)},
+			Obj:    newRESPArray([]*resp{newRESPBulk([]byte("4\r\nMGET")), newRESPBulk([]byte("3\r\nABC")), newRESPBulk([]byte("3\r\nxnc"))}),
 			Expect: "*2\r\n$3\r\nabc\r\n$-1\r\n",
 		},
 		{
 			Name: "MergeCountOk",
-			Reps: []*resp{newRespInt(1), newRespInt(1), newRespInt(0)},
-			Obj: newRespArray(
+			Reps: []*resp{newRESPInt(1), newRESPInt(1), newRESPInt(0)},
+			Obj: newRESPArray(
 				[]*resp{
-					newRespBulk([]byte("3\r\nDEL")),
-					newRespBulk([]byte("1\r\na")),
-					newRespBulk([]byte("2\r\nab")),
-					newRespBulk([]byte("3\r\nabc")),
+					newRESPBulk([]byte("3\r\nDEL")),
+					newRESPBulk([]byte("1\r\na")),
+					newRESPBulk([]byte("2\r\nab")),
+					newRESPBulk([]byte("3\r\nabc")),
 				}),
 			Expect: ":2\r\n",
 		},
 		{
 			Name: "MergeCountOk",
-			Reps: []*resp{newRespString([]byte("OK")), newRespString([]byte("OK"))},
-			Obj: newRespArray(
+			Reps: []*resp{newRESPString([]byte("OK")), newRESPString([]byte("OK"))},
+			Obj: newRESPArray(
 				[]*resp{
-					newRespBulk([]byte("4\r\nMSET")),
-					newRespBulk([]byte("1\r\na")),
-					newRespBulk([]byte("2\r\nab")),
-					newRespBulk([]byte("3\r\nabc")),
-					newRespBulk([]byte("4\r\nabcd")),
+					newRESPBulk([]byte("4\r\nMSET")),
+					newRESPBulk([]byte("1\r\na")),
+					newRESPBulk([]byte("2\r\nab")),
+					newRESPBulk([]byte("3\r\nabc")),
+					newRESPBulk([]byte("4\r\nabcd")),
 				}),
 			Expect: "+OK\r\n",
 		},

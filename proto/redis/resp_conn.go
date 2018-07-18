@@ -6,7 +6,7 @@ import (
 	libnet "overlord/lib/net"
 )
 
-// respConn will encode and decode resp object to socket
+// respConn will encode and decode res object to socket
 type respConn struct {
 	br *bufio.Reader
 	bw *bufio.Writer
@@ -14,8 +14,8 @@ type respConn struct {
 	completed bool
 }
 
-// newRespConn will create new resp object Conn
-func newRespConn(conn *libnet.Conn) *respConn {
+// newRespConn will create new redis server protocol object Conn
+func newRESPConn(conn *libnet.Conn) *respConn {
 	r := &respConn{
 		br:        bufio.NewReader(conn, bufio.Get(1024)),
 		bw:        bufio.NewWriter(conn),
@@ -40,7 +40,7 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 	}
 
 	for i := 0; i < max; i++ {
-		robj, err = rc.decodeResp()
+		robj, err = rc.decodeRESP()
 		if err == bufio.ErrBufferFull {
 			rc.completed = true
 			err = nil
@@ -77,7 +77,7 @@ func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
 				return
 			}
 
-			robj, err = rc.decodeResp()
+			robj, err = rc.decodeRESP()
 			if err == bufio.ErrBufferFull {
 				break
 			}
@@ -91,7 +91,7 @@ func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
 	}
 }
 
-func (rc *respConn) decodeResp() (robj *resp, err error) {
+func (rc *respConn) decodeRESP() (robj *resp, err error) {
 	var (
 		line []byte
 	)
@@ -116,7 +116,7 @@ func (rc *respConn) decodeResp() (robj *resp, err error) {
 }
 
 func (rc *respConn) decodePlain(line []byte) *resp {
-	return newRespPlain(line[0], line[1:len(line)-2])
+	return newRESPPlain(line[0], line[1:len(line)-2])
 }
 
 func (rc *respConn) decodeBulk(line []byte) (*resp, error) {
@@ -129,7 +129,7 @@ func (rc *respConn) decodeBulk(line []byte) (*resp, error) {
 	}
 
 	if size == -1 {
-		return newRespNull(respBulk), nil
+		return newRESPNull(respBulk), nil
 	}
 
 	rc.br.Advance(-(lineSize - 1))
@@ -142,7 +142,7 @@ func (rc *respConn) decodeBulk(line []byte) (*resp, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	return newRespBulk(data[:len(data)-2]), nil
+	return newRESPBulk(data[:len(data)-2]), nil
 }
 
 func (rc *respConn) decodeArray(line []byte) (*resp, error) {
@@ -152,13 +152,13 @@ func (rc *respConn) decodeArray(line []byte) (*resp, error) {
 		return nil, err
 	}
 	if size == -1 {
-		return newRespNull(respArray), nil
+		return newRESPNull(respArray), nil
 	}
-	robj := newRespArrayWithCapcity(size)
+	robj := newRESPArrayWithCapcity(size)
 	robj.data = line[1 : lineSize-2]
 	mark := rc.br.Mark()
 	for i := 0; i < size; i++ {
-		sub, err := rc.decodeResp()
+		sub, err := rc.decodeRESP()
 		if err != nil {
 			rc.br.AdvanceTo(mark)
 			rc.br.Advance(-lineSize)

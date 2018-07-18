@@ -40,7 +40,7 @@ func subCmdMset(robj *resp) ([]*Command, error) {
 	mid := robj.Len() / 2
 	cmds := make([]*Command, mid)
 	for i := 0; i < mid; i++ {
-		cmdObj := newRespArrayWithCapcity(3)
+		cmdObj := newRESPArrayWithCapcity(3)
 		cmdObj.replace(0, robjMSet)
 		cmdObj.replace(1, robj.nth(i*2+1))
 		cmdObj.replace(2, robj.nth(i*2+2))
@@ -55,9 +55,9 @@ func subCmdByKeys(robj *resp) ([]*Command, error) {
 	for i, sub := range robj.slice()[1:] {
 		var cmdObj *resp
 		if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
-			cmdObj = newRespArray([]*resp{robjGet, sub})
+			cmdObj = newRESPArray([]*resp{robjGet, sub})
 		} else {
-			cmdObj = newRespArray([]*resp{robj.nth(0), sub})
+			cmdObj = newRESPArray([]*resp{robj.nth(0), sub})
 		}
 		cmds[i] = newCommand(cmdObj)
 	}

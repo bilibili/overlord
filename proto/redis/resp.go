@@ -39,7 +39,7 @@ var (
 	}
 )
 
-// resp is a redis resp protocol item.
+// resp is a redis server protocol item.
 type resp struct {
 	rtype respType
 	// in Bulk this is the size field
@@ -48,16 +48,16 @@ type resp struct {
 	array []*resp
 }
 
-func newRespInt(val int) *resp {
+func newRESPInt(val int) *resp {
 	s := strconv.Itoa(val)
-	return newRespPlain(respInt, []byte(s))
+	return newRESPPlain(respInt, []byte(s))
 }
 
-func newRespBulk(data []byte) *resp {
-	return newRespPlain(respBulk, data)
+func newRESPBulk(data []byte) *resp {
+	return newRESPPlain(respBulk, data)
 }
 
-func newRespPlain(rtype respType, data []byte) *resp {
+func newRESPPlain(rtype respType, data []byte) *resp {
 	robj := respPool.Get().(*resp)
 	robj.rtype = rtype
 	robj.data = data
@@ -65,15 +65,15 @@ func newRespPlain(rtype respType, data []byte) *resp {
 	return robj
 }
 
-func newRespString(val []byte) *resp {
-	return newRespPlain(respString, val)
+func newRESPString(val []byte) *resp {
+	return newRESPPlain(respString, val)
 }
 
-func newRespNull(rtype respType) *resp {
-	return newRespPlain(rtype, nil)
+func newRESPNull(rtype respType) *resp {
+	return newRESPPlain(rtype, nil)
 }
 
-func newRespArray(resps []*resp) *resp {
+func newRESPArray(resps []*resp) *resp {
 	robj := respPool.Get().(*resp)
 	robj.rtype = respArray
 	robj.data = []byte(strconv.Itoa(len(resps)))
@@ -81,7 +81,7 @@ func newRespArray(resps []*resp) *resp {
 	return robj
 }
 
-func newRespArrayWithCapcity(length int) *resp {
+func newRESPArrayWithCapcity(length int) *resp {
 	robj := respPool.Get().(*resp)
 	robj.rtype = respArray
 	robj.data = nil

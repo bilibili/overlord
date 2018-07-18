@@ -17,8 +17,8 @@ var (
 )
 
 var (
-	robjGet  = newRespBulk([]byte("3\r\nGET"))
-	robjMSet = newRespBulk([]byte("4\r\nMSET"))
+	robjGet  = newRESPBulk([]byte("3\r\nGET"))
+	robjMSet = newRESPBulk([]byte("4\r\nMSET"))
 
 	cmdMSetLenBytes = []byte("3")
 	cmdMSetBytes    = []byte("4\r\nMSET")
@@ -53,13 +53,13 @@ type Command struct {
 //     NewCommand("GET", "mykey")
 //     NewCommand("CLUSTER", "NODES")
 func NewCommand(cmd string, args ...string) *Command {
-	respObj := newRespArrayWithCapcity(len(args) + 1)
-	respObj.replace(0, newRespBulk([]byte(cmd)))
+	respObj := newRESPArrayWithCapcity(len(args) + 1)
+	respObj.replace(0, newRESPBulk([]byte(cmd)))
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
 		data := args[i-1]
 		line := fmt.Sprintf("%d\r\n%s", len(data), data)
-		respObj.replace(i, newRespBulk([]byte(line)))
+		respObj.replace(i, newRESPBulk([]byte(line)))
 	}
 	respObj.data = []byte(strconv.Itoa(len(args) + 1))
 	return newCommand(respObj)
