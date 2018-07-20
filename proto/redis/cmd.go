@@ -53,13 +53,15 @@ type Command struct {
 //     NewCommand("GET", "mykey")
 //     NewCommand("CLUSTER", "NODES")
 func NewCommand(cmd string, args ...string) *Command {
-	respObj := newRESPArrayWithCapcity(len(args) + 1)
-	respObj.replace(0, newRESPBulk([]byte(cmd)))
+	respObj := respPool.Get().(*resp)
+	respObj.next().setBulk([]byte(cmd))
+	// respObj := newRESPArrayWithCapcity(len(args) + 1)
+	// respObj.replace(0, newRESPBulk([]byte(cmd)))
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
 		data := args[i-1]
 		line := fmt.Sprintf("%d\r\n%s", len(data), data)
-		respObj.replace(i, newRESPBulk([]byte(line)))
+		respObj.next().setBulk([]byte(line))
 	}
 	respObj.data = []byte(strconv.Itoa(len(args) + 1))
 	return newCommand(respObj)
@@ -68,6 +70,7 @@ func NewCommand(cmd string, args ...string) *Command {
 func newCommand(robj *resp) *Command {
 	r := &Command{respObj: robj}
 	r.mergeType = getMergeType(robj.nth(0).data)
+	r.reply = &resp{}
 	return r
 }
 

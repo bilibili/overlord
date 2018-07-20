@@ -2,8 +2,10 @@ package redis
 
 import (
 	"io"
-	"overlord/lib/bufio"
 	"testing"
+
+	"overlord/lib/bufio"
+	"overlord/proto"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +19,8 @@ func _runDecodeResps(t *testing.T, line string, expect string, rtype respType, e
 	rc := _createRespConn([]byte(line))
 	err := rc.br.Read()
 	if assert.NoError(t, err) {
-		robj, err := rc.decodeRESP()
+		robj := &resp{}
+		err = rc.decodeRESP(robj)
 		if eErr == nil {
 			if assert.NoError(t, err) {
 				if expect == "" {
@@ -67,7 +70,8 @@ func TestDecodeRESP(t *testing.T) {
 func TestDecodeMaxReachMaxOk(t *testing.T) {
 	line := []byte("$1\r\na\r\n+my name is van\r\n-baka error\r\n")
 	rc := _createRespConn([]byte(line))
-	rs, err := rc.decodeMax(2)
+	msgs := []*proto.Message{proto.NewMessage(), proto.NewMessage()}
+	rs, err := rc.decodeMax(msgs)
 	assert.NoError(t, err)
 	assert.Len(t, rs, 2)
 	assert.Equal(t, respBulk, rs[0].rtype)
@@ -77,7 +81,8 @@ func TestDecodeMaxReachMaxOk(t *testing.T) {
 func TestDecodeMaxReachFullOk(t *testing.T) {
 	line := []byte("$1\r\na\r\n+my name is")
 	rc := _createRespConn([]byte(line))
-	rs, err := rc.decodeMax(2)
+	msgs := []*proto.Message{proto.NewMessage(), proto.NewMessage()}
+	rs, err := rc.decodeMax(msgs)
 	assert.NoError(t, err)
 	assert.Len(t, rs, 1)
 	assert.Equal(t, respBulk, rs[0].rtype)
@@ -86,7 +91,8 @@ func TestDecodeMaxReachFullOk(t *testing.T) {
 func TestDecodeCountOk(t *testing.T) {
 	line := []byte("$1\r\na\r\n+my name is\r\n")
 	rc := _createRespConn([]byte(line))
-	rs, err := rc.decodeCount(2)
+	rs := []*resp{&resp{}, &resp{}}
+	err := rc.decodeCount(rs)
 	assert.NoError(t, err)
 	assert.Len(t, rs, 2)
 	assert.Equal(t, respBulk, rs[0].rtype)
@@ -96,7 +102,8 @@ func TestDecodeCountOk(t *testing.T) {
 func TestDecodeCountNotFull(t *testing.T) {
 	line := []byte("$1\r\na\r\n+my name is\r\n")
 	rc := _createRespConn([]byte(line))
-	_, err := rc.decodeCount(3)
+	rs := []*resp{&resp{}, &resp{}, &resp{}}
+	err := rc.decodeCount(rs)
 	assert.Error(t, err)
 	assert.Equal(t, io.EOF, err)
 }

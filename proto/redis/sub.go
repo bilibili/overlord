@@ -40,7 +40,9 @@ func subCmdMset(robj *resp) ([]*Command, error) {
 	mid := robj.Len() / 2
 	cmds := make([]*Command, mid)
 	for i := 0; i < mid; i++ {
-		cmdObj := newRESPArrayWithCapcity(3)
+		cmdObj := respPool.Get().(*resp)
+		cmdObj.rtype = respArray
+		cmdObj.data = nil
 		cmdObj.replace(0, robjMSet)
 		cmdObj.replace(1, robj.nth(i*2+1))
 		cmdObj.replace(2, robj.nth(i*2+2))

@@ -46,6 +46,8 @@ type resp struct {
 	// in array this is the count field
 	data  []byte
 	array []*resp
+	// in order to reuse array.use arrayn to mark current obj.
+	arrayn int 
 }
 
 func newRESPInt(val int) *resp {
@@ -53,8 +55,17 @@ func newRESPInt(val int) *resp {
 	return newRESPPlain(respInt, []byte(s))
 }
 
+func (r *resp)setInt(val int)  {
+	s := strconv.Itoa(val)
+	r.setPlain(respInt, []byte(s))
+}
+
 func newRESPBulk(data []byte) *resp {
 	return newRESPPlain(respBulk, data)
+}
+
+func (r *resp)setBulk(data []byte)  {
+	r.setPlain(respBulk, data)
 }
 
 func newRESPPlain(rtype respType, data []byte) *resp {
@@ -65,12 +76,26 @@ func newRESPPlain(rtype respType, data []byte) *resp {
 	return robj
 }
 
+func (r *resp)setPlain(rtype respType, data []byte)  {
+	r.rtype = rtype
+	r.data = data
+	r.arrayn=0
+}
+
 func newRESPString(val []byte) *resp {
 	return newRESPPlain(respString, val)
 }
 
+func (r *resp)setString(val []byte)  {
+	r.setPlain(respString, val)
+}
+
 func newRESPNull(rtype respType) *resp {
 	return newRESPPlain(rtype, nil)
+}
+
+func (r *resp)setNull(rtype respType)  {
+	 r.setPlain(rtype, nil)
 }
 
 func newRESPArray(resps []*resp) *resp {
@@ -78,24 +103,38 @@ func newRESPArray(resps []*resp) *resp {
 	robj.rtype = respArray
 	robj.data = []byte(strconv.Itoa(len(resps)))
 	robj.array = resps
+	robj.arrayn = len(resps)
 	return robj
 }
 
-func newRESPArrayWithCapcity(length int) *resp {
-	robj := respPool.Get().(*resp)
-	robj.rtype = respArray
-	robj.data = nil
-	robj.array = make([]*resp, length)
-	return robj
+func (r *resp)setArray(resps []*resp)  {
+	r.rtype = respArray
+	r.data = []byte(strconv.Itoa(len(resps)))
+	r.array = resps
+	r.arrayn = len(resps)
 }
-
+// func newRESPArray(resps []*resp) *resp {
+// return 
+// }
 func (r *resp) nth(pos int) *resp {
 	return r.array[pos]
 }
 
+func (r *resp)next()*resp {
+	if r.arrayn < len(r.array) {
+		robj:= r.array[r.arrayn]
+		r.arrayn++
+		return robj
+	} else {
+		robj := respPool.Get().(*resp)
+		r.array = append(r.array,robj)
+		r.arrayn++
+		return robj
+	}
+}
 func (r *resp) isNull() bool {
 	if r.rtype == respArray {
-		return r.array == nil
+		return r.arrayn == 0
 	}
 	if r.rtype == respBulk {
 		return r.data == nil
@@ -108,16 +147,22 @@ func (r *resp) replaceAll(begin int, newers []*resp) {
 }
 
 func (r *resp) replace(pos int, newer *resp) {
-	r.array[pos] = newer
+	if pos <len(r.array) {
+		r.array[pos] = newer
+		r.arrayn= pos
+	}else {
+		r.array = append(r.array, newer)
+		r.arrayn = len(r.array)
+	}
 }
 
 func (r *resp) slice() []*resp {
-	return r.array
+	return r.array[:r.arrayn]
 }
 
 // Len represent the respArray type's length
 func (r *resp) Len() int {
-	return len(r.array)
+	return r.arrayn
 }
 
 // String was only for debug
@@ -125,11 +170,11 @@ func (r *resp) String() string {
 	if r.rtype == respArray {
 		var sb strings.Builder
 		sb.Write([]byte("["))
-		for _, sub := range r.array[:len(r.array)-1] {
+		for _, sub := range r.array[:r.arrayn-1] {
 			sb.WriteString(sub.String())
 			sb.WriteString(", ")
 		}
-		sb.WriteString(r.array[len(r.array)-1].String())
+		sb.WriteString(r.array[r.arrayn-1].String())
 		sb.Write([]byte("]"))
 		sb.WriteString("\n")
 		return sb.String()

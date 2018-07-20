@@ -5,7 +5,6 @@ import (
 	"overlord/lib/conv"
 	libnet "overlord/lib/net"
 	"overlord/proto"
-
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -30,7 +29,7 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 }
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
-	rs, err := pc.rc.decodeMax(len(msgs))
+	rs, err := pc.rc.decodeMax(msgs)
 	if err != nil {
 		return msgs, err
 	}
@@ -80,7 +79,6 @@ func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
 		err = errors.Wrap(err, "Redis Encoder encode")
 		return
 	}
-
 	if err = pc.rc.Flush(); err != nil {
 		err = errors.Wrap(err, "Redis Encoder flush response")
 	}
@@ -127,14 +125,21 @@ func (pc *proxyConn) merge(msg *proto.Message) (*resp, error) {
 	}
 }
 
-func (pc *proxyConn) mergeOk(msg *proto.Message) (*resp, error) {
-	for _, sub := range msg.Subs() {
-		if err := sub.Err(); err != nil {
+func (pc *proxyConn) mergeOk(msg *proto.Message) (robj *resp, err error) {
+	for i, sub := range msg.Subs() {
+		if err = sub.Err(); err != nil {
 			cmd := sub.Request().(*Command)
-			return newRESPPlain(respError, cmd.reply.data), nil
+			robj = cmd.reply
+			robj.setPlain(respError, cmd.reply.data)
+			return
+		}
+		if i == len(msg.Subs())-1 {
+			cmd := sub.Request().(*Command)
+			robj = cmd.reply
+			robj.setString(okBytes)
 		}
 	}
-	return newRESPString(okBytes), nil
+	return
 }
 
 func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
@@ -158,7 +163,11 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 }
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
-	reply = newRESPArrayWithCapcity(len(msg.Subs()))
+	// TODO(LINTANGHUI):reuse reply
+	reply = &resp{}
+	reply.rtype = respArray
+	reply.arrayn = 0
+	// reply = newRESPArrayWithCapcity(len(msg.Subs()))
 	subs := msg.Subs()
 	for i, sub := range subs {
 		subcmd, ok := sub.Request().(*Command)
@@ -169,6 +178,7 @@ func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
 			}
 			continue
 		}
+		subcmd.reply.arrayn = 0
 		reply.replace(i, subcmd.reply)
 	}
 	reply.data = []byte(strconv.Itoa(len(subs)))

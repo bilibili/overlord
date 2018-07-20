@@ -63,18 +63,19 @@ func (nc *nodeConn) write(m *proto.Message) error {
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) error {
 	nc.rc.br.ResetBuffer(mb.Buffer())
 	defer nc.rc.br.ResetBuffer(nil)
-
-	count := mb.Count()
-	resps, err := nc.rc.decodeCount(count)
-	if err != nil {
-		return err
-	}
+	resps := make([]*resp, len(mb.Msgs()))
 	for i, msg := range mb.Msgs() {
 		cmd, ok := msg.Request().(*Command)
 		if !ok {
 			return ErrBadAssert
 		}
-		cmd.reply = resps[i]
+		resps[i] = cmd.reply
+	}
+	err := nc.rc.decodeCount(resps)
+	if err != nil {
+		return err
+	}
+	for _, msg := range mb.Msgs() {
 		msg.MarkRead()
 	}
 	return nil
@@ -107,7 +108,8 @@ func (nc *nodeConn) FetchSlots() (nodes []string, slots [][]int, err error) {
 	if err != nil {
 		return
 	}
-	rs, err := nc.rc.decodeCount(1)
+	rs := []*resp{&resp{}}
+	err = nc.rc.decodeCount(rs)
 	if err != nil {
 		return
 	}

@@ -18,7 +18,7 @@ func TestCommandNewCommand(t *testing.T) {
 
 func TestCommandRedirect(t *testing.T) {
 	cmd := NewCommand("GET", "BAKA")
-	cmd.reply = newRespPlain(respError, []byte("ASK 1024 127.0.0.1:2048"))
+	cmd.reply = newRESPPlain(respError, []byte("ASK 1024 127.0.0.1:2048"))
 	assert.True(t, cmd.IsRedirect())
 	r, slot, addr, err := cmd.RedirectTriple()
 	assert.NoError(t, err)

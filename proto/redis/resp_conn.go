@@ -4,6 +4,7 @@ import (
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
 	libnet "overlord/lib/net"
+	"overlord/proto"
 )
 
 // respConn will encode and decode res object to socket
@@ -26,11 +27,7 @@ func newRESPConn(conn *libnet.Conn) *respConn {
 
 // decodeMax will parse all the resp objects and keep the reuse reference until
 // next call of this function.
-func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
-	var (
-		robj *resp
-	)
-
+func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) {
 	if rc.completed {
 		err = rc.br.Read()
 		if err != nil {
@@ -39,8 +36,15 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 		rc.completed = false
 	}
 
-	for i := 0; i < max; i++ {
-		robj, err = rc.decodeRESP()
+	for _, msg := range msgs {
+		var robj *resp
+		subcmd, ok := msg.Request().(*Command)
+		if !ok {
+			robj = respPool.Get().(*resp)
+		} else {
+			robj = subcmd.respObj
+		}
+		err = rc.decodeRESP(robj)
 		if err == bufio.ErrBufferFull {
 			rc.completed = true
 			err = nil
@@ -55,11 +59,11 @@ func (rc *respConn) decodeMax(max int) (resps []*resp, err error) {
 }
 
 // decodeCount will trying to parse the buffer until meet the count.
-func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
+func (rc *respConn) decodeCount(robjs []*resp) (err error) {
 	var (
-		robj  *resp
 		begin = rc.br.Mark()
 		now   = rc.br.Mark()
+		n     = len(robjs)
 		i     = 0
 	)
 
@@ -77,96 +81,95 @@ func (rc *respConn) decodeCount(n int) (resps []*resp, err error) {
 				return
 			}
 
-			robj, err = rc.decodeRESP()
+			err = rc.decodeRESP(robjs[i])
 			if err == bufio.ErrBufferFull {
 				break
 			}
 			if err != nil {
 				return
 			}
-			resps = append(resps, robj)
 			now = rc.br.Mark()
 			i++
 		}
 	}
 }
 
-func (rc *respConn) decodeRESP() (robj *resp, err error) {
+func (rc *respConn) decodeRESP(robj *resp) (err error) {
 	var (
 		line []byte
 	)
 	line, err = rc.br.ReadLine()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	rtype := line[0]
 	switch rtype {
 	case respString, respInt, respError:
 		// decocde use one line to parse
-		robj = rc.decodePlain(line)
+		rc.decodePlain(line, robj)
 	case respBulk:
 		// decode bulkString
 		// fmt.Printf("line:%s\n", strconv.Quote(string(line)))
-		robj, err = rc.decodeBulk(line)
+		err = rc.decodeBulk(line, robj)
 	case respArray:
-		robj, err = rc.decodeArray(line)
+		err = rc.decodeArray(line, robj)
 	}
 	return
 }
 
-func (rc *respConn) decodePlain(line []byte) *resp {
-	return newRESPPlain(line[0], line[1:len(line)-2])
+func (rc *respConn) decodePlain(line []byte, robj *resp) {
+	robj.setPlain(line[0], line[1:len(line)-2])
 }
 
-func (rc *respConn) decodeBulk(line []byte) (*resp, error) {
+func (rc *respConn) decodeBulk(line []byte, robj *resp) error {
 	lineSize := len(line)
 	sizeBytes := line[1 : lineSize-2]
 	// fmt.Printf("size:%s\n", strconv.Quote(string(sizeBytes)))
 	size, err := decodeInt(sizeBytes)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	if size == -1 {
-		return newRESPNull(respBulk), nil
+		robj.setNull(respBulk)
+		return nil
 	}
-
 	rc.br.Advance(-(lineSize - 1))
 	fullDataSize := lineSize - 1 + size + 2
 	data, err := rc.br.ReadExact(fullDataSize)
 	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 	if err == bufio.ErrBufferFull {
 		rc.br.Advance(-1)
-		return nil, err
+		return err
 	} else if err != nil {
-		return nil, err
+		return err
 	}
-	return newRESPBulk(data[:len(data)-2]), nil
+	robj.setBulk(data[:len(data)-2])
+	return nil
 }
 
-func (rc *respConn) decodeArray(line []byte) (*resp, error) {
+func (rc *respConn) decodeArray(line []byte, robj *resp) error {
 	lineSize := len(line)
 	size, err := decodeInt(line[1 : lineSize-2])
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if size == -1 {
-		return newRESPNull(respArray), nil
+		robj.setNull(respArray)
+		return nil
 	}
-	robj := newRESPArrayWithCapcity(size)
 	robj.data = line[1 : lineSize-2]
+	robj.rtype = respArray
 	mark := rc.br.Mark()
 	for i := 0; i < size; i++ {
-		sub, err := rc.decodeRESP()
+		err = rc.decodeRESP(robj.next())
 		if err != nil {
 			rc.br.AdvanceTo(mark)
 			rc.br.Advance(-lineSize)
-			return nil, err
+			return err
 		}
-		robj.replace(i, sub)
 	}
-	return robj, nil
+	return nil
 }
 
 func decodeInt(data []byte) (int, error) {
