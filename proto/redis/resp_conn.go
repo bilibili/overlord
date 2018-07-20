@@ -38,11 +38,11 @@ func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) 
 
 	for _, msg := range msgs {
 		var robj *resp
-		subcmd, ok := msg.Request().(*Command)
-		if !ok {
+		req := msg.Request()
+		if req == nil {
 			robj = respPool.Get().(*resp)
 		} else {
-			robj = subcmd.respObj
+			robj = req.(*Command).respObj
 		}
 		err = rc.decodeRESP(robj)
 		if err == bufio.ErrBufferFull {
@@ -52,7 +52,6 @@ func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) 
 		} else if err != nil {
 			return
 		}
-
 		resps = append(resps, robj)
 	}
 	return
