@@ -163,7 +163,7 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 }
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
-	// TODO(LINTANGHUI):reuse reply
+	// TODO (LINTANGHUI):reuse reply
 	reply = &resp{}
 	reply.rtype = respArray
 	reply.arrayn = 0

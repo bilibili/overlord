@@ -47,7 +47,7 @@ type resp struct {
 	data  []byte
 	array []*resp
 	// in order to reuse array.use arrayn to mark current obj.
-	arrayn int 
+	arrayn int
 }
 
 func newRESPInt(val int) *resp {
@@ -55,7 +55,7 @@ func newRESPInt(val int) *resp {
 	return newRESPPlain(respInt, []byte(s))
 }
 
-func (r *resp)setInt(val int)  {
+func (r *resp) setInt(val int) {
 	s := strconv.Itoa(val)
 	r.setPlain(respInt, []byte(s))
 }
@@ -64,7 +64,7 @@ func newRESPBulk(data []byte) *resp {
 	return newRESPPlain(respBulk, data)
 }
 
-func (r *resp)setBulk(data []byte)  {
+func (r *resp) setBulk(data []byte) {
 	r.setPlain(respBulk, data)
 }
 
@@ -76,17 +76,17 @@ func newRESPPlain(rtype respType, data []byte) *resp {
 	return robj
 }
 
-func (r *resp)setPlain(rtype respType, data []byte)  {
+func (r *resp) setPlain(rtype respType, data []byte) {
 	r.rtype = rtype
 	r.data = data
-	r.arrayn=0
+	r.arrayn = 0
 }
 
 func newRESPString(val []byte) *resp {
 	return newRESPPlain(respString, val)
 }
 
-func (r *resp)setString(val []byte)  {
+func (r *resp) setString(val []byte) {
 	r.setPlain(respString, val)
 }
 
@@ -94,8 +94,8 @@ func newRESPNull(rtype respType) *resp {
 	return newRESPPlain(rtype, nil)
 }
 
-func (r *resp)setNull(rtype respType)  {
-	 r.setPlain(rtype, nil)
+func (r *resp) setNull(rtype respType) {
+	r.setPlain(rtype, nil)
 }
 
 func newRESPArray(resps []*resp) *resp {
@@ -107,27 +107,28 @@ func newRESPArray(resps []*resp) *resp {
 	return robj
 }
 
-func (r *resp)setArray(resps []*resp)  {
+func (r *resp) setArray(resps []*resp) {
 	r.rtype = respArray
 	r.data = []byte(strconv.Itoa(len(resps)))
 	r.array = resps
 	r.arrayn = len(resps)
 }
+
 // func newRESPArray(resps []*resp) *resp {
-// return 
+// return
 // }
 func (r *resp) nth(pos int) *resp {
 	return r.array[pos]
 }
 
-func (r *resp)next()*resp {
+func (r *resp) next() *resp {
 	if r.arrayn < len(r.array) {
-		robj:= r.array[r.arrayn]
+		robj := r.array[r.arrayn]
 		r.arrayn++
 		return robj
 	} else {
 		robj := respPool.Get().(*resp)
-		r.array = append(r.array,robj)
+		r.array = append(r.array, robj)
 		r.arrayn++
 		return robj
 	}
@@ -147,10 +148,10 @@ func (r *resp) replaceAll(begin int, newers []*resp) {
 }
 
 func (r *resp) replace(pos int, newer *resp) {
-	if pos <len(r.array) {
+	if pos < len(r.array) {
 		r.array[pos] = newer
-		r.arrayn= pos
-	}else {
+		r.arrayn = pos
+	} else {
 		r.array = append(r.array, newer)
 		r.arrayn = len(r.array)
 	}
