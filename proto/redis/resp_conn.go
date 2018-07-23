@@ -25,13 +25,14 @@ func newRESPConn(conn *libnet.Conn) *respConn {
 	return r
 }
 
-// decodeMax will parse all the resp objects and keep the reuse reference until
+// decodeMsg will parse all the req resp objects into message and keep the reuse reference until
 // next call of this function.
-func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*proto.Message, err error) {
+func (rc *respConn) decodeMsg(msgs []*proto.Message) ([]*proto.Message, error) {
+	var err error
 	if rc.completed {
 		err = rc.br.Read()
 		if err != nil {
-			return
+			return nil, err
 		}
 		rc.completed = false
 	}
@@ -50,17 +51,17 @@ func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*proto.Message, er
 			err = nil
 			return msgs[:i], nil
 		} else if err != nil {
-			return
+			return nil, err
 		}
 		msg.Type = proto.CacheTypeRedis
 		msg.MarkStart()
 		err = robj.decode(msg)
 		if err != nil {
 			msg.Reset()
-			return
+			return nil, err
 		}
 	}
-	return
+	return msgs, nil
 }
 
 // decodeCount will trying to parse the buffer until meet the count.

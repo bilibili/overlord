@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
 	// "crc"
 	"bytes"
 )
@@ -72,6 +73,12 @@ func newCommand(robj *resp) *Command {
 	r.mergeType = getMergeType(robj.nth(0).data)
 	r.reply = &resp{}
 	return r
+}
+
+func (c *Command) setRESP(robj *resp) {
+	c.respObj = robj
+	c.mergeType = getMergeType(robj.nth(0).data)
+	c.reply = &resp{}
 }
 
 func newCommandWithMergeType(robj *resp, mtype MergeType) *Command {

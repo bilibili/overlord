@@ -76,12 +76,11 @@ func TestEncodeCmdOk(t *testing.T) {
 			msg := proto.NewMessage()
 			co := tt.Obj
 			if isComplex(co.nth(0).data) {
-				cmds, err := newSubCmd(co)
+				err := newSubCmd(msg, co)
 				if assert.NoError(t, err) {
-					for i, cmd := range cmds {
+					for i, req := range msg.Requests() {
+						cmd := req.(*Command)
 						cmd.reply = rs[i]
-						//	fmt.Printf("cmd %+v\n", cmd)
-						msg.WithRequest(cmd)
 					}
 					msg.Batch()
 				}

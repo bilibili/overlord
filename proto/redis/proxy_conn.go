@@ -29,35 +29,7 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 }
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
-	return pc.rc.decodeMax(msgs)
-}
-
-func (pc *proxyConn) decodeToMsg(robj *resp, msg *proto.Message) (err error) {
-	if isComplex(robj.nth(0).data) {
-		cmds, inerr := newSubCmd(robj)
-		if inerr != nil {
-			err = inerr
-			return
-		}
-		for _, cmd := range cmds {
-			pc.withReq(msg, cmd)
-		}
-	} else {
-		pc.withReq(msg, newCommand(robj))
-	}
-	return
-}
-
-func (pc *proxyConn) withReq(m *proto.Message, cmd *Command) {
-	req := m.NextReq()
-	if req == nil {
-		m.WithRequest(cmd)
-	} else {
-		reqCmd := req.(*Command)
-		reqCmd.respObj = cmd.respObj
-		reqCmd.mergeType = cmd.mergeType
-		reqCmd.reply = cmd.reply
-	}
+	return pc.rc.decodeMsg(msgs)
 }
 
 func (pc *proxyConn) Encode(msg *proto.Message) (err error) {

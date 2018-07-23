@@ -278,28 +278,22 @@ func (r *resp) encodeArray(w proto.Writer) (err error) {
 
 func (r *resp) decode(msg *proto.Message) (err error) {
 	if isComplex(r.nth(0).data) {
-		cmds, inerr := newSubCmd(r)
-		if inerr != nil {
-			err = inerr
+		err = newSubCmd(msg, r)
+		if err != nil {
 			return
 		}
-		for _, cmd := range cmds {
-			withReq(msg, cmd)
-		}
 	} else {
-		withReq(msg, newCommand(r))
+		withReq(msg, r)
 	}
 	return
 }
 
-func withReq(m *proto.Message, cmd *Command) {
+func withReq(m *proto.Message, robj *resp) {
 	req := m.NextReq()
 	if req == nil {
-		m.WithRequest(cmd)
+		m.WithRequest(newCommand(robj))
 	} else {
 		reqCmd := req.(*Command)
-		reqCmd.respObj = cmd.respObj
-		reqCmd.mergeType = cmd.mergeType
-		reqCmd.reply = cmd.reply
+		reqCmd.setRESP(robj)
 	}
 }
