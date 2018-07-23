@@ -93,6 +93,26 @@ func (rc *respConn) decodeCount(robjs []*resp) (err error) {
 	}
 }
 
+// decodeOne will trying to parse the buffer until get one complete resp..
+func (rc *respConn) decodeOne(robj *resp) (err error) {
+	var (
+		begin = rc.br.Mark()
+	)
+	for {
+		// advance the r position to begin to avoid Read fill buffer
+		rc.br.AdvanceTo(begin)
+		err = rc.br.Read()
+		if err != nil {
+			return
+		}
+		err = rc.decodeRESP(robj)
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		return
+	}
+}
+
 func (rc *respConn) decodeRESP(robj *resp) (err error) {
 	var (
 		line []byte
@@ -176,96 +196,7 @@ func decodeInt(data []byte) (int, error) {
 	return int(i), err
 }
 
-func (rc *respConn) encode(robj *resp) error {
-	switch robj.rtype {
-	case respInt:
-		return rc.encodeInt(robj)
-	case respError:
-		return rc.encodeError(robj)
-	case respString:
-		return rc.encodeString(robj)
-	case respBulk:
-		return rc.encodeBulk(robj)
-	case respArray:
-		return rc.encodeArray(robj)
-	}
-	return nil
-}
-
 // Flush was used to writev to flush.
 func (rc *respConn) Flush() error {
 	return rc.bw.Flush()
-}
-
-func (rc *respConn) encodeInt(robj *resp) (err error) {
-	return rc.encodePlain(respIntBytes, robj)
-}
-
-func (rc *respConn) encodeError(robj *resp) (err error) {
-	return rc.encodePlain(respErrorBytes, robj)
-}
-
-func (rc *respConn) encodeString(robj *resp) (err error) {
-	return rc.encodePlain(respStringBytes, robj)
-}
-
-func (rc *respConn) encodePlain(rtypeBytes []byte, robj *resp) (err error) {
-	err = rc.bw.Write(rtypeBytes)
-	if err != nil {
-		return
-	}
-
-	err = rc.bw.Write(robj.data)
-	if err != nil {
-		return
-	}
-	err = rc.bw.Write(crlfBytes)
-	return
-}
-
-func (rc *respConn) encodeBulk(robj *resp) (err error) {
-	// NOTICE: we need not to convert robj.Len() as int
-	// due number has been writen into data
-	err = rc.bw.Write(respBulkBytes)
-	if err != nil {
-		return
-	}
-	if robj.isNull() {
-		err = rc.bw.Write(respNullBytes)
-		return
-	}
-
-	err = rc.bw.Write(robj.data)
-	if err != nil {
-		return
-	}
-
-	err = rc.bw.Write(crlfBytes)
-	return
-}
-
-func (rc *respConn) encodeArray(robj *resp) (err error) {
-	err = rc.bw.Write(respArrayBytes)
-	if err != nil {
-		return
-	}
-
-	if robj.isNull() {
-		err = rc.bw.Write(respNullBytes)
-		return
-	}
-	// output size
-	err = rc.bw.Write(robj.data)
-	if err != nil {
-		return
-	}
-	err = rc.bw.Write(crlfBytes)
-
-	for _, item := range robj.slice() {
-		err = rc.encode(item)
-		if err != nil {
-			return
-		}
-	}
-	return
 }

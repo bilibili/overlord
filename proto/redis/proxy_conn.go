@@ -75,9 +75,15 @@ func (pc *proxyConn) withReq(m *proto.Message, cmd *Command) {
 }
 
 func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
-	if err = pc.encode(msg); err != nil {
-		err = errors.Wrap(err, "Redis Encoder encode")
-		return
+	if err := msg.Err(); err != nil {
+		return pc.encodeError(err)
+	}
+	err = pc.merge(msg)
+	if err != nil {
+		return pc.encodeError(err)
+	}
+	for _, item := range msg.SubResps() {
+		_ = pc.rc.bw.Write(item)
 	}
 	if err = pc.rc.Flush(); err != nil {
 		err = errors.Wrap(err, "Redis Encoder flush response")
@@ -85,32 +91,18 @@ func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
 	return
 }
 
-func (pc *proxyConn) encode(msg *proto.Message) error {
-	if err := msg.Err(); err != nil {
-		return pc.encodeError(err)
-	}
-	reply, err := pc.merge(msg)
-	if err != nil {
-		return pc.encodeError(err)
-	}
-	return pc.rc.encode(reply)
-}
-
-func (pc *proxyConn) merge(msg *proto.Message) (*resp, error) {
+func (pc *proxyConn) merge(msg *proto.Message) error {
 	cmd, ok := msg.Request().(*Command)
 	if !ok {
-		return nil, ErrBadAssert
+		return ErrBadAssert
 	}
-
 	if !msg.IsBatch() {
-		return cmd.reply, nil
+		return cmd.reply.encode(msg)
 	}
-
 	mtype, err := pc.getBatchMergeType(msg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	switch mtype {
 	case MergeTypeJoin:
 		return pc.mergeJoin(msg)
@@ -125,24 +117,25 @@ func (pc *proxyConn) merge(msg *proto.Message) (*resp, error) {
 	}
 }
 
-func (pc *proxyConn) mergeOk(msg *proto.Message) (robj *resp, err error) {
+func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
 	for i, sub := range msg.Subs() {
 		if err = sub.Err(); err != nil {
 			cmd := sub.Request().(*Command)
-			robj = cmd.reply
-			robj.setPlain(respError, cmd.reply.data)
+			msg.Write(respErrorBytes)
+			msg.Write(cmd.reply.data)
+			msg.Write(crlfBytes)
 			return
 		}
 		if i == len(msg.Subs())-1 {
-			cmd := sub.Request().(*Command)
-			robj = cmd.reply
-			robj.setString(okBytes)
+			msg.Write(respStringBytes)
+			msg.Write(okBytes)
+			msg.Write(crlfBytes)
 		}
 	}
 	return
 }
 
-func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
+func (pc *proxyConn) mergeCount(msg *proto.Message) (err error) {
 	var sum = 0
 	for _, sub := range msg.Subs() {
 		if sub.Err() != nil {
@@ -150,38 +143,41 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (reply *resp, err error) {
 		}
 		subcmd, ok := sub.Request().(*Command)
 		if !ok {
-			return nil, ErrBadAssert
+			return ErrBadAssert
 		}
 		ival, err := conv.Btoi(subcmd.reply.data)
 		if err != nil {
-			return nil, ErrBadCount
+			return ErrBadCount
 		}
 		sum += int(ival)
 	}
-	reply = newRESPInt(sum)
+	msg.Write(respIntBytes)
+	msg.Write([]byte(strconv.Itoa(sum)))
+	msg.Write(crlfBytes)
 	return
 }
 
-func (pc *proxyConn) mergeJoin(msg *proto.Message) (reply *resp, err error) {
+func (pc *proxyConn) mergeJoin(msg *proto.Message) (err error) {
 	// TODO (LINTANGHUI):reuse reply
-	reply = &resp{}
-	reply.rtype = respArray
-	reply.arrayn = 0
-	// reply = newRESPArrayWithCapcity(len(msg.Subs()))
 	subs := msg.Subs()
-	for i, sub := range subs {
+	msg.Write(respArrayBytes)
+	if len(subs) == 0 {
+		msg.Write(respNullBytes)
+		return
+	}
+	msg.Write([]byte(strconv.Itoa(len(subs))))
+	msg.Write(crlfBytes)
+	for _, sub := range subs {
 		subcmd, ok := sub.Request().(*Command)
 		if !ok {
 			err = pc.encodeError(ErrBadAssert)
 			if err != nil {
 				return
 			}
-			continue
+			return ErrBadAssert
 		}
-		subcmd.reply.arrayn = 0
-		reply.replace(i, subcmd.reply)
+		subcmd.reply.encode(msg)
 	}
-	reply.data = []byte(strconv.Itoa(len(subs)))
 	return
 }
 
@@ -198,5 +194,5 @@ func (pc *proxyConn) getBatchMergeType(msg *proto.Message) (mtype MergeType, err
 func (pc *proxyConn) encodeError(err error) error {
 	se := errors.Cause(err).Error()
 	robj := newRESPPlain(respError, []byte(se))
-	return pc.rc.encode(robj)
+	return robj.encode(pc.rc.bw)
 }

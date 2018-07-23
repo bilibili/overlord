@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bytes"
+	"overlord/proto"
 	"strconv"
 	"strings"
 	"sync"
@@ -114,9 +115,6 @@ func (r *resp) setArray(resps []*resp) {
 	r.arrayn = len(resps)
 }
 
-// func newRESPArray(resps []*resp) *resp {
-// return
-// }
 func (r *resp) nth(pos int) *resp {
 	return r.array[pos]
 }
@@ -133,6 +131,7 @@ func (r *resp) next() *resp {
 		return robj
 	}
 }
+
 func (r *resp) isNull() bool {
 	if r.rtype == respArray {
 		return r.arrayn == 0
@@ -141,10 +140,6 @@ func (r *resp) isNull() bool {
 		return r.data == nil
 	}
 	return false
-}
-
-func (r *resp) replaceAll(begin int, newers []*resp) {
-	copy(r.array[begin:], newers)
 }
 
 func (r *resp) replace(pos int, newer *resp) {
@@ -191,4 +186,93 @@ func (r *resp) bytes() []byte {
 		pos = bytes.Index(data, crlfBytes) + 2
 	}
 	return data[pos:]
+}
+
+func (r *resp) encode(w proto.Writer) error {
+	switch r.rtype {
+	case respInt:
+		return r.encodeInt(w)
+	case respError:
+		return r.encodeError(w)
+	case respString:
+		return r.encodeString(w)
+	case respBulk:
+		return r.encodeBulk(w)
+	case respArray:
+		return r.encodeArray(w)
+	}
+	return nil
+}
+
+func (r *resp) encodeError(w proto.Writer) (err error) {
+	return r.encodePlain(respErrorBytes, w)
+}
+
+func (r *resp) encodeInt(w proto.Writer) (err error) {
+	return r.encodePlain(respIntBytes, w)
+	return
+
+}
+
+func (r *resp) encodeString(w proto.Writer) (err error) {
+	return r.encodePlain(respStringBytes, w)
+}
+
+func (r *resp) encodePlain(rtypeBytes []byte, w proto.Writer) (err error) {
+	err = w.Write(rtypeBytes)
+	if err != nil {
+		return
+	}
+	err = w.Write(r.data)
+	if err != nil {
+		return
+	}
+	err = w.Write(crlfBytes)
+	return
+}
+
+func (r *resp) encodeBulk(w proto.Writer) (err error) {
+	// NOTICE: we need not to convert robj.Len() as int
+	// due number has been writen into data
+	err = w.Write(respBulkBytes)
+	if err != nil {
+		return
+	}
+	if r.isNull() {
+		err = w.Write(respNullBytes)
+		return
+	}
+
+	err = w.Write(r.data)
+	if err != nil {
+		return
+	}
+	err = w.Write(crlfBytes)
+	return
+}
+
+func (r *resp) encodeArray(w proto.Writer) (err error) {
+	err = w.Write(respArrayBytes)
+	if err != nil {
+		return
+	}
+
+	if r.isNull() {
+		err = w.Write(respNullBytes)
+		return
+	}
+	// output size
+	err = w.Write(r.data)
+	if err != nil {
+		return
+	}
+	err = w.Write(crlfBytes)
+
+	for _, item := range r.slice() {
+		item.encode(w)
+		if err != nil {
+			return
+		}
+	}
+	return
 }

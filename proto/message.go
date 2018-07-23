@@ -200,6 +200,11 @@ func (m *Message) AddSubResps(items ...[]byte) {
 	m.subResps = append(m.subResps, items...)
 }
 
+func (m *Message) Write(p []byte) error {
+	m.AddSubResps(p)
+	return nil
+}
+
 // Subs returns all the sub messages.
 func (m *Message) Subs() []*Message {
 	return m.subs[:m.reqn]

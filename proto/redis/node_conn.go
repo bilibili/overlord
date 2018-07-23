@@ -57,25 +57,20 @@ func (nc *nodeConn) write(m *proto.Message) error {
 		m.DoneWithError(ErrBadAssert)
 		return ErrBadAssert
 	}
-	return nc.rc.encode(cmd.respObj)
+	return cmd.respObj.encode(nc.rc.bw)
 }
 
-func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) error {
+func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	nc.rc.br.ResetBuffer(mb.Buffer())
 	defer nc.rc.br.ResetBuffer(nil)
-	resps := make([]*resp, len(mb.Msgs()))
-	for i, msg := range mb.Msgs() {
+	for _, msg := range mb.Msgs() {
 		cmd, ok := msg.Request().(*Command)
 		if !ok {
 			return ErrBadAssert
 		}
-		resps[i] = cmd.reply
-	}
-	err := nc.rc.decodeCount(resps)
-	if err != nil {
-		return err
-	}
-	for _, msg := range mb.Msgs() {
+		if err = nc.rc.decodeOne(cmd.reply); err != nil {
+			return
+		}
 		msg.MarkRead()
 	}
 	return nil
@@ -100,7 +95,7 @@ var (
 )
 
 func (nc *nodeConn) FetchSlots() (nodes []string, slots [][]int, err error) {
-	err = nc.rc.encode(robjCluterNodes)
+	robjCluterNodes.encode(nc.rc.bw)
 	if err != nil {
 		return
 	}
@@ -128,6 +123,5 @@ func (nc *nodeConn) FetchSlots() (nodes []string, slots [][]int, err error) {
 			slots = append(slots, node.Slots())
 		}
 	}
-
 	return
 }

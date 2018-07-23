@@ -132,7 +132,7 @@ func TestEncodeResp(t *testing.T) {
 			sock, buf := _createDownStreamConn()
 			conn := newRESPConn(sock)
 			// err := conn.encode(newRespInt(1024))
-			err := conn.encode(tt.Robj)
+			err := tt.Robj.encode(conn.bw)
 			assert.NoError(t, err)
 			err = conn.Flush()
 			assert.NoError(t, err)
