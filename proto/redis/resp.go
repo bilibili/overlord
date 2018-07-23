@@ -210,7 +210,6 @@ func (r *resp) encodeError(w proto.Writer) (err error) {
 
 func (r *resp) encodeInt(w proto.Writer) (err error) {
 	return r.encodePlain(respIntBytes, w)
-	return
 
 }
 
@@ -275,4 +274,32 @@ func (r *resp) encodeArray(w proto.Writer) (err error) {
 		}
 	}
 	return
+}
+
+func (r *resp) decode(msg *proto.Message) (err error) {
+	if isComplex(r.nth(0).data) {
+		cmds, inerr := newSubCmd(r)
+		if inerr != nil {
+			err = inerr
+			return
+		}
+		for _, cmd := range cmds {
+			withReq(msg, cmd)
+		}
+	} else {
+		withReq(msg, newCommand(r))
+	}
+	return
+}
+
+func withReq(m *proto.Message, cmd *Command) {
+	req := m.NextReq()
+	if req == nil {
+		m.WithRequest(cmd)
+	} else {
+		reqCmd := req.(*Command)
+		reqCmd.respObj = cmd.respObj
+		reqCmd.mergeType = cmd.mergeType
+		reqCmd.reply = cmd.reply
+	}
 }

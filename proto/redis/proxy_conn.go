@@ -29,21 +29,7 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 }
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
-	rs, err := pc.rc.decodeMax(msgs)
-	if err != nil {
-		return msgs, err
-	}
-	for i, r := range rs {
-		msgs[i].Type = proto.CacheTypeRedis
-		msgs[i].MarkStart()
-
-		err = pc.decodeToMsg(r, msgs[i])
-		if err != nil {
-			msgs[i].Reset()
-			return nil, err
-		}
-	}
-	return msgs[:len(rs)], nil
+	return pc.rc.decodeMax(msgs)
 }
 
 func (pc *proxyConn) decodeToMsg(robj *resp, msg *proto.Message) (err error) {
@@ -83,7 +69,7 @@ func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
 		return pc.encodeError(err)
 	}
 	for _, item := range msg.SubResps() {
-		_ = pc.rc.bw.Write(item)
+		pc.rc.bw.Write(item)
 	}
 	if err = pc.rc.Flush(); err != nil {
 		err = errors.Wrap(err, "Redis Encoder flush response")
@@ -118,7 +104,7 @@ func (pc *proxyConn) merge(msg *proto.Message) error {
 }
 
 func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
-	for i, sub := range msg.Subs() {
+	for _, sub := range msg.Subs() {
 		if err = sub.Err(); err != nil {
 			cmd := sub.Request().(*Command)
 			msg.Write(respErrorBytes)
@@ -126,12 +112,10 @@ func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
 			msg.Write(crlfBytes)
 			return
 		}
-		if i == len(msg.Subs())-1 {
-			msg.Write(respStringBytes)
-			msg.Write(okBytes)
-			msg.Write(crlfBytes)
-		}
 	}
+	msg.Write(respStringBytes)
+	msg.Write(okBytes)
+	msg.Write(crlfBytes)
 	return
 }
 
@@ -193,6 +177,7 @@ func (pc *proxyConn) getBatchMergeType(msg *proto.Message) (mtype MergeType, err
 
 func (pc *proxyConn) encodeError(err error) error {
 	se := errors.Cause(err).Error()
-	robj := newRESPPlain(respError, []byte(se))
-	return robj.encode(pc.rc.bw)
+	pc.rc.bw.Write(respErrorBytes)
+	pc.rc.bw.Write([]byte(se))
+	return pc.rc.bw.Write(crlfBytes)
 }

@@ -27,7 +27,7 @@ func newRESPConn(conn *libnet.Conn) *respConn {
 
 // decodeMax will parse all the resp objects and keep the reuse reference until
 // next call of this function.
-func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) {
+func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*proto.Message, err error) {
 	if rc.completed {
 		err = rc.br.Read()
 		if err != nil {
@@ -36,7 +36,7 @@ func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) 
 		rc.completed = false
 	}
 
-	for _, msg := range msgs {
+	for i, msg := range msgs {
 		var robj *resp
 		req := msg.Request()
 		if req == nil {
@@ -48,11 +48,17 @@ func (rc *respConn) decodeMax(msgs []*proto.Message) (resps []*resp, err error) 
 		if err == bufio.ErrBufferFull {
 			rc.completed = true
 			err = nil
-			return
+			return msgs[:i], nil
 		} else if err != nil {
 			return
 		}
-		resps = append(resps, robj)
+		msg.Type = proto.CacheTypeRedis
+		msg.MarkStart()
+		err = robj.decode(msg)
+		if err != nil {
+			msg.Reset()
+			return
+		}
 	}
 	return
 }
