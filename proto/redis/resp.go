@@ -323,7 +323,6 @@ const (
 )
 
 func getMergeType(cmd []byte) MergeType {
-	// fmt.Println("mtype :", strconv.Quote(string(cmd)))
 	// TODO: impl with tire tree to search quickly
 	if bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdGetBytes) {
 		return MergeTypeJoin

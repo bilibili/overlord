@@ -242,7 +242,6 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	// fmt.Println("buf:", w.bufs[:w.cursor])
 	w.bufsp = net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
