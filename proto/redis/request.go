@@ -15,8 +15,6 @@ var (
 	lfByte     = byte('\n')
 	movedBytes = []byte("MOVED")
 	askBytes   = []byte("ASK")
-
-	errNotSuportBytes = []byte("Error: command not support")
 )
 
 var (
@@ -73,24 +71,8 @@ func newRequest(robj *resp) *Request {
 	r := &Request{respObj: robj}
 	r.mergeType = getMergeType(robj.nth(0).data)
 	r.rtype = getReqType(robj.nth(0).data)
-	if !setupSpecialReply(r) {
-		r.reply = &resp{}
-	}
+	r.reply = &resp{}
 	return r
-}
-
-func setupSpecialReply(req *Request) bool {
-	data := req.respObj.nth(0).data
-	if bytes.Equal(data, cmdPingBytes) {
-		req.reply = newRESPPlain(respString, pongBytes)
-		return true
-	}
-
-	if req.rtype == reqTypeNotSupport {
-		req.reply = newRESPPlain(respError, errNotSuportBytes)
-		return true
-	}
-	return false
 }
 
 func (c *Request) setRESP(robj *resp) {

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bytes"
 	stderrs "errors"
 	"overlord/lib/conv"
 	libnet "overlord/lib/net"
@@ -14,6 +15,11 @@ import (
 var (
 	ErrBadAssert = stderrs.New("bad assert for redis")
 	ErrBadCount  = stderrs.New("bad count number")
+)
+
+var (
+	robjErrNotSupport = newRESPBulk([]byte("Error: command not support"))
+	robjPong          = newRESPPlain(respString, pongBytes)
 )
 
 type proxyConn struct {
@@ -52,7 +58,7 @@ func (pc *proxyConn) merge(msg *proto.Message) error {
 		return ErrBadAssert
 	}
 	if !msg.IsBatch() {
-		return cmd.reply.encode(pc.rc.bw)
+		return pc.encodeReply(cmd)
 	}
 	mtype, err := pc.getBatchMergeType(msg)
 	if err != nil {
@@ -70,6 +76,19 @@ func (pc *proxyConn) merge(msg *proto.Message) error {
 	default:
 		panic("unreachable path")
 	}
+}
+
+func (pc *proxyConn) encodeReply(req *Request) error {
+	if req.rtype == reqTypeNotSupport {
+		return robjErrNotSupport.encode(pc.rc.bw)
+	}
+
+	data := req.respObj.nth(0).data
+	if bytes.Equal(data, cmdPingBytes) {
+		return robjPong.encode(pc.rc.bw)
+	}
+
+	return req.reply.encode(pc.rc.bw)
 }
 
 func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {

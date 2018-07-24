@@ -65,10 +65,6 @@ func newRESPInt(val int) *resp {
 	return newRESPPlain(respInt, []byte(s))
 }
 
-func (r *resp) isZero() bool {
-	return r.rtype == 0
-}
-
 func (r *resp) setInt(val int) {
 	s := strconv.Itoa(val)
 	r.setPlain(respInt, []byte(s))
