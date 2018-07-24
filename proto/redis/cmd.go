@@ -26,7 +26,7 @@ var (
 	cmdMGetBytes    = []byte("4\r\nMGET")
 	cmdGetBytes     = []byte("3\r\nGET")
 	cmdDelBytes     = []byte("3\r\nDEL")
-	cmdExistsBytes  = []byte("5\r\nEXITS")
+	cmdExistsBytes  = []byte("6\r\nEXISTS")
 )
 
 // errors
