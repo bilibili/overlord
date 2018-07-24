@@ -286,6 +286,10 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 }
 
 func (r *resp) decode(msg *proto.Message) (err error) {
+	if r.Len() < 1 {
+		err = ErrRequestBadFormat
+		return
+	}
 	if isComplex(r.nth(0).data) {
 		err = newSubCmd(msg, r)
 		if err != nil {

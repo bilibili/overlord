@@ -78,6 +78,7 @@ func newRequest(robj *resp) *Request {
 func (c *Request) setRESP(robj *resp) {
 	c.respObj = robj
 	c.mergeType = getMergeType(robj.nth(0).data)
+	c.rtype = getReqType(robj.nth(0).data)
 	c.reply = &resp{}
 }
 
