@@ -146,7 +146,7 @@ func init() {
 		"PFMERGE":  reqTypeWrite,
 		"EVAL":     reqTypeNotSupport,
 		"EVALSHA":  reqTypeNotSupport,
-		"PING":     reqTypeNotSupport,
+		"PING":     reqTypeCtl,
 		"AUTH":     reqTypeNotSupport,
 		"ECHO":     reqTypeNotSupport,
 		"INFO":     reqTypeNotSupport,
