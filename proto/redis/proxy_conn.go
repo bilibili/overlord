@@ -76,9 +76,9 @@ func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
 	for _, sub := range msg.Subs() {
 		if err = sub.Err(); err != nil {
 			cmd := sub.Request().(*Request)
-			msg.Write(respErrorBytes)
-			msg.Write(cmd.reply.data)
-			msg.Write(crlfBytes)
+			pc.rc.bw.Write(respErrorBytes)
+			pc.rc.bw.Write(cmd.reply.data)
+			pc.rc.bw.Write(crlfBytes)
 			return
 		}
 	}
