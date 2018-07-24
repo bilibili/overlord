@@ -65,6 +65,51 @@ func (rc *respConn) decodeMsg(msgs []*proto.Message) ([]*proto.Message, error) {
 	return msgs, nil
 }
 
+func (rc *respConn) decodeToMsgBatch(mb *proto.MsgBatch) (err error) {
+	var (
+		begin = rc.br.Mark()
+		now   = rc.br.Mark()
+		n     = mb.Count()
+		i     = 0
+	)
+	for {
+		rc.br.AdvanceTo(begin)
+		err = rc.br.Read()
+		if err != nil {
+			return
+		}
+		rc.br.AdvanceTo(now)
+
+		for {
+			if i == n {
+				return
+			}
+			msg := mb.Nth(i)
+			cmd, ok := msg.Request().(*Request)
+			if !ok {
+				msg.DoneWithError(ErrBadAssert)
+				return ErrBadAssert
+			}
+
+			if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
+				i++
+				continue
+			}
+
+			err = rc.decodeRESP(cmd.reply)
+			if err == bufio.ErrBufferFull {
+				break
+			} else if err != nil {
+				return
+			}
+			msg.MarkRead()
+
+			now = rc.br.Mark()
+			i++
+		}
+	}
+}
+
 // decodeCount will trying to parse the buffer until meet the count.
 func (rc *respConn) decodeCount(robjs []*resp) (err error) {
 	var (
@@ -131,6 +176,7 @@ func (rc *respConn) decodeRESP(robj *resp) (err error) {
 	}
 
 	rtype := line[0]
+	// fmt.Println("read:", strconv.Quote(string(line)))
 	switch rtype {
 	case respString, respInt, respError:
 		// decocde use one line to parse
@@ -164,7 +210,6 @@ func (rc *respConn) decodeBulk(line []byte, robj *resp) error {
 	rc.br.Advance(-(lineSize - 1))
 	fullDataSize := lineSize - 1 + size + 2
 	data, err := rc.br.ReadExact(fullDataSize)
-	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 	if err == bufio.ErrBufferFull {
 		rc.br.Advance(-1)
 		return err

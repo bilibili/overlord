@@ -68,22 +68,8 @@ func (nc *nodeConn) write(m *proto.Message) error {
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	nc.rc.br.ResetBuffer(mb.Buffer())
 	defer nc.rc.br.ResetBuffer(nil)
-	for _, msg := range mb.Msgs() {
-		cmd, ok := msg.Request().(*Request)
-		if !ok {
-			return ErrBadAssert
-		}
 
-		if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
-			continue
-		}
-
-		if err = nc.rc.decodeOne(cmd.reply); err != nil {
-			return
-		}
-		msg.MarkRead()
-	}
-	return nil
+	return nc.rc.decodeToMsgBatch(mb)
 }
 
 func (nc *nodeConn) Ping() error {

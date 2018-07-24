@@ -2,21 +2,17 @@ package redis
 
 import (
 	"bytes"
-
-	"github.com/tatsushid/go-critbit"
 )
 
 // reqType is a kind for cmd which is Ctl/Read/Write/NotSupport
 type reqType = int
 
 const (
-	reqTypeCtl        reqType = iota
-	reqTypeRead       reqType = iota
-	reqTypeWrite      reqType = iota
-	reqTypeNotSupport reqType = iota
+	reqTypeCtl        reqType = 1
+	reqTypeRead       reqType = 2
+	reqTypeWrite      reqType = 3
+	reqTypeNotSupport reqType = 4
 )
-
-var reqMap *critbit.Tree
 
 var (
 	reqReadBytes = []byte("" +

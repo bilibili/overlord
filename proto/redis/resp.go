@@ -3,6 +3,7 @@ package redis
 import (
 	"bytes"
 	"overlord/lib/bufio"
+	"overlord/lib/conv"
 	"overlord/proto"
 	"strconv"
 	"strings"
@@ -286,10 +287,11 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 }
 
 func (r *resp) decode(msg *proto.Message) (err error) {
-	if r.Len() < 1 {
-		err = ErrRequestBadFormat
-		return
+	if r.nth(0) == nil || r.nth(0).data == nil {
+		return ErrProxyFail
 	}
+
+	conv.UpdateToUpper(r.nth(0).data)
 	if isComplex(r.nth(0).data) {
 		err = newSubCmd(msg, r)
 		if err != nil {
