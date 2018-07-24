@@ -351,9 +351,6 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		_ = p.bw.Write(crlfBytes)
 	} else {
 		_ = p.Merge(m)
-		for _, item := range m.SubResps() {
-			_ = p.bw.Write(item)
-		}
 	}
 	if err = p.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Encoder encode response flush bytes")

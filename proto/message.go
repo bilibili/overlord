@@ -48,10 +48,9 @@ func PutMsg(msg *Message) {
 type Message struct {
 	Type CacheType
 
-	req      []Request
-	reqn     int
-	subs     []*Message
-	subResps [][]byte
+	req  []Request
+	reqn int
+	subs []*Message
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error
@@ -69,7 +68,6 @@ func (m *Message) Reset() {
 	m.reqn = 0
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
-	m.subResps = m.subResps[:0]
 }
 
 // Clear will clean the msg
@@ -195,24 +193,9 @@ func (m *Message) Batch() []*Message {
 	return m.subs[:slen]
 }
 
-// AddSubResps appends all items into subResps
-func (m *Message) AddSubResps(items ...[]byte) {
-	m.subResps = append(m.subResps, items...)
-}
-
-func (m *Message) Write(p []byte) error {
-	m.AddSubResps(p)
-	return nil
-}
-
 // Subs returns all the sub messages.
 func (m *Message) Subs() []*Message {
 	return m.subs[:m.reqn]
-}
-
-// SubResps returns the response bytes buffer.
-func (m *Message) SubResps() [][]byte {
-	return m.subResps
 }
 
 // Err returns error.

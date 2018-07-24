@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCommandNewCommand(t *testing.T) {
-	cmd := NewCommand("GET", "a")
+func TestRequestNewRequest(t *testing.T) {
+	cmd := NewRequest("GET", "a")
 	assert.Equal(t, MergeTypeBasic, cmd.mergeType)
 	assert.Equal(t, 2, cmd.respObj.Len())
 
@@ -16,8 +16,8 @@ func TestCommandNewCommand(t *testing.T) {
 	assert.Equal(t, "a", string(cmd.Key()))
 }
 
-func TestCommandRedirect(t *testing.T) {
-	cmd := NewCommand("GET", "BAKA")
+func TestRequestRedirect(t *testing.T) {
+	cmd := NewRequest("GET", "BAKA")
 	cmd.reply = newRESPPlain(respError, []byte("ASK 1024 127.0.0.1:2048"))
 	assert.True(t, cmd.IsRedirect())
 	r, slot, addr, err := cmd.RedirectTriple()

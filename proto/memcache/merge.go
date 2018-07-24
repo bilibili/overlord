@@ -6,14 +6,18 @@ import (
 )
 
 // Merge the response and set the response into subResps
-func (*proxyConn) Merge(m *proto.Message) error {
+func (p *proxyConn) Merge(m *proto.Message) error {
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
-		m.AddSubResps(serverErrorPrefixBytes, []byte(ErrAssertReq.Error()), crlfBytes)
+		p.bw.Write(serverErrorPrefixBytes)
+		p.bw.Write([]byte(ErrAssertReq.Error()))
+		p.bw.Write(crlfBytes)
+		// m.AddSubResps(serverErrorPrefixBytes, []byte(ErrAssertReq.Error()), crlfBytes)
 		return nil
 	}
 	if !m.IsBatch() {
-		m.AddSubResps(mcr.data)
+		p.bw.Write(mcr.data)
+		// m.AddSubResps(mcr.data)
 		return nil
 	}
 
@@ -28,10 +32,12 @@ func (*proxyConn) Merge(m *proto.Message) error {
 		if len(bs) == 0 {
 			continue
 		}
-		m.AddSubResps(bs)
+		p.bw.Write(bs)
+		// m.AddSubResps(bs)
 	}
 	if trimEnd {
-		m.AddSubResps(endBytes)
+		p.bw.Write(endBytes)
+		// m.AddSubResps(endBytes)
 	}
 	return nil
 }

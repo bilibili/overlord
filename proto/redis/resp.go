@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bytes"
+	"overlord/lib/bufio"
 	"overlord/proto"
 	"strconv"
 	"strings"
@@ -196,7 +197,7 @@ func (r *resp) bytes() []byte {
 	return data[pos:]
 }
 
-func (r *resp) encode(w proto.Writer) error {
+func (r *resp) encode(w *bufio.Writer) error {
 	switch r.rtype {
 	case respInt:
 		return r.encodeInt(w)
@@ -212,20 +213,20 @@ func (r *resp) encode(w proto.Writer) error {
 	return nil
 }
 
-func (r *resp) encodeError(w proto.Writer) (err error) {
+func (r *resp) encodeError(w *bufio.Writer) (err error) {
 	return r.encodePlain(respErrorBytes, w)
 }
 
-func (r *resp) encodeInt(w proto.Writer) (err error) {
+func (r *resp) encodeInt(w *bufio.Writer) (err error) {
 	return r.encodePlain(respIntBytes, w)
 
 }
 
-func (r *resp) encodeString(w proto.Writer) (err error) {
+func (r *resp) encodeString(w *bufio.Writer) (err error) {
 	return r.encodePlain(respStringBytes, w)
 }
 
-func (r *resp) encodePlain(rtypeBytes []byte, w proto.Writer) (err error) {
+func (r *resp) encodePlain(rtypeBytes []byte, w *bufio.Writer) (err error) {
 	err = w.Write(rtypeBytes)
 	if err != nil {
 		return
@@ -238,7 +239,7 @@ func (r *resp) encodePlain(rtypeBytes []byte, w proto.Writer) (err error) {
 	return
 }
 
-func (r *resp) encodeBulk(w proto.Writer) (err error) {
+func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
 	// NOTICE: we need not to convert robj.Len() as int
 	// due number has been writen into data
 	err = w.Write(respBulkBytes)
@@ -258,7 +259,7 @@ func (r *resp) encodeBulk(w proto.Writer) (err error) {
 	return
 }
 
-func (r *resp) encodeArray(w proto.Writer) (err error) {
+func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	err = w.Write(respArrayBytes)
 	if err != nil {
 		return
@@ -299,9 +300,38 @@ func (r *resp) decode(msg *proto.Message) (err error) {
 func withReq(m *proto.Message, robj *resp) {
 	req := m.NextReq()
 	if req == nil {
-		m.WithRequest(newCommand(robj))
+		m.WithRequest(newRequest(robj))
 	} else {
-		reqCmd := req.(*Command)
+		reqCmd := req.(*Request)
 		reqCmd.setRESP(robj)
 	}
+}
+
+// MergeType is used to decript the merge operation.
+type MergeType = uint8
+
+// merge types
+const (
+	MergeTypeCount MergeType = iota
+	MergeTypeOk
+	MergeTypeJoin
+	MergeTypeBasic
+)
+
+func getMergeType(cmd []byte) MergeType {
+	// fmt.Println("mtype :", strconv.Quote(string(cmd)))
+	// TODO: impl with tire tree to search quickly
+	if bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdGetBytes) {
+		return MergeTypeJoin
+	}
+
+	if bytes.Equal(cmd, cmdMSetBytes) {
+		return MergeTypeOk
+	}
+
+	if bytes.Equal(cmd, cmdExistsBytes) || bytes.Equal(cmd, cmdDelBytes) {
+		return MergeTypeCount
+	}
+
+	return MergeTypeBasic
 }

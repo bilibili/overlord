@@ -52,7 +52,7 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) error {
 }
 
 func (nc *nodeConn) write(m *proto.Message) error {
-	cmd, ok := m.Request().(*Command)
+	cmd, ok := m.Request().(*Request)
 	if !ok {
 		m.DoneWithError(ErrBadAssert)
 		return ErrBadAssert
@@ -64,7 +64,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	nc.rc.br.ResetBuffer(mb.Buffer())
 	defer nc.rc.br.ResetBuffer(nil)
 	for _, msg := range mb.Msgs() {
-		cmd, ok := msg.Request().(*Command)
+		cmd, ok := msg.Request().(*Request)
 		if !ok {
 			return ErrBadAssert
 		}

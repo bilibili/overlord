@@ -13,7 +13,7 @@ const (
 
 // errors
 var (
-	ErrBadCommandSize = errors.New("wrong Mset arguments number")
+	ErrBadRequestSize = errors.New("wrong Mset arguments number")
 )
 
 func isEven(v int) bool {
@@ -34,13 +34,13 @@ func newSubCmd(msg *proto.Message, robj *resp) error {
 	return cmdByKeys(msg, robj)
 }
 
-// func subCmdMset(robj *resp) ([]*Command, error) {
+// func subCmdMset(robj *resp) ([]*Request, error) {
 // 	if !isEven(robj.Len() - 1) {
-// 		return nil, ErrBadCommandSize
+// 		return nil, ErrBadRequestSize
 // 	}
 
 // 	mid := robj.Len() / 2
-// 	cmds := make([]*Command, mid)
+// 	cmds := make([]*Request, mid)
 // 	for i := 0; i < mid; i++ {
 // 		cmdObj := respPool.Get().(*resp)
 // 		cmdObj.rtype = respArray
@@ -49,14 +49,14 @@ func newSubCmd(msg *proto.Message, robj *resp) error {
 // 		cmdObj.replace(1, robj.nth(i*2+1))
 // 		cmdObj.replace(2, robj.nth(i*2+2))
 // 		cmdObj.data = cmdMSetLenBytes
-// 		cmds[i] = newCommandWithMergeType(cmdObj, MergeTypeOk)
+// 		cmds[i] = newRequestWithMergeType(cmdObj, MergeTypeOk)
 // 	}
 // 	return cmds, nil
 // }
 
 func cmdMset(msg *proto.Message, robj *resp) error {
 	if !isEven(robj.Len() - 1) {
-		return ErrBadCommandSize
+		return ErrBadRequestSize
 	}
 	mid := robj.Len() / 2
 	for i := 0; i < mid; i++ {
@@ -69,10 +69,10 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 			cmdObj.replace(1, robj.nth(i*2+1))
 			cmdObj.replace(2, robj.nth(i*2+2))
 			cmdObj.data = cmdMSetLenBytes
-			cmd := newCommandWithMergeType(cmdObj, MergeTypeOk)
+			cmd := newRequestWithMergeType(cmdObj, MergeTypeOk)
 			msg.WithRequest(cmd)
 		} else {
-			reqCmd := req.(*Command)
+			reqCmd := req.(*Request)
 			reqCmd.mergeType = MergeTypeOk
 			cmdObj := reqCmd.respObj
 			cmdObj.rtype = respArray
@@ -86,8 +86,8 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 	return nil
 }
 
-// func subCmdByKeys(robj *resp) ([]*Command, error) {
-// 	cmds := make([]*Command, robj.Len()-1)
+// func subCmdByKeys(robj *resp) ([]*Request, error) {
+// 	cmds := make([]*Request, robj.Len()-1)
 // 	for i, sub := range robj.slice()[1:] {
 // 		var cmdObj *resp
 // 		if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
@@ -95,7 +95,7 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 // 		} else {
 // 			cmdObj = newRESPArray([]*resp{robj.nth(0), sub})
 // 		}
-// 		cmds[i] = newCommand(cmdObj)
+// 		cmds[i] = newRequest(cmdObj)
 // 	}
 // 	return cmds, nil
 // }
@@ -110,10 +110,10 @@ func cmdByKeys(msg *proto.Message, robj *resp) error {
 			} else {
 				cmdObj = newRESPArray([]*resp{robj.nth(0), sub})
 			}
-			cmd := newCommand(cmdObj)
+			cmd := newRequest(cmdObj)
 			msg.WithRequest(cmd)
 		} else {
-			reqCmd := req.(*Command)
+			reqCmd := req.(*Request)
 			cmdObj := reqCmd.respObj
 			if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
 				cmdObj.setArray([]*resp{robjGet, sub})

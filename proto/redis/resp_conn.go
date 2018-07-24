@@ -43,7 +43,7 @@ func (rc *respConn) decodeMsg(msgs []*proto.Message) ([]*proto.Message, error) {
 		if req == nil {
 			robj = respPool.Get().(*resp)
 		} else {
-			robj = req.(*Command).respObj
+			robj = req.(*Request).respObj
 			// reset metadata before reuse it.
 			robj.reset()
 		}

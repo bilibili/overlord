@@ -42,18 +42,18 @@ const (
 	SlotShiled = 0x3fff
 )
 
-// Command is the type of a complete redis command
-type Command struct {
+// Request is the type of a complete redis command
+type Request struct {
 	respObj   *resp
 	mergeType MergeType
 	reply     *resp
 }
 
-// NewCommand will create new command by given args
+// NewRequest will create new command by given args
 // example:
-//     NewCommand("GET", "mykey")
-//     NewCommand("CLUSTER", "NODES")
-func NewCommand(cmd string, args ...string) *Command {
+//     NewRequest("GET", "mykey")
+//     NewRequest("CLUSTER", "NODES")
+func NewRequest(cmd string, args ...string) *Request {
 	respObj := respPool.Get().(*resp)
 	respObj.next().setBulk([]byte(cmd))
 	// respObj := newRESPArrayWithCapcity(len(args) + 1)
@@ -65,38 +65,38 @@ func NewCommand(cmd string, args ...string) *Command {
 		respObj.next().setBulk([]byte(line))
 	}
 	respObj.data = []byte(strconv.Itoa(len(args) + 1))
-	return newCommand(respObj)
+	return newRequest(respObj)
 }
 
-func newCommand(robj *resp) *Command {
-	r := &Command{respObj: robj}
+func newRequest(robj *resp) *Request {
+	r := &Request{respObj: robj}
 	r.mergeType = getMergeType(robj.nth(0).data)
 	r.reply = &resp{}
 	return r
 }
 
-func (c *Command) setRESP(robj *resp) {
+func (c *Request) setRESP(robj *resp) {
 	c.respObj = robj
 	c.mergeType = getMergeType(robj.nth(0).data)
 	c.reply = &resp{}
 }
 
-func newCommandWithMergeType(robj *resp, mtype MergeType) *Command {
-	return &Command{respObj: robj, mergeType: mtype}
+func newRequestWithMergeType(robj *resp, mtype MergeType) *Request {
+	return &Request{respObj: robj, mergeType: mtype}
 }
 
 // CmdString get the cmd
-func (c *Command) CmdString() string {
+func (c *Request) CmdString() string {
 	return strings.ToUpper(string(c.respObj.nth(0).data))
 }
 
 // Cmd get the cmd
-func (c *Command) Cmd() []byte {
+func (c *Request) Cmd() []byte {
 	return c.respObj.nth(0).data
 }
 
 // Key impl the proto.protoRequest and get the Key of redis
-func (c *Command) Key() []byte {
+func (c *Request) Key() []byte {
 	var data = c.respObj.nth(1).data
 	var pos int
 	if c.respObj.nth(1).rtype == respBulk {
@@ -107,12 +107,12 @@ func (c *Command) Key() []byte {
 }
 
 // Put the resource back to pool
-func (c *Command) Put() {
+func (c *Request) Put() {
 }
 
 // IsRedirect check if response type is Redis Error
 // and payload was prefix with "ASK" && "MOVED"
-func (c *Command) IsRedirect() bool {
+func (c *Request) IsRedirect() bool {
 	if c.reply.rtype != respError {
 		return false
 	}
@@ -129,7 +129,7 @@ func (c *Command) IsRedirect() bool {
 // second is the slot of redirect
 // third is the redirect addr
 // last is the error when parse the redirect body
-func (c *Command) RedirectTriple() (redirect string, slot int, addr string, err error) {
+func (c *Request) RedirectTriple() (redirect string, slot int, addr string, err error) {
 	fields := strings.Fields(string(c.reply.data))
 	if len(fields) != 3 {
 		err = ErrRedirectBadFormat

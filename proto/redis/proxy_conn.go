@@ -40,9 +40,6 @@ func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
 	if err != nil {
 		return pc.encodeError(err)
 	}
-	for _, item := range msg.SubResps() {
-		pc.rc.bw.Write(item)
-	}
 	if err = pc.rc.Flush(); err != nil {
 		err = errors.Wrap(err, "Redis Encoder flush response")
 	}
@@ -50,12 +47,12 @@ func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
 }
 
 func (pc *proxyConn) merge(msg *proto.Message) error {
-	cmd, ok := msg.Request().(*Command)
+	cmd, ok := msg.Request().(*Request)
 	if !ok {
 		return ErrBadAssert
 	}
 	if !msg.IsBatch() {
-		return cmd.reply.encode(msg)
+		return cmd.reply.encode(pc.rc.bw)
 	}
 	mtype, err := pc.getBatchMergeType(msg)
 	if err != nil {
@@ -78,16 +75,16 @@ func (pc *proxyConn) merge(msg *proto.Message) error {
 func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
 	for _, sub := range msg.Subs() {
 		if err = sub.Err(); err != nil {
-			cmd := sub.Request().(*Command)
+			cmd := sub.Request().(*Request)
 			msg.Write(respErrorBytes)
 			msg.Write(cmd.reply.data)
 			msg.Write(crlfBytes)
 			return
 		}
 	}
-	msg.Write(respStringBytes)
-	msg.Write(okBytes)
-	msg.Write(crlfBytes)
+	pc.rc.bw.Write(respStringBytes)
+	pc.rc.bw.Write(okBytes)
+	pc.rc.bw.Write(crlfBytes)
 	return
 }
 
@@ -97,7 +94,7 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (err error) {
 		if sub.Err() != nil {
 			continue
 		}
-		subcmd, ok := sub.Request().(*Command)
+		subcmd, ok := sub.Request().(*Request)
 		if !ok {
 			return ErrBadAssert
 		}
@@ -107,23 +104,23 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (err error) {
 		}
 		sum += int(ival)
 	}
-	msg.Write(respIntBytes)
-	msg.Write([]byte(strconv.Itoa(sum)))
-	msg.Write(crlfBytes)
+	pc.rc.bw.Write(respIntBytes)
+	pc.rc.bw.Write([]byte(strconv.Itoa(sum)))
+	pc.rc.bw.Write(crlfBytes)
 	return
 }
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (err error) {
 	subs := msg.Subs()
-	msg.Write(respArrayBytes)
+	pc.rc.bw.Write(respArrayBytes)
 	if len(subs) == 0 {
-		msg.Write(respNullBytes)
+		pc.rc.bw.Write(respNullBytes)
 		return
 	}
-	msg.Write([]byte(strconv.Itoa(len(subs))))
-	msg.Write(crlfBytes)
+	pc.rc.bw.Write([]byte(strconv.Itoa(len(subs))))
+	pc.rc.bw.Write(crlfBytes)
 	for _, sub := range subs {
-		subcmd, ok := sub.Request().(*Command)
+		subcmd, ok := sub.Request().(*Request)
 		if !ok {
 			err = pc.encodeError(ErrBadAssert)
 			if err != nil {
@@ -131,13 +128,13 @@ func (pc *proxyConn) mergeJoin(msg *proto.Message) (err error) {
 			}
 			return ErrBadAssert
 		}
-		subcmd.reply.encode(msg)
+		subcmd.reply.encode(pc.rc.bw)
 	}
 	return
 }
 
 func (pc *proxyConn) getBatchMergeType(msg *proto.Message) (mtype MergeType, err error) {
-	cmd, ok := msg.Subs()[0].Request().(*Command)
+	cmd, ok := msg.Subs()[0].Request().(*Request)
 	if !ok {
 		err = ErrBadAssert
 		return

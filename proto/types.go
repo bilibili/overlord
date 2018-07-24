@@ -44,8 +44,3 @@ type NodeConn interface {
 
 	FetchSlots() (nodes []string, slots [][]int, err error)
 }
-
-// Writer  writer without err.
-type Writer interface {
-	Write([]byte) error
-}

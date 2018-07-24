@@ -25,11 +25,11 @@ func TestDecodeComplexOk(t *testing.T) {
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
 	// test reuse command
-	msgs[1].WithRequest(NewCommand("get", "a"))
-	msgs[1].WithRequest(NewCommand("get", "a"))
+	msgs[1].WithRequest(NewRequest("get", "a"))
+	msgs[1].WithRequest(NewRequest("get", "a"))
 	msgs[1].Reset()
-	msgs[2].WithRequest(NewCommand("get", "a"))
-	msgs[2].WithRequest(NewCommand("get", "a"))
+	msgs[2].WithRequest(NewRequest("get", "a"))
+	msgs[2].WithRequest(NewRequest("get", "a"))
 	msgs[2].Reset()
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
@@ -86,13 +86,13 @@ func TestEncodeCmdOk(t *testing.T) {
 				err := newSubCmd(msg, co)
 				if assert.NoError(t, err) {
 					for i, req := range msg.Requests() {
-						cmd := req.(*Command)
+						cmd := req.(*Request)
 						cmd.reply = rs[i]
 					}
 					msg.Batch()
 				}
 			} else {
-				cmd := newCommand(co)
+				cmd := newRequest(co)
 				cmd.reply = rs[0]
 				msg.WithRequest(cmd)
 			}
