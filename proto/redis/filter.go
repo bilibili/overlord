@@ -18,162 +18,160 @@ const (
 
 var reqMap *critbit.Tree
 
-func init() {
+var (
+	reqReadBytes = []byte("" +
+		"4\r\nDUMP" +
+		"6\r\nEXISTS" +
+		"4\r\nPTTL" +
+		"3\r\nTTL" +
+		"4\r\nTYPE" +
+		"8\r\nBITCOUNT" +
+		"6\r\nBITPOS" +
+		"3\r\nGET" +
+		"6\r\nGETBIT" +
+		"8\r\nGETRANGE" +
+		"4\r\nMGET" +
+		"6\r\nSTRLEN" +
+		"7\r\nHEXISTS" +
+		"4\r\nHGET" +
+		"7\r\nHGETALL" +
+		"5\r\nHKEYS" +
+		"4\r\nHLEN" +
+		"5\r\nHMGET" +
+		"7\r\nHSTRLEN" +
+		"5\r\nHVALS" +
+		"5\r\nHSCAN" +
+		"5\r\nSCARD" +
+		"5\r\nSDIFF" +
+		"6\r\nSINTER" +
+		"9\r\nSISMEMBER" +
+		"8\r\nSMEMBERS" +
+		"11\r\nSRANDMEMBER" +
+		"6\r\nSUNION" +
+		"5\r\nSSCAN" +
+		"5\r\nZCARD" +
+		"6\r\nZCOUNT" +
+		"9\r\nZLEXCOUNT" +
+		"6\r\nZRANGE" +
+		"11\r\nZRANGEBYLEX" +
+		"13\r\nZRANGEBYSCORE" +
+		"5\r\nZRANK" +
+		"9\r\nZREVRANGE" +
+		"14\r\nZREVRANGEBYLEX" +
+		"16\r\nZREVRANGEBYSCORE" +
+		"8\r\nZREVRANK" +
+		"6\r\nZSCORE" +
+		"5\r\nZSCAN" +
+		"6\r\nLINDEX" +
+		"4\r\nLLEN" +
+		"6\r\nLRANGE" +
+		"7\r\nPFCOUNT")
 
-	tmpMap := map[string]reqType{
-		"DEL":       reqTypeWrite,
-		"DUMP":      reqTypeRead,
-		"EXISTS":    reqTypeRead,
-		"EXPIRE":    reqTypeWrite,
-		"EXPIREAT":  reqTypeWrite,
-		"KEYS":      reqTypeNotSupport,
-		"MIGRATE":   reqTypeNotSupport,
-		"MOVE":      reqTypeNotSupport,
-		"OBJECT":    reqTypeNotSupport,
-		"PERSIST":   reqTypeWrite,
-		"PEXPIRE":   reqTypeWrite,
-		"PEXPIREAT": reqTypeWrite,
-		"PTTL":      reqTypeRead,
+	reqWriteBytes = []byte("" +
+		"3\r\nDEL" +
+		"6\r\nEXPIRE" +
+		"8\r\nEXPIREAT" +
+		"7\r\nPERSIST" +
+		"7\r\nPEXPIRE" +
+		"9\r\nPEXPIREAT" +
+		"7\r\nRESTORE" +
+		"4\r\nSORT" +
+		"6\r\nAPPEND" +
+		"4\r\nDECR" +
+		"6\r\nDECRBY" +
+		"6\r\nGETSET" +
+		"4\r\nINCR" +
+		"6\r\nINCRBY" +
+		"11\r\nINCRBYFLOAT" +
+		"4\r\nMSET" +
+		"6\r\nPSETEX" +
+		"3\r\nSET" +
+		"6\r\nSETBIT" +
+		"5\r\nSETEX" +
+		"5\r\nSETNX" +
+		"8\r\nSETRANGE" +
+		"4\r\nHDEL" +
+		"7\r\nHINCRBY" +
+		"12\r\nHINCRBYFLOAT" +
+		"5\r\nHMSET" +
+		"4\r\nHSET" +
+		"6\r\nHSETNX" +
+		"7\r\nLINSERT" +
+		"4\r\nLPOP" +
+		"5\r\nLPUSH" +
+		"6\r\nLPUSHX" +
+		"4\r\nLREM" +
+		"4\r\nLSET" +
+		"5\r\nLTRIM" +
+		"4\r\nRPOP" +
+		"9\r\nRPOPLPUSH" +
+		"5\r\nRPUSH" +
+		"6\r\nRPUSHX" +
+		"4\r\nSADD" +
+		"10\r\nSDIFFSTORE" +
+		"11\r\nSINTERSTORE" +
+		"5\r\nSMOVE" +
+		"4\r\nSPOP" +
+		"4\r\nSREM" +
+		"11\r\nSUNIONSTORE" +
+		"4\r\nZADD" +
+		"7\r\nZINCRBY" +
+		"11\r\nZINTERSTORE" +
+		"4\r\nZREM" +
+		"14\r\nZREMRANGEBYLEX" +
+		"15\r\nZREMRANGEBYRANK" +
+		"16\r\nZREMRANGEBYSCORE" +
+		"11\r\nZUNIONSTORE" +
+		"5\r\nPFADD" +
+		"7\r\nPFMERGE")
 
-		"RANDOMKEY":   reqTypeNotSupport,
-		"RENAME":      reqTypeNotSupport,
-		"RENAMENX":    reqTypeNotSupport,
-		"RESTORE":     reqTypeWrite,
-		"SCAN":        reqTypeNotSupport,
-		"SORT":        reqTypeWrite,
-		"TTL":         reqTypeRead,
-		"TYPE":        reqTypeRead,
-		"WAIT":        reqTypeNotSupport,
-		"APPEND":      reqTypeWrite,
-		"BITCOUNT":    reqTypeRead,
-		"BITOP":       reqTypeNotSupport,
-		"BITPOS":      reqTypeRead,
-		"DECR":        reqTypeWrite,
-		"DECRBY":      reqTypeWrite,
-		"GET":         reqTypeRead,
-		"GETBIT":      reqTypeRead,
-		"GETRANGE":    reqTypeRead,
-		"GETSET":      reqTypeWrite,
-		"INCR":        reqTypeWrite,
-		"INCRBY":      reqTypeWrite,
-		"INCRBYFLOAT": reqTypeWrite,
+	reqNotSupportBytes = []byte("" +
+		"6\r\nMSETNX" +
+		"5\r\nBLPOP" +
+		"5\r\nBRPOP" +
+		"10\r\nBRPOPLPUSH" +
+		"4\r\nKEYS" +
+		"7\r\nMIGRATE" +
+		"4\r\nMOVE" +
+		"6\r\nOBJECT" +
+		"9\r\nRANDOMKEY" +
+		"6\r\nRENAME" +
+		"8\r\nRENAMENX" +
+		"4\r\nSCAN" +
+		"4\r\nWAIT" +
+		"5\r\nBITOP" +
+		"4\r\nEVAL" +
+		"7\r\nEVALSHA" +
+		"4\r\nAUTH" +
+		"4\r\nECHO" +
+		"4\r\nINFO" +
+		"5\r\nPROXY" +
+		"7\r\nSLOWLOG" +
+		"4\r\nQUIT" +
+		"6\r\nSELECT" +
+		"4\r\nTIME" +
+		"6\r\nCONFIG" +
+		"8\r\nCOMMANDS")
 
-		"MGET":     reqTypeRead,
-		"MSET":     reqTypeWrite,
-		"MSETNX":   reqTypeNotSupport,
-		"PSETEX":   reqTypeWrite,
-		"SET":      reqTypeWrite,
-		"SETBIT":   reqTypeWrite,
-		"SETEX":    reqTypeWrite,
-		"SETNX":    reqTypeWrite,
-		"SETRANGE": reqTypeWrite,
-		"STRLEN":   reqTypeRead,
-
-		"HDEL":         reqTypeWrite,
-		"HEXISTS":      reqTypeRead,
-		"HGET":         reqTypeRead,
-		"HGETALL":      reqTypeRead,
-		"HINCRBY":      reqTypeWrite,
-		"HINCRBYFLOAT": reqTypeWrite,
-		"HKEYS":        reqTypeRead,
-		"HLEN":         reqTypeRead,
-		"HMGET":        reqTypeRead,
-		"HMSET":        reqTypeWrite,
-		"HSET":         reqTypeWrite,
-		"HSETNX":       reqTypeWrite,
-		"HSTRLEN":      reqTypeRead,
-		"HVALS":        reqTypeRead,
-		"HSCAN":        reqTypeRead,
-		"BLPOP":        reqTypeNotSupport,
-		"BRPOP":        reqTypeNotSupport,
-		"BRPOPLPUSH":   reqTypeNotSupport,
-
-		"LINDEX":    reqTypeRead,
-		"LINSERT":   reqTypeWrite,
-		"LLEN":      reqTypeRead,
-		"LPOP":      reqTypeWrite,
-		"LPUSH":     reqTypeWrite,
-		"LPUSHX":    reqTypeWrite,
-		"LRANGE":    reqTypeRead,
-		"LREM":      reqTypeWrite,
-		"LSET":      reqTypeWrite,
-		"LTRIM":     reqTypeWrite,
-		"RPOP":      reqTypeWrite,
-		"RPOPLPUSH": reqTypeWrite,
-		"RPUSH":     reqTypeWrite,
-		"RPUSHX":    reqTypeWrite,
-
-		"SADD":        reqTypeWrite,
-		"SCARD":       reqTypeRead,
-		"SDIFF":       reqTypeRead,
-		"SDIFFSTORE":  reqTypeWrite,
-		"SINTER":      reqTypeRead,
-		"SINTERSTORE": reqTypeWrite,
-		"SISMEMBER":   reqTypeRead,
-		"SMEMBERS":    reqTypeRead,
-		"SMOVE":       reqTypeWrite,
-		"SPOP":        reqTypeWrite,
-		"SRANDMEMBER": reqTypeRead,
-		"SREM":        reqTypeWrite,
-		"SUNION":      reqTypeRead,
-		"SUNIONSTORE": reqTypeWrite,
-		"SSCAN":       reqTypeRead,
-
-		"ZADD":             reqTypeWrite,
-		"ZCARD":            reqTypeRead,
-		"ZCOUNT":           reqTypeRead,
-		"ZINCRBY":          reqTypeWrite,
-		"ZINTERSTORE":      reqTypeWrite,
-		"ZLEXCOUNT":        reqTypeRead,
-		"ZRANGE":           reqTypeRead,
-		"ZRANGEBYLEX":      reqTypeRead,
-		"ZRANGEBYSCORE":    reqTypeRead,
-		"ZRANK":            reqTypeRead,
-		"ZREM":             reqTypeWrite,
-		"ZREMRANGEBYLEX":   reqTypeWrite,
-		"ZREMRANGEBYRANK":  reqTypeWrite,
-		"ZREMRANGEBYSCORE": reqTypeWrite,
-		"ZREVRANGE":        reqTypeRead,
-		"ZREVRANGEBYLEX":   reqTypeRead,
-		"ZREVRANGEBYSCORE": reqTypeRead,
-		"ZREVRANK":         reqTypeRead,
-		"ZSCORE":           reqTypeRead,
-		"ZUNIONSTORE":      reqTypeWrite,
-		"ZSCAN":            reqTypeRead,
-
-		"PFADD":    reqTypeWrite,
-		"PFCOUNT":  reqTypeRead,
-		"PFMERGE":  reqTypeWrite,
-		"EVAL":     reqTypeNotSupport,
-		"EVALSHA":  reqTypeNotSupport,
-		"PING":     reqTypeCtl,
-		"AUTH":     reqTypeNotSupport,
-		"ECHO":     reqTypeNotSupport,
-		"INFO":     reqTypeNotSupport,
-		"PROXY":    reqTypeNotSupport,
-		"SLOWLOG":  reqTypeNotSupport,
-		"QUIT":     reqTypeNotSupport,
-		"SELECT":   reqTypeNotSupport,
-		"TIME":     reqTypeNotSupport,
-		"CONFIG":   reqTypeNotSupport,
-		"COMMANDS": reqTypeNotSupport,
-	}
-
-	reqMap = critbit.New()
-	for key, tp := range tmpMap {
-		reqMap.Insert([]byte(key), tp)
-	}
-}
+	reqCtlBytes = []byte("4\r\nPING")
+)
 
 func getReqType(cmd []byte) reqType {
-	idx := bytes.IndexByte(cmd, lfByte)
-	if idx != -1 {
-		cmd = cmd[idx+1:]
-	}
-
-	val, ok := reqMap.Get(cmd)
-	if !ok {
+	if bytes.Contains(reqNotSupportBytes, cmd) {
 		return reqTypeNotSupport
 	}
-	return val.(int)
+
+	if bytes.Contains(reqReadBytes, cmd) {
+		return reqTypeRead
+	}
+
+	if bytes.Contains(reqWriteBytes, cmd) {
+		return reqTypeWrite
+	}
+
+	if bytes.Contains(reqCtlBytes, cmd) {
+		return reqTypeCtl
+	}
+
+	return reqTypeNotSupport
 }

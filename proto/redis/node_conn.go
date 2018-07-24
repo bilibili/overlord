@@ -58,7 +58,7 @@ func (nc *nodeConn) write(m *proto.Message) error {
 		return ErrBadAssert
 	}
 
-	if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
+	if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
 		return nil
 	}
 
@@ -74,7 +74,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			return ErrBadAssert
 		}
 
-		if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
+		if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
 			continue
 		}
 
