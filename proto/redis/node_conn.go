@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"bytes"
 	libnet "overlord/lib/net"
 	"overlord/proto"
 	"sync/atomic"
@@ -58,9 +57,11 @@ func (nc *nodeConn) write(m *proto.Message) error {
 		m.DoneWithError(ErrBadAssert)
 		return ErrBadAssert
 	}
-	if bytes.Equal(cmd.Cmd(), commandBytes) {
+
+	if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
 		return nil
 	}
+
 	return cmd.respObj.encode(nc.rc.bw)
 }
 
@@ -72,10 +73,11 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		if bytes.Equal(cmd.Cmd(), commandBytes) {
-			cmd.reply = newRESPNull(respError)
+
+		if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
 			continue
 		}
+
 		if err = nc.rc.decodeOne(cmd.reply); err != nil {
 			return
 		}
@@ -94,10 +96,3 @@ func (nc *nodeConn) Close() error {
 	}
 	return nil
 }
-
-var (
-	robjCluterNodes = newRESPArray([]*resp{
-		newRESPBulk([]byte("7\r\nCLUSTER")),
-		newRESPBulk([]byte("5\r\nNODES")),
-	})
-)
