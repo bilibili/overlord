@@ -15,11 +15,15 @@ var (
 	lfByte     = byte('\n')
 	movedBytes = []byte("MOVED")
 	askBytes   = []byte("ASK")
+
+	pingReqBytes = []byte("4\r\nPING")
 )
 
 var (
-	robjGet  = newRESPBulk([]byte("3\r\nGET"))
-	robjMSet = newRESPBulk([]byte("4\r\nMSET"))
+	robjGet           = newRESPBulk([]byte("3\r\nGET"))
+	robjMSet          = newRESPBulk([]byte("4\r\nMSET"))
+	robjErrNotSupport = newRESPPlain(respError, []byte("Error: command not support"))
+	robjPong          = newRESPString([]byte("PONG"))
 
 	cmdMSetLenBytes = []byte("3")
 	cmdMSetBytes    = []byte("4\r\nMSET")
@@ -48,6 +52,7 @@ type Request struct {
 	respObj   *resp
 	mergeType MergeType
 	reply     *resp
+	rtype     reqType
 }
 
 // NewRequest will create new command by given args
@@ -72,8 +77,25 @@ func NewRequest(cmd string, args ...string) *Request {
 func newRequest(robj *resp) *Request {
 	r := &Request{respObj: robj}
 	r.mergeType = getMergeType(robj.nth(0).data)
-	r.reply = &resp{}
+	r.rtype = getReqType(robj.nth(0).data)
+	if !setupSpecialReply(r) {
+		r.reply = &resp{}
+	}
 	return r
+}
+
+func setupSpecialReply(req *Request) bool {
+	data := req.respObj.nth(0).data
+	if bytes.Equal(data, pingReqBytes) {
+		req.reply = robjPong
+		return true
+	}
+
+	if req.rtype == reqTypeNotSupport {
+		req.reply = robjErrNotSupport
+		return true
+	}
+	return false
 }
 
 func (c *Request) setRESP(robj *resp) {

@@ -74,8 +74,9 @@ const (
 func UpdateToUpper(src []byte) {
 	for i := range src {
 		if src[i] < lowerBegin || src[i] > lowerEnd {
-			src[i] -= step
+			continue
 		}
+		src[i] -= step
 	}
 }
 
