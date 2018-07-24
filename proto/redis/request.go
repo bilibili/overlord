@@ -16,15 +16,11 @@ var (
 	movedBytes = []byte("MOVED")
 	askBytes   = []byte("ASK")
 
-	pingReqBytes = []byte("4\r\nPING")
+	errNotSuportBytes = []byte("Error: command not support")
 )
 
 var (
-	robjGet           = newRESPBulk([]byte("3\r\nGET"))
-	robjMSet          = newRESPBulk([]byte("4\r\nMSET"))
-	robjErrNotSupport = newRESPPlain(respError, []byte("Error: command not support"))
-	robjPong          = newRESPString([]byte("PONG"))
-
+	cmdPingBytes    = []byte("4\r\nPING")
 	cmdMSetLenBytes = []byte("3")
 	cmdMSetBytes    = []byte("4\r\nMSET")
 	cmdMGetBytes    = []byte("4\r\nMGET")
@@ -85,13 +81,13 @@ func newRequest(robj *resp) *Request {
 
 func setupSpecialReply(req *Request) bool {
 	data := req.respObj.nth(0).data
-	if bytes.Equal(data, pingReqBytes) {
-		req.reply = robjPong
+	if bytes.Equal(data, cmdPingBytes) {
+		req.reply = newRESPPlain(respString, pongBytes)
 		return true
 	}
 
 	if req.rtype == reqTypeNotSupport {
-		req.reply = robjErrNotSupport
+		req.reply = newRESPPlain(respError, errNotSuportBytes)
 		return true
 	}
 	return false

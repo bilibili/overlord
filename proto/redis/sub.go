@@ -65,7 +65,7 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 			cmdObj := respPool.Get().(*resp)
 			cmdObj.rtype = respArray
 			cmdObj.data = nil
-			cmdObj.replace(0, robjMSet)
+			cmdObj.replace(0, newRESPBulk(cmdMSetBytes))
 			cmdObj.replace(1, robj.nth(i*2+1))
 			cmdObj.replace(2, robj.nth(i*2+2))
 			cmdObj.data = cmdMSetLenBytes
@@ -77,7 +77,7 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 			cmdObj := reqCmd.respObj
 			cmdObj.rtype = respArray
 			cmdObj.data = nil
-			cmdObj.replace(0, robjMSet)
+			cmdObj.replace(0, newRESPBulk(cmdMSetBytes))
 			cmdObj.replace(1, robj.nth(i*2+1))
 			cmdObj.replace(2, robj.nth(i*2+2))
 			cmdObj.data = cmdMSetLenBytes
@@ -106,7 +106,7 @@ func cmdByKeys(msg *proto.Message, robj *resp) error {
 		req := msg.NextReq()
 		if req == nil {
 			if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
-				cmdObj = newRESPArray([]*resp{robjGet, sub})
+				cmdObj = newRESPArray([]*resp{newRESPBulk(cmdGetBytes), sub})
 			} else {
 				cmdObj = newRESPArray([]*resp{robj.nth(0), sub})
 			}
@@ -116,7 +116,7 @@ func cmdByKeys(msg *proto.Message, robj *resp) error {
 			reqCmd := req.(*Request)
 			cmdObj := reqCmd.respObj
 			if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
-				cmdObj.setArray([]*resp{robjGet, sub})
+				cmdObj.setArray([]*resp{newRESPBulk(cmdGetBytes), sub})
 			} else {
 				cmdObj.setArray([]*resp{robj.nth(0), sub})
 			}
