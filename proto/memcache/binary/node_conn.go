@@ -3,7 +3,6 @@ package binary
 import (
 	"bytes"
 	"encoding/binary"
-	stderr "errors"
 	"io"
 	"sync/atomic"
 	"time"
@@ -19,11 +18,6 @@ import (
 const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
-)
-
-// errors
-var (
-	ErrNotImpl = stderr.New("i am groot")
 )
 
 type nodeConn struct {
@@ -207,10 +201,4 @@ func (n *nodeConn) Close() error {
 
 func (n *nodeConn) Closed() bool {
 	return atomic.LoadInt32(&n.closed) == handlerClosed
-}
-
-// FetchSlots was not supported in mc.
-func (n *nodeConn) FetchSlots() (ndoes []string, slots [][]int, err error) {
-	err = ErrNotImpl
-	return
 }

@@ -137,7 +137,6 @@ func (rc *respConn) decodeRESP(robj *resp) (err error) {
 		rc.decodePlain(line, robj)
 	case respBulk:
 		// decode bulkString
-		// fmt.Printf("line:%s\n", strconv.Quote(string(line)))
 		err = rc.decodeBulk(line, robj)
 	case respArray:
 		err = rc.decodeArray(line, robj)
@@ -152,7 +151,6 @@ func (rc *respConn) decodePlain(line []byte, robj *resp) {
 func (rc *respConn) decodeBulk(line []byte, robj *resp) error {
 	lineSize := len(line)
 	sizeBytes := line[1 : lineSize-2]
-	// fmt.Printf("size:%s\n", strconv.Quote(string(sizeBytes)))
 	size, err := decodeInt(sizeBytes)
 	if err != nil {
 		return err
@@ -164,7 +162,6 @@ func (rc *respConn) decodeBulk(line []byte, robj *resp) error {
 	rc.br.Advance(-(lineSize - 1))
 	fullDataSize := lineSize - 1 + size + 2
 	data, err := rc.br.ReadExact(fullDataSize)
-	// fmt.Printf("data:%s\n", strconv.Quote(string(data)))
 	if err == bufio.ErrBufferFull {
 		rc.br.Advance(-1)
 		return err

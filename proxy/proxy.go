@@ -12,6 +12,7 @@ import (
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
+	"overlord/proto/redis"
 
 	"github.com/pkg/errors"
 )
@@ -88,22 +89,19 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		if p.c.Proxy.MaxConnections > 0 {
 			if conns := atomic.AddInt32(&p.conns, 1); conns > p.c.Proxy.MaxConnections {
 				// cache type
+				var encoder proto.ProxyConn
 				switch cc.CacheType {
 				case proto.CacheTypeMemcache:
-					encoder := memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-					m := proto.ErrMessage(ErrProxyMoreMaxConns)
-					_ = encoder.Encode(m)
-					_ = conn.Close()
+					encoder = memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case proto.CacheTypeMemcacheBinary:
-					encoder := mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-					m := proto.ErrMessage(ErrProxyMoreMaxConns)
-					_ = encoder.Encode(m)
-					_ = conn.Close()
+					encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case proto.CacheTypeRedis:
-					// TODO(felix): support redis.
-				default:
-					_ = conn.Close()
+					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				}
+				if encoder != nil {
+					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns))
+				}
+				_ = conn.Close()
 				if log.V(3) {
 					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
 				}

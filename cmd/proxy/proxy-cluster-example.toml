@@ -1,6 +1,6 @@
 [[clusters]]
 # This be used to specify the name of cache cluster.
-name = "test-cluster"
+name = "test-mc"
 # The name of the hash function. Possible values are: sha1.
 hash_method = "fnv1a_64"
 # The key distribution mode. Possible values are: ketama.
@@ -34,7 +34,7 @@ servers = [
 
 [[clusters]]
 # This be used to specify the name of cache cluster.
-name = "redis"
+name = "test-redis"
 # The name of the hash function. Possible values are: sha1.
 hash_method = "fnv1a_64"
 # The key distribution mode. Possible values are: ketama.
@@ -46,7 +46,7 @@ cache_type = "redis"
 # proxy listen proto: tcp | unix
 listen_proto = "tcp"
 # proxy listen addr: tcp addr | unix sock path
-listen_addr = "0.0.0.0:22211"
+listen_addr = "0.0.0.0:26379"
 # Authenticate to the Redis server on connect.
 redis_auth = ""
 # The dial timeout value in msec that we wait for to establish a connection to the server. By default, we wait indefinitely.

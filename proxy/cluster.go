@@ -31,7 +31,7 @@ var (
 type pinger struct {
 	ping   proto.NodeConn
 	node   string
-	weight []int
+	weight int
 
 	failure int
 	retries int
@@ -71,8 +71,6 @@ type Cluster struct {
 	aliasMap map[string]int
 	nodeChan map[int]*batchChanel
 
-	syncConn proto.NodeConn
-
 	lock   sync.Mutex
 	closed bool
 }
@@ -90,18 +88,13 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
 	c.alias = alias
-
-	var wlist [][]int
+	// hash ring
 	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
 	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary || cc.CacheType == proto.CacheTypeRedis {
 		if c.alias {
 			ring.Init(ans, ws)
 		} else {
 			ring.Init(addrs, ws)
-		}
-		wlist = make([][]int, len(ws))
-		for i, w := range ws {
-			wlist[i] = []int{w}
 		}
 	} else {
 		panic("unsupported protocol")
@@ -110,7 +103,6 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	nodeChan := make(map[int]*batchChanel)
 	nodeMap := make(map[string]int)
 	aliasMap := make(map[string]int)
-
 	for i := range addrs {
 		nbc := newBatchChanel(cc.NodeConnections)
 		go c.processBatch(nbc, addrs[i])
@@ -126,7 +118,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeMap = nodeMap
 	c.ring = ring
 	if c.cc.PingAutoEject {
-		go c.startPinger(c.cc, addrs, wlist)
+		go c.startPinger(c.cc, addrs, ws)
 	}
 	return
 }
@@ -148,10 +140,7 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 // DispatchBatch delivers all the messages to batch execute by hash
 func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 	// TODO: dynamic update mbs by add more than configrured nodes
-	var (
-		bidx int
-	)
-
+	var bidx int
 	for _, msg := range slice {
 		if msg.IsBatch() {
 			for _, sub := range msg.Batch() {
@@ -163,7 +152,6 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 			mbs[bidx].AddMsg(msg)
 		}
 	}
-
 	c.deliver(mbs)
 }
 
@@ -227,7 +215,7 @@ func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
 	return err
 }
 
-func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws [][]int) {
+func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
 	for idx, addr := range addrs {
 		w := ws[idx]
 		nc := newNodeConn(cc, addr)
@@ -251,7 +239,7 @@ func (c *Cluster) processPing(p *pinger) {
 		} else {
 			p.failure = 0
 			if del {
-				c.ring.AddNode(p.node, p.weight...)
+				c.ring.AddNode(p.node, p.weight)
 				del = false
 			}
 		}

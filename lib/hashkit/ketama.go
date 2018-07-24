@@ -54,13 +54,8 @@ func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	return
 }
 
-// UpdateSlot fake impl
-func (h *HashRing) UpdateSlot(node string, slot int) {
-}
-
 // Init init hash ring with nodes.
-func (h *HashRing) Init(nodes []string, sl ...[]int) {
-	spots := sl[0]
+func (h *HashRing) Init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
@@ -115,13 +110,12 @@ func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
 // AddNode a new node to the hash ring.
 // n: name of the server
 // s: multiplier for default number of ticks (useful when one cache node has more resources, like RAM, than another)
-func (h *HashRing) AddNode(node string, args ...int) {
+func (h *HashRing) AddNode(node string, spot int) {
 	var (
 		tmpNode []string
 		tmpSpot []int
 		exitst  bool
 	)
-	spot := args[0]
 	h.lock.Lock()
 	for i, nd := range h.nodes {
 		tmpNode = append(tmpNode, nd)
@@ -165,11 +159,6 @@ func (h *HashRing) DelNode(n string) {
 	if del {
 		h.Init(tmpNode, tmpSpot)
 	}
-}
-
-// Hash returns result node.
-func (h *HashRing) Hash(key []byte) (string, bool) {
-	return h.GetNode(key)
 }
 
 // GetNode returns result node by given key.

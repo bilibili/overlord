@@ -58,7 +58,7 @@ func testHash(t *testing.T) {
 	for i := 0; i < 1e6; i++ {
 		s := "test value" + strconv.FormatUint(uint64(i), 10)
 		bs := []byte(s)
-		n, ok := ring.Hash(bs)
+		n, ok := ring.GetNode(bs)
 		if !ok {
 			if !delAll {
 				t.Error("unexpected not ok???")
