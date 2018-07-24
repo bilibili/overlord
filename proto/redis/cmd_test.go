@@ -25,4 +25,8 @@ func TestCommandRedirect(t *testing.T) {
 	assert.Equal(t, "ASK", r)
 	assert.Equal(t, 1024, slot)
 	assert.Equal(t, "127.0.0.1:2048", addr)
+	cmd.reply = newRESPPlain(respError, []byte("ERROR"))
+	assert.False(t, cmd.IsRedirect())
+	_, _, _, err = cmd.RedirectTriple()
+	assert.Error(t, err)
 }

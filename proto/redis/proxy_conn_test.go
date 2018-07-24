@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"overlord/proto"
 	"testing"
 
@@ -20,13 +21,19 @@ func TestDecodeBasicOk(t *testing.T) {
 
 func TestDecodeComplexOk(t *testing.T) {
 	msgs := proto.GetMsgSlice(16)
-	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n"
+	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nb\r\n$1\r\nc\r\n*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n"
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
-
+	// test reuse command
+	msgs[1].WithRequest(NewCommand("get", "a"))
+	msgs[1].WithRequest(NewCommand("get", "a"))
+	msgs[1].Reset()
+	msgs[2].WithRequest(NewCommand("get", "a"))
+	msgs[2].WithRequest(NewCommand("get", "a"))
+	msgs[2].Reset()
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
-	assert.Len(t, nmsgs, 1)
+	assert.Len(t, nmsgs, 3)
 	assert.Len(t, nmsgs[0].Batch(), 2)
 }
 
@@ -101,4 +108,15 @@ func TestEncodeCmdOk(t *testing.T) {
 		})
 	}
 
+}
+func TestEncodeErr(t *testing.T) {
+	data := make([]byte, 2048)
+	conn, buf := _createDownStreamConn()
+	pc := NewProxyConn(conn)
+	msg := proto.NewMessage()
+	msg.DoneWithError(fmt.Errorf("ERR msg err"))
+	err := pc.Encode(msg)
+	assert.NoError(t, err)
+	size, _ := buf.Read(data)
+	assert.Equal(t, "-ERR msg err\r\n", string(data[:size]))
 }

@@ -67,7 +67,7 @@ func TestDecodeRESP(t *testing.T) {
 	}
 }
 
-func TestDecodeMaxReachMaxOk(t *testing.T) {
+func TestDecodeMsgReachMaxOk(t *testing.T) {
 	line := []byte("*2\r\n$3\r\nget\r\n$1\r\na\r\n*2\r\n$3\r\nget\r\n$1\r\na\r\n")
 	rc := _createRespConn([]byte(line))
 	msgs := []*proto.Message{proto.NewMessage(), proto.NewMessage()}
@@ -79,7 +79,7 @@ func TestDecodeMaxReachMaxOk(t *testing.T) {
 	assert.Equal(t, 2, rs[1].Request().(*Command).respObj.Len())
 }
 
-func TestDecodeMaxReachFullOk(t *testing.T) {
+func TestDecodeMsgReachFullOk(t *testing.T) {
 	line := []byte("*2\r\n$3\r\nget\r\n$1\r\na\r\n*2\r\n$3\r\nget\r\n$1")
 	rc := _createRespConn([]byte(line))
 	msgs := []*proto.Message{proto.NewMessage(), proto.NewMessage()}
@@ -89,6 +89,23 @@ func TestDecodeMaxReachFullOk(t *testing.T) {
 	assert.Equal(t, respArray, rs[0].Request().(*Command).respObj.rtype)
 }
 
+func TestDecodeMsgReuseRESP(t *testing.T) {
+	line := []byte("*2\r\n$3\r\nget\r\n$1\r\na\r\n*2\r\n$3\r\nget\r\n$1\r\na\r\n")
+	rc := _createRespConn([]byte(line))
+	msg0 := proto.NewMessage()
+	msg0.WithRequest(NewCommand("get", "a"))
+	msg0.Reset()
+	msg1 := proto.NewMessage()
+	msg1.WithRequest(NewCommand("get", "a"))
+	msg1.Reset()
+	msgs := []*proto.Message{msg0, msg1}
+	rs, err := rc.decodeMsg(msgs)
+	assert.NoError(t, err)
+	assert.Len(t, rs, 2)
+
+	assert.Equal(t, respArray, rs[0].Request().(*Command).respObj.rtype)
+	assert.Equal(t, 2, rs[1].Request().(*Command).respObj.Len())
+}
 func TestDecodeCountOk(t *testing.T) {
 	line := []byte("$1\r\na\r\n+my name is\r\n")
 	rc := _createRespConn([]byte(line))

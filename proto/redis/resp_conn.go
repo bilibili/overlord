@@ -44,11 +44,12 @@ func (rc *respConn) decodeMsg(msgs []*proto.Message) ([]*proto.Message, error) {
 			robj = respPool.Get().(*resp)
 		} else {
 			robj = req.(*Command).respObj
+			// reset metadata before reuse it.
+			robj.reset()
 		}
 		err = rc.decodeRESP(robj)
 		if err == bufio.ErrBufferFull {
 			rc.completed = true
-			err = nil
 			return msgs[:i], nil
 		} else if err != nil {
 			return nil, err

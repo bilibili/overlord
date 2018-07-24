@@ -51,6 +51,14 @@ type resp struct {
 	arrayn int
 }
 
+func (r *resp) reset() {
+	r.data = r.data[:0]
+	r.arrayn = 0
+	for _, ar := range r.array {
+		ar.reset()
+	}
+}
+
 func newRESPInt(val int) *resp {
 	s := strconv.Itoa(val)
 	return newRESPPlain(respInt, []byte(s))

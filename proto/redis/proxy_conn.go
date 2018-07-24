@@ -114,7 +114,6 @@ func (pc *proxyConn) mergeCount(msg *proto.Message) (err error) {
 }
 
 func (pc *proxyConn) mergeJoin(msg *proto.Message) (err error) {
-	// TODO (LINTANGHUI):reuse reply
 	subs := msg.Subs()
 	msg.Write(respArrayBytes)
 	if len(subs) == 0 {
@@ -151,5 +150,6 @@ func (pc *proxyConn) encodeError(err error) error {
 	se := errors.Cause(err).Error()
 	pc.rc.bw.Write(respErrorBytes)
 	pc.rc.bw.Write([]byte(se))
-	return pc.rc.bw.Write(crlfBytes)
+	pc.rc.bw.Write(crlfBytes)
+	return pc.rc.bw.Flush()
 }
