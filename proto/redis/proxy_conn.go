@@ -18,7 +18,7 @@ var (
 )
 
 var (
-	robjErrNotSupport = newRESPBulk([]byte("Error: command not support"))
+	robjErrNotSupport = newRESPPlain(respError, []byte("Error: command not support"))
 	robjPong          = newRESPPlain(respString, pongBytes)
 )
 
