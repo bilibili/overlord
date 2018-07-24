@@ -64,7 +64,7 @@ type Cluster struct {
 
 	hashTag []byte
 
-	ring hashkit.Ring
+	ring *hashkit.HashRing
 
 	alias    bool
 	nodeMap  map[string]int
@@ -93,7 +93,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 
 	var wlist [][]int
 	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary {
+	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary || cc.CacheType == proto.CacheTypeRedis {
 		if c.alias {
 			ring.Init(ans, ws)
 		} else {
@@ -103,17 +103,6 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		for i, w := range ws {
 			wlist[i] = []int{w}
 		}
-	} else if cc.CacheType == proto.CacheTypeRedis {
-		sc := newNodeConn(cc, addrs[0])
-		nodes, slots, err := sc.FetchSlots()
-		// fmt.Println(nodes, len(nodes))
-		if err != nil {
-			panic(err)
-		}
-		addrs = nodes
-		ring.Init(nodes, slots...)
-		c.syncConn = sc
-		wlist = slots
 	} else {
 		panic("unsupported protocol")
 	}

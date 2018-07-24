@@ -41,6 +41,4 @@ type NodeConn interface {
 
 	Ping() error
 	Close() error
-
-	FetchSlots() (nodes []string, slots [][]int, err error)
 }

@@ -74,7 +74,7 @@ func TestReadBatchWithNilError(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	msg.WithRequest(&Request{})
+	msg.WithRequest(NewRequest("get", "a"))
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)
 	assert.Error(t, err)

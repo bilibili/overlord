@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bytes"
 	libnet "overlord/lib/net"
 	"overlord/proto"
 	"sync/atomic"
@@ -57,6 +58,9 @@ func (nc *nodeConn) write(m *proto.Message) error {
 		m.DoneWithError(ErrBadAssert)
 		return ErrBadAssert
 	}
+	if bytes.Equal(cmd.Cmd(), commandBytes) {
+		return nil
+	}
 	return cmd.respObj.encode(nc.rc.bw)
 }
 
@@ -67,6 +71,10 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		cmd, ok := msg.Request().(*Request)
 		if !ok {
 			return ErrBadAssert
+		}
+		if bytes.Equal(cmd.Cmd(), commandBytes) {
+			cmd.reply = newRESPNull(respError)
+			continue
 		}
 		if err = nc.rc.decodeOne(cmd.reply); err != nil {
 			return
@@ -93,35 +101,3 @@ var (
 		newRESPBulk([]byte("5\r\nNODES")),
 	})
 )
-
-func (nc *nodeConn) FetchSlots() (nodes []string, slots [][]int, err error) {
-	robjCluterNodes.encode(nc.rc.bw)
-	if err != nil {
-		return
-	}
-	err = nc.rc.Flush()
-	if err != nil {
-		return
-	}
-	rs := []*resp{&resp{}}
-	err = nc.rc.decodeCount(rs)
-	if err != nil {
-		return
-	}
-	robj := rs[0]
-	ns, err := ParseSlots(robj)
-	if err != nil {
-		return
-	}
-
-	cns := ns.GetNodes()
-	nodes = make([]string, 0)
-	slots = make([][]int, 0)
-	for _, node := range cns {
-		if node.Role() == roleMaster {
-			nodes = append(nodes, node.Addr())
-			slots = append(slots, node.Slots())
-		}
-	}
-	return
-}

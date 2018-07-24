@@ -29,8 +29,7 @@ var (
 	respArrayBytes  = []byte("*")
 
 	respNullBytes = []byte("-1\r\n")
-
-	okBytes = []byte("OK")
+	okBytes       = []byte("OK")
 )
 
 var (
