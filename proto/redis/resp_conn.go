@@ -103,7 +103,6 @@ func (rc *respConn) decodeToMsgBatch(mb *proto.MsgBatch) (err error) {
 				return
 			}
 			msg.MarkRead()
-
 			now = rc.br.Mark()
 			i++
 		}
@@ -176,18 +175,21 @@ func (rc *respConn) decodeRESP(robj *resp) (err error) {
 	}
 
 	rtype := line[0]
-	// fmt.Println("read:", strconv.Quote(string(line)))
 	switch rtype {
 	case respString, respInt, respError:
 		// decocde use one line to parse
 		rc.decodePlain(line, robj)
+		return
 	case respBulk:
 		// decode bulkString
 		// fmt.Printf("line:%s\n", strconv.Quote(string(line)))
 		err = rc.decodeBulk(line, robj)
+		return
 	case respArray:
 		err = rc.decodeArray(line, robj)
+		return
 	}
+	err = ErrProxyFail
 	return
 }
 

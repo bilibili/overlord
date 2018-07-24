@@ -54,7 +54,7 @@ type Request struct {
 //     NewRequest("CLUSTER", "NODES")
 func NewRequest(cmd string, args ...string) *Request {
 	respObj := respPool.Get().(*resp)
-	respObj.next().setBulk([]byte(cmd))
+	respObj.next().setBulk([]byte(fmt.Sprintf("%d\r\n%s", len(cmd), cmd)))
 	// respObj := newRESPArrayWithCapcity(len(args) + 1)
 	// respObj.replace(0, newRESPBulk([]byte(cmd)))
 	maxLen := len(args) + 1

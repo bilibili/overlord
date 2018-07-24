@@ -15,8 +15,9 @@ var (
 )
 
 var (
-	pingBytes = []byte("*1\r\n$4\r\nPING\r\n")
-	pongBytes = []byte("+PONG\r\n")
+	pingBytes       = []byte("*1\r\n$4\r\nPING\r\n")
+	pingInLineBytes = []byte("PING")
+	pongBytes       = []byte("+PONG\r\n")
 )
 
 type pinger struct {
