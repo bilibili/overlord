@@ -2,6 +2,7 @@
 
 ## Version 1.1.0
 1. add memcache binary protocol support.
+2. add conf file check
 
 ## Version 1.0.0
 1. compitable consist hash with twemproxy.
