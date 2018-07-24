@@ -58,7 +58,7 @@ func (nc *nodeConn) write(m *proto.Message) error {
 		return ErrBadAssert
 	}
 
-	if cmd.rtype == reqTypeNotSupport && cmd.reply.isZero() {
+	if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
 		return nil
 	}
 
@@ -74,7 +74,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			return ErrBadAssert
 		}
 
-		if cmd.rtype == reqTypeNotSupport {
+		if cmd.rtype == reqTypeNotSupport && !cmd.reply.isZero() {
 			continue
 		}
 
@@ -96,10 +96,3 @@ func (nc *nodeConn) Close() error {
 	}
 	return nil
 }
-
-var (
-	robjCluterNodes = newRESPArray([]*resp{
-		newRESPBulk([]byte("7\r\nCLUSTER")),
-		newRESPBulk([]byte("5\r\nNODES")),
-	})
-)

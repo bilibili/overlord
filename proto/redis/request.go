@@ -31,7 +31,6 @@ var (
 	cmdGetBytes     = []byte("3\r\nGET")
 	cmdDelBytes     = []byte("3\r\nDEL")
 	cmdExistsBytes  = []byte("6\r\nEXISTS")
-	commandBytes    = []byte("7\r\nCOMMAND")
 )
 
 // errors
