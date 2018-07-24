@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.2.0
+1. add redis protocol support.
+
 ## Version 1.1.0
 1. add memcache binary protocol support.
 2. add conf file check
