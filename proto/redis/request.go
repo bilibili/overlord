@@ -2,95 +2,145 @@ package redis
 
 import (
 	"bytes"
-	"strings"
+	errs "errors"
+	"sync"
 )
 
 var (
+	emptyBytes = []byte("")
 	crlfBytes  = []byte("\r\n")
-	lfByte     = byte('\n')
-	movedBytes = []byte("MOVED")
-	askBytes   = []byte("ASK")
+
+	arrayLenTwo   = []byte("2")
+	arrayLenThree = []byte("3")
+
+	cmdPingBytes   = []byte("4\r\nPING")
+	cmdMSetBytes   = []byte("4\r\nMSET")
+	cmdMGetBytes   = []byte("4\r\nMGET")
+	cmdGetBytes    = []byte("3\r\nGET")
+	cmdDelBytes    = []byte("3\r\nDEL")
+	cmdExistsBytes = []byte("6\r\nEXISTS")
+
+	respNullBytes = []byte("-1\r\n")
+	okBytes       = []byte("OK")
+
+	notSupportCmdBytes = []byte("" +
+		"6\r\nMSETNX" +
+		"5\r\nBLPOP" +
+		"5\r\nBRPOP" +
+		"10\r\nBRPOPLPUSH" +
+		"4\r\nKEYS" +
+		"7\r\nMIGRATE" +
+		"4\r\nMOVE" +
+		"6\r\nOBJECT" +
+		"9\r\nRANDOMKEY" +
+		"6\r\nRENAME" +
+		"8\r\nRENAMENX" +
+		"4\r\nSCAN" +
+		"4\r\nWAIT" +
+		"5\r\nBITOP" +
+		"4\r\nEVAL" +
+		"7\r\nEVALSHA" +
+		"4\r\nAUTH" +
+		"4\r\nECHO" +
+		"4\r\nINFO" +
+		"5\r\nPROXY" +
+		"7\r\nSLOWLOG" +
+		"4\r\nQUIT" +
+		"6\r\nSELECT" +
+		"4\r\nTIME" +
+		"6\r\nCONFIG" +
+		"8\r\nCOMMANDS")
 )
 
+// errors
 var (
-	cmdPingBytes    = []byte("4\r\nPING")
-	cmdMSetLenBytes = []byte("3")
-	cmdMSetBytes    = []byte("4\r\nMSET")
-	cmdMGetBytes    = []byte("4\r\nMGET")
-	cmdGetBytes     = []byte("3\r\nGET")
-	cmdDelBytes     = []byte("3\r\nDEL")
-	cmdExistsBytes  = []byte("6\r\nEXISTS")
+	ErrBadAssert  = errs.New("bad assert for redis")
+	ErrBadCount   = errs.New("bad count number")
+	ErrBadRequest = errs.New("bad request")
+)
+
+// mergeType is used to decript the merge operation.
+type mergeType = uint8
+
+// merge types
+const (
+	mergeTypeNo mergeType = iota
+	mergeTypeCount
+	mergeTypeOK
+	mergeTypeJoin
 )
 
 // Request is the type of a complete redis command
 type Request struct {
-	respObj   *resp
-	mergeType MergeType
-	reply     *resp
-	rtype     reqType
+	resp  *resp
+	reply *resp
+	mType mergeType
 }
 
-// NewRequest will create new command by given args
-// example:
-//     NewRequest("GET", "mykey")
-//     NewRequest("CLUSTER", "NODES")
-// func NewRequest(cmd string, args ...string) *Request {
-// 	respObj := respPool.Get().(*resp)
-// 	respObj.next().setBulk([]byte(cmd))
-// 	// respObj := newRESPArrayWithCapcity(len(args) + 1)
-// 	// respObj.replace(0, newRESPBulk([]byte(cmd)))
-// 	maxLen := len(args) + 1
-// 	for i := 1; i < maxLen; i++ {
-// 		data := args[i-1]
-// 		line := fmt.Sprintf("%d\r\n%s", len(data), data)
-// 		respObj.next().setBulk([]byte(line))
-// 	}
-// 	respObj.data = []byte(strconv.Itoa(len(args) + 1))
-// 	return newRequest(respObj)
-// }
+var reqPool = &sync.Pool{
+	New: func() interface{} {
+		return newReq()
+	},
+}
 
-func newRequest(robj *resp) *Request {
-	r := &Request{respObj: robj}
-	r.mergeType = getMergeType(robj.nth(0).data)
-	r.rtype = getReqType(robj.nth(0).data)
+// getReq get the msg from pool
+func getReq() *Request {
+	return reqPool.Get().(*Request)
+}
+
+func newReq() *Request {
+	r := &Request{}
+	r.resp = &resp{}
 	r.reply = &resp{}
 	return r
 }
 
-func (c *Request) setRESP(robj *resp) {
-	c.respObj = robj
-	c.mergeType = getMergeType(robj.nth(0).data)
-	c.reply = &resp{}
-}
-
-func newRequestWithMergeType(robj *resp, mtype MergeType) *Request {
-	return &Request{respObj: robj, mergeType: mtype}
-}
-
 // CmdString get the cmd
-func (c *Request) CmdString() string {
-	return strings.ToUpper(string(c.respObj.nth(0).data))
+func (r *Request) CmdString() string {
+	return string(r.Cmd())
 }
 
 // Cmd get the cmd
-func (c *Request) Cmd() []byte {
-	return c.respObj.nth(0).data
+func (r *Request) Cmd() []byte {
+	if r.resp.arrayn < 1 {
+		return emptyBytes
+	}
+	cmd := r.resp.array[0]
+	var pos int
+	if cmd.rTp == respBulk {
+		pos = bytes.Index(cmd.data, crlfBytes) + 2
+	}
+	return cmd.data[pos:]
 }
 
 // Key impl the proto.protoRequest and get the Key of redis
-func (c *Request) Key() []byte {
-	if len(c.respObj.array) == 1 {
-		return c.respObj.nth(0).data
+func (r *Request) Key() []byte {
+	if r.resp.arrayn < 1 {
+		return emptyBytes
 	}
-	var data = c.respObj.nth(1).data
+	if r.resp.arrayn == 1 {
+		return r.resp.array[0].data
+	}
+	k := r.resp.array[1]
 	var pos int
-	if c.respObj.nth(1).rtype == respBulk {
-		pos = bytes.Index(data, crlfBytes) + 2
+	if k.rTp == respBulk {
+		pos = bytes.Index(k.data, crlfBytes) + 2
 	}
-	// pos is never lower than 0
-	return data[pos:]
+	return k.data[pos:]
 }
 
 // Put the resource back to pool
-func (c *Request) Put() {
+func (r *Request) Put() {
+	r.resp.reset()
+	r.reply.reset()
+	r.mType = mergeTypeNo
+	reqPool.Put(r)
+}
+
+// notSupport command not support
+func (r *Request) notSupport() bool {
+	if r.resp.arrayn < 1 {
+		return false
+	}
+	return bytes.Index(notSupportCmdBytes, r.resp.array[0].data) > -1
 }

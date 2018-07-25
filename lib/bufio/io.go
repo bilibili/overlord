@@ -46,17 +46,19 @@ func (r *Reader) fill() error {
 	return nil
 }
 
+// Advance proxy to buffer advance
+func (r *Reader) Advance(n int) {
+	r.b.Advance(n)
+}
+
+// Mark return buf read pos.
 func (r *Reader) Mark() int {
 	return r.b.r
 }
 
+// AdvanceTo reset buffer read pos.
 func (r *Reader) AdvanceTo(mark int) {
 	r.Advance(mark - r.b.r)
-}
-
-// Advance proxy to buffer advance
-func (r *Reader) Advance(n int) {
-	r.b.Advance(n)
 }
 
 // Buffer will return the reference of local buffer
@@ -69,15 +71,12 @@ func (r *Reader) Read() error {
 	if r.err != nil {
 		return r.err
 	}
-
 	if r.b.buffered() == r.b.len() {
 		r.b.grow()
 	}
-
 	if r.b.w == r.b.len() {
 		r.b.shrink()
 	}
-
 	if err := r.fill(); err != io.EOF {
 		return err
 	}
@@ -152,32 +151,32 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 // If ReadUntil encounters an error before finding a delimiter,
 // it returns all the data in the buffer and the error itself (often io.EOF).
 // ReadUntil returns err != nil if and only if line does not end in delim.
-func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	for {
-		var index = bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
-		if index >= 0 {
-			limit := r.b.r + index + 1
-			slice := r.b.buf[r.b.r:limit]
-			r.b.r = limit
-			return slice, nil
-		}
-		if r.b.w >= r.b.len() {
-			r.b.grow()
-		}
-		err := r.fill()
-		if err == io.EOF && r.b.buffered() > 0 {
-			data := r.b.buf[r.b.r:r.b.w]
-			r.b.r = r.b.w
-			return data, nil
-		} else if err != nil {
-			r.err = err
-			return nil, err
-		}
-	}
-}
+// func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
+// 	if r.err != nil {
+// 		return nil, r.err
+// 	}
+// 	for {
+// 		var index = bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
+// 		if index >= 0 {
+// 			limit := r.b.r + index + 1
+// 			slice := r.b.buf[r.b.r:limit]
+// 			r.b.r = limit
+// 			return slice, nil
+// 		}
+// 		if r.b.w >= r.b.len() {
+// 			r.b.grow()
+// 		}
+// 		err := r.fill()
+// 		if err == io.EOF && r.b.buffered() > 0 {
+// 			data := r.b.buf[r.b.r:r.b.w]
+// 			r.b.r = r.b.w
+// 			return data, nil
+// 		} else if err != nil {
+// 			r.err = err
+// 			return nil, err
+// 		}
+// 	}
+// }
 
 // ReadFull reads exactly n bytes from r into buf.
 // It returns the number of bytes copied and an error if fewer bytes were read.
@@ -185,34 +184,34 @@ func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
 // If an EOF happens after reading some but not all the bytes,
 // ReadFull returns ErrUnexpectedEOF.
 // On return, n == len(buf) if and only if err == nil.
-func (r *Reader) ReadFull(n int) ([]byte, error) {
-	if n <= 0 {
-		return nil, nil
-	}
-	if r.err != nil {
-		return nil, r.err
-	}
-	for {
-		if r.b.buffered() >= n {
-			bs := r.b.buf[r.b.r : r.b.r+n]
-			r.b.r += n
-			return bs, nil
-		}
-		maxCanRead := r.b.len() - r.b.w + r.b.buffered()
-		if maxCanRead < n {
-			r.b.grow()
-		}
-		err := r.fill()
-		if err == io.EOF && r.b.buffered() > 0 {
-			data := r.b.buf[r.b.r:r.b.w]
-			r.b.r = r.b.w
-			return data, nil
-		} else if err != nil {
-			r.err = err
-			return nil, err
-		}
-	}
-}
+// func (r *Reader) ReadFull(n int) ([]byte, error) {
+// 	if n <= 0 {
+// 		return nil, nil
+// 	}
+// 	if r.err != nil {
+// 		return nil, r.err
+// 	}
+// 	for {
+// 		if r.b.buffered() >= n {
+// 			bs := r.b.buf[r.b.r : r.b.r+n]
+// 			r.b.r += n
+// 			return bs, nil
+// 		}
+// 		maxCanRead := r.b.len() - r.b.w + r.b.buffered()
+// 		if maxCanRead < n {
+// 			r.b.grow()
+// 		}
+// 		err := r.fill()
+// 		if err == io.EOF && r.b.buffered() > 0 {
+// 			data := r.b.buf[r.b.r:r.b.w]
+// 			r.b.r = r.b.w
+// 			return data, nil
+// 		} else if err != nil {
+// 			r.err = err
+// 			return nil, err
+// 		}
+// 	}
+// }
 
 // Writer implements buffering for an io.Writer object.
 // If an error occurs writing to a Writer, no more data will be

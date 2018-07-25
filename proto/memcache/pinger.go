@@ -47,8 +47,9 @@ func (m *mcPinger) Ping() (err error) {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
+	_ = m.br.Read()
 	var b []byte
-	if b, err = m.br.ReadUntil(delim); err != nil {
+	if b, err = m.br.ReadLine(); err != nil {
 		err = errors.Wrap(err, "MC ping read response")
 		return
 	}

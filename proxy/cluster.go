@@ -188,31 +188,18 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			}
 			return
 		}
-
-		err := c.processWriteBatch(nc, mb)
-		if err != nil {
+		if err := nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
-
-		err = c.processReadBatch(nc, mb)
-		if err != nil {
+		if err := nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
 		mb.BatchDone(c.cc.Name, addr)
 	}
-}
-
-func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
-	return w.WriteBatch(mb)
-}
-
-func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
-	err := r.ReadBatch(mb)
-	return err
 }
 
 func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {

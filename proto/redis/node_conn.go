@@ -1,24 +1,28 @@
 package redis
 
 import (
-	libnet "overlord/lib/net"
-	"overlord/proto"
 	"sync/atomic"
 	"time"
+
+	"overlord/lib/bufio"
+	libnet "overlord/lib/net"
+	"overlord/proto"
 )
 
 const (
-	closed = uint32(0)
-	opened = uint32(1)
+	opened = uint32(0)
+	closed = uint32(1)
 )
 
 type nodeConn struct {
 	cluster string
 	addr    string
 	conn    *libnet.Conn
-	rc      *respConn
-	p       *pinger
+	bw      *bufio.Writer
+	br      *bufio.Reader
 	state   uint32
+
+	p *pinger
 }
 
 // NewNodeConn create the node conn from proxy to redis
@@ -31,14 +35,14 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	return &nodeConn{
 		cluster: cluster,
 		addr:    addr,
-		rc:      newRESPConn(conn),
+		br:      bufio.NewReader(conn, nil),
+		bw:      bufio.NewWriter(conn),
 		conn:    conn,
 		p:       newPinger(conn),
-		state:   closed,
 	}
 }
 
-func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) error {
+func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	for _, m := range mb.Msgs() {
 		err := nc.write(m)
 		if err != nil {
@@ -47,52 +51,64 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) error {
 		}
 		m.MarkWrite()
 	}
-	err := nc.rc.Flush()
-	return err
+	return nc.bw.Flush()
 }
 
-func (nc *nodeConn) write(m *proto.Message) error {
-	cmd, ok := m.Request().(*Request)
+func (nc *nodeConn) write(m *proto.Message) (err error) {
+	req, ok := m.Request().(*Request)
 	if !ok {
 		m.DoneWithError(ErrBadAssert)
 		return ErrBadAssert
 	}
-
-	if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
+	if req.notSupport() {
 		return nil
 	}
-
-	return cmd.respObj.encode(nc.rc.bw)
+	return req.resp.encode(nc.bw)
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
-	nc.rc.br.ResetBuffer(mb.Buffer())
-	defer nc.rc.br.ResetBuffer(nil)
-	for _, msg := range mb.Msgs() {
-		cmd, ok := msg.Request().(*Request)
+	nc.br.ResetBuffer(mb.Buffer())
+	defer nc.br.ResetBuffer(nil)
+	// read
+	if err = nc.br.Read(); err != nil {
+		return
+	}
+	begin := nc.br.Mark()
+	now := nc.br.Mark()
+	for i := 0; i < mb.Count(); {
+		m := mb.Nth(i)
+		req, ok := m.Request().(*Request)
 		if !ok {
 			return ErrBadAssert
 		}
-
-		if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
-			continue
-		}
-
-		if err = nc.rc.decodeOne(cmd.reply); err != nil {
+		if req.notSupport() {
+			i++
 			return
 		}
-		msg.MarkRead()
+		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
+			nc.br.AdvanceTo(begin)
+			if err = nc.br.Read(); err != nil {
+				return
+			}
+			nc.br.AdvanceTo(now)
+			continue
+		} else if err != nil {
+			return
+		}
+		m.MarkRead()
+		i++
+		now = nc.br.Mark()
 	}
-	return nil
+	return
 }
 
-func (nc *nodeConn) Ping() error {
+func (nc *nodeConn) Ping() (err error) {
 	return nc.p.ping()
 }
 
-func (nc *nodeConn) Close() error {
+func (nc *nodeConn) Close() (err error) {
 	if atomic.CompareAndSwapUint32(&nc.state, opened, closed) {
 		return nc.conn.Close()
 	}
-	return nil
+	return
 }

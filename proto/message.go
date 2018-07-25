@@ -193,11 +193,6 @@ func (m *Message) Batch() []*Message {
 	return m.subs[:slen]
 }
 
-// Subs returns all the sub messages.
-func (m *Message) Subs() []*Message {
-	return m.subs[:m.reqn]
-}
-
 // Err returns error.
 func (m *Message) Err() error {
 	return m.err

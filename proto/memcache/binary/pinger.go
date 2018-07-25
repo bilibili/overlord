@@ -64,7 +64,7 @@ func (m *mcPinger) Ping() (err error) {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-	err = m.br.Read()
+	_ = m.br.Read()
 	head, err := m.br.ReadExact(requestHeaderLen)
 	if err != nil {
 		err = errors.Wrap(err, "MC ping read exact")

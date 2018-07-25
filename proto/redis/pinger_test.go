@@ -19,6 +19,7 @@ func TestPingerClosed(t *testing.T) {
 	assert.NoError(t, p.Close())
 	err := p.ping()
 	assert.Error(t, err)
+	assert.EqualError(t, err, "ping interface has been closed")
 	assert.NoError(t, p.Close())
 }
 
@@ -27,4 +28,5 @@ func TestPingerWrongResp(t *testing.T) {
 	p := newPinger(conn)
 	err := p.ping()
 	assert.Error(t, err)
+	assert.EqualError(t, err, "pong response payload is bad")
 }

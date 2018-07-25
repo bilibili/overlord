@@ -2,9 +2,9 @@ package redis
 
 import (
 	"bytes"
-	stderrs "errors"
 	"strconv"
 
+	"overlord/lib/bufio"
 	"overlord/lib/conv"
 	libnet "overlord/lib/net"
 	"overlord/proto"
@@ -12,161 +12,215 @@ import (
 	"github.com/pkg/errors"
 )
 
-// errors
-var (
-	ErrBadAssert = stderrs.New("bad assert for redis")
-	ErrBadCount  = stderrs.New("bad count number")
-)
-
-var (
-	robjErrNotSupport = newRESPPlain(respError, []byte("Error: command not support"))
-	robjPong          = newRESPPlain(respString, pongBytes)
-)
-
 type proxyConn struct {
-	rc *respConn
+	br        *bufio.Reader
+	bw        *bufio.Writer
+	completed bool
+
+	resp *resp
 }
 
 // NewProxyConn creates new redis Encoder and Decoder.
 func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 	r := &proxyConn{
-		rc: newRESPConn(conn),
+		br:        bufio.NewReader(conn, bufio.Get(1024)),
+		bw:        bufio.NewWriter(conn),
+		completed: true,
+		resp:      &resp{},
 	}
 	return r
 }
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
-	return pc.rc.decodeMsg(msgs)
+	var err error
+	if pc.completed {
+		err = pc.br.Read()
+		if err != nil {
+			return nil, err
+		}
+		pc.completed = false
+	}
+	for i := range msgs {
+		msgs[i].Type = proto.CacheTypeRedis
+		// decode
+		if err = pc.decode(msgs[i]); err == bufio.ErrBufferFull {
+			pc.completed = true
+			return msgs[:i], nil
+		} else if err != nil {
+			return nil, err
+		}
+		msgs[i].MarkStart()
+	}
+	return msgs, nil
 }
 
-func (pc *proxyConn) Encode(msg *proto.Message) (err error) {
-	if err := msg.Err(); err != nil {
-		return pc.encodeError(err)
+func (pc *proxyConn) decode(m *proto.Message) (err error) {
+	if err = pc.resp.decode(pc.br); err != nil {
+		return
 	}
-	err = pc.merge(msg)
+	if pc.resp.arrayn < 1 {
+		return
+	}
+	cmd := pc.resp.array[0].data // NOTE: when array, first is command
+	if bytes.Equal(cmd, cmdMSetBytes) {
+		mid := pc.resp.arrayn / 2
+		for i := 0; i < mid; i++ {
+			r := nextReq(m)
+			r.mType = mergeTypeOK
+			r.resp.reset() // NOTE: *3\r\n
+			r.resp.rTp = respArray
+			r.resp.data = arrayLenThree
+			// array resp: mset
+			nre1 := r.resp.next() // NOTE: $4\r\nMSET\r\n
+			nre1.reset()
+			nre1.rTp = respBulk
+			nre1.data = cmdMSetBytes
+			// array resp: key
+			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
+			nre2.reset()
+			nre2.rTp = pc.resp.array[i*2+1].rTp
+			nre2.data = pc.resp.array[i*2+1].data
+			// array resp: value
+			nre3 := r.resp.next() // NOTE: $vlen\r\nvalue\r\n
+			nre3.reset()
+			nre3.rTp = pc.resp.array[i*2+2].rTp
+			nre3.data = pc.resp.array[i*2+2].data
+		}
+	} else if bytes.Equal(cmd, cmdMGetBytes) {
+		for i := 1; i < pc.resp.arrayn; i++ {
+			r := nextReq(m)
+			r.mType = mergeTypeJoin
+			r.resp.reset() // NOTE: *2\r\n
+			r.resp.rTp = respArray
+			r.resp.data = arrayLenTwo
+			// array resp: get
+			nre1 := r.resp.next() // NOTE: $3\r\nGET\r\n
+			nre1.reset()
+			nre1.rTp = respBulk
+			nre1.data = cmdGetBytes
+			// array resp: key
+			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
+			nre2.reset()
+			nre2.rTp = pc.resp.array[i].rTp
+			nre2.data = pc.resp.array[i].data
+		}
+	} else if bytes.Equal(cmd, cmdDelBytes) || bytes.Equal(cmd, cmdExistsBytes) {
+		for i := 1; i < pc.resp.arrayn; i++ {
+			r := nextReq(m)
+			r.mType = mergeTypeCount
+			r.resp.reset() // NOTE: *2\r\n
+			r.resp.rTp = respArray
+			r.resp.data = arrayLenTwo
+			// array resp: get
+			nre1 := r.resp.next() // NOTE: $3\r\nDEL\r\n | $6\r\nEXISTS\r\n
+			nre1.reset()
+			nre1.rTp = pc.resp.array[0].rTp
+			nre1.data = pc.resp.array[0].data
+			// array resp: key
+			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
+			nre2.reset()
+			nre2.rTp = pc.resp.array[i].rTp
+			nre2.data = pc.resp.array[i].data
+		}
+	} else {
+		r := nextReq(m)
+		r.resp.reset()
+		r.resp.rTp = pc.resp.rTp
+		r.resp.data = pc.resp.data
+		for i := 0; i < pc.resp.arrayn; i++ {
+			nre := r.resp.next()
+			nre.reset()
+			nre.rTp = pc.resp.array[i].rTp
+			nre.data = pc.resp.array[i].data
+		}
+	}
+	return
+}
+
+func nextReq(m *proto.Message) *Request {
+	req := m.NextReq()
+	if req == nil {
+		r := getReq()
+		m.WithRequest(r)
+		return r
+	}
+	r := req.(*Request)
+	return r
+}
+
+func (pc *proxyConn) Encode(m *proto.Message) (err error) {
+	if err = m.Err(); err != nil {
+		return
+	}
+	req, ok := m.Request().(*Request)
+	if !ok {
+		return ErrBadAssert
+	}
+	if !m.IsBatch() {
+		err = req.reply.encode(pc.bw)
+	} else {
+		switch req.mType {
+		case mergeTypeOK:
+			err = pc.mergeOK(m)
+		case mergeTypeJoin:
+			err = pc.mergeJoin(m)
+		case mergeTypeCount:
+			err = pc.mergeCount(m)
+		default:
+			// TODO: panic???
+		}
+	}
 	if err != nil {
-		return pc.encodeError(err)
+		err = errors.Wrap(err, "Redis Encoder before flush response")
+		return
 	}
-	if err = pc.rc.Flush(); err != nil {
+	if err = pc.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "Redis Encoder flush response")
 	}
 	return
 }
 
-func (pc *proxyConn) merge(msg *proto.Message) error {
-	cmd, ok := msg.Request().(*Request)
-	if !ok {
-		return ErrBadAssert
-	}
-	if !msg.IsBatch() {
-		return pc.encodeReply(cmd)
-	}
-	mtype, err := pc.getBatchMergeType(msg)
-	if err != nil {
-		return err
-	}
-	switch mtype {
-	case MergeTypeJoin:
-		return pc.mergeJoin(msg)
-	case MergeTypeOk:
-		return pc.mergeOk(msg)
-	case MergeTypeCount:
-		return pc.mergeCount(msg)
-	case MergeTypeBasic:
-		fallthrough
-	default:
-		panic("unreachable path")
-	}
-}
-
-func (pc *proxyConn) encodeReply(req *Request) error {
-	if req.rtype == reqTypeNotSupport {
-		return robjErrNotSupport.encode(pc.rc.bw)
-	}
-
-	data := req.respObj.nth(0).data
-	if bytes.Equal(data, cmdPingBytes) {
-		return robjPong.encode(pc.rc.bw)
-	}
-
-	return req.reply.encode(pc.rc.bw)
-}
-
-func (pc *proxyConn) mergeOk(msg *proto.Message) (err error) {
-	for _, sub := range msg.Subs() {
-		if err = sub.Err(); err != nil {
-			cmd := sub.Request().(*Request)
-			pc.rc.bw.Write(respErrorBytes)
-			pc.rc.bw.Write(cmd.reply.data)
-			pc.rc.bw.Write(crlfBytes)
-			return
-		}
-	}
-	pc.rc.bw.Write(respStringBytes)
-	pc.rc.bw.Write(okBytes)
-	pc.rc.bw.Write(crlfBytes)
+func (pc *proxyConn) mergeOK(m *proto.Message) (err error) {
+	_ = pc.bw.Write(respStringBytes)
+	_ = pc.bw.Write(okBytes)
+	_ = pc.bw.Write(crlfBytes)
 	return
 }
 
-func (pc *proxyConn) mergeCount(msg *proto.Message) (err error) {
+func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 	var sum = 0
-	for _, sub := range msg.Subs() {
-		if sub.Err() != nil {
-			continue
-		}
-		subcmd, ok := sub.Request().(*Request)
+	for _, mreq := range m.Requests() {
+		req, ok := mreq.(*Request)
 		if !ok {
 			return ErrBadAssert
 		}
-		ival, err := conv.Btoi(subcmd.reply.data)
+		ival, err := conv.Btoi(req.reply.data)
 		if err != nil {
 			return ErrBadCount
 		}
 		sum += int(ival)
 	}
-	pc.rc.bw.Write(respIntBytes)
-	pc.rc.bw.Write([]byte(strconv.Itoa(sum)))
-	pc.rc.bw.Write(crlfBytes)
+	_ = pc.bw.Write(respIntBytes)
+	_ = pc.bw.Write([]byte(strconv.Itoa(sum)))
+	_ = pc.bw.Write(crlfBytes)
 	return
 }
 
-func (pc *proxyConn) mergeJoin(msg *proto.Message) (err error) {
-	subs := msg.Subs()
-	pc.rc.bw.Write(respArrayBytes)
-	if len(subs) == 0 {
-		pc.rc.bw.Write(respNullBytes)
+func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
+	reqs := m.Requests()
+	_ = pc.bw.Write(respArrayBytes)
+	if len(reqs) == 0 {
+		_ = pc.bw.Write(respNullBytes)
 		return
 	}
-	pc.rc.bw.Write([]byte(strconv.Itoa(len(subs))))
-	pc.rc.bw.Write(crlfBytes)
-	for _, sub := range subs {
-		subcmd, ok := sub.Request().(*Request)
+	_ = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
+	_ = pc.bw.Write(crlfBytes)
+	for _, mreq := range reqs {
+		req, ok := mreq.(*Request)
 		if !ok {
-			err = pc.encodeError(ErrBadAssert)
-			if err != nil {
-				return
-			}
 			return ErrBadAssert
 		}
-		subcmd.reply.encode(pc.rc.bw)
+		_ = req.reply.encode(pc.bw)
 	}
 	return
-}
-
-func (pc *proxyConn) getBatchMergeType(msg *proto.Message) (mtype MergeType, err error) {
-	cmd, ok := msg.Subs()[0].Request().(*Request)
-	if !ok {
-		err = ErrBadAssert
-		return
-	}
-	mtype = cmd.mergeType
-	return
-}
-
-func (pc *proxyConn) encodeError(err error) error {
-	se := errors.Cause(err).Error()
-	pc.rc.bw.Write(respErrorBytes)
-	pc.rc.bw.Write([]byte(se))
-	pc.rc.bw.Write(crlfBytes)
-	return pc.rc.bw.Flush()
 }

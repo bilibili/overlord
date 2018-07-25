@@ -3,9 +3,10 @@ package redis
 import (
 	"bytes"
 	"errors"
+	"sync/atomic"
+
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
-	"sync/atomic"
 )
 
 // errors
@@ -42,15 +43,12 @@ func (p *pinger) ping() (err error) {
 		err = ErrPingClosed
 		return
 	}
-	err = p.bw.Write(pingBytes)
-	if err != nil {
-		return
-	}
-	err = p.bw.Flush()
-	if err != nil {
+	_ = p.bw.Write(pingBytes)
+	if err = p.bw.Flush(); err != nil {
 		return err
 	}
-	data, err := p.br.ReadUntil(lfByte)
+	_ = p.br.Read()
+	data, err := p.br.ReadLine()
 	if err != nil {
 		return
 	}

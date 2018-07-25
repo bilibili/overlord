@@ -1,9 +1,10 @@
 package redis
 
 import (
-	"io"
-	"overlord/proto"
 	"testing"
+
+	"overlord/lib/bufio"
+	"overlord/proto"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +31,24 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	msg.WithRequest(NewRequest("GET", "A"))
+	req := getReq()
+	req.mType = mergeTypeNo
+	req.resp = &resp{
+		rTp:  respArray,
+		data: []byte("2"),
+		array: []*resp{
+			&resp{
+				rTp:  respBulk,
+				data: []byte("3\r\nGET"),
+			},
+			&resp{
+				rTp:  respBulk,
+				data: []byte("5\r\nabcde"),
+			},
+		},
+		arrayn: 2,
+	}
+	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.WriteBatch(mb)
 	assert.NoError(t, err)
@@ -53,7 +71,10 @@ func TestReadBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(data)))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	msg.WithRequest(NewRequest("SET", "baka", "miao"))
+	req := getReq()
+	req.mType = mergeTypeNo
+	req.reply = &resp{}
+	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)
 	assert.NoError(t, err)
@@ -74,15 +95,18 @@ func TestReadBatchWithNilError(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	msg.WithRequest(NewRequest("GET", "a"))
+	req := getReq()
+	req.mType = mergeTypeNo
+	req.reply = &resp{}
+	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)
 	assert.Error(t, err)
-	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, bufio.ErrBufferFull, err)
 }
 
 func TestPingOk(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createRepeatConn(pongBytes, 100))
+	nc := newNodeConn("baka", "127.0.0.1:12345", _createRepeatConn(pongBytes, 1))
 	err := nc.Ping()
 	assert.NoError(t, err)
 }
