@@ -20,7 +20,8 @@ const (
 )
 
 var (
-	serverErrorBytes = []byte(serverErrorPrefix)
+	serverErrorBytes       = []byte(serverErrorPrefix)
+	serverErrorPrefixBytes = []byte("SERVER_ERROR ")
 )
 
 type proxyConn struct {
@@ -349,30 +350,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		_ = p.bw.Write([]byte(se))
 		_ = p.bw.Write(crlfBytes)
 	} else {
-		var bs []byte
-		reqs := m.Requests()
-		for _, req := range reqs {
-			mcr, ok := req.(*MCRequest)
-			if !ok {
-				_ = p.bw.Write(serverErrorBytes)
-				_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-				_ = p.bw.Write(crlfBytes)
-			} else {
-				_, ok := withValueTypes[mcr.rTp]
-				if ok && m.IsBatch() {
-					bs = bytes.TrimSuffix(mcr.data, endBytes)
-				} else {
-					bs = mcr.data
-				}
-				if len(bs) == 0 {
-					continue
-				}
-				_ = p.bw.Write(bs)
-			}
-		}
-		if m.IsBatch() {
-			_ = p.bw.Write(endBytes)
-		}
+		_ = p.Merge(m)
 	}
 	if err = p.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Encoder encode response flush bytes")

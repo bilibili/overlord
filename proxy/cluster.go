@@ -17,6 +17,7 @@ import (
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
+	"overlord/proto/redis"
 
 	"github.com/pkg/errors"
 )
@@ -30,7 +31,7 @@ var (
 type pinger struct {
 	ping   proto.NodeConn
 	node   string
-	weight int
+	weight []int
 
 	failure int
 	retries int
@@ -70,6 +71,8 @@ type Cluster struct {
 	aliasMap map[string]int
 	nodeChan map[int]*batchChanel
 
+	syncConn proto.NodeConn
+
 	lock   sync.Mutex
 	closed bool
 }
@@ -88,11 +91,20 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	}
 	c.alias = alias
 
-	ring := hashkit.Ketama()
-	if c.alias {
-		ring.Init(ans, ws)
+	var wlist [][]int
+	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
+	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary || cc.CacheType == proto.CacheTypeRedis {
+		if c.alias {
+			ring.Init(ans, ws)
+		} else {
+			ring.Init(addrs, ws)
+		}
+		wlist = make([][]int, len(ws))
+		for i, w := range ws {
+			wlist[i] = []int{w}
+		}
 	} else {
-		ring.Init(addrs, ws)
+		panic("unsupported protocol")
 	}
 
 	nodeChan := make(map[int]*batchChanel)
@@ -114,7 +126,7 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 	c.nodeMap = nodeMap
 	c.ring = ring
 	if c.cc.PingAutoEject {
-		go c.startPinger(c.cc, addrs, ws)
+		go c.startPinger(c.cc, addrs, wlist)
 	}
 	return
 }
@@ -215,7 +227,7 @@ func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
 	return err
 }
 
-func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
+func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws [][]int) {
 	for idx, addr := range addrs {
 		w := ws[idx]
 		nc := newNodeConn(cc, addr)
@@ -235,10 +247,11 @@ func (c *Cluster) processPing(p *pinger) {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
 			p.retries = 0
+			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 		} else {
 			p.failure = 0
 			if del {
-				c.ring.AddNode(p.node, p.weight)
+				c.ring.AddNode(p.node, p.weight...)
 				del = false
 			}
 		}
@@ -269,7 +282,7 @@ func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	if len(realKey) == 0 {
 		realKey = key
 	}
-	node, ok = c.ring.Hash(realKey)
+	node, ok = c.ring.GetNode(realKey)
 	return
 }
 
@@ -333,9 +346,8 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case proto.CacheTypeMemcacheBinary:
 		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
-	// TODO(felix): support redis
+		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
-	return nil
 }

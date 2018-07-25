@@ -51,7 +51,6 @@ type Message struct {
 	req  []Request
 	reqn int
 	subs []*Message
-
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error
@@ -192,6 +191,11 @@ func (m *Message) Batch() []*Message {
 		m.subs = append(m.subs, msg)
 	}
 	return m.subs[:slen]
+}
+
+// Subs returns all the sub messages.
+func (m *Message) Subs() []*Message {
+	return m.subs[:m.reqn]
 }
 
 // Err returns error.

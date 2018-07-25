@@ -18,6 +18,10 @@ var (
 	ErrBufferFull = bufio.ErrBufferFull
 )
 
+var (
+	crlfBytes = []byte("\r\n")
+)
+
 // Reader implements buffering for an io.Reader object.
 type Reader struct {
 	rd  io.Reader
@@ -40,6 +44,14 @@ func (r *Reader) fill() error {
 		return io.ErrNoProgress
 	}
 	return nil
+}
+
+func (r *Reader) Mark() int {
+	return r.b.r
+}
+
+func (r *Reader) AdvanceTo(mark int) {
+	r.Advance(mark - r.b.r)
 }
 
 // Advance proxy to buffer advance
@@ -70,6 +82,19 @@ func (r *Reader) Read() error {
 		return err
 	}
 	return nil
+}
+
+// ReadLine will read until meet the first crlf bytes.
+func (r *Reader) ReadLine() (line []byte, err error) {
+	idx := bytes.Index(r.b.buf[r.b.r:r.b.w], crlfBytes)
+	if idx == -1 {
+		line = nil
+		err = ErrBufferFull
+		return
+	}
+	line = r.b.buf[r.b.r : r.b.r+idx+2]
+	r.b.r += idx + 2
+	return
 }
 
 // ReadSlice will read until the delim or return ErrBufferFull.
@@ -217,6 +242,7 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
+	// fmt.Println("buf:", w.bufs[:w.cursor])
 	w.bufsp = net.Buffers(w.bufs[:w.cursor])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {

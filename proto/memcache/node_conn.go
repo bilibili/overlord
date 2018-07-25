@@ -11,12 +11,19 @@ import (
 	"overlord/lib/prom"
 	"overlord/proto"
 
+	stderr "errors"
+
 	"github.com/pkg/errors"
 )
 
 const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
+)
+
+// errors
+var (
+	ErrNotImpl = stderr.New("i am groot")
 )
 
 type nodeConn struct {
@@ -135,7 +142,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
-				err = nil
 				break
 			} else if err != nil {
 				return
@@ -188,7 +194,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < size {
 		return 0, bufio.ErrBufferFull
 	}
-
 	mcr.data = data[:size]
 	return
 }
@@ -205,4 +210,10 @@ func (n *nodeConn) Close() error {
 
 func (n *nodeConn) Closed() bool {
 	return atomic.LoadInt32(&n.closed) == handlerClosed
+}
+
+// FetchSlots was not supported in mc.
+func (n *nodeConn) FetchSlots() (ndoes []string, slots [][]int, err error) {
+	err = ErrNotImpl
+	return
 }

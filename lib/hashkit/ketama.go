@@ -40,22 +40,27 @@ type HashRing struct {
 }
 
 // Ketama new a hash ring with ketama consistency.
-// Default hash: sha1
+// Default hash: fnv1a64
 func Ketama() (h *HashRing) {
 	h = new(HashRing)
 	h.hash = NewFnv1a64().fnv1a64
 	return
 }
 
-// NewRingWithHash new a hash ring with a hash func.
-func NewRingWithHash(hash func([]byte) uint) (h *HashRing) {
+// newRingWithHash new a hash ring with a hash func.
+func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	h = Ketama()
 	h.hash = hash
 	return
 }
 
+// UpdateSlot fake impl
+func (h *HashRing) UpdateSlot(node string, slot int) {
+}
+
 // Init init hash ring with nodes.
-func (h *HashRing) Init(nodes []string, spots []int) {
+func (h *HashRing) Init(nodes []string, sl ...[]int) {
+	spots := sl[0]
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
@@ -110,12 +115,13 @@ func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
 // AddNode a new node to the hash ring.
 // n: name of the server
 // s: multiplier for default number of ticks (useful when one cache node has more resources, like RAM, than another)
-func (h *HashRing) AddNode(node string, spot int) {
+func (h *HashRing) AddNode(node string, args ...int) {
 	var (
 		tmpNode []string
 		tmpSpot []int
 		exitst  bool
 	)
+	spot := args[0]
 	h.lock.Lock()
 	for i, nd := range h.nodes {
 		tmpNode = append(tmpNode, nd)
@@ -163,6 +169,11 @@ func (h *HashRing) DelNode(n string) {
 
 // Hash returns result node.
 func (h *HashRing) Hash(key []byte) (string, bool) {
+	return h.GetNode(key)
+}
+
+// GetNode returns result node by given key.
+func (h *HashRing) GetNode(key []byte) (string, bool) {
 	ts, ok := h.ticks.Load().(*tickArray)
 	if !ok || ts.length == 0 {
 		return "", false
