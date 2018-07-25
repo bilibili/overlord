@@ -3,8 +3,9 @@ package redis
 import (
 	"bytes"
 	"net"
-	libnet "overlord/lib/net"
 	"time"
+
+	libnet "overlord/lib/net"
 )
 
 type mockAddr string

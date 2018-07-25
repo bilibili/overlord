@@ -133,12 +133,11 @@ func (r *resp) next() *resp {
 		robj := r.array[r.arrayn]
 		r.arrayn++
 		return robj
-	} else {
-		robj := respPool.Get().(*resp)
-		r.array = append(r.array, robj)
-		r.arrayn++
-		return robj
 	}
+	robj := respPool.Get().(*resp)
+	r.array = append(r.array, robj)
+	r.arrayn++
+	return robj
 }
 
 func (r *resp) isNull() bool {
@@ -184,7 +183,6 @@ func (r *resp) String() string {
 		sb.WriteString("\n")
 		return sb.String()
 	}
-
 	return strconv.Quote(string(r.data))
 }
 
@@ -219,7 +217,6 @@ func (r *resp) encodeError(w *bufio.Writer) (err error) {
 
 func (r *resp) encodeInt(w *bufio.Writer) (err error) {
 	return r.encodePlain(respIntBytes, w)
-
 }
 
 func (r *resp) encodeString(w *bufio.Writer) (err error) {
@@ -250,7 +247,6 @@ func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
 		err = w.Write(respNullBytes)
 		return
 	}
-
 	err = w.Write(r.data)
 	if err != nil {
 		return
@@ -264,7 +260,6 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	if err != nil {
 		return
 	}
-
 	if r.isNull() {
 		err = w.Write(respNullBytes)
 		return
@@ -275,7 +270,6 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 		return
 	}
 	err = w.Write(crlfBytes)
-
 	for _, item := range r.slice() {
 		item.encode(w)
 		if err != nil {

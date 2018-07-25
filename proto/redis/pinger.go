@@ -56,7 +56,6 @@ func (p *pinger) ping() (err error) {
 	}
 	if !bytes.Equal(data, pongBytes) {
 		err = ErrBadPong
-		return
 	}
 	return
 }
