@@ -97,10 +97,6 @@ func newRESPString(val []byte) *resp {
 	return newRESPPlain(respString, val)
 }
 
-func (r *resp) setString(val []byte) {
-	r.setPlain(respString, val)
-}
-
 func newRESPNull(rtype respType) *resp {
 	return newRESPPlain(rtype, nil)
 }
@@ -134,12 +130,12 @@ func (r *resp) next() *resp {
 		robj := r.array[r.arrayn]
 		r.arrayn++
 		return robj
-	} else {
-		robj := respPool.Get().(*resp)
-		r.array = append(r.array, robj)
-		r.arrayn++
-		return robj
 	}
+
+	robj := respPool.Get().(*resp)
+	r.array = append(r.array, robj)
+	r.arrayn++
+	return robj
 }
 
 func (r *resp) isNull() bool {
@@ -175,27 +171,18 @@ func (r *resp) Len() int {
 func (r *resp) String() string {
 	if r.rtype == respArray {
 		var sb strings.Builder
-		sb.Write([]byte("["))
+		_, _ = sb.Write([]byte("["))
 		for _, sub := range r.array[:r.arrayn-1] {
-			sb.WriteString(sub.String())
-			sb.WriteString(", ")
+			_, _ = sb.WriteString(sub.String())
+			_, _ = sb.WriteString(", ")
 		}
-		sb.WriteString(r.array[r.arrayn-1].String())
-		sb.Write([]byte("]"))
-		sb.WriteString("\n")
+		_, _ = sb.WriteString(r.array[r.arrayn-1].String())
+		_, _ = sb.Write([]byte("]"))
+		_, _ = sb.WriteString("\n")
 		return sb.String()
 	}
 
 	return strconv.Quote(string(r.data))
-}
-
-func (r *resp) bytes() []byte {
-	var data = r.data
-	var pos int
-	if r.rtype == respBulk {
-		pos = bytes.Index(data, crlfBytes) + 2
-	}
-	return data[pos:]
 }
 
 func (r *resp) encode(w *bufio.Writer) error {
@@ -278,7 +265,7 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	err = w.Write(crlfBytes)
 
 	for _, item := range r.slice() {
-		item.encode(w)
+		err = item.encode(w)
 		if err != nil {
 			return
 		}
