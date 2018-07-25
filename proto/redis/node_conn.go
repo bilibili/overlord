@@ -19,8 +19,6 @@ type nodeConn struct {
 	rc      *respConn
 	p       *pinger
 	state   uint32
-
-	batchCount int
 }
 
 // NewNodeConn create the node conn from proxy to redis
@@ -63,21 +61,14 @@ func (nc *nodeConn) write(m *proto.Message) error {
 	if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
 		return nil
 	}
-
-	nc.batchCount++
 	return cmd.respObj.encode(nc.rc.bw)
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
-	if nc.batchCount == 0 {
-		return
-	}
 	nc.rc.br.ResetBuffer(mb.Buffer())
-	defer func() {
-		nc.rc.br.ResetBuffer(nil)
-		nc.batchCount = 0
-	}()
-	return nc.rc.decodeToMsgBatch(mb)
+	err = nc.rc.decodeToMsgBatch(mb)
+	nc.rc.br.ResetBuffer(nil)
+	return
 }
 
 func (nc *nodeConn) Ping() error {

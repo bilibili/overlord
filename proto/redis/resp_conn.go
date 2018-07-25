@@ -73,39 +73,35 @@ func (rc *respConn) decodeToMsgBatch(mb *proto.MsgBatch) (err error) {
 		i     = 0
 	)
 	for {
-		rc.br.AdvanceTo(begin)
-		err = rc.br.Read()
-		if err != nil {
+		if i == n {
 			return
 		}
-		rc.br.AdvanceTo(now)
-
-		for {
-			if i == n {
-				return
-			}
-			msg := mb.Nth(i)
-			cmd, ok := msg.Request().(*Request)
-			if !ok {
-				msg.DoneWithError(ErrBadAssert)
-				return ErrBadAssert
-			}
-
-			if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
-				i++
-				continue
-			}
-
-			err = rc.decodeRESP(cmd.reply)
-			if err == bufio.ErrBufferFull {
-				break
-			} else if err != nil {
-				return
-			}
-			msg.MarkRead()
-			now = rc.br.Mark()
-			i++
+		msg := mb.Nth(i)
+		cmd, ok := msg.Request().(*Request)
+		if !ok {
+			msg.DoneWithError(ErrBadAssert)
+			return ErrBadAssert
 		}
+
+		if cmd.rtype == reqTypeNotSupport || cmd.rtype == reqTypeCtl {
+			i++
+			continue
+		}
+		err = rc.decodeRESP(cmd.reply)
+		if err == bufio.ErrBufferFull {
+			rc.br.AdvanceTo(begin)
+			err = rc.br.Read()
+			if err != nil {
+				return
+			}
+			rc.br.AdvanceTo(now)
+			continue
+		} else if err != nil {
+			return
+		}
+		msg.MarkRead()
+		now = rc.br.Mark()
+		i++
 	}
 }
 

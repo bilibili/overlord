@@ -54,8 +54,6 @@ type Request struct {
 func NewRequest(cmd string, args ...string) *Request {
 	respObj := respPool.Get().(*resp)
 	respObj.next().setBulk([]byte(fmt.Sprintf("%d\r\n%s", len(cmd), cmd)))
-	// respObj := newRESPArrayWithCapcity(len(args) + 1)
-	// respObj.replace(0, newRESPBulk([]byte(cmd)))
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
 		data := args[i-1]
