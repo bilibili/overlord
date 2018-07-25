@@ -155,7 +155,7 @@ func (r *resp) isNull() bool {
 func (r *resp) replace(pos int, newer *resp) {
 	if pos < len(r.array) {
 		r.array[pos] = newer
-		r.arrayn = pos
+		r.arrayn = pos + 1
 	} else {
 		r.array = append(r.array, newer)
 		r.arrayn = len(r.array)

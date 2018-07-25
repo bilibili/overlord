@@ -34,26 +34,6 @@ func newSubCmd(msg *proto.Message, robj *resp) error {
 	return cmdByKeys(msg, robj)
 }
 
-// func subCmdMset(robj *resp) ([]*Request, error) {
-// 	if !isEven(robj.Len() - 1) {
-// 		return nil, ErrBadRequestSize
-// 	}
-
-// 	mid := robj.Len() / 2
-// 	cmds := make([]*Request, mid)
-// 	for i := 0; i < mid; i++ {
-// 		cmdObj := respPool.Get().(*resp)
-// 		cmdObj.rtype = respArray
-// 		cmdObj.data = nil
-// 		cmdObj.replace(0, robjMSet)
-// 		cmdObj.replace(1, robj.nth(i*2+1))
-// 		cmdObj.replace(2, robj.nth(i*2+2))
-// 		cmdObj.data = cmdMSetLenBytes
-// 		cmds[i] = newRequestWithMergeType(cmdObj, MergeTypeOk)
-// 	}
-// 	return cmds, nil
-// }
-
 func cmdMset(msg *proto.Message, robj *resp) error {
 	if !isEven(robj.Len() - 1) {
 		return ErrBadRequestSize
@@ -64,41 +44,27 @@ func cmdMset(msg *proto.Message, robj *resp) error {
 		if req == nil {
 			cmdObj := respPool.Get().(*resp)
 			cmdObj.rtype = respArray
-			cmdObj.data = nil
 			cmdObj.replace(0, newRESPBulk(cmdMSetBytes))
 			cmdObj.replace(1, robj.nth(i*2+1))
 			cmdObj.replace(2, robj.nth(i*2+2))
 			cmdObj.data = cmdMSetLenBytes
 			cmd := newRequestWithMergeType(cmdObj, MergeTypeOk)
+			cmd.rtype = getReqType(cmdObj.nth(0).data)
 			msg.WithRequest(cmd)
 		} else {
 			reqCmd := req.(*Request)
 			reqCmd.mergeType = MergeTypeOk
 			cmdObj := reqCmd.respObj
 			cmdObj.rtype = respArray
-			cmdObj.data = nil
 			cmdObj.replace(0, newRESPBulk(cmdMSetBytes))
 			cmdObj.replace(1, robj.nth(i*2+1))
 			cmdObj.replace(2, robj.nth(i*2+2))
 			cmdObj.data = cmdMSetLenBytes
+			reqCmd.rtype = getReqType(cmdObj.nth(0).data)
 		}
 	}
 	return nil
 }
-
-// func subCmdByKeys(robj *resp) ([]*Request, error) {
-// 	cmds := make([]*Request, robj.Len()-1)
-// 	for i, sub := range robj.slice()[1:] {
-// 		var cmdObj *resp
-// 		if bytes.Equal(robj.nth(0).data, cmdMGetBytes) {
-// 			cmdObj = newRESPArray([]*resp{robjGet, sub})
-// 		} else {
-// 			cmdObj = newRESPArray([]*resp{robj.nth(0), sub})
-// 		}
-// 		cmds[i] = newRequest(cmdObj)
-// 	}
-// 	return cmds, nil
-// }
 
 func cmdByKeys(msg *proto.Message, robj *resp) error {
 	var cmdObj *resp
@@ -120,6 +86,7 @@ func cmdByKeys(msg *proto.Message, robj *resp) error {
 			} else {
 				cmdObj.setArray([]*resp{robj.nth(0), sub})
 			}
+			reqCmd.rtype = getReqType(cmdObj.nth(0).data)
 			reqCmd.mergeType = getMergeType(cmdObj.nth(0).data)
 		}
 	}

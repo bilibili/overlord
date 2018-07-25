@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	// "crc"
 	"bytes"
 )
 
@@ -83,7 +82,7 @@ func (c *Request) setRESP(robj *resp) {
 }
 
 func newRequestWithMergeType(robj *resp, mtype MergeType) *Request {
-	return &Request{respObj: robj, mergeType: mtype}
+	return &Request{respObj: robj, mergeType: mtype, reply: &resp{}}
 }
 
 // CmdString get the cmd
