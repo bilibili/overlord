@@ -1,9 +1,12 @@
 package redis
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
 	"testing"
 
-	"overlord/lib/bufio"
 	"overlord/proto"
 
 	"github.com/stretchr/testify/assert"
@@ -96,17 +99,72 @@ func TestReadBatchWithNilError(t *testing.T) {
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
 	req := getReq()
-	req.mType = mergeTypeNo
+	req.mType = mergeTypeJoin
 	req.reply = &resp{}
+	req.resp = newresp(respArray, []byte("2"))
+	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("get")))
+	req.resp.arrayn++
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)
 	assert.Error(t, err)
-	assert.Equal(t, bufio.ErrBufferFull, err)
+	assert.Equal(t, io.EOF, err)
 }
 
 func TestPingOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createRepeatConn(pongBytes, 1))
 	err := nc.Ping()
 	assert.NoError(t, err)
+}
+
+func newRequest(cmd string, args ...string) *Request {
+	respObj := &resp{}
+	respObj.array = append(respObj.array, newresp(respBulk, []byte(fmt.Sprintf("%d\r\n%s", len(cmd), cmd))))
+	respObj.arrayn++
+	maxLen := len(args) + 1
+	for i := 1; i < maxLen; i++ {
+		data := args[i-1]
+		line := fmt.Sprintf("%d\r\n%s", len(data), data)
+		respObj.array = append(respObj.array, newresp(respBulk, []byte(line)))
+		respObj.arrayn++
+	}
+	respObj.data = []byte(strconv.Itoa(len(args) + 1))
+	return &Request{
+		resp:  respObj,
+		mType: getMergeType(respObj.array[0].data),
+		reply: &resp{},
+	}
+}
+func getMergeType(cmd []byte) mergeType {
+	// fmt.Println("mtype :", strconv.Quote(string(cmd)))
+	// TODO: impl with tire tree to search quickly
+	if bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdGetBytes) {
+		return mergeTypeJoin
+	}
+
+	if bytes.Equal(cmd, cmdMSetBytes) {
+		return mergeTypeOK
+	}
+
+	if bytes.Equal(cmd, cmdExistsBytes) || bytes.Equal(cmd, cmdDelBytes) {
+		return mergeTypeCount
+	}
+
+	return mergeTypeNo
+}
+
+func newresp(rtype respType, data []byte) (robj *resp) {
+	robj = &resp{}
+	robj.rTp = rtype
+	robj.data = data
+	return
+}
+
+func newrespArray(resps []*resp) (robj *resp) {
+	robj = &resp{}
+	robj.rTp = respArray
+	robj.data = []byte((strconv.Itoa(len(resps))))
+	robj.array = resps
+	robj.arrayn = len(resps)
+	return
 }

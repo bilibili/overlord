@@ -65,9 +65,9 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	nc.br.ResetBuffer(mb.Buffer())
 	defer nc.br.ResetBuffer(nil)
 	// read
-	if err = nc.br.Read(); err != nil {
-		return
-	}
+	// if err = nc.br.Read(); err != nil {
+	// 	return
+	// }
 	begin := nc.br.Mark()
 	now := nc.br.Mark()
 	for i := 0; i < mb.Count(); {
