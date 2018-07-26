@@ -12,6 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	pongDataBytes       = []byte("+PONG")
+	notSupportDataBytes = []byte("-Error: command not support")
+)
+
 type proxyConn struct {
 	br        *bufio.Reader
 	bw        *bufio.Writer
@@ -55,6 +60,9 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	if err = pc.resp.decode(pc.br); err != nil && err != bufio.ErrBufferFull {
+		return
+	}
+	if pc.resp.arrayn < 1 {
 		return
 	}
 	conv.UpdateToUpper(pc.resp.array[0].data)
@@ -160,11 +168,11 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if !m.IsBatch() {
 		if !req.isSupport() {
 			req.reply.rTp = respError
-			req.reply.data = notSupportBytes
+			req.reply.data = notSupportDataBytes
 		} else if req.isCtl() {
 			if bytes.Equal(req.Cmd(), pingBytes) {
 				req.reply.rTp = respString
-				req.reply.data = pongBytes
+				req.reply.data = pongDataBytes
 			}
 		}
 		err = req.reply.encode(pc.bw)

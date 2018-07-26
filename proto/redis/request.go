@@ -248,7 +248,7 @@ func (r *Request) Put() {
 // isSupport check command support.
 func (r *Request) isSupport() bool {
 	if r.resp.arrayn < 1 {
-		return bytes.Index(reqReadCmdsBytes, r.resp.data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.data) > -1
+		return false
 	}
 	return bytes.Index(reqReadCmdsBytes, r.resp.array[0].data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.array[0].data) > -1
 }
@@ -256,7 +256,7 @@ func (r *Request) isSupport() bool {
 // isCtl is control command.
 func (r *Request) isCtl() bool {
 	if r.resp.arrayn < 1 {
-		return bytes.Index(reqCtlCmdsBytes, r.resp.data) > -1
+		return false
 	}
 	return bytes.Index(reqCtlCmdsBytes, r.resp.array[0].data) > -1
 }
