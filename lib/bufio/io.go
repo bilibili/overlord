@@ -9,10 +9,6 @@ import (
 	libnet "overlord/lib/net"
 )
 
-const (
-	maxBuffered = 64
-)
-
 // ErrProxy
 var (
 	ErrBufferFull = bufio.ErrBufferFull
@@ -152,17 +148,18 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 // Flush method to guarantee all data has been forwarded to
 // the underlying io.Writer.
 type Writer struct {
-	wr     *libnet.Conn
-	bufsp  net.Buffers
-	bufs   [][]byte
-	cursor int
+	wr    *libnet.Conn
+	bufsp net.Buffers
+	bufs  [][]byte
+	cnt   int
 
 	err error
 }
 
 // NewWriter returns a new Writer whose buffer has the default size.
 func NewWriter(wr *libnet.Conn) *Writer {
-	return &Writer{wr: wr, bufs: make([][]byte, maxBuffered)}
+	const defaultBuffered = 64
+	return &Writer{wr: wr, bufs: make([][]byte, 0, defaultBuffered)}
 }
 
 // Flush writes any buffered data to the underlying io.Writer.
@@ -173,12 +170,13 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	w.bufsp = net.Buffers(w.bufs[:w.cursor])
+	w.bufsp = net.Buffers(w.bufs[:w.cnt])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
 		w.err = err
 	}
-	w.cursor = 0
+	w.bufs = w.bufs[:0]
+	w.cnt = 0
 	return w.err
 }
 
@@ -193,12 +191,7 @@ func (w *Writer) Write(p []byte) (err error) {
 	if p == nil {
 		return nil
 	}
-	if w.cursor+1 == maxBuffered {
-		if err = w.Flush(); err != nil {
-			return err
-		}
-	}
-	w.bufs[w.cursor] = p
-	w.cursor = (w.cursor + 1) % maxBuffered
+	w.bufs = append(w.bufs, p)
+	w.cnt++
 	return nil
 }

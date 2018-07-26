@@ -20,9 +20,6 @@ var (
 	cmdDelBytes    = []byte("3\r\nDEL")
 	cmdExistsBytes = []byte("6\r\nEXISTS")
 
-	respNullBytes = []byte("-1\r\n")
-	okBytes       = []byte("OK")
-
 	reqReadCmdsBytes = []byte("" +
 		"4\r\nDUMP" +
 		"6\r\nEXISTS" +

@@ -24,6 +24,8 @@ var (
 	respIntBytes    = []byte(":")
 	respBulkBytes   = []byte("$")
 	respArrayBytes  = []byte("*")
+
+	nullDataBytes = []byte("-1")
 )
 
 // resp is a redis server protocol item.
@@ -145,55 +147,38 @@ func (r *resp) encode(w *bufio.Writer) (err error) {
 func (r *resp) encodePlain(w *bufio.Writer) (err error) {
 	switch r.rTp {
 	case respInt:
-		err = w.Write(respIntBytes)
+		_ = w.Write(respIntBytes)
 	case respError:
-		err = w.Write(respErrorBytes)
+		_ = w.Write(respErrorBytes)
 	case respString:
-		err = w.Write(respStringBytes)
-	}
-	if err != nil {
-		return
+		_ = w.Write(respStringBytes)
 	}
 	if len(r.data) > 0 {
-		if err = w.Write(r.data); err != nil {
-			return
-		}
+		_ = w.Write(r.data)
 	}
 	err = w.Write(crlfBytes)
 	return
 }
 
 func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
-	if err = w.Write(respBulkBytes); err != nil {
-		return
-	}
+	_ = w.Write(respBulkBytes)
 	if len(r.data) > 0 {
-		err = w.Write(r.data)
+		_ = w.Write(r.data)
 	} else {
-		err = w.Write(respNullBytes)
-	}
-	if err != nil {
-		return
+		_ = w.Write(nullDataBytes)
 	}
 	err = w.Write(crlfBytes)
 	return
 }
 
 func (r *resp) encodeArray(w *bufio.Writer) (err error) {
-	if err = w.Write(respArrayBytes); err != nil {
-		return
-	}
+	_ = w.Write(respArrayBytes)
 	if len(r.data) > 0 {
-		err = w.Write(r.data)
+		_ = w.Write(r.data)
 	} else {
-		err = w.Write(respNullBytes)
+		_ = w.Write(nullDataBytes)
 	}
-	if err != nil {
-		return
-	}
-	if err = w.Write(crlfBytes); err != nil {
-		return
-	}
+	_ = w.Write(crlfBytes)
 	for i := 0; i < r.arrayn; i++ {
 		if err = r.array[i].encode(w); err != nil {
 			return

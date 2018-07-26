@@ -13,6 +13,8 @@ import (
 )
 
 var (
+	nullBytes           = []byte("-1\r\n")
+	okBytes             = []byte("OK\r\n")
 	pongDataBytes       = []byte("+PONG")
 	notSupportDataBytes = []byte("-Error: command not support")
 )
@@ -194,19 +196,9 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	return
 }
 
-func (pc *proxyConn) writeOneLine(rtype, data []byte) (err error) {
-	if err = pc.bw.Write(rtype); err != nil {
-		return
-	}
-	if err = pc.bw.Write(data); err != nil {
-		return
-	}
-	err = pc.bw.Write(crlfBytes)
-	return
-}
-
 func (pc *proxyConn) mergeOK(m *proto.Message) (err error) {
-	err = pc.writeOneLine(respStringBytes, okBytes)
+	_ = pc.bw.Write(respStringBytes)
+	err = pc.bw.Write(okBytes)
 	return
 }
 
@@ -223,22 +215,20 @@ func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 		}
 		sum += int(ival)
 	}
-	err = pc.writeOneLine(respIntBytes, []byte(strconv.Itoa(sum)))
+	_ = pc.bw.Write(respIntBytes)
+	_ = pc.bw.Write([]byte(strconv.Itoa(sum)))
+	err = pc.bw.Write(crlfBytes)
 	return
 }
 
 func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 	reqs := m.Requests()
-	if err = pc.bw.Write(respArrayBytes); err != nil {
-		return
-	}
+	_ = pc.bw.Write(respArrayBytes)
 	if len(reqs) == 0 {
-		err = pc.bw.Write(respNullBytes)
+		err = pc.bw.Write(nullBytes)
 		return
 	}
-	if err = pc.bw.Write([]byte(strconv.Itoa(len(reqs)))); err != nil {
-		return
-	}
+	_ = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
 	if err = pc.bw.Write(crlfBytes); err != nil {
 		return
 	}
