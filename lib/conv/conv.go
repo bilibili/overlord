@@ -39,7 +39,7 @@ func Btoi(b []byte) (int64, error) {
 func UpdateToLower(src []byte) {
 	const step = byte('a') - byte('A')
 	for i := range src {
-		if src[i] >= 'A' || src[i] <= 'Z' {
+		if src[i] >= 'A' && src[i] <= 'Z' {
 			src[i] += step
 		}
 	}
@@ -49,7 +49,7 @@ func UpdateToLower(src []byte) {
 func UpdateToUpper(src []byte) {
 	const step = byte('a') - byte('A')
 	for i := range src {
-		if src[i] >= 'a' || src[i] <= 'z' {
+		if src[i] >= 'a' && src[i] <= 'z' {
 			src[i] -= step
 		}
 	}

@@ -58,8 +58,10 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 		return
 	}
 	if pc.resp.arrayn < 1 {
+		conv.UpdateToUpper(pc.resp.data)
 		return
 	}
+	conv.UpdateToUpper(pc.resp.array[0].data)
 	cmd := pc.resp.array[0].data // NOTE: when array, first is command
 	if bytes.Equal(cmd, cmdMSetBytes) {
 		mid := pc.resp.arrayn / 2
