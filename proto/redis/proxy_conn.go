@@ -12,6 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	pongDataBytes       = []byte("+PONG")
+	notSupportDataBytes = []byte("-Error: command not support")
+)
+
 type proxyConn struct {
 	br        *bufio.Reader
 	bw        *bufio.Writer
@@ -160,11 +165,11 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if !m.IsBatch() {
 		if !req.isSupport() {
 			req.reply.rTp = respError
-			req.reply.data = notSupportBytes
+			req.reply.data = notSupportDataBytes
 		} else if req.isCtl() {
 			if bytes.Equal(req.Cmd(), pingBytes) {
 				req.reply.rTp = respString
-				req.reply.data = pongBytes
+				req.reply.data = pongDataBytes
 			}
 		}
 		err = req.reply.encode(pc.bw)
