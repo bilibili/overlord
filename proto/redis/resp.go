@@ -171,6 +171,7 @@ func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
 		err = w.Write(r.data)
 	} else {
 		err = w.Write(respNullBytes)
+		return
 	}
 	if err != nil {
 		return
