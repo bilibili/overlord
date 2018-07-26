@@ -34,8 +34,7 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	var err error
 	if pc.completed {
-		err = pc.br.Read()
-		if err != nil {
+		if err = pc.br.Read(); err != nil {
 			return nil, err
 		}
 		pc.completed = false
@@ -55,12 +54,14 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 }
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
-	if err = pc.resp.decode(pc.br); err != nil {
+	if err = pc.resp.decode(pc.br); err != nil && err != bufio.ErrBufferFull {
 		return
 	}
 	if pc.resp.arrayn < 1 {
+		conv.UpdateToUpper(pc.resp.data)
 		return
 	}
+	conv.UpdateToUpper(pc.resp.array[0].data)
 	cmd := pc.resp.array[0].data // NOTE: when array, first is command
 	if bytes.Equal(cmd, cmdMSetBytes) {
 		mid := pc.resp.arrayn / 2
@@ -190,13 +191,11 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 }
 
 func (pc *proxyConn) writeOneLine(rtype, data []byte) (err error) {
-	err = pc.bw.Write(rtype)
-	if err != nil {
-		return err
+	if err = pc.bw.Write(rtype); err != nil {
+		return
 	}
-	err = pc.bw.Write(data)
-	if err != nil {
-		return err
+	if err = pc.bw.Write(data); err != nil {
+		return
 	}
 	err = pc.bw.Write(crlfBytes)
 	return
@@ -226,20 +225,17 @@ func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 
 func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 	reqs := m.Requests()
-	err = pc.bw.Write(respArrayBytes)
-	if err != nil {
+	if err = pc.bw.Write(respArrayBytes); err != nil {
 		return
 	}
 	if len(reqs) == 0 {
 		err = pc.bw.Write(respNullBytes)
 		return
 	}
-	err = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
-	if err != nil {
+	if err = pc.bw.Write([]byte(strconv.Itoa(len(reqs)))); err != nil {
 		return
 	}
-	err = pc.bw.Write(crlfBytes)
-	if err != nil {
+	if err = pc.bw.Write(crlfBytes); err != nil {
 		return
 	}
 	for _, mreq := range reqs {
@@ -247,7 +243,9 @@ func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		_ = req.reply.encode(pc.bw)
+		if err = req.reply.encode(pc.bw); err != nil {
+			return
+		}
 	}
 	return
 }

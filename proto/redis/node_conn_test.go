@@ -102,7 +102,7 @@ func TestReadBatchWithNilError(t *testing.T) {
 	req.mType = mergeTypeJoin
 	req.reply = &resp{}
 	req.resp = newresp(respArray, []byte("2"))
-	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("get")))
+	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("GET")))
 	req.resp.arrayn++
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
