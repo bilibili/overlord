@@ -70,6 +70,10 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	conv.UpdateToUpper(pc.resp.array[0].data)
 	cmd := pc.resp.array[0].data // NOTE: when array, first is command
 	if bytes.Equal(cmd, cmdMSetBytes) {
+		if pc.resp.arrayn%2 == 0 {
+			err = ErrBadRequest
+			return
+		}
 		mid := pc.resp.arrayn / 2
 		for i := 0; i < mid; i++ {
 			r := nextReq(m)
