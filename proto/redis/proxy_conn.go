@@ -16,7 +16,7 @@ var (
 	nullBytes           = []byte("-1\r\n")
 	okBytes             = []byte("OK\r\n")
 	pongDataBytes       = []byte("+PONG")
-	notSupportDataBytes = []byte("-Error: command not support")
+	notSupportDataBytes = []byte("Error: command not support")
 )
 
 type proxyConn struct {
@@ -65,6 +65,10 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 		return
 	}
 	if pc.resp.arrayn < 1 {
+		r := nextReq(m)
+		r.resp.reset()
+		r.resp.rTp = pc.resp.rTp
+		r.resp.data = pc.resp.data
 		return
 	}
 	conv.UpdateToUpper(pc.resp.array[0].data)
