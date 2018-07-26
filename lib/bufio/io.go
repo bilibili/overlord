@@ -195,7 +195,10 @@ func (w *Writer) Write(p []byte) (err error) {
 	}
 
 	if w.cursor+1 == maxBuffered {
-		w.Flush()
+		err = w.Flush()
+		if err != nil {
+			return err
+		}
 	}
 	w.bufs[w.cursor] = p
 	w.cursor = (w.cursor + 1) % maxBuffered

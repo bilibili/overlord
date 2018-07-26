@@ -121,6 +121,9 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) error {
 	for i := 0; i < int(size); i++ {
 		nre := r.next()
 		err = nre.decode(br)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -128,52 +131,100 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) error {
 func (r *resp) encode(w *bufio.Writer) (err error) {
 	switch r.rTp {
 	case respInt, respString, respError:
-		_ = r.encodePlain(w)
+		err = r.encodePlain(w)
+		if err != nil {
+			return
+		}
 	case respBulk:
-		_ = r.encodeBulk(w)
+		err = r.encodeBulk(w)
+		if err != nil {
+			return
+		}
 	case respArray:
-		_ = r.encodeArray(w)
+		err = r.encodeArray(w)
+		if err != nil {
+			return
+		}
 	}
-	return nil
+	return
 }
 
 func (r *resp) encodePlain(w *bufio.Writer) (err error) {
 	switch r.rTp {
 	case respInt:
-		_ = w.Write(respIntBytes)
+		err = w.Write(respIntBytes)
+		if err != nil {
+			return
+		}
+
 	case respError:
-		_ = w.Write(respErrorBytes)
+		err = w.Write(respErrorBytes)
+		if err != nil {
+			return
+		}
 	case respString:
-		_ = w.Write(respStringBytes)
+		err = w.Write(respStringBytes)
+		if err != nil {
+			return
+		}
 	}
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		err = w.Write(r.data)
+		if err != nil {
+			return
+		}
 	}
 	err = w.Write(crlfBytes)
-	return err
+	return
 }
 
 func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
-	_ = w.Write(respBulkBytes)
+	err = w.Write(respBulkBytes)
+	if err != nil {
+		return
+	}
+
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		err = w.Write(r.data)
+		if err != nil {
+			return
+		}
 	} else {
-		_ = w.Write(respNullBytes)
+		err = w.Write(respNullBytes)
+		if err != nil {
+			return
+		}
 	}
 	err = w.Write(crlfBytes)
-	return err
+	return
 }
 
 func (r *resp) encodeArray(w *bufio.Writer) (err error) {
-	_ = w.Write(respArrayBytes)
+	err = w.Write(respArrayBytes)
+	if err != nil {
+		return
+	}
+
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		err = w.Write(r.data)
+		if err != nil {
+			return
+		}
 	} else {
-		_ = w.Write(respNullBytes)
+		err = w.Write(respNullBytes)
+		if err != nil {
+			return
+		}
 	}
-	_ = w.Write(crlfBytes)
+	err = w.Write(crlfBytes)
+	if err != nil {
+		return
+	}
 	for i := 0; i < r.arrayn; i++ {
-		_ = r.array[i].encode(w)
+		err = r.array[i].encode(w)
+		if err != nil {
+			return
+		}
 	}
-	return nil
+	return
 }

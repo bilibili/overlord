@@ -176,7 +176,7 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		case mergeTypeCount:
 			err = pc.mergeCount(m)
 		default:
-			// TODO: panic???
+			panic("unreachable merge path")
 		}
 	}
 	if err != nil {
@@ -189,10 +189,21 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	return
 }
 
+func (pc *proxyConn) writeOneLine(rtype, data []byte) (err error) {
+	err = pc.bw.Write(rtype)
+	if err != nil {
+		return err
+	}
+	err = pc.bw.Write(data)
+	if err != nil {
+		return err
+	}
+	err = pc.bw.Write(crlfBytes)
+	return
+}
+
 func (pc *proxyConn) mergeOK(m *proto.Message) (err error) {
-	_ = pc.bw.Write(respStringBytes)
-	_ = pc.bw.Write(okBytes)
-	_ = pc.bw.Write(crlfBytes)
+	err = pc.writeOneLine(respStringBytes, okBytes)
 	return
 }
 
@@ -209,21 +220,28 @@ func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 		}
 		sum += int(ival)
 	}
-	_ = pc.bw.Write(respIntBytes)
-	_ = pc.bw.Write([]byte(strconv.Itoa(sum)))
-	_ = pc.bw.Write(crlfBytes)
+	err = pc.writeOneLine(respIntBytes, []byte(strconv.Itoa(sum)))
 	return
 }
 
 func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 	reqs := m.Requests()
-	_ = pc.bw.Write(respArrayBytes)
-	if len(reqs) == 0 {
-		_ = pc.bw.Write(respNullBytes)
+	err = pc.bw.Write(respArrayBytes)
+	if err != nil {
 		return
 	}
-	_ = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
-	_ = pc.bw.Write(crlfBytes)
+	if len(reqs) == 0 {
+		err = pc.bw.Write(respNullBytes)
+		return
+	}
+	err = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
+	if err != nil {
+		return
+	}
+	err = pc.bw.Write(crlfBytes)
+	if err != nil {
+		return
+	}
 	for _, mreq := range reqs {
 		req, ok := mreq.(*Request)
 		if !ok {
