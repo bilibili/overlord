@@ -82,16 +82,16 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	return
 }
 
-func (r *resp) decodeBulk(line []byte, br *bufio.Reader) error {
+func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 	ls := len(line)
 	sBs := line[1 : ls-2]
 	size, err := conv.Btoi(sBs)
 	if err != nil {
-		return err
+		return
 	}
 	if size == -1 {
 		r.data = nil
-		return nil
+		return
 	}
 	br.Advance(-(ls - 1))
 	all := ls - 1 + int(size) + 2
@@ -100,22 +100,22 @@ func (r *resp) decodeBulk(line []byte, br *bufio.Reader) error {
 		br.Advance(-1)
 		return err
 	} else if err != nil {
-		return err
+		return
 	}
 	r.data = data[:len(data)-2]
-	return nil
+	return
 }
 
-func (r *resp) decodeArray(line []byte, br *bufio.Reader) error {
+func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 	ls := len(line)
 	sBs := line[1 : ls-2]
 	size, err := conv.Btoi(sBs)
 	if err != nil {
-		return err
+		return
 	}
 	if size == -1 {
 		r.data = nil
-		return nil
+		return
 	}
 	r.data = sBs
 	mark := br.Mark()
@@ -124,60 +124,80 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) error {
 		if err = nre.decode(br); err != nil {
 			br.AdvanceTo(mark)
 			br.Advance(-ls)
+			return
 		}
 	}
-	return nil
+	return
 }
 
 func (r *resp) encode(w *bufio.Writer) (err error) {
 	switch r.rTp {
 	case respInt, respString, respError:
-		_ = r.encodePlain(w)
+		err = r.encodePlain(w)
 	case respBulk:
-		_ = r.encodeBulk(w)
+		err = r.encodeBulk(w)
 	case respArray:
-		_ = r.encodeArray(w)
+		err = r.encodeArray(w)
 	}
-	return nil
+	return
 }
 
 func (r *resp) encodePlain(w *bufio.Writer) (err error) {
 	switch r.rTp {
 	case respInt:
-		_ = w.Write(respIntBytes)
+		err = w.Write(respIntBytes)
 	case respError:
-		_ = w.Write(respErrorBytes)
+		err = w.Write(respErrorBytes)
 	case respString:
-		_ = w.Write(respStringBytes)
+		err = w.Write(respStringBytes)
+	}
+	if err != nil {
+		return
 	}
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		if err = w.Write(r.data); err != nil {
+			return
+		}
 	}
 	err = w.Write(crlfBytes)
-	return err
+	return
 }
 
 func (r *resp) encodeBulk(w *bufio.Writer) (err error) {
-	_ = w.Write(respBulkBytes)
+	if err = w.Write(respBulkBytes); err != nil {
+		return
+	}
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		err = w.Write(r.data)
 	} else {
-		_ = w.Write(respNullBytes)
+		err = w.Write(respNullBytes)
+	}
+	if err != nil {
+		return
 	}
 	err = w.Write(crlfBytes)
-	return err
+	return
 }
 
 func (r *resp) encodeArray(w *bufio.Writer) (err error) {
-	_ = w.Write(respArrayBytes)
+	if err = w.Write(respArrayBytes); err != nil {
+		return
+	}
 	if len(r.data) > 0 {
-		_ = w.Write(r.data)
+		err = w.Write(r.data)
 	} else {
-		_ = w.Write(respNullBytes)
+		err = w.Write(respNullBytes)
 	}
-	_ = w.Write(crlfBytes)
+	if err != nil {
+		return
+	}
+	if err = w.Write(crlfBytes); err != nil {
+		return
+	}
 	for i := 0; i < r.arrayn; i++ {
-		_ = r.array[i].encode(w)
+		if err = r.array[i].encode(w); err != nil {
+			return
+		}
 	}
-	return nil
+	return
 }
