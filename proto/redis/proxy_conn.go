@@ -34,8 +34,7 @@ func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	var err error
 	if pc.completed {
-		err = pc.br.Read()
-		if err != nil {
+		if err = pc.br.Read(); err != nil {
 			return nil, err
 		}
 		pc.completed = false
@@ -55,7 +54,7 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 }
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
-	if err = pc.resp.decode(pc.br); err != nil {
+	if err = pc.resp.decode(pc.br); err != nil && err != bufio.ErrBufferFull {
 		return
 	}
 	if pc.resp.arrayn < 1 {

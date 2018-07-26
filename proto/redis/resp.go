@@ -118,9 +118,13 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) error {
 		return nil
 	}
 	r.data = sBs
+	mark := br.Mark()
 	for i := 0; i < int(size); i++ {
 		nre := r.next()
-		err = nre.decode(br)
+		if err = nre.decode(br); err != nil {
+			br.AdvanceTo(mark)
+			br.Advance(-ls)
+		}
 	}
 	return nil
 }

@@ -49,7 +49,7 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 			m.DoneWithError(ErrBadAssert)
 			return ErrBadAssert
 		}
-		if req.isSupport() || req.isCtl() {
+		if !req.isSupport() || req.isCtl() {
 			return nil
 		}
 		if err = req.resp.encode(nc.bw); err != nil {
@@ -64,10 +64,6 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	nc.br.ResetBuffer(mb.Buffer())
 	defer nc.br.ResetBuffer(nil)
-	// read
-	if err = nc.br.Read(); err != nil {
-		return
-	}
 	begin := nc.br.Mark()
 	now := nc.br.Mark()
 	for i := 0; i < mb.Count(); {
@@ -76,9 +72,9 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		if req.isSupport() || req.isCtl() {
+		if !req.isSupport() || req.isCtl() {
 			i++
-			return
+			continue
 		}
 		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
 			nc.br.AdvanceTo(begin)
@@ -91,8 +87,8 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			return
 		}
 		m.MarkRead()
-		i++
 		now = nc.br.Mark()
+		i++
 	}
 	return
 }
