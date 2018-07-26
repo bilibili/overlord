@@ -16,8 +16,9 @@ var (
 )
 
 var (
-	pingBytes = []byte("*1\r\n$4\r\nPING\r\n")
-	pongBytes = []byte("+PONG\r\n")
+	pingBytes       = []byte("*1\r\n$4\r\nPING\r\n")
+	pongBytes       = []byte("+PONG\r\n")
+	notSupportBytes = []byte("-Error: command not support\r\n")
 )
 
 type pinger struct {

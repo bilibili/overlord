@@ -44,26 +44,21 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 
 func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	for _, m := range mb.Msgs() {
-		err := nc.write(m)
-		if err != nil {
+		req, ok := m.Request().(*Request)
+		if !ok {
+			m.DoneWithError(ErrBadAssert)
+			return ErrBadAssert
+		}
+		if req.isSupport() || req.isCtl() {
+			return nil
+		}
+		if err = req.resp.encode(nc.bw); err != nil {
 			m.DoneWithError(err)
 			return err
 		}
 		m.MarkWrite()
 	}
 	return nc.bw.Flush()
-}
-
-func (nc *nodeConn) write(m *proto.Message) (err error) {
-	req, ok := m.Request().(*Request)
-	if !ok {
-		m.DoneWithError(ErrBadAssert)
-		return ErrBadAssert
-	}
-	if req.notSupport() {
-		return nil
-	}
-	return req.resp.encode(nc.bw)
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
@@ -81,7 +76,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		if req.notSupport() {
+		if req.isSupport() || req.isCtl() {
 			i++
 			return
 		}

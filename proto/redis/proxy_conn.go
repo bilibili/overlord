@@ -157,6 +157,15 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		return ErrBadAssert
 	}
 	if !m.IsBatch() {
+		if !req.isSupport() {
+			req.reply.rTp = respError
+			req.reply.data = notSupportBytes
+		} else if req.isCtl() {
+			if bytes.Equal(req.Cmd(), pingBytes) {
+				req.reply.rTp = respString
+				req.reply.data = pongBytes
+			}
+		}
 		err = req.reply.encode(pc.bw)
 	} else {
 		switch req.mType {

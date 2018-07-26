@@ -1,8 +1,14 @@
 package net
 
 import (
+	"errors"
 	"net"
 	"time"
+)
+
+var (
+	// ErrConnClosed error connection closed.
+	ErrConnClosed = errors.New("connection is closed")
 )
 
 // Conn is a net.Conn self implement
@@ -103,5 +109,8 @@ func (c *Conn) Close() error {
 
 // Writev impl the net.buffersWriter to support writev
 func (c *Conn) Writev(buf *net.Buffers) (int64, error) {
+	if c.Conn == nil {
+		return 0, ErrConnClosed
+	}
 	return buf.WriteTo(c.Conn)
 }
