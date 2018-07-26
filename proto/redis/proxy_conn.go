@@ -63,7 +63,6 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 		return
 	}
 	if pc.resp.arrayn < 1 {
-		conv.UpdateToUpper(pc.resp.data)
 		return
 	}
 	conv.UpdateToUpper(pc.resp.array[0].data)
