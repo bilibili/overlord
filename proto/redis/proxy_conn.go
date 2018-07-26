@@ -61,7 +61,11 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 }
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
-	if err = pc.resp.decode(pc.br); err != nil && err != bufio.ErrBufferFull {
+	mark := pc.br.Mark()
+	if err = pc.resp.decode(pc.br); err != nil {
+		if err == bufio.ErrBufferFull {
+			pc.br.AdvanceTo(mark)
+		}
 		return
 	}
 	if pc.resp.arrayn < 1 {

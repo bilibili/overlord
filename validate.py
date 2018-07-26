@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python
 import redis
 import sys
 
@@ -66,8 +66,10 @@ def check_hmset_hmget_cmd(key_count, step, hashs, keys, vals):
 
 def main():
     global host, port
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 3:
         host = sys.argv[1].strip()
+        port = int(sys.argv[2].strip())
+    elif len(sys.argv) == 2:
         port = int(sys.argv[2].strip())
 
     keys = gen_items("keys-", 1000)
@@ -80,4 +82,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-v
