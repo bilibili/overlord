@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultRespBufSize  = 4096
+	defaultRespBufSize  = 1024
 	defaultMsgBatchSize = 2
 )
 
