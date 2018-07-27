@@ -1,10 +1,20 @@
 #!/usr/bin/env python
-from gevent.monkey import patch_all
-patch_all()
-from gevent.pool import Pool
 
-from fakeredis import FakeStrictRedis
-from redis import StrictRedis
+try:
+    from gevent.monkey import patch_all
+    patch_all()
+    from gevent.pool import Pool
+
+    from fakeredis import FakeStrictRedis
+    from redis import StrictRedis
+except ImportError:
+    print("""ERROR: you are running within a bad dependencies environment.
+You may run the follows commands to fixed it:
+
+    pip install fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
+
+""")
+    raise
 
 import random
 import sys
