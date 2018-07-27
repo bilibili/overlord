@@ -85,6 +85,7 @@ var (
 		"6\r\nINCRBY" +
 		"11\r\nINCRBYFLOAT" +
 		"4\r\nMSET" +
+		"6\r\nMSETNX" +
 		"6\r\nPSETEX" +
 		"3\r\nSET" +
 		"6\r\nSETBIT" +
@@ -109,12 +110,9 @@ var (
 		"5\r\nRPUSH" +
 		"6\r\nRPUSHX" +
 		"4\r\nSADD" +
-		"10\r\nSDIFFSTORE" +
-		"11\r\nSINTERSTORE" +
 		"5\r\nSMOVE" +
 		"4\r\nSPOP" +
 		"4\r\nSREM" +
-		"11\r\nSUNIONSTORE" +
 		"4\r\nZADD" +
 		"7\r\nZINCRBY" +
 		"11\r\nZINTERSTORE" +
@@ -122,12 +120,14 @@ var (
 		"14\r\nZREMRANGEBYLEX" +
 		"15\r\nZREMRANGEBYRANK" +
 		"16\r\nZREMRANGEBYSCORE" +
-		"11\r\nZUNIONSTORE" +
 		"5\r\nPFADD" +
 		"7\r\nPFMERGE")
 
 	reqNotSupportCmdsBytes = []byte("" +
-		"6\r\nMSETNX" +
+		"10\r\nSDIFFSTORE" +
+		"11\r\nSINTERSTORE" +
+		"11\r\nSUNIONSTORE" +
+		"11\r\nZUNIONSTORE" +
 		"5\r\nBLPOP" +
 		"5\r\nBRPOP" +
 		"10\r\nBRPOPLPUSH" +
