@@ -48,7 +48,7 @@ Congratulations! You've just run the overlord proxy.
 ## Features
 
 - [x] support memcache protocol
-- [ ] support redis protocol
+- [x] support redis protocol
 - [x] connection pool for reduce number to backend caching servers
 - [x] keepalive & failover
 - [x] hash tag: specify the part of the key used for hashing
