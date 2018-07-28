@@ -85,7 +85,6 @@ var (
 		"6\r\nINCRBY" +
 		"11\r\nINCRBYFLOAT" +
 		"4\r\nMSET" +
-		"6\r\nMSETNX" +
 		"6\r\nPSETEX" +
 		"3\r\nSET" +
 		"6\r\nSETBIT" +
@@ -124,6 +123,7 @@ var (
 		"7\r\nPFMERGE")
 
 	reqNotSupportCmdsBytes = []byte("" +
+		"6\r\nMSETNX" +
 		"10\r\nSDIFFSTORE" +
 		"11\r\nSINTERSTORE" +
 		"11\r\nSUNIONSTORE" +
