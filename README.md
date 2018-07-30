@@ -35,12 +35,16 @@ go build
 #### Test
 
 ```shell
+# test memcache
 echo -e "set a_11 0 0 5\r\nhello\r\n" | nc 127.0.0.1 21211
 # STORED
 echo -e "get a_11\r\n" | nc 127.0.0.1 21211
 # VALUE a_11 0 5
 # hello
 # END
+
+# test redis
+python ./validate.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
 ```
 
 Congratulations! You've just run the overlord proxy.
