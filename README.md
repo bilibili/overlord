@@ -44,7 +44,7 @@ echo -e "get a_11\r\n" | nc 127.0.0.1 21211
 # END
 
 # test redis
-python ./validate.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
+python ./scripts/validate_redis_features.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
 ```
 
 Congratulations! You've just run the overlord proxy.
