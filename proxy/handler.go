@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -45,6 +46,7 @@ type Handler struct {
 	closed int32
 	// wg     sync.WaitGroup
 	err error
+	str strings.Builder
 }
 
 // NewHandler new a conn handler.
@@ -75,6 +77,12 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 // then reads response from cache server and writes response into client connection.
 func (h *Handler) Handle() {
 	go h.handle()
+}
+
+func (h *Handler) toStr(p []byte) string {
+	h.str.Reset()
+	h.str.Write(p)
+	return h.str.String()
 }
 
 func (h *Handler) handle() {
@@ -114,7 +122,7 @@ func (h *Handler) handle() {
 			}
 			msg.MarkEnd()
 			msg.ReleaseSubs()
-			prom.ProxyTime(h.cluster.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+			prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
 		}
 
 		err = h.pc.Flush()
