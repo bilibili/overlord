@@ -200,10 +200,6 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	}
 	if err != nil {
 		err = errors.Wrap(err, "Redis Encoder before flush response")
-		return
-	}
-	if err = pc.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "Redis Encoder flush response")
 	}
 	return
 }
@@ -252,6 +248,13 @@ func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 		if err = req.reply.encode(pc.bw); err != nil {
 			return
 		}
+	}
+	return
+}
+
+func (pc *proxyConn) Flush() (err error) {
+	if err = pc.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "Redis Encoder flush response")
 	}
 	return
 }

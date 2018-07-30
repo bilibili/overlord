@@ -117,6 +117,11 @@ func (h *Handler) handle() {
 			prom.ProxyTime(h.cluster.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 		}
 
+		err = h.pc.Flush()
+		if err != nil {
+			return
+		}
+
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()

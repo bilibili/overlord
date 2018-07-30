@@ -164,6 +164,10 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			_ = p.bw.Write(mcr.data)
 		}
 	}
+	return
+}
+
+func (p *proxyConn) Flush() (err error) {
 	if err = p.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
 	}

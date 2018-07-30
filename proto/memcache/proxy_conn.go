@@ -339,6 +339,13 @@ func revSpacIdx(bs []byte) int {
 	return -1
 }
 
+func (p *proxyConn) Flush() (err error) {
+	if err = p.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
+	}
+	return
+}
+
 // Encode encode response and write into writer.
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
@@ -373,9 +380,6 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		if m.IsBatch() {
 			_ = p.bw.Write(endBytes)
 		}
-	}
-	if err = p.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
 	}
 	return
 }
