@@ -36,7 +36,7 @@ func TestPingerPing100Ok(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		err := pinger.Ping()
-		assert.NoError(t, err)
+		assert.NoError(t, err, "error iter: %d", i)
 	}
 
 	err := pinger.Ping()

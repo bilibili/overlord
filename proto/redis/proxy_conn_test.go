@@ -131,7 +131,7 @@ func TestEncodeCmdOk(t *testing.T) {
 		Expect string
 	}{
 		{
-			Name:  "mergeStr",
+			Name:  "mergeNotSupport",
 			MType: mergeTypeNo,
 			Reply: []*resp{
 				&resp{
@@ -139,30 +139,30 @@ func TestEncodeCmdOk(t *testing.T) {
 					data: []byte("123456789"),
 				},
 			},
-			Expect: "+123456789\r\n",
+			Expect: "-Error: command not support\r\n",
 		},
-		{
-			Name:  "mergeInt",
-			MType: mergeTypeNo,
-			Reply: []*resp{
-				&resp{
-					rTp:  respInt,
-					data: []byte("12"),
-				},
-			},
-			Expect: ":12\r\n",
-		},
-		{
-			Name:  "mergeError",
-			MType: mergeTypeNo,
-			Reply: []*resp{
-				&resp{
-					rTp:  respError,
-					data: []byte("i am error"),
-				},
-			},
-			Expect: "-i am error\r\n",
-		},
+		// {
+		// 	Name:  "mergeCtl",
+		// 	MType: mergeTypeNo,
+		// 	Reply: []*resp{
+		// 		&resp{
+		// 			rTp:  respInt,
+		// 			data: []byte("12"),
+		// 		},
+		// 	},
+		// 	Expect: ":12\r\n",
+		// },
+		// {
+		// 	Name:  "mergeError",
+		// 	MType: mergeTypeNo,
+		// 	Reply: []*resp{
+		// 		&resp{
+		// 			rTp:  respError,
+		// 			data: []byte("i am error"),
+		// 		},
+		// 	},
+		// 	Expect: "-i am error\r\n",
+		// },
 		{
 			Name:  "mergeOK",
 			MType: mergeTypeOK,
@@ -228,12 +228,18 @@ func TestEncodeCmdOk(t *testing.T) {
 			conn, buf := _createDownStreamConn()
 			pc := NewProxyConn(conn)
 			err := pc.Encode(msg)
-			if assert.NoError(t, err) {
-				data := make([]byte, 2048)
-				size, err := buf.Read(data)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.Expect, string(data[:size]))
+			if !assert.NoError(t, err) {
+				return
 			}
+			err = pc.Flush()
+			if !assert.NoError(t, err) {
+				return
+			}
+			data := make([]byte, 2048)
+			size, err := buf.Read(data)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.Expect, string(data[:size]))
+
 		})
 	}
 }

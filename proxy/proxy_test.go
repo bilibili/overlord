@@ -26,8 +26,8 @@ var (
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21211",
 			RedisAuth:        "",
-			DialTimeout:      1000,
-			ReadTimeout:      1000,
+			DialTimeout:      100,
+			ReadTimeout:      100,
 			NodeConnections:  10,
 			WriteTimeout:     1000,
 			PingFailLimit:    3,
@@ -47,8 +47,8 @@ var (
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21212",
 			RedisAuth:        "",
-			DialTimeout:      1000,
-			ReadTimeout:      1000,
+			DialTimeout:      100,
+			ReadTimeout:      100,
 			NodeConnections:  10,
 			WriteTimeout:     1000,
 			PingFailLimit:    3,
@@ -207,10 +207,10 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 }
 
 func TestProxyFull(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-		testCmdBin(t, cmdBins[0], cmdBins[1])
-	}
+	// for i := 0; i < 10; i++ {
+	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	// testCmdBin(t, cmdBins[0], cmdBins[1])
+	// }
 }
 
 func TestProxyWithAssert(t *testing.T) {
