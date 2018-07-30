@@ -126,9 +126,7 @@ func (h *Handler) handle() {
 				prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
-
-		err = h.pc.Flush()
-		if err != nil {
+		if err = h.pc.Flush(); err != nil {
 			return
 		}
 

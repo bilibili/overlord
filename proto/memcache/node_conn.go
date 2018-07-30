@@ -172,7 +172,9 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	}
 
 	if bytes.Equal(bs, endBytes) {
-		prom.Miss(n.cluster, n.addr)
+		if prom.On() {
+			prom.Miss(n.cluster, n.addr)
+		}
 		return
 	}
 	if prom.On() {

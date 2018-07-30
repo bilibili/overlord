@@ -221,7 +221,7 @@ func TestNodeConnAssertError(t *testing.T) {
 }
 
 func TestNocdConnPingOk(t *testing.T) {
-	nc := _createNodeConn(pong)
+	nc := _createNodeConn(pongBytes)
 	err := nc.Ping()
 	assert.NoError(t, err)
 	assert.NoError(t, nc.Close())

@@ -36,9 +36,7 @@ func init() {
 func initBufPool(idx int) {
 	pools[idx] = &sync.Pool{
 		New: func() interface{} {
-			return &Buffer{
-				buf: make([]byte, sizes[idx]),
-			}
+			return NewBuffer(sizes[idx])
 		},
 	}
 }
@@ -47,6 +45,11 @@ func initBufPool(idx int) {
 type Buffer struct {
 	buf  []byte
 	r, w int
+}
+
+// NewBuffer new buffer.
+func NewBuffer(size int) *Buffer {
+	return &Buffer{buf: make([]byte, size)}
 }
 
 // Bytes return the bytes readed
@@ -97,8 +100,7 @@ func Get(size int) *Buffer {
 	}
 	i := sort.SearchInts(sizes, size)
 	if i >= len(pools) {
-		b := &Buffer{buf: make([]byte, size)}
-		return b
+		return NewBuffer(size)
 	}
 	b := pools[i].Get().(*Buffer)
 	b.Reset()

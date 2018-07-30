@@ -32,7 +32,7 @@ type pinger struct {
 func newPinger(conn *libnet.Conn) *pinger {
 	return &pinger{
 		conn:  conn,
-		br:    bufio.NewReader(conn, bufio.Get(64)),
+		br:    bufio.NewReader(conn, bufio.NewBuffer(7)),
 		bw:    bufio.NewWriter(conn),
 		state: opened,
 	}

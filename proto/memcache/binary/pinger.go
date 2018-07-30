@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	pingBufferSize = 32
+	pingBufferSize = 24
 )
 
 var (
@@ -50,7 +50,7 @@ func newMCPinger(nc *libnet.Conn) *mcPinger {
 	return &mcPinger{
 		conn: nc,
 		bw:   bufio.NewWriter(nc),
-		br:   bufio.NewReader(nc, bufio.Get(pingBufferSize)),
+		br:   bufio.NewReader(nc, bufio.NewBuffer(pingBufferSize)),
 	}
 }
 

@@ -9,10 +9,8 @@ import (
 	libnet "overlord/lib/net"
 )
 
-const maxWritevSize = 1024
-
-// ErrProxy
 var (
+	// ErrBufferFull err buffer full
 	ErrBufferFull = bufio.ErrBufferFull
 )
 
@@ -108,33 +106,6 @@ func (r *Reader) ReadSlice(delim byte) (data []byte, err error) {
 	return
 }
 
-// ReadBytes is the same as (*bufio.Buffer).ReadBytes in std.
-func (r *Reader) ReadBytes(delim byte) (data []byte, err error) {
-	if r.err != nil {
-		err = r.err
-		return
-	}
-
-	for {
-		idx := bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
-		if idx != -1 {
-			data = r.b.buf[r.b.r : r.b.r+idx+1]
-			r.b.r += idx + 1
-			return
-		}
-		if r.b.buffered() == r.b.len() {
-			r.b.grow()
-		}
-		if r.b.w == r.b.len() {
-			r.b.shrink()
-		}
-
-		if err = r.fill(); err != nil {
-			return
-		}
-	}
-}
-
 // ReadExact will read n size bytes or return ErrBufferFull.
 // It never contains any I/O operation
 func (r *Reader) ReadExact(n int) (data []byte, err error) {
@@ -170,6 +141,10 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 	r.b.w = b.w
 }
 
+const (
+	maxWritevSize = 1024
+)
+
 // Writer implements buffering for an io.Writer object.
 // If an error occurs writing to a Writer, no more data will be
 // accepted and all subsequent writes, and Flush, will return the error.
@@ -187,8 +162,7 @@ type Writer struct {
 
 // NewWriter returns a new Writer whose buffer has the default size.
 func NewWriter(wr *libnet.Conn) *Writer {
-	const defaultBuffered = 64
-	return &Writer{wr: wr, bufs: make([][]byte, 0, defaultBuffered)}
+	return &Writer{wr: wr, bufs: make([][]byte, 0, maxWritevSize)}
 }
 
 // Flush writes any buffered data to the underlying io.Writer.

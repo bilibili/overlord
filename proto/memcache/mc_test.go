@@ -3,8 +3,9 @@ package memcache
 import (
 	"bytes"
 	"net"
-	libnet "overlord/lib/net"
 	"time"
+
+	libnet "overlord/lib/net"
 )
 
 type mockAddr string
@@ -17,12 +18,18 @@ func (m mockAddr) String() string {
 }
 
 type mockConn struct {
-	rbuf *bytes.Buffer
-	wbuf *bytes.Buffer
-	addr mockAddr
+	addr   mockAddr
+	rbuf   *bytes.Buffer
+	wbuf   *bytes.Buffer
+	data   []byte
+	repeat int
 }
 
 func (m *mockConn) Read(b []byte) (n int, err error) {
+	if m.repeat > 0 {
+		m.rbuf.Write(m.data)
+		m.repeat--
+	}
 	return m.rbuf.Read(b)
 }
 func (m *mockConn) Write(b []byte) (n int, err error) {
@@ -49,9 +56,11 @@ func _createConn(data []byte) *libnet.Conn {
 
 func _createRepeatConn(data []byte, r int) *libnet.Conn {
 	mconn := &mockConn{
-		addr: "127.0.0.1:12345",
-		rbuf: bytes.NewBuffer(bytes.Repeat(data, r)),
-		wbuf: new(bytes.Buffer),
+		addr:   "127.0.0.1:12345",
+		rbuf:   bytes.NewBuffer(nil),
+		wbuf:   new(bytes.Buffer),
+		data:   data,
+		repeat: r,
 	}
 	conn := libnet.NewConn(mconn, time.Second, time.Second)
 	return conn

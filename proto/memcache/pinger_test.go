@@ -1,15 +1,16 @@
 package memcache
 
 import (
-	"io"
 	"testing"
+
+	"overlord/lib/bufio"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPingerPingOk(t *testing.T) {
-	conn := _createConn(pong)
+	conn := _createConn(pongBytes)
 	pinger := newMCPinger(conn)
 
 	err := pinger.Ping()
@@ -17,7 +18,7 @@ func TestPingerPingOk(t *testing.T) {
 }
 
 func TestPingerPingEOF(t *testing.T) {
-	conn := _createConn(pong)
+	conn := _createConn(pongBytes)
 	pinger := newMCPinger(conn)
 
 	err := pinger.Ping()
@@ -27,11 +28,11 @@ func TestPingerPingEOF(t *testing.T) {
 	assert.Error(t, err)
 
 	err = errors.Cause(err)
-	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, bufio.ErrBufferFull, err)
 }
 
 func TestPingerPing100Ok(t *testing.T) {
-	conn := _createRepeatConn(pong, 100)
+	conn := _createRepeatConn(pongBytes, 100)
 	pinger := newMCPinger(conn)
 
 	for i := 0; i < 100; i++ {
@@ -41,11 +42,11 @@ func TestPingerPing100Ok(t *testing.T) {
 
 	err := pinger.Ping()
 	assert.Error(t, err)
-	_causeEqual(t, io.EOF, err)
+	_causeEqual(t, bufio.ErrBufferFull, err)
 }
 
 func TestPingerClosed(t *testing.T) {
-	conn := _createRepeatConn(pong, 100)
+	conn := _createRepeatConn(pongBytes, 100)
 	pinger := newMCPinger(conn)
 	err := pinger.Close()
 	assert.NoError(t, err)

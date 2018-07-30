@@ -30,7 +30,8 @@ var (
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
 	clusterNodeCmdLabels = []string{"cluster", "node", "cmd"}
-	on                   bool
+
+	on bool
 )
 
 // On return if open prom metrics.

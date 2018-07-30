@@ -67,7 +67,7 @@ func TestReaderReadSlice(t *testing.T) {
 	assert.Len(t, data, 3)
 
 	_, err = b.ReadSlice('\n')
-	assert.EqualError(t, err, "bufio: buffer full")
+	assert.Equal(t, ErrBufferFull, err)
 }
 
 func TestReaderReadExact(t *testing.T) {
@@ -80,7 +80,7 @@ func TestReaderReadExact(t *testing.T) {
 	assert.Len(t, data, 5)
 
 	_, err = b.ReadExact(5 * 3 * 100)
-	assert.EqualError(t, err, "bufio: buffer full")
+	assert.Equal(t, ErrBufferFull, err)
 }
 
 func TestReaderResetBuffer(t *testing.T) {
