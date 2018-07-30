@@ -67,7 +67,7 @@ def main():
         "expect",
         help=
         "expect validate address. command will be send to this address first.")
-    parser.add_argument("-k", "--keys", default=1024, help="range range of keys")
+    parser.add_argument("-k", "--keys", type=int, default=1024, help="default 1024. It's recommands be the 10 times than the count of backends.")
     opt = parser.parse_args()
     check = opt.check
     expect = opt.check
