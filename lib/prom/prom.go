@@ -30,10 +30,17 @@ var (
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
 	clusterNodeCmdLabels = []string{"cluster", "node", "cmd"}
+	on                   bool
 )
+
+// On return if open prom metrics.
+func On() bool {
+	return on
+}
 
 // Init init prometheus.
 func Init() {
+	on = true
 	conns = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: statConns,

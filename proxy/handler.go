@@ -122,7 +122,9 @@ func (h *Handler) handle() {
 			}
 			msg.MarkEnd()
 			msg.ReleaseSubs()
-			prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
+			if prom.On() {
+				prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
+			}
 		}
 
 		err = h.pc.Flush()
@@ -165,7 +167,9 @@ func (h *Handler) closeWithError(err error) {
 		h.cancel()
 		h.msgCh.Close()
 		_ = h.conn.Close()
-		prom.ConnDecr(h.cluster.cc.Name)
+		if prom.On() {
+			prom.ConnDecr(h.cluster.cc.Name)
+		}
 		if log.V(3) {
 			if err != io.EOF {
 				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)

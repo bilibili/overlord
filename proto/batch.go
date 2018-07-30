@@ -115,10 +115,12 @@ func (m *MsgBatch) Msgs() []*Message {
 
 // BatchDone will set done and report prom HandleTime.
 func (m *MsgBatch) BatchDone(cluster, addr string) {
-	for _, msg := range m.Msgs() {
-		prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
+	if prom.On() {
+		for _, msg := range m.Msgs() {
+			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
+		}
+		m.Done()
 	}
-	m.Done()
 }
 
 // BatchDoneWithError will set done with error and report prom ErrIncr.
@@ -128,7 +130,9 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 		if log.V(1) {
 			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
 		}
-		prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
+		if prom.On() {
+			prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
+		}
 	}
 	m.Done()
 }
