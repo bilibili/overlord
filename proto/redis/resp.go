@@ -48,6 +48,16 @@ func (r *resp) reset() {
 	}
 }
 
+func (r *resp) copy(re *resp) {
+	r.reset()
+	r.rTp = re.rTp
+	r.data = re.data
+	for i := 0; i < re.arrayn; i++ {
+		nre := r.next()
+		nre.copy(re.array[i])
+	}
+}
+
 func (r *resp) next() *resp {
 	if r.arrayn < len(r.array) {
 		nr := r.array[r.arrayn]
