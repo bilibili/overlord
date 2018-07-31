@@ -97,6 +97,9 @@ func (h *Handler) handle() {
 		for _, msg := range msgs {
 			msg.Clear()
 		}
+		for _, mb := range mbatch {
+			proto.DropMsgBatch(mb)
+		}
 		h.closeWithError(err)
 	}()
 

@@ -136,3 +136,13 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 	}
 	m.Done()
 }
+
+// DropMsgBatch put MsgBatch into recycle using pool.
+func DropMsgBatch(m *MsgBatch) {
+	m.buf.Reset()
+	m.msgs = m.msgs[:0]
+	m.count = 0
+	m.wg = nil
+	msgBatchPool.Put(m)
+	m = nil
+}
