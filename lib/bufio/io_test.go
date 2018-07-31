@@ -70,6 +70,14 @@ func TestReaderReadSlice(t *testing.T) {
 	assert.Equal(t, ErrBufferFull, err)
 }
 
+func TestReaderReadLine(t *testing.T) {
+	b := NewReader(bytes.NewBuffer([]byte("abcd\r\nabc")), Get(defaultBufferSize))
+	b.Read()
+	data, err := b.ReadLine()
+	assert.NoError(t, err)
+	assert.Len(t, data, 6)
+}
+
 func TestReaderReadExact(t *testing.T) {
 	bts := _genData()
 
