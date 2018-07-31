@@ -109,7 +109,7 @@ func (m *MsgBatch) Msgs() []*Message {
 // BatchDone will set done and report prom HandleTime.
 func (m *MsgBatch) BatchDone(cluster, addr string) {
 	m.Done()
-	if prom.On() {
+	if prom.On {
 		for _, msg := range m.Msgs() {
 			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 		}
@@ -123,7 +123,7 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 		if log.V(1) {
 			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
 		}
-		if prom.On() {
+		if prom.On {
 			prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
 		}
 	}

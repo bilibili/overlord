@@ -125,7 +125,7 @@ func (h *Handler) handle() {
 			}
 			msg.MarkEnd()
 			msg.ReleaseSubs()
-			if prom.On() {
+			if prom.On {
 				prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
@@ -168,7 +168,7 @@ func (h *Handler) closeWithError(err error) {
 		h.cancel()
 		h.msgCh.Close()
 		_ = h.conn.Close()
-		if prom.On() {
+		if prom.On {
 			prom.ConnDecr(h.cluster.cc.Name)
 		}
 		if log.V(3) {

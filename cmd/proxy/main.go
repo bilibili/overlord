@@ -82,6 +82,8 @@ func main() {
 		go http.ListenAndServe(c.Pprof, nil)
 		if c.Proxy.UseMetrics {
 			prom.Init()
+		} else {
+			prom.On = false
 		}
 	}
 	// new proxy
