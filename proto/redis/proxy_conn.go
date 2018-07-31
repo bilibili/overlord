@@ -70,9 +70,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	}
 	if pc.resp.arrayn < 1 {
 		r := nextReq(m)
-		r.resp.reset()
-		r.resp.rTp = pc.resp.rTp
-		r.resp.data = pc.resp.data
+		r.resp.copy(pc.resp)
 		return
 	}
 	conv.UpdateToUpper(pc.resp.array[0].data)
@@ -96,14 +94,10 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			nre1.data = cmdMSetBytes
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.reset()
-			nre2.rTp = pc.resp.array[i*2+1].rTp
-			nre2.data = pc.resp.array[i*2+1].data
+			nre2.copy(pc.resp.array[i*2+1])
 			// array resp: value
 			nre3 := r.resp.next() // NOTE: $vlen\r\nvalue\r\n
-			nre3.reset()
-			nre3.rTp = pc.resp.array[i*2+2].rTp
-			nre3.data = pc.resp.array[i*2+2].data
+			nre3.copy(pc.resp.array[i*2+2])
 		}
 	} else if bytes.Equal(cmd, cmdMGetBytes) {
 		for i := 1; i < pc.resp.arrayn; i++ {
@@ -119,9 +113,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			nre1.data = cmdGetBytes
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.reset()
-			nre2.rTp = pc.resp.array[i].rTp
-			nre2.data = pc.resp.array[i].data
+			nre2.copy(pc.resp.array[i])
 		}
 	} else if bytes.Equal(cmd, cmdDelBytes) || bytes.Equal(cmd, cmdExistsBytes) {
 		for i := 1; i < pc.resp.arrayn; i++ {
@@ -132,26 +124,14 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.resp.data = arrayLenTwo
 			// array resp: get
 			nre1 := r.resp.next() // NOTE: $3\r\nDEL\r\n | $6\r\nEXISTS\r\n
-			nre1.reset()
-			nre1.rTp = pc.resp.array[0].rTp
-			nre1.data = pc.resp.array[0].data
+			nre1.copy(pc.resp.array[0])
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.reset()
-			nre2.rTp = pc.resp.array[i].rTp
-			nre2.data = pc.resp.array[i].data
+			nre2.copy(pc.resp.array[i])
 		}
 	} else {
 		r := nextReq(m)
-		r.resp.reset()
-		r.resp.rTp = pc.resp.rTp
-		r.resp.data = pc.resp.data
-		for i := 0; i < pc.resp.arrayn; i++ {
-			nre := r.resp.next()
-			nre.reset()
-			nre.rTp = pc.resp.array[i].rTp
-			nre.data = pc.resp.array[i].data
-		}
+		r.resp.copy(pc.resp)
 	}
 	return
 }
