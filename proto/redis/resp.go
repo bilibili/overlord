@@ -52,11 +52,9 @@ func (r *resp) copy(re *resp) {
 	r.reset()
 	r.rTp = re.rTp
 	r.data = re.data
-	if re.arrayn > 0 {
-		for i := 0; i < re.arrayn; i++ {
-			nre := r.next()
-			nre.copy(re.array[i])
-		}
+	for i := 0; i < re.arrayn; i++ {
+		nre := r.next()
+		nre.copy(re.array[i])
 	}
 }
 
