@@ -13,7 +13,7 @@ func TestDecodeBasicOk(t *testing.T) {
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
 
-	msgs := proto.GetMsgSlice(2)
+	msgs := proto.GetMsgSlice(1)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
 	assert.Len(t, nmsgs, 1)
@@ -30,7 +30,7 @@ func TestDecodeBasicOk(t *testing.T) {
 }
 
 func TestDecodeComplexOk(t *testing.T) {
-	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n"
+	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
 	// test reuse command
@@ -45,7 +45,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	// decode
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
-	assert.Len(t, nmsgs, 4)
+	assert.Len(t, nmsgs, 5)
 	// MGET baka
 	assert.Len(t, nmsgs[0].Batch(), 2)
 	req := msgs[0].Requests()[0].(*Request)
@@ -121,6 +121,13 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("2"), req.resp.data)
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("5\r\nabcde"), req.resp.array[1].data)
+
+	req = msgs[4].Requests()[0].(*Request)
+	assert.Equal(t, mergeTypeCount, req.mType)
+	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, "DEL", req.CmdString())
+	assert.Equal(t, "a", string(req.Key()))
+	assert.Equal(t, []byte("2"), req.resp.data)
 }
 
 func TestEncodeCmdOk(t *testing.T) {

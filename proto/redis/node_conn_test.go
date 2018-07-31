@@ -34,27 +34,16 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	req := getReq()
-	req.mType = mergeTypeNo
-	req.resp = &resp{
-		rTp:  respArray,
-		data: []byte("2"),
-		array: []*resp{
-			&resp{
-				rTp:  respBulk,
-				data: []byte("3\r\nGET"),
-			},
-			&resp{
-				rTp:  respBulk,
-				data: []byte("5\r\nabcde"),
-			},
-		},
-		arrayn: 2,
-	}
+	req := newRequest("GET", "AA")
+	msg.WithRequest(req)
+	mb.AddMsg(msg)
+	msg = proto.NewMessage()
+	req = newRequest("unsupport")
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.WriteBatch(mb)
 	assert.NoError(t, err)
+	nc.Close()
 }
 
 func TestNodeConnWriteBadAssert(t *testing.T) {
@@ -74,9 +63,11 @@ func TestReadBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(data)))
 	mb := proto.NewMsgBatch()
 	msg := proto.GetMsg()
-	req := getReq()
-	req.mType = mergeTypeNo
-	req.reply = &resp{}
+	req := newRequest("unsportcmd", "a")
+	msg.WithRequest(req)
+	mb.AddMsg(msg)
+	msg = proto.GetMsg()
+	req = newRequest("GET", "a")
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)

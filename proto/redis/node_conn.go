@@ -50,7 +50,7 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 			return ErrBadAssert
 		}
 		if !req.isSupport() || req.isCtl() {
-			return nil
+			continue
 		}
 		if err = req.resp.encode(nc.bw); err != nil {
 			m.DoneWithError(err)
