@@ -58,8 +58,8 @@ func (c *Conn) ReConnect() (err error) {
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
-	if c.closed {
-		return
+	if c.closed || c.Conn == nil {
+		return 0, ErrConnClosed
 	}
 	if c.err != nil && c.addr != "" {
 		if re := c.ReConnect(); re != nil {
@@ -74,12 +74,16 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			return
 		}
 	}
+
 	n, err = c.Conn.Read(b)
 	c.err = err
 	return
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
+	if c.closed || c.Conn == nil {
+		return 0, ErrConnClosed
+	}
 	if c.err != nil && c.addr != "" {
 		if re := c.ReConnect(); re != nil {
 			err = c.err
@@ -109,7 +113,7 @@ func (c *Conn) Close() error {
 
 // Writev impl the net.buffersWriter to support writev
 func (c *Conn) Writev(buf *net.Buffers) (int64, error) {
-	if c.Conn == nil {
+	if c.closed || c.Conn == nil {
 		return 0, ErrConnClosed
 	}
 	return buf.WriteTo(c.Conn)
