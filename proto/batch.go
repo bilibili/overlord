@@ -41,13 +41,6 @@ func NewMsgBatch() *MsgBatch {
 	return msgBatchPool.Get().(*MsgBatch)
 }
 
-// PutMsgBatch will release the batch object
-func PutMsgBatch(b *MsgBatch) {
-	b.Reset()
-	b.wg = nil
-	msgBatchPool.Put(b)
-}
-
 // MsgBatch is a single execute unit
 type MsgBatch struct {
 	buf  *bufio.Buffer
