@@ -140,10 +140,6 @@ func (*mockReq) Key() []byte {
 	return []byte{}
 }
 
-func (*mockReq) Resp() []byte {
-	return nil
-}
-
 func (*mockReq) Put() {
 
 }
@@ -205,9 +201,9 @@ func TestNodeConnReadOk(t *testing.T) {
 			batch.AddMsg(req)
 			err := nc.ReadBatch(batch)
 			assert.NoError(t, err)
-
 			mcr, ok := req.Request().(*MCRequest)
-			assert.Equal(t, true, ok)
+			assert.True(t, ok)
+			assert.NotNil(t, mcr)
 			assert.Equal(t, tt.except, string(mcr.data))
 		})
 
@@ -225,7 +221,7 @@ func TestNodeConnAssertError(t *testing.T) {
 }
 
 func TestNocdConnPingOk(t *testing.T) {
-	nc := _createNodeConn(pong)
+	nc := _createNodeConn(pongBytes)
 	err := nc.Ping()
 	assert.NoError(t, err)
 	assert.NoError(t, nc.Close())

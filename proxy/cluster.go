@@ -17,6 +17,7 @@ import (
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
+	"overlord/proto/redis"
 
 	"github.com/pkg/errors"
 )
@@ -87,18 +88,21 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
 	}
 	c.alias = alias
-
-	ring := hashkit.Ketama()
-	if c.alias {
-		ring.Init(ans, ws)
+	// hash ring
+	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
+	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary || cc.CacheType == proto.CacheTypeRedis {
+		if c.alias {
+			ring.Init(ans, ws)
+		} else {
+			ring.Init(addrs, ws)
+		}
 	} else {
-		ring.Init(addrs, ws)
+		panic("unsupported protocol")
 	}
 
 	nodeChan := make(map[int]*batchChanel)
 	nodeMap := make(map[string]int)
 	aliasMap := make(map[string]int)
-
 	for i := range addrs {
 		nbc := newBatchChanel(cc.NodeConnections)
 		go c.processBatch(nbc, addrs[i])
@@ -136,10 +140,7 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 // DispatchBatch delivers all the messages to batch execute by hash
 func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 	// TODO: dynamic update mbs by add more than configrured nodes
-	var (
-		bidx int
-	)
-
+	var bidx int
 	for _, msg := range slice {
 		if msg.IsBatch() {
 			for _, sub := range msg.Batch() {
@@ -151,7 +152,6 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 			mbs[bidx].AddMsg(msg)
 		}
 	}
-
 	c.deliver(mbs)
 }
 
@@ -188,31 +188,18 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			}
 			return
 		}
-
-		err := c.processWriteBatch(nc, mb)
-		if err != nil {
+		if err := nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
-
-		err = c.processReadBatch(nc, mb)
-		if err != nil {
+		if err := nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
 		mb.BatchDone(c.cc.Name, addr)
 	}
-}
-
-func (c *Cluster) processWriteBatch(w proto.NodeConn, mb *proto.MsgBatch) error {
-	return w.WriteBatch(mb)
-}
-
-func (c *Cluster) processReadBatch(r proto.NodeConn, mb *proto.MsgBatch) error {
-	err := r.ReadBatch(mb)
-	return err
 }
 
 func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
@@ -235,6 +222,7 @@ func (c *Cluster) processPing(p *pinger) {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
 			p.retries = 0
+			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 		} else {
 			p.failure = 0
 			if del {
@@ -269,7 +257,7 @@ func (c *Cluster) hash(key []byte) (node string, ok bool) {
 	if len(realKey) == 0 {
 		realKey = key
 	}
-	node, ok = c.ring.Hash(realKey)
+	node, ok = c.ring.GetNode(realKey)
 	return
 }
 
@@ -333,9 +321,8 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case proto.CacheTypeMemcacheBinary:
 		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	case proto.CacheTypeRedis:
-	// TODO(felix): support redis
+		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
-	return nil
 }

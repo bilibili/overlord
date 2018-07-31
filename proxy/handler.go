@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
+	"overlord/proto/redis"
 )
 
 const (
@@ -44,6 +46,7 @@ type Handler struct {
 	closed int32
 	// wg     sync.WaitGroup
 	err error
+	str strings.Builder
 }
 
 // NewHandler new a conn handler.
@@ -61,7 +64,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	case proto.CacheTypeMemcacheBinary:
 		h.pc = mcbin.NewProxyConn(h.conn)
 	case proto.CacheTypeRedis:
-		// TODO(felix): support redis.
+		h.pc = redis.NewProxyConn(h.conn)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
@@ -76,10 +79,16 @@ func (h *Handler) Handle() {
 	go h.handle()
 }
 
+func (h *Handler) toStr(p []byte) string {
+	h.str.Reset()
+	h.str.Write(p)
+	return h.str.String()
+}
+
 func (h *Handler) handle() {
 	var (
 		messages = proto.GetMsgSlice(defaultConcurrent)
-		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.cc.Servers))
+		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.nodeMap))
 		msgs     []*proto.Message
 		err      error
 	)
@@ -87,6 +96,9 @@ func (h *Handler) handle() {
 	defer func() {
 		for _, msg := range msgs {
 			msg.Clear()
+		}
+		for _, mb := range mbatch {
+			proto.DropMsgBatch(mb)
 		}
 		h.closeWithError(err)
 	}()
@@ -113,7 +125,12 @@ func (h *Handler) handle() {
 			}
 			msg.MarkEnd()
 			msg.ReleaseSubs()
-			prom.ProxyTime(h.cluster.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+			if prom.On {
+				prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
+			}
+		}
+		if err = h.pc.Flush(); err != nil {
+			return
 		}
 
 		// 4. release resource
@@ -151,7 +168,9 @@ func (h *Handler) closeWithError(err error) {
 		h.cancel()
 		h.msgCh.Close()
 		_ = h.conn.Close()
-		prom.ConnDecr(h.cluster.cc.Name)
+		if prom.On {
+			prom.ConnDecr(h.cluster.cc.Name)
+		}
 		if log.V(3) {
 			if err != io.EOF {
 				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)

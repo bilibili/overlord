@@ -9,13 +9,13 @@ import (
 	libnet "overlord/lib/net"
 )
 
-const (
-	maxBuffered = 64
+var (
+	// ErrBufferFull err buffer full
+	ErrBufferFull = bufio.ErrBufferFull
 )
 
-// ErrProxy
 var (
-	ErrBufferFull = bufio.ErrBufferFull
+	crlfBytes = []byte("\r\n")
 )
 
 // Reader implements buffering for an io.Reader object.
@@ -47,6 +47,16 @@ func (r *Reader) Advance(n int) {
 	r.b.Advance(n)
 }
 
+// Mark return buf read pos.
+func (r *Reader) Mark() int {
+	return r.b.r
+}
+
+// AdvanceTo reset buffer read pos.
+func (r *Reader) AdvanceTo(mark int) {
+	r.Advance(mark - r.b.r)
+}
+
 // Buffer will return the reference of local buffer
 func (r *Reader) Buffer() *Buffer {
 	return r.b
@@ -57,19 +67,29 @@ func (r *Reader) Read() error {
 	if r.err != nil {
 		return r.err
 	}
-
 	if r.b.buffered() == r.b.len() {
 		r.b.grow()
 	}
-
 	if r.b.w == r.b.len() {
 		r.b.shrink()
 	}
-
 	if err := r.fill(); err != io.EOF {
 		return err
 	}
 	return nil
+}
+
+// ReadLine will read until meet the first crlf bytes.
+func (r *Reader) ReadLine() (line []byte, err error) {
+	idx := bytes.Index(r.b.buf[r.b.r:r.b.w], crlfBytes)
+	if idx == -1 {
+		line = nil
+		err = ErrBufferFull
+		return
+	}
+	line = r.b.buf[r.b.r : r.b.r+idx+2]
+	r.b.r += idx + 2
+	return
 }
 
 // ReadSlice will read until the delim or return ErrBufferFull.
@@ -121,73 +141,9 @@ func (r *Reader) ResetBuffer(b *Buffer) {
 	r.b.w = b.w
 }
 
-// ReadUntil reads until the first occurrence of delim in the input,
-// returning a slice pointing at the bytes in the buffer.
-// The bytes stop being valid at the next read.
-// If ReadUntil encounters an error before finding a delimiter,
-// it returns all the data in the buffer and the error itself (often io.EOF).
-// ReadUntil returns err != nil if and only if line does not end in delim.
-func (r *Reader) ReadUntil(delim byte) ([]byte, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	for {
-		var index = bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
-		if index >= 0 {
-			limit := r.b.r + index + 1
-			slice := r.b.buf[r.b.r:limit]
-			r.b.r = limit
-			return slice, nil
-		}
-		if r.b.w >= r.b.len() {
-			r.b.grow()
-		}
-		err := r.fill()
-		if err == io.EOF && r.b.buffered() > 0 {
-			data := r.b.buf[r.b.r:r.b.w]
-			r.b.r = r.b.w
-			return data, nil
-		} else if err != nil {
-			r.err = err
-			return nil, err
-		}
-	}
-}
-
-// ReadFull reads exactly n bytes from r into buf.
-// It returns the number of bytes copied and an error if fewer bytes were read.
-// The error is EOF only if no bytes were read.
-// If an EOF happens after reading some but not all the bytes,
-// ReadFull returns ErrUnexpectedEOF.
-// On return, n == len(buf) if and only if err == nil.
-func (r *Reader) ReadFull(n int) ([]byte, error) {
-	if n <= 0 {
-		return nil, nil
-	}
-	if r.err != nil {
-		return nil, r.err
-	}
-	for {
-		if r.b.buffered() >= n {
-			bs := r.b.buf[r.b.r : r.b.r+n]
-			r.b.r += n
-			return bs, nil
-		}
-		maxCanRead := r.b.len() - r.b.w + r.b.buffered()
-		if maxCanRead < n {
-			r.b.grow()
-		}
-		err := r.fill()
-		if err == io.EOF && r.b.buffered() > 0 {
-			data := r.b.buf[r.b.r:r.b.w]
-			r.b.r = r.b.w
-			return data, nil
-		} else if err != nil {
-			r.err = err
-			return nil, err
-		}
-	}
-}
+const (
+	maxWritevSize = 1024
+)
 
 // Writer implements buffering for an io.Writer object.
 // If an error occurs writing to a Writer, no more data will be
@@ -196,17 +152,17 @@ func (r *Reader) ReadFull(n int) ([]byte, error) {
 // Flush method to guarantee all data has been forwarded to
 // the underlying io.Writer.
 type Writer struct {
-	wr     *libnet.Conn
-	bufsp  net.Buffers
-	bufs   [][]byte
-	cursor int
+	wr    *libnet.Conn
+	bufsp net.Buffers
+	bufs  [][]byte
+	cnt   int
 
 	err error
 }
 
 // NewWriter returns a new Writer whose buffer has the default size.
 func NewWriter(wr *libnet.Conn) *Writer {
-	return &Writer{wr: wr, bufs: make([][]byte, maxBuffered)}
+	return &Writer{wr: wr, bufs: make([][]byte, 0, maxWritevSize)}
 }
 
 // Flush writes any buffered data to the underlying io.Writer.
@@ -217,12 +173,13 @@ func (w *Writer) Flush() error {
 	if len(w.bufs) == 0 {
 		return nil
 	}
-	w.bufsp = net.Buffers(w.bufs[:w.cursor])
+	w.bufsp = net.Buffers(w.bufs[:w.cnt])
 	_, err := w.wr.Writev(&w.bufsp)
 	if err != nil {
 		w.err = err
 	}
-	w.cursor = 0
+	w.bufs = w.bufs[:0]
+	w.cnt = 0
 	return w.err
 }
 
@@ -237,11 +194,10 @@ func (w *Writer) Write(p []byte) (err error) {
 	if p == nil {
 		return nil
 	}
-
-	if w.cursor+1 == maxBuffered {
-		w.Flush()
+	w.bufs = append(w.bufs, p)
+	w.cnt++
+	if len(w.bufs) == maxWritevSize {
+		err = w.Flush()
 	}
-	w.bufs[w.cursor] = p
-	w.cursor = (w.cursor + 1) % maxBuffered
-	return nil
+	return
 }

@@ -347,6 +347,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
 			err := p.Encode(msg)
 			assert.NoError(t, err)
+			assert.NoError(t, p.Flush())
 			c := conn.Conn.(*mockConn)
 			buf := make([]byte, 1024)
 			size, err := c.wbuf.Read(buf)

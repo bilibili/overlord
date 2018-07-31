@@ -51,7 +51,6 @@ type Message struct {
 	req  []Request
 	reqn int
 	subs []*Message
-
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error

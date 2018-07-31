@@ -40,15 +40,15 @@ type HashRing struct {
 }
 
 // Ketama new a hash ring with ketama consistency.
-// Default hash: sha1
+// Default hash: fnv1a64
 func Ketama() (h *HashRing) {
 	h = new(HashRing)
 	h.hash = NewFnv1a64().fnv1a64
 	return
 }
 
-// NewRingWithHash new a hash ring with a hash func.
-func NewRingWithHash(hash func([]byte) uint) (h *HashRing) {
+// newRingWithHash new a hash ring with a hash func.
+func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	h = Ketama()
 	h.hash = hash
 	return
@@ -161,8 +161,8 @@ func (h *HashRing) DelNode(n string) {
 	}
 }
 
-// Hash returns result node.
-func (h *HashRing) Hash(key []byte) (string, bool) {
+// GetNode returns result node by given key.
+func (h *HashRing) GetNode(key []byte) (string, bool) {
 	ts, ok := h.ticks.Load().(*tickArray)
 	if !ok || ts.length == 0 {
 		return "", false

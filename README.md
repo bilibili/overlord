@@ -35,12 +35,16 @@ go build
 #### Test
 
 ```shell
+# test memcache
 echo -e "set a_11 0 0 5\r\nhello\r\n" | nc 127.0.0.1 21211
 # STORED
 echo -e "get a_11\r\n" | nc 127.0.0.1 21211
 # VALUE a_11 0 5
 # hello
 # END
+
+# test redis
+python ./scripts/validate_redis_features.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
 ```
 
 Congratulations! You've just run the overlord proxy.
@@ -48,7 +52,7 @@ Congratulations! You've just run the overlord proxy.
 ## Features
 
 - [x] support memcache protocol
-- [ ] support redis protocol
+- [x] support redis protocol
 - [x] connection pool for reduce number to backend caching servers
 - [x] keepalive & failover
 - [x] hash tag: specify the part of the key used for hashing

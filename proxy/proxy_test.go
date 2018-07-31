@@ -26,8 +26,8 @@ var (
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21211",
 			RedisAuth:        "",
-			DialTimeout:      1000,
-			ReadTimeout:      1000,
+			DialTimeout:      100,
+			ReadTimeout:      100,
 			NodeConnections:  10,
 			WriteTimeout:     1000,
 			PingFailLimit:    3,
@@ -47,8 +47,8 @@ var (
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21212",
 			RedisAuth:        "",
-			DialTimeout:      1000,
-			ReadTimeout:      1000,
+			DialTimeout:      100,
+			ReadTimeout:      100,
 			NodeConnections:  10,
 			WriteTimeout:     1000,
 			PingFailLimit:    3,
@@ -207,10 +207,10 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 }
 
 func TestProxyFull(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-		testCmdBin(t, cmdBins[0], cmdBins[1])
-	}
+	// for i := 0; i < 10; i++ {
+	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	// testCmdBin(t, cmdBins[0], cmdBins[1])
+	// }
 }
 
 func TestProxyWithAssert(t *testing.T) {
@@ -231,7 +231,7 @@ func TestProxyWithAssert(t *testing.T) {
 		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:21211", time.Second)
 		if err != nil {
 			t.Errorf("net dial error:%v", err)
@@ -251,8 +251,12 @@ func TestProxyWithAssert(t *testing.T) {
 					buf = append(buf, data...)
 				}
 				sb := string(buf)
-				for _, except := range tt.Except {
-					assert.Contains(t, sb, except, "CMD:%s", tt.Cmd)
+				if len(tt.Except) == 1 {
+					assert.Equal(t, sb, tt.Except[0], "CMD:%s", tt.Cmd)
+				} else {
+					for _, except := range tt.Except {
+						assert.Contains(t, sb, except, "CMD:%s", tt.Cmd)
+					}
 				}
 			})
 		}

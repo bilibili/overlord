@@ -3,11 +3,11 @@ package bufio
 import (
 	"bytes"
 	"errors"
-	"io"
 	"net"
-	libnet "overlord/lib/net"
 	"testing"
 	"time"
+
+	libnet "overlord/lib/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,6 +34,15 @@ func TestReaderAdvance(t *testing.T) {
 	assert.Len(t, buf.Bytes(), 502)
 	b.Advance(-10)
 	assert.Len(t, buf.Bytes(), 512)
+
+	b.ReadExact(10)
+	m := b.Mark()
+	assert.Equal(t, 10, m)
+
+	b.AdvanceTo(5)
+	m = b.Mark()
+	assert.Equal(t, 5, m)
+	assert.Equal(t, 5, b.Buffer().r)
 }
 
 func TestReaderRead(t *testing.T) {
@@ -48,18 +57,6 @@ func TestReaderRead(t *testing.T) {
 	assert.EqualError(t, err, "some error")
 }
 
-func TestReaderReadUntil(t *testing.T) {
-	bts := _genData()
-	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-	data, err := b.ReadUntil(fbyte)
-	assert.NoError(t, err)
-	assert.Len(t, data, 5*3*100)
-
-	b.err = errors.New("some error")
-	_, err = b.ReadUntil(fbyte)
-	assert.EqualError(t, err, "some error")
-}
-
 func TestReaderReadSlice(t *testing.T) {
 	bts := _genData()
 
@@ -70,20 +67,15 @@ func TestReaderReadSlice(t *testing.T) {
 	assert.Len(t, data, 3)
 
 	_, err = b.ReadSlice('\n')
-	assert.EqualError(t, err, "bufio: buffer full")
+	assert.Equal(t, ErrBufferFull, err)
 }
 
-func TestReaderReadFull(t *testing.T) {
-	bts := _genData()
-
-	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-	data, err := b.ReadFull(1200)
+func TestReaderReadLine(t *testing.T) {
+	b := NewReader(bytes.NewBuffer([]byte("abcd\r\nabc")), Get(defaultBufferSize))
+	b.Read()
+	data, err := b.ReadLine()
 	assert.NoError(t, err)
-	assert.Len(t, data, 1200)
-
-	b.err = errors.New("some error")
-	_, err = b.ReadFull(1)
-	assert.EqualError(t, err, "some error")
+	assert.Len(t, data, 6)
 }
 
 func TestReaderReadExact(t *testing.T) {
@@ -96,24 +88,30 @@ func TestReaderReadExact(t *testing.T) {
 	assert.Len(t, data, 5)
 
 	_, err = b.ReadExact(5 * 3 * 100)
-	assert.EqualError(t, err, "bufio: buffer full")
+	assert.Equal(t, ErrBufferFull, err)
 }
 
 func TestReaderResetBuffer(t *testing.T) {
 	bts := _genData()
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
 
-	_, err := b.ReadFull(1200)
+	err := b.Read()
+	assert.NoError(t, err)
+
+	_, err = b.ReadExact(512)
 	assert.NoError(t, err)
 
 	b.ResetBuffer(Get(defaultBufferSize))
-	data, err := b.ReadFull(300)
+	err = b.Read()
+	assert.NoError(t, err)
+
+	data, err := b.ReadExact(300)
 	assert.NoError(t, err)
 	assert.Len(t, data, 300)
 
-	_, err = b.ReadFull(300)
+	_, err = b.ReadExact(300)
 	assert.Error(t, err)
-	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, ErrBufferFull, err)
 
 	b.ResetBuffer(nil)
 	buf := b.Buffer()

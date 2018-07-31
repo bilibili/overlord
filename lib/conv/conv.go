@@ -4,27 +4,7 @@ import (
 	"strconv"
 )
 
-const (
-	maxCmdLen = 64
-)
-
-var (
-	charmap [256]byte
-)
-
-func init() {
-	for i := range charmap {
-		c := byte(i)
-		switch {
-		case c >= 'A' && c <= 'Z':
-			charmap[i] = c + 'a' - 'A'
-		case c >= 'a' && c <= 'z':
-			charmap[i] = c
-		}
-	}
-}
-
-// btoi returns the corresponding value i.
+// Btoi returns the corresponding value i.
 func Btoi(b []byte) (int64, error) {
 	if len(b) != 0 && len(b) < 10 {
 		var neg, i = false, 0
@@ -57,20 +37,20 @@ func Btoi(b []byte) (int64, error) {
 
 // UpdateToLower will convert to lower case
 func UpdateToLower(src []byte) {
+	const step = byte('a') - byte('A')
 	for i := range src {
-		if c := charmap[src[i]]; c != 0 {
-			src[i] = c
+		if src[i] >= 'A' && src[i] <= 'Z' {
+			src[i] += step
 		}
 	}
 }
 
-// ToLower returns a copy of the string s with all Unicode letters mapped to their lower case.
-func ToLower(src []byte) []byte {
-	var lower [maxCmdLen]byte
+// UpdateToUpper will convert to lower case
+func UpdateToUpper(src []byte) {
+	const step = byte('a') - byte('A')
 	for i := range src {
-		if c := charmap[src[i]]; c != 0 {
-			lower[i] = c
+		if src[i] >= 'a' && src[i] <= 'z' {
+			src[i] -= step
 		}
 	}
-	return lower[:len(src)]
 }

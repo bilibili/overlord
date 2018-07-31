@@ -135,7 +135,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
-				err = nil
 				break
 			} else if err != nil {
 				return
@@ -173,11 +172,14 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	}
 
 	if bytes.Equal(bs, endBytes) {
-		prom.Miss(n.cluster, n.addr)
+		if prom.On {
+			prom.Miss(n.cluster, n.addr)
+		}
 		return
 	}
-	prom.Hit(n.cluster, n.addr)
-
+	if prom.On {
+		prom.Hit(n.cluster, n.addr)
+	}
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
@@ -188,7 +190,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < size {
 		return 0, bufio.ErrBufferFull
 	}
-
 	mcr.data = data[:size]
 	return
 }

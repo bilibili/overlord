@@ -30,6 +30,8 @@ var (
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
 	clusterNodeCmdLabels = []string{"cluster", "node", "cmd"}
+	// On Prom switch
+	On = true
 )
 
 // Init init prometheus.

@@ -106,7 +106,9 @@ func TestProxyConnDecodeOk(t *testing.T) {
 			conn := _createConn([]byte(tt.Data))
 			p := NewProxyConn(conn)
 			mlist := proto.GetMsgSlice(2)
-
+			// test req reuse.
+			mlist[0].WithRequest(NewReq())
+			mlist[0].Reset()
 			msgs, err := p.Decode(mlist)
 
 			if tt.Err != nil {
@@ -182,6 +184,8 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			p := NewProxyConn(conn)
 			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
 			err := p.Encode(msg)
+			assert.NoError(t, err)
+			err = p.Flush()
 			assert.NoError(t, err)
 			c := conn.Conn.(*mockConn)
 			buf := make([]byte, 1024)

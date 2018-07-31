@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	pingBufferSize = 32
+	pingBufferSize = 24
 )
 
 var (
@@ -50,7 +50,7 @@ func newMCPinger(nc *libnet.Conn) *mcPinger {
 	return &mcPinger{
 		conn: nc,
 		bw:   bufio.NewWriter(nc),
-		br:   bufio.NewReader(nc, bufio.Get(pingBufferSize)),
+		br:   bufio.NewReader(nc, bufio.NewBuffer(pingBufferSize)),
 	}
 }
 
@@ -64,7 +64,7 @@ func (m *mcPinger) Ping() (err error) {
 		err = errors.Wrap(err, "MC ping flush")
 		return
 	}
-	err = m.br.Read()
+	_ = m.br.Read()
 	head, err := m.br.ReadExact(requestHeaderLen)
 	if err != nil {
 		err = errors.Wrap(err, "MC ping read exact")

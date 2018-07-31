@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultRespBufSize  = 4096
+	defaultRespBufSize  = 1024
 	defaultMsgBatchSize = 2
 )
 
@@ -39,13 +39,6 @@ func NewMsgBatchSlice(n int) []*MsgBatch {
 // NewMsgBatch will get msg from pool
 func NewMsgBatch() *MsgBatch {
 	return msgBatchPool.Get().(*MsgBatch)
-}
-
-// PutMsgBatch will release the batch object
-func PutMsgBatch(b *MsgBatch) {
-	b.Reset()
-	b.wg = nil
-	msgBatchPool.Put(b)
 }
 
 // MsgBatch is a single execute unit
@@ -115,10 +108,12 @@ func (m *MsgBatch) Msgs() []*Message {
 
 // BatchDone will set done and report prom HandleTime.
 func (m *MsgBatch) BatchDone(cluster, addr string) {
-	for _, msg := range m.Msgs() {
-		prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
-	}
 	m.Done()
+	if prom.On {
+		for _, msg := range m.Msgs() {
+			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
+		}
+	}
 }
 
 // BatchDoneWithError will set done with error and report prom ErrIncr.
@@ -128,7 +123,19 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 		if log.V(1) {
 			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
 		}
-		prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
+		if prom.On {
+			prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
+		}
 	}
 	m.Done()
+}
+
+// DropMsgBatch put MsgBatch into recycle using pool.
+func DropMsgBatch(m *MsgBatch) {
+	m.buf.Reset()
+	m.msgs = m.msgs[:0]
+	m.count = 0
+	m.wg = nil
+	msgBatchPool.Put(m)
+	m = nil
 }
