@@ -109,12 +109,6 @@
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
 			"revisionTime": "2018-05-06T18:05:49Z"
-		},
-		{
-			"checksumSHA1": "9yMoHF1RPGh802dGQtG/8EvS6FA=",
-			"path": "github.com/tatsushid/go-critbit",
-			"revision": "487ef94b52c147166c6c62a3c2db431cad0f329b",
-			"revisionTime": "2018-03-27T15:21:58Z"
 		}
 	],
 	"rootPath": "overlord"
