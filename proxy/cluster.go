@@ -1,25 +1,24 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
 	errs "errors"
 	"net"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/backoff"
 	"overlord/lib/conv"
-	"overlord/lib/hashkit"
 	"overlord/lib/log"
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+)
 
-	"github.com/pkg/errors"
+const (
+	clusterStateOpening = uint32(0)
+	clusterStateClosed  = uint32(1)
 )
 
 // cluster errors
@@ -63,216 +62,100 @@ type Cluster struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	hashTag []byte
+	executor proto.Executor
 
-	ring *hashkit.HashRing
-
-	alias    bool
-	nodeMap  map[string]int
-	aliasMap map[string]int
-	nodeChan map[int]*batchChanel
-
-	lock   sync.Mutex
-	closed bool
+	state uint32
 }
 
 // NewCluster new a cluster by cluster config.
 func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
-	c = &Cluster{cc: cc}
-	c.ctx, c.cancel = context.WithCancel(ctx)
-	// parse
-	addrs, ws, ans, alias, err := parseServers(cc.Servers)
-	if err != nil {
-		panic(err)
-	}
-	if len(cc.HashTag) == 2 {
-		c.hashTag = []byte{cc.HashTag[0], cc.HashTag[1]}
-	}
-	c.alias = alias
-	// hash ring
-	ring := hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	if cc.CacheType == proto.CacheTypeMemcache || cc.CacheType == proto.CacheTypeMemcacheBinary || cc.CacheType == proto.CacheTypeRedis {
-		if c.alias {
-			ring.Init(ans, ws)
-		} else {
-			ring.Init(addrs, ws)
+	c = &Cluster{cc: cc, state: clusterStateOpening}
+	if c.cc.CacheType != proto.CacheTypeRedisCluster {
+		exec, err := newDefaultExecutor().Start(c.cc)
+		if err != nil {
+			log.Errorf("fail to start defaultExecutor by %s", err)
+			return
 		}
+		c.executor = exec
 	} else {
-		panic("unsupported protocol")
+		log.Info("start to init executor with redis cluster executor")
 	}
-
-	nodeChan := make(map[int]*batchChanel)
-	nodeMap := make(map[string]int)
-	aliasMap := make(map[string]int)
-	for i := range addrs {
-		nbc := newBatchChanel(cc.NodeConnections)
-		go c.processBatch(nbc, addrs[i])
-		nodeChan[i] = nbc
-		nodeMap[addrs[i]] = i
-		if c.alias {
-			aliasMap[ans[i]] = i
-		}
-	}
-
-	c.aliasMap = aliasMap
-	c.nodeChan = nodeChan
-	c.nodeMap = nodeMap
-	c.ring = ring
-	if c.cc.PingAutoEject {
-		go c.startPinger(c.cc, addrs, ws)
-	}
+	c.ctx, c.cancel = context.WithCancel(ctx)
+	// if c.cc.PingAutoEject {
+	// go c.startPinger(c.cc, addrs, ws)
+	// }
 	return
 }
 
-func (c *Cluster) calculateBatchIndex(key []byte) int {
-	node, ok := c.hash(key)
-	if !ok {
-		if log.V(3) {
-			log.Warnf("cluster(%s) addr(%s) Msg(%s) hash node not ok", c.cc.Name, c.cc.ListenAddr, key)
-		}
-		return -1
-	}
-	if c.alias {
-		return c.aliasMap[node]
-	}
-	return c.nodeMap[node]
+// Execute impl proto.Executor and forword it into inner executor
+func (c *Cluster) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) error {
+	return c.executor.Execute(mba, msgs)
 }
 
-// DispatchBatch delivers all the messages to batch execute by hash
-func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
-	// TODO: dynamic update mbs by add more than configrured nodes
-	var bidx int
-	for _, msg := range slice {
-		if msg.IsBatch() {
-			for _, sub := range msg.Batch() {
-				bidx = c.calculateBatchIndex(sub.Request().Key())
-				mbs[bidx].AddMsg(sub)
-			}
-		} else {
-			bidx = c.calculateBatchIndex(msg.Request().Key())
-			mbs[bidx].AddMsg(msg)
-		}
-	}
-	c.deliver(mbs)
-}
+// func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
+// 	for idx, addr := range addrs {
+// 		w := ws[idx]
+// 		nc := newNodeConn(cc, addr)
+// 		p := &pinger{ping: nc, node: addr, weight: w}
+// 		go c.processPing(p)
+// 	}
+// }
 
-func (c *Cluster) deliver(mbs []*proto.MsgBatch) {
-	for i := range mbs {
-		if mbs[i].Count() != 0 {
-			mbs[i].Add(1)
-			c.nodeChan[i].push(mbs[i])
-		}
-	}
-}
+// func (c *Cluster) processPing(p *pinger) {
+// 	del := false
+// 	for {
+// 		select {
+// 		case <-c.ctx.Done():
+// 			return
+// 		default:
+// 		}
+// 		if err := p.ping.Ping(); err != nil {
+// 			p.failure++
+// 			p.retries = 0
+// 			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
+// 		} else {
+// 			p.failure = 0
+// 			if del {
+// 				c.ring.AddNode(p.node, p.weight)
+// 				del = false
+// 			}
+// 		}
+// 		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
+// 			c.ring.DelNode(p.node)
+// 			del = true
+// 		}
+// 		select {
+// 		case <-time.After(backoff.Backoff(p.retries)):
+// 			p.retries++
+// 			continue
+// 		case <-c.ctx.Done():
+// 			return
+// 		}
+// 	}
+// }
 
-func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
-	for i := int32(0); i < nbc.cnt; i++ {
-		go func(i int32) {
-			ch := nbc.chs[i]
-			w := newNodeConn(c.cc, addr)
-			c.processBatchIO(addr, ch, w)
-		}(i)
-	}
-}
-
-func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
-	for {
-		var mb *proto.MsgBatch
-		select {
-		case mb = <-ch:
-		case <-c.ctx.Done():
-			if err := nc.Close(); err != nil {
-				if log.V(1) {
-					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
-				}
-			}
-			return
-		}
-		if err := nc.WriteBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch write")
-			mb.BatchDoneWithError(c.cc.Name, addr, err)
-			continue
-		}
-		if err := nc.ReadBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch read")
-			mb.BatchDoneWithError(c.cc.Name, addr, err)
-			continue
-		}
-		mb.BatchDone(c.cc.Name, addr)
-	}
-}
-
-func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
-	for idx, addr := range addrs {
-		w := ws[idx]
-		nc := newNodeConn(cc, addr)
-		p := &pinger{ping: nc, cc: cc, node: addr, weight: w}
-		go c.processPing(p)
-	}
-}
-
-func (c *Cluster) processPing(p *pinger) {
-	del := false
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		default:
-		}
-		if err := p.ping.Ping(); err != nil {
-			p.failure++
-			p.retries = 0
-			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
-			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				p.ping.Close()
-				p.ping = newNodeConn(p.cc, p.node)
-			}
-		} else {
-			p.failure = 0
-			if del {
-				c.ring.AddNode(p.node, p.weight)
-				del = false
-			}
-		}
-		if c.cc.PingAutoEject && p.failure >= c.cc.PingFailLimit {
-			c.ring.DelNode(p.node)
-			del = true
-		}
-		select {
-		case <-time.After(backoff.Backoff(p.retries)):
-			p.retries++
-			continue
-		case <-c.ctx.Done():
-			return
-		}
-	}
-}
-
-// hash returns node by hash hit.
-func (c *Cluster) hash(key []byte) (node string, ok bool) {
-	var realKey []byte
-	if len(c.hashTag) == 2 {
-		if b := bytes.IndexByte(key, c.hashTag[0]); b >= 0 {
-			if e := bytes.IndexByte(key[b+1:], c.hashTag[1]); e >= 0 {
-				realKey = key[b+1 : b+1+e]
-			}
-		}
-	}
-	if len(realKey) == 0 {
-		realKey = key
-	}
-	node, ok = c.ring.GetNode(realKey)
-	return
-}
+// // hash returns node by hash hit.
+// func (c *Cluster) hash(key []byte) (node string, ok bool) {
+// 	var realKey []byte
+// 	if len(c.hashTag) == 2 {
+// 		if b := bytes.IndexByte(key, c.hashTag[0]); b >= 0 {
+// 			if e := bytes.IndexByte(key[b+1:], c.hashTag[1]); e >= 0 {
+// 				realKey = key[b+1 : b+1+e]
+// 			}
+// 		}
+// 	}
+// 	if len(realKey) == 0 {
+// 		realKey = key
+// 	}
+// 	node, ok = c.ring.GetNode(realKey)
+// 	return
+// }
 
 // Close closes resources.
 func (c *Cluster) Close() error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.closed {
-		return nil
+	if atomic.CompareAndSwapUint32(&c.state, clusterStateOpening, clusterStateClosed) {
+		c.cancel()
 	}
-	c.closed = true
 	return nil
 }
 

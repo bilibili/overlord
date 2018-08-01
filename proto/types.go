@@ -10,7 +10,7 @@ var (
 )
 
 // CacheType memcache or redis
-type CacheType string
+type CacheType = string
 
 // Cache type: memcache or redis.
 const (
@@ -18,6 +18,7 @@ const (
 	CacheTypeMemcache       CacheType = "memcache"
 	CacheTypeMemcacheBinary CacheType = "memcache_binary"
 	CacheTypeRedis          CacheType = "redis"
+	CacheTypeRedisCluster   CacheType = "redis_cluster"
 )
 
 // Request request interface.
@@ -42,4 +43,9 @@ type NodeConn interface {
 
 	Ping() error
 	Close() error
+}
+
+// Executor is the interface for backend run and execute the messages.
+type Executor interface {
+	Execute(mba *MsgBatchAllocator, msgs []*Message) error
 }
