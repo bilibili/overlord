@@ -94,7 +94,7 @@ func (h *Handler) handle() {
 	)
 
 	defer func() {
-		for _, msg := range msgs {
+		for _, msg := range messages {
 			msg.Clear()
 		}
 		for _, mb := range mbatch {

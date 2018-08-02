@@ -80,7 +80,6 @@ func (m *Message) Clear() {
 	m.req = nil
 	for _, s := range m.subs {
 		s.Clear()
-		PutMsg(s)
 	}
 	m.subs = nil
 	PutMsg(m)
