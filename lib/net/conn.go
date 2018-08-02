@@ -116,5 +116,13 @@ func (c *Conn) Writev(buf *net.Buffers) (int64, error) {
 	if c.closed || c.Conn == nil {
 		return 0, ErrConnClosed
 	}
-	return buf.WriteTo(c.Conn)
+	if c.err != nil && c.addr != "" {
+		if re := c.ReConnect(); re != nil {
+			return 0, c.err
+		}
+		c.err = nil
+	}
+	n, err := buf.WriteTo(c.Conn)
+	c.err = err
+	return n, err
 }
