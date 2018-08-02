@@ -260,7 +260,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			conn := _createConn(tt.Data)
 			p := NewProxyConn(conn)
-			mlist := proto.GetMsgSlice(2)
+			mlist := proto.GetMsgs(2)
 
 			msgs, err := p.Decode(mlist)
 
@@ -283,7 +283,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
 	conn := _createConn([]byte(req))
 	p := NewProxyConn(conn)
-	mlist := proto.GetMsgSlice(2)
+	mlist := proto.GetMsgs(2)
 
 	_, err := p.Decode(mlist)
 	assert.NoError(t, err)

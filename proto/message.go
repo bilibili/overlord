@@ -12,7 +12,7 @@ var (
 
 var msgPool = &sync.Pool{
 	New: func() interface{} {
-		return NewMessage()
+		return &Message{}
 	},
 }
 
@@ -45,6 +45,7 @@ func PutMsgs(msgs []*Message) {
 			r.Put()
 		}
 		m.clear()
+		putMsg(m)
 	}
 }
 
@@ -73,7 +74,7 @@ type Message struct {
 // NewMessage will create new message object.
 // this will be used be sub msg req.
 func NewMessage() *Message {
-	return &Message{}
+	return getMsg()
 }
 
 // Reset will clean the msg

@@ -33,7 +33,7 @@ func (*mockCmd) Put() {
 func TestNodeConnWriteBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
-	msg := proto.GetMsg()
+	msg := proto.NewMessage()
 	req := newRequest("GET", "AA")
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
@@ -49,7 +49,7 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 func TestNodeConnWriteBadAssert(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
-	msg := proto.GetMsg()
+	msg := proto.NewMessage()
 	msg.WithRequest(&mockCmd{})
 	mb.AddMsg(msg)
 
@@ -62,11 +62,11 @@ func TestReadBatchOk(t *testing.T) {
 	data := ":1\r\n"
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(data)))
 	mb := proto.NewMsgBatch()
-	msg := proto.GetMsg()
+	msg := proto.NewMessage()
 	req := newRequest("unsportcmd", "a")
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
-	msg = proto.GetMsg()
+	msg = proto.NewMessage()
 	req = newRequest("GET", "a")
 	msg.WithRequest(req)
 	mb.AddMsg(msg)
@@ -77,7 +77,7 @@ func TestReadBatchOk(t *testing.T) {
 func TestReadBatchWithBadAssert(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
 	mb := proto.NewMsgBatch()
-	msg := proto.GetMsg()
+	msg := proto.NewMessage()
 	msg.WithRequest(&mockCmd{})
 	mb.AddMsg(msg)
 	err := nc.ReadBatch(mb)
@@ -88,7 +88,7 @@ func TestReadBatchWithBadAssert(t *testing.T) {
 func TestReadBatchWithNilError(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
-	msg := proto.GetMsg()
+	msg := proto.NewMessage()
 	req := getReq()
 	req.mType = mergeTypeJoin
 	req.reply = &resp{}

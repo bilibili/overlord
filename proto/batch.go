@@ -30,7 +30,7 @@ func GetMsgBatchs(n int) []*MsgBatch {
 	wg := &sync.WaitGroup{}
 	mbs := make([]*MsgBatch, n)
 	for i := 0; i < n; i++ {
-		mbs[i] = newMsgBatch()
+		mbs[i] = NewMsgBatch()
 		mbs[i].wg = wg
 	}
 	return mbs
@@ -47,8 +47,8 @@ func PutMsgBatchs(mbs []*MsgBatch) {
 	}
 }
 
-// newMsgBatch will get msg from pool
-func newMsgBatch() *MsgBatch {
+// NewMsgBatch will get msg from pool
+func NewMsgBatch() *MsgBatch {
 	return msgBatchPool.Get().(*MsgBatch)
 }
 
