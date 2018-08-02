@@ -25,31 +25,37 @@ var msgBatchPool = &sync.Pool{
 	},
 }
 
-// NewMsgBatchSlice returns new slice of msgs
-func NewMsgBatchSlice(n int) []*MsgBatch {
-	wg := &sync.WaitGroup{}
-	m := make([]*MsgBatch, n)
+// GetMsgBatchs returns new slice of msgs
+func GetMsgBatchs(n int) []*MsgBatch {
+	mbs := make([]*MsgBatch, n)
 	for i := 0; i < n; i++ {
-		m[i] = NewMsgBatch()
-		m[i].wg = wg
+		mbs[i] = newMsgBatch()
 	}
-	return m
+	return mbs
 }
 
-// NewMsgBatch will get msg from pool
-func NewMsgBatch() *MsgBatch {
+// PutMsgBatchs put MsgBatchs into recycle using pool.
+func PutMsgBatchs(mbs []*MsgBatch) {
+	for _, mb := range mbs {
+		mb.buf.Reset()
+		mb.msgs = nil
+		mb.count = 0
+		msgBatchPool.Put(mb)
+	}
+}
+
+// newMsgBatch will get msg from pool
+func newMsgBatch() *MsgBatch {
 	return msgBatchPool.Get().(*MsgBatch)
 }
 
 // MsgBatch is a single execute unit
 type MsgBatch struct {
-	buf  *bufio.Buffer
-	msgs []*Message
-	// message count
+	buf   *bufio.Buffer
+	msgs  []*Message
 	count int
 
-	// TODO: change waitgroup to channel
-	wg *sync.WaitGroup
+	wg sync.WaitGroup
 }
 
 // AddMsg will add new message reference to the buffer
@@ -80,11 +86,6 @@ func (m *MsgBatch) Buffer() *bufio.Buffer {
 	return m.buf
 }
 
-// Done will set the total batch to done and notify the handler to check it.
-func (m *MsgBatch) Done() {
-	m.wg.Done()
-}
-
 // Reset will reset all the field as initial value but msgs
 func (m *MsgBatch) Reset() {
 	m.count = 0
@@ -94,6 +95,11 @@ func (m *MsgBatch) Reset() {
 // Add adds n for WaitGroup
 func (m *MsgBatch) Add(n int) {
 	m.wg.Add(n)
+}
+
+// Done will set the total batch to done and notify the handler to check it.
+func (m *MsgBatch) Done() {
+	m.wg.Done()
 }
 
 // Wait waits until all the message was done
@@ -128,14 +134,4 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 		}
 	}
 	m.Done()
-}
-
-// DropMsgBatch put MsgBatch into recycle using pool.
-func DropMsgBatch(m *MsgBatch) {
-	m.buf.Reset()
-	m.msgs = m.msgs[:0]
-	m.count = 0
-	m.wg = nil
-	msgBatchPool.Put(m)
-	m = nil
 }

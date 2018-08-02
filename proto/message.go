@@ -16,13 +16,8 @@ var msgPool = &sync.Pool{
 	},
 }
 
-// GetMsg get the msg from pool
-func GetMsg() *Message {
-	return msgPool.Get().(*Message)
-}
-
-// GetMsgSlice alloc a slice to the message
-func GetMsgSlice(n int, caps ...int) []*Message {
+// GetMsgs alloc a slice to the message
+func GetMsgs(n int, caps ...int) []*Message {
 	largs := len(caps)
 	if largs > 1 {
 		panic(fmt.Sprintf("optional argument except 1, but get %d", largs))
@@ -34,14 +29,33 @@ func GetMsgSlice(n int, caps ...int) []*Message {
 		msgs = make([]*Message, n, caps[0])
 	}
 	for idx := range msgs {
-		msgs[idx] = GetMsg()
+		msgs[idx] = getMsg()
 	}
 	return msgs
 }
 
-// PutMsg Release Msg
-func PutMsg(msg *Message) {
-	msgPool.Put(msg)
+// PutMsgs Release message.
+func PutMsgs(msgs []*Message) {
+	for _, m := range msgs {
+		for _, sm := range m.subs {
+			sm.clear()
+			putMsg(sm)
+		}
+		for _, r := range m.req {
+			r.Put()
+		}
+		m.clear()
+	}
+}
+
+// getMsg get the msg from pool
+func getMsg() *Message {
+	return msgPool.Get().(*Message)
+}
+
+// putMsg put the msg into pool
+func putMsg(m *Message) {
+	msgPool.Put(m)
 }
 
 // Message read from client.
@@ -70,22 +84,11 @@ func (m *Message) Reset() {
 	m.err = nil
 }
 
-// Clear will clean the msg
-func (m *Message) Clear() {
+// clear will clean the msg
+func (m *Message) clear() {
 	m.Reset()
-	// put pool
-	for _, r := range m.req {
-		r.Put()
-	}
 	m.req = nil
-	for _, s := range m.subs {
-		// NOTE:do not reput req into pool
-		s.Reset()
-		s.req = nil
-		s.subs = nil
-	}
 	m.subs = nil
-	PutMsg(m)
 }
 
 // TotalDur will return the total duration of a command.
@@ -123,11 +126,10 @@ func (m *Message) DoneWithError(err error) {
 	m.err = err
 }
 
-// ReleaseSubs will return the Msg data to flush and reset
-func (m *Message) ReleaseSubs() {
+// ResetSubs will return the Msg data to flush and reset
+func (m *Message) ResetSubs() {
 	for i := range m.subs {
-		sub := m.subs[i]
-		sub.Reset()
+		m.subs[i].Reset()
 	}
 	m.reqn = 0
 }
@@ -187,7 +189,7 @@ func (m *Message) Batch() []*Message {
 	}
 	delta := slen - len(m.subs)
 	for i := 0; i < delta; i++ {
-		msg := GetMsg()
+		msg := getMsg()
 		msg.Type = m.Type
 		msg.setRequest(m.req[min+i])
 		m.subs = append(m.subs, msg)
