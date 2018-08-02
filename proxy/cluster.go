@@ -37,25 +37,6 @@ type pinger struct {
 	retries int
 }
 
-type batchChanel struct {
-	idx int32
-	cnt int32
-	chs []chan *proto.MsgBatch
-}
-
-func newBatchChanel(n int32) *batchChanel {
-	chs := make([]chan *proto.MsgBatch, n)
-	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.MsgBatch, 1)
-	}
-	return &batchChanel{cnt: n, chs: chs}
-}
-
-func (c *batchChanel) push(m *proto.MsgBatch) {
-	i := atomic.AddInt32(&c.idx, 1)
-	c.chs[i%c.cnt] <- m
-}
-
 // Cluster is cache cluster.
 type Cluster struct {
 	cc     *ClusterConfig

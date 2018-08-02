@@ -24,7 +24,7 @@ type defaultExecutor struct {
 	locker sync.RWMutex
 	// recording alias to real node
 	aliasMap map[string]string
-	nodeMap  map[string]*batchChanel
+	nodeMap  map[string]*proto.BatchChan
 }
 
 // newDefaultExecutor must combine with Start
@@ -70,7 +70,7 @@ func (de *defaultExecutor) Start(cc *ClusterConfig) (proto.Executor, error) {
 	}
 
 	// start nbc
-	de.nodeMap = make(map[string]*batchChanel)
+	de.nodeMap = make(map[string]*proto.BatchChan)
 	for _, node := range addrs {
 		de.nodeMap[node] = de.process(cc, node)
 	}
@@ -121,7 +121,7 @@ func (de *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.M
 	// TODO: use quick search to make iterator fast
 	for node, mb := range mba.MsgBatchs() {
 		if mb.Count() > 0 {
-			de.nodeMap[node].push(mb)
+			de.nodeMap[node].Push(mb)
 		}
 	}
 
@@ -129,11 +129,11 @@ func (de *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.M
 }
 
 // process will start the special backend connection.
-func (de *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChanel {
+func (de *defaultExecutor) process(cc *ClusterConfig, addr string) *proto.BatchChan {
 	conns := cc.NodeConnections
-	nbc := newBatchChanel(conns)
+	nbc := proto.NewBatchChan(conns)
 	for i := 0; i < int(conns); i++ {
-		ch := nbc.chs[i]
+		ch := nbc.GetCh(i)
 		nc := newNodeConn(cc, addr)
 		go de.processIO(cc.Name, addr, ch, nc)
 	}
