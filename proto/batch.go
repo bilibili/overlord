@@ -27,9 +27,11 @@ var msgBatchPool = &sync.Pool{
 
 // GetMsgBatchs returns new slice of msgs
 func GetMsgBatchs(n int) []*MsgBatch {
+	wg := &sync.WaitGroup{}
 	mbs := make([]*MsgBatch, n)
 	for i := 0; i < n; i++ {
 		mbs[i] = newMsgBatch()
+		mbs[i].wg = wg
 	}
 	return mbs
 }
@@ -40,6 +42,7 @@ func PutMsgBatchs(mbs []*MsgBatch) {
 		mb.buf.Reset()
 		mb.msgs = nil
 		mb.count = 0
+		mb.wg = nil
 		msgBatchPool.Put(mb)
 	}
 }
@@ -55,7 +58,7 @@ type MsgBatch struct {
 	msgs  []*Message
 	count int
 
-	wg sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 // AddMsg will add new message reference to the buffer
