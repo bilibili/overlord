@@ -84,6 +84,16 @@ func (h *Handler) toStr(p []byte) string {
 	h.str.Write(p)
 	return h.str.String()
 }
+func (h *Handler) deferFunc(msg []*proto.Message, mba []*proto.MsgBatch, err error) {
+	for _, msg := range msg {
+		msg.Clear()
+	}
+	for _, mb := range mba {
+		proto.DropMsgBatch(mb)
+	}
+	h.closeWithError(err)
+	return
+}
 
 func (h *Handler) handle() {
 	var (
@@ -92,21 +102,11 @@ func (h *Handler) handle() {
 		msgs     []*proto.Message
 		err      error
 	)
-
-	defer func() {
-		for _, msg := range messages {
-			msg.Clear()
-		}
-		for _, mb := range mbatch {
-			proto.DropMsgBatch(mb)
-		}
-		h.closeWithError(err)
-	}()
-
 	for {
 		// 1. read until limit or error
 		msgs, err = h.pc.Decode(messages)
 		if err != nil {
+			h.deferFunc(messages, mbatch, err)
 			return
 		}
 
@@ -121,6 +121,7 @@ func (h *Handler) handle() {
 		for _, msg := range msgs {
 			err = h.pc.Encode(msg)
 			if err != nil {
+				h.deferFunc(messages, mbatch, err)
 				return
 			}
 			msg.MarkEnd()
@@ -130,6 +131,7 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
+			h.deferFunc(messages, mbatch, err)
 			return
 		}
 
