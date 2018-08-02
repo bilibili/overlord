@@ -3,6 +3,7 @@ package net
 import (
 	"errors"
 	"net"
+	"overlord/lib/log"
 	"time"
 )
 
@@ -28,6 +29,11 @@ type Conn struct {
 // DialWithTimeout will create new auto timeout Conn
 func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (c *Conn) {
 	sock, err := net.DialTimeout("tcp", addr, dialTimeout)
+	if err != nil {
+		log.Errorf("dialtimeout  %s fail", addr)
+		time.Sleep(time.Second)
+		sock, err = net.DialTimeout("tcp", addr, dialTimeout)
+	}
 	c = &Conn{addr: addr, Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout, err: err}
 	return
 }
