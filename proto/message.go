@@ -79,7 +79,10 @@ func (m *Message) Clear() {
 	}
 	m.req = nil
 	for _, s := range m.subs {
-		s.Clear()
+		// NOTE:do not reput req into pool
+		s.Reset()
+		s.req = nil
+		s.subs = nil
 	}
 	m.subs = nil
 	PutMsg(m)
