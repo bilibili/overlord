@@ -117,12 +117,12 @@ func (m *MsgBatch) Msgs() []*Message {
 
 // BatchDone will set done and report prom HandleTime.
 func (m *MsgBatch) BatchDone(cluster, addr string) {
-	m.Done()
 	if prom.On {
 		for _, msg := range m.Msgs() {
 			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 		}
 	}
+	m.Done()
 }
 
 // BatchDoneWithError will set done with error and report prom ErrIncr.

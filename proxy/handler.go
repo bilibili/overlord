@@ -94,7 +94,7 @@ func (h *Handler) handle() {
 		// 3. wait to done
 		for _, mb := range mbatch {
 			mb.Wait()
-			break // NOTE: one wait!!!
+			//	break // NOTE: one wait!!!
 		}
 		// 4. encode
 		for _, msg := range msgs {
