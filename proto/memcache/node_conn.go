@@ -8,7 +8,6 @@ import (
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
-	"overlord/lib/prom"
 	"overlord/proto"
 
 	"github.com/pkg/errors"
@@ -172,9 +171,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	}
 
 	if bytes.Equal(bs, endBytes) {
-		if prom.On {
-			prom.Miss(n.cluster, n.addr)
-		}
 		return
 	}
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)

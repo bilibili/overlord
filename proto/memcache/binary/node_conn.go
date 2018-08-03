@@ -171,11 +171,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 
 	bl := binary.BigEndian.Uint32(mcr.bodyLen)
 	if bl == 0 {
-		if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetK || mcr.rTp == RequestTypeGetKQ {
-			if prom.On {
-				prom.Miss(n.cluster, n.addr)
-			}
-		}
 		size = requestHeaderLen
 		return
 	}

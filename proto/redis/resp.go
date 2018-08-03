@@ -43,9 +43,6 @@ func (r *resp) reset() {
 	r.rTp = respUnknown
 	r.data = nil
 	r.arrayn = 0
-	// for _, ar := range r.array {
-	// 	ar.reset()
-	// }
 }
 
 func (r *resp) copy(re *resp) {

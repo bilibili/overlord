@@ -181,8 +181,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		select {
 		case mb = <-ch:
 		case <-c.ctx.Done():
-			err := nc.Close()
-			if err != nil {
+			if err := nc.Close(); err != nil {
 				if log.V(1) {
 					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
 				}
