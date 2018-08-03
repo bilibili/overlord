@@ -30,6 +30,7 @@ var (
 
 type pinger struct {
 	ping   proto.NodeConn
+	cc     *ClusterConfig
 	node   string
 	weight int
 
@@ -180,8 +181,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 		select {
 		case mb = <-ch:
 		case <-c.ctx.Done():
-			err := nc.Close()
-			if err != nil {
+			if err := nc.Close(); err != nil {
 				if log.V(1) {
 					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
 				}
@@ -206,7 +206,7 @@ func (c *Cluster) startPinger(cc *ClusterConfig, addrs []string, ws []int) {
 	for idx, addr := range addrs {
 		w := ws[idx]
 		nc := newNodeConn(cc, addr)
-		p := &pinger{ping: nc, node: addr, weight: w}
+		p := &pinger{ping: nc, cc: cc, node: addr, weight: w}
 		go c.processPing(p)
 	}
 }
@@ -223,6 +223,10 @@ func (c *Cluster) processPing(p *pinger) {
 			p.failure++
 			p.retries = 0
 			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
+			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
+				p.ping.Close()
+				p.ping = newNodeConn(p.cc, p.node)
+			}
 		} else {
 			p.failure = 0
 			if del {

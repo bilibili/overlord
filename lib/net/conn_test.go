@@ -2,6 +2,7 @@ package net
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -161,7 +162,7 @@ func TestConnWriteReConnect(t *testing.T) {
 	conn := DialWithTimeout(laddr.String(), time.Second, time.Second, time.Second)
 	buf := []byte("Bilibili 干杯 - ( ゜- ゜)つロ")
 
-	_ = conn.Close()
+	conn.err = fmt.Errorf("mock err")
 	_, err = conn.Write(buf)
 	assert.Error(t, err)
 	// assert.Equal(t, io.EOF, err)
@@ -171,6 +172,38 @@ func TestConnWriteReConnect(t *testing.T) {
 	}
 }
 
+func TestConnWritevReConnect(t *testing.T) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	l, err := net.ListenTCP("tcp", addr)
+	assert.NoError(t, err)
+	laddr := l.Addr()
+	go func() {
+		sock, err := l.Accept()
+		assert.NoError(t, err)
+		_ = sock.Close()
+
+		sock, err = l.Accept()
+		assert.NoError(t, err)
+		_ = sock.Close()
+		_ = l.Close()
+	}()
+
+	conn := DialWithTimeout(laddr.String(), time.Second, time.Second, time.Second)
+	buf := net.Buffers([][]byte{[]byte("Bilibili 干杯 - ( ゜- ゜)つロ")})
+
+	conn.err = fmt.Errorf("mock err")
+	_, err = conn.Writev(&buf)
+	assert.Error(t, err)
+	// assert.Equal(t, io.EOF, err)
+	for i := 0; i < 3; i++ {
+		_, err = conn.Writev(&buf)
+		assert.Error(t, err)
+	}
+	conn.Close()
+	err = conn.Close()
+	assert.NoError(t, err)
+}
 func TestConnWriteBuffersOk(t *testing.T) {
 	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)

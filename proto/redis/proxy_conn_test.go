@@ -13,7 +13,7 @@ func TestDecodeBasicOk(t *testing.T) {
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
 
-	msgs := proto.GetMsgSlice(1)
+	msgs := proto.GetMsgs(1)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
 	assert.Len(t, nmsgs, 1)
@@ -34,7 +34,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	conn := _createConn([]byte(data))
 	pc := NewProxyConn(conn)
 	// test reuse command
-	msgs := proto.GetMsgSlice(16)
+	msgs := proto.GetMsgs(16)
 	msgs[1].WithRequest(getReq())
 	msgs[1].WithRequest(getReq())
 	msgs[1].Reset()

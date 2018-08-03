@@ -25,15 +25,26 @@ var msgBatchPool = &sync.Pool{
 	},
 }
 
-// NewMsgBatchSlice returns new slice of msgs
-func NewMsgBatchSlice(n int) []*MsgBatch {
+// GetMsgBatchs returns new slice of msgs
+func GetMsgBatchs(n int) []*MsgBatch {
 	wg := &sync.WaitGroup{}
-	m := make([]*MsgBatch, n)
+	mbs := make([]*MsgBatch, n)
 	for i := 0; i < n; i++ {
-		m[i] = NewMsgBatch()
-		m[i].wg = wg
+		mbs[i] = NewMsgBatch()
+		mbs[i].wg = wg
 	}
-	return m
+	return mbs
+}
+
+// PutMsgBatchs put MsgBatchs into recycle using pool.
+func PutMsgBatchs(mbs []*MsgBatch) {
+	for _, mb := range mbs {
+		mb.buf.Reset()
+		mb.msgs = nil
+		mb.count = 0
+		mb.wg = nil
+		msgBatchPool.Put(mb)
+	}
 }
 
 // NewMsgBatch will get msg from pool
@@ -43,12 +54,10 @@ func NewMsgBatch() *MsgBatch {
 
 // MsgBatch is a single execute unit
 type MsgBatch struct {
-	buf  *bufio.Buffer
-	msgs []*Message
-	// message count
+	buf   *bufio.Buffer
+	msgs  []*Message
 	count int
 
-	// TODO: change waitgroup to channel
 	wg *sync.WaitGroup
 }
 
@@ -80,11 +89,6 @@ func (m *MsgBatch) Buffer() *bufio.Buffer {
 	return m.buf
 }
 
-// Done will set the total batch to done and notify the handler to check it.
-func (m *MsgBatch) Done() {
-	m.wg.Done()
-}
-
 // Reset will reset all the field as initial value but msgs
 func (m *MsgBatch) Reset() {
 	m.count = 0
@@ -94,6 +98,11 @@ func (m *MsgBatch) Reset() {
 // Add adds n for WaitGroup
 func (m *MsgBatch) Add(n int) {
 	m.wg.Add(n)
+}
+
+// Done will set the total batch to done and notify the handler to check it.
+func (m *MsgBatch) Done() {
+	m.wg.Done()
 }
 
 // Wait waits until all the message was done
@@ -108,12 +117,12 @@ func (m *MsgBatch) Msgs() []*Message {
 
 // BatchDone will set done and report prom HandleTime.
 func (m *MsgBatch) BatchDone(cluster, addr string) {
-	m.Done()
 	if prom.On {
 		for _, msg := range m.Msgs() {
 			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 		}
 	}
+	m.Done()
 }
 
 // BatchDoneWithError will set done with error and report prom ErrIncr.
@@ -128,14 +137,4 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 		}
 	}
 	m.Done()
-}
-
-// DropMsgBatch put MsgBatch into recycle using pool.
-func DropMsgBatch(m *MsgBatch) {
-	m.buf.Reset()
-	m.msgs = m.msgs[:0]
-	m.count = 0
-	m.wg = nil
-	msgBatchPool.Put(m)
-	m = nil
 }

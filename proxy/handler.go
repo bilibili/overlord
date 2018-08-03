@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"net"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -44,9 +43,7 @@ type Handler struct {
 	msgCh   *proto.MsgChan
 
 	closed int32
-	// wg     sync.WaitGroup
-	err error
-	str strings.Builder
+	err    error
 }
 
 // NewHandler new a conn handler.
@@ -79,60 +76,41 @@ func (h *Handler) Handle() {
 	go h.handle()
 }
 
-func (h *Handler) toStr(p []byte) string {
-	h.str.Reset()
-	h.str.Write(p)
-	return h.str.String()
-}
-
 func (h *Handler) handle() {
 	var (
-		messages = proto.GetMsgSlice(defaultConcurrent)
-		mbatch   = proto.NewMsgBatchSlice(len(h.cluster.nodeMap))
+		messages = proto.GetMsgs(defaultConcurrent)
+		mbatch   = proto.GetMsgBatchs(len(h.cluster.nodeMap))
 		msgs     []*proto.Message
 		err      error
 	)
-
-	defer func() {
-		for _, msg := range msgs {
-			msg.Clear()
-		}
-		for _, mb := range mbatch {
-			proto.DropMsgBatch(mb)
-		}
-		h.closeWithError(err)
-	}()
-
 	for {
 		// 1. read until limit or error
-		msgs, err = h.pc.Decode(messages)
-		if err != nil {
+		if msgs, err = h.pc.Decode(messages); err != nil {
+			h.deferHandle(messages, mbatch, err)
 			return
 		}
-
 		// 2. send to cluster
 		h.cluster.DispatchBatch(mbatch, msgs)
 		// 3. wait to done
 		for _, mb := range mbatch {
 			mb.Wait()
 		}
-
 		// 4. encode
 		for _, msg := range msgs {
-			err = h.pc.Encode(msg)
-			if err != nil {
+			if err = h.pc.Encode(msg); err != nil {
+				h.deferHandle(messages, mbatch, err)
 				return
 			}
 			msg.MarkEnd()
-			msg.ReleaseSubs()
+			msg.ResetSubs()
 			if prom.On {
-				prom.ProxyTime(h.cluster.cc.Name, h.toStr(msg.Request().Cmd()), int64(msg.TotalDur()/time.Microsecond))
+				prom.ProxyTime(h.cluster.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
+			h.deferHandle(messages, mbatch, err)
 			return
 		}
-
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
@@ -140,19 +118,23 @@ func (h *Handler) handle() {
 		for _, mb := range mbatch {
 			mb.Reset()
 		}
-
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
 }
 
+func (h *Handler) deferHandle(msgs []*proto.Message, mbs []*proto.MsgBatch, err error) {
+	proto.PutMsgs(msgs)
+	proto.PutMsgBatchs(mbs)
+	h.closeWithError(err)
+	return
+}
+
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
-	// TODO: change the msgs by lastCount trending
 	lm := len(msgs)
 	if lm < maxConcurrent && lm == lastCount {
-		for i := 0; i < lm; i++ {
-			msgs = append(msgs, proto.GetMsg())
-		}
+		proto.PutMsgs(msgs)
+		msgs = proto.GetMsgs(lm * 2) // TODO: change the msgs by lastCount trending
 	}
 	return msgs
 }
