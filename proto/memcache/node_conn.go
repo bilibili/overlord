@@ -177,9 +177,6 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 		}
 		return
 	}
-	if prom.On {
-		prom.Hit(n.cluster, n.addr)
-	}
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
 		err = errors.Wrap(err, "MC Handler while parse length")
