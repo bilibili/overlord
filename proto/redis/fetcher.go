@@ -33,6 +33,12 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 	if err = f.bw.Write(cmdClusterNodesRawBytes); err != nil {
 		return
 	}
+
+	err = f.br.Read()
+	if err != nil {
+		return
+	}
+
 	reply := &resp{}
 	if err = reply.decode(f.br); err != nil {
 		return
@@ -42,10 +48,11 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 		return
 	}
 	idx := bytes.Index(reply.data, crlfBytes)
-	if idx == -1 {
-		err = ErrBadRequest
-		return
-	}
 	data = reply.data[idx+2:]
 	return
+}
+
+// Close enable to close the conneciton of backend.
+func (f *Fetcher) Close() error {
+	return f.conn.Close()
 }

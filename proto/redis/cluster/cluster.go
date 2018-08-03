@@ -2,12 +2,15 @@ package cluster
 
 import (
 	"bytes"
-	"errors"
+	"overlord/lib/log"
+	libnet "overlord/lib/net"
 	"overlord/proto"
 	"overlord/proto/redis"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const musk = 0x3fff
@@ -22,7 +25,9 @@ type RedisClusterConfig struct {
 	// Cluster Name
 	Cluster string
 	Servers []string
+	HashTag []byte
 
+	NodeConnections int32
 	// ReadTimeout is read timeout config of node connection.
 	ReadTimeout time.Duration
 	// WriteTimeout is write timeout config of node connection.
@@ -41,12 +46,80 @@ type redisClusterExecutor struct {
 
 // StartExecutor will start new redis executor
 func StartExecutor(rcc *RedisClusterConfig) (proto.Executor, error) {
-	return &redisClusterExecutor{}, nil
+	re := &redisClusterExecutor{rcc: rcc}
+	err := re.start()
+	return re, err
 }
 
-func (re *redisClusterExecutor) start(rcc *RedisClusterConfig) error {
-	// servers := rcc.Servers
+func (re *redisClusterExecutor) start() error {
+	re.locker.Lock()
+	defer re.locker.Unlock()
+
+	var (
+		ns   *redis.NodeSlots
+		sm   *slotsMap
+		data []byte
+		err  error
+	)
+
+	for _, server := range re.rcc.Servers {
+		conn := libnet.DialWithTimeout(server, re.rcc.DialTimeout, re.rcc.ReadTimeout, re.rcc.WriteTimeout)
+		f := redis.NewFetcher(conn)
+		data, err = f.Fetch()
+		if err != nil {
+			log.Errorf("failt to start new processIO goroutione of %s", err)
+			continue
+		}
+		ns, err = redis.ParseSlots(data)
+		if err != nil {
+			log.Errorf("failt to parse Cluster Nodes data due %s", err)
+			continue
+		}
+
+		sm = newSlotsMap(ns.GetSlots(), re.rcc.HashTag)
+		break
+	}
+	if sm == nil {
+		panic("all seed nodes fail to connected, shutdown")
+	}
+	re.smap = sm
+
+	nmap := make(map[string]*proto.BatchChan)
+	for _, node := range ns.GetMasters() {
+		nbc := re.startProcess(node)
+		nmap[node] = nbc
+	}
+	re.nodeMap = nmap
+
 	return nil
+}
+
+func (re *redisClusterExecutor) startProcess(addr string) *proto.BatchChan {
+	nbc := proto.NewBatchChan(re.rcc.NodeConnections)
+	count := int(re.rcc.NodeConnections)
+	for i := 0; i < count; i++ {
+		ch := nbc.GetCh(i)
+		nc := newRedisNodeConn(re.rcc, addr)
+		go re.processIO(re.rcc.Cluster, addr, ch, nc)
+	}
+	return nbc
+}
+
+func (re *redisClusterExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	for {
+		mb := <-ch
+		if err := nc.WriteBatch(mb); err != nil {
+			err = errors.Wrap(err, "Cluster batch write")
+			mb.BatchDoneWithError(cluster, addr, err)
+			continue
+		}
+		if err := nc.ReadBatch(mb); err != nil {
+			err = errors.Wrap(err, "Cluster batch read")
+			mb.BatchDoneWithError(cluster, addr, err)
+			continue
+		}
+		mb.BatchDone(cluster, addr)
+	}
 }
 
 // Execute impl proto.Executor

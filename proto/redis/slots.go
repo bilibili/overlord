@@ -13,7 +13,7 @@ const slotsCount = 16384
 
 // errors
 var (
-	ErrAbsentField   = errors.New("node fields is absent")
+	ErrAbsentField   = errors.New("Node fields is absent")
 	ErrEmptyNodeLine = errors.New("empty line of cluster nodes")
 	ErrBadReplyType  = errors.New("bad reply type")
 )
@@ -22,26 +22,8 @@ var (
 	roleSlave  = "slave"
 )
 
-// Slots is the container of all slots.
-type Slots interface {
-	GetSlots() []string
-	GetSlaveSlots() [][]string
-}
-
-// Nodes is the container caontains Nodes.
-type Nodes interface {
-	GetNodes() []Node
-	GetNodeByAddr(addr string) (Node, bool)
-}
-
-// NodeSlots is the export interface of CLUSTER NODES.
-type NodeSlots interface {
-	Slots
-	Nodes
-}
-
 // ParseSlots must be call as "CLSUTER NODES" response
-func ParseSlots(data []byte) (NodeSlots, error) {
+func ParseSlots(data []byte) (*NodeSlots, error) {
 	br := bufio.NewReader(bytes.NewBuffer(data))
 	lines := []string{}
 	for {
@@ -58,10 +40,10 @@ func ParseSlots(data []byte) (NodeSlots, error) {
 			break
 		}
 	}
-	nodes := make(map[string]Node)
+	nodes := make(map[string]*Node)
 	slots := make([]string, slotsCount)
 	slaveSlots := make([][]string, slotsCount)
-	masterIDMap := make(map[string]Node)
+	masterIDMap := make(map[string]*Node)
 	// full fill master slots
 	for _, line := range lines {
 		node, err := parseNode(line)
@@ -92,25 +74,30 @@ func ParseSlots(data []byte) (NodeSlots, error) {
 			}
 		}
 	}
-	return &nodeSlots{nodes: nodes, slots: slots, slaveSlots: slaveSlots}, nil
+	return &NodeSlots{nodes: nodes, slots: slots, slaveSlots: slaveSlots}, nil
 }
 
-type nodeSlots struct {
-	nodes      map[string]Node
+// NodeSlots is the slots map collections.
+type NodeSlots struct {
+	nodes      map[string]*Node
 	slaveSlots [][]string
 	slots      []string
 }
 
-func (ns *nodeSlots) GetSlots() []string {
+// GetSlots will return all the 16384 Slots with Address.
+func (ns *NodeSlots) GetSlots() []string {
 	return ns.slots
 }
 
-func (ns *nodeSlots) GetSlaveSlots() [][]string {
+// GetSlaveSlots returns all slots slaves of 16384 slots.
+// For one-to-many arch, slaves may more than one.
+func (ns *NodeSlots) GetSlaveSlots() [][]string {
 	return ns.slaveSlots
 }
 
-func (ns *nodeSlots) GetNodes() []Node {
-	nodes := make([]Node, len(ns.nodes))
+// GetNodes returns all the Node address of backend.
+func (ns *NodeSlots) GetNodes() []*Node {
+	nodes := make([]*Node, len(ns.nodes))
 	idx := 0
 	for _, val := range ns.nodes {
 		nodes[idx] = val
@@ -119,14 +106,19 @@ func (ns *nodeSlots) GetNodes() []Node {
 	return nodes
 }
 
-func (ns *nodeSlots) GetNodeByAddr(addr string) (Node, bool) {
-	if n, ok := ns.nodes[addr]; ok {
-		return n, true
+// GetMasters return all the Masters address.
+func (ns *NodeSlots) GetMasters() []string {
+	masters := make([]string, 0)
+	for _, node := range ns.GetNodes() {
+		if node.Role() == roleMaster {
+			masters = append(masters, node.Addr())
+		}
 	}
-	return nil, false
+	return masters
 }
 
-type node struct {
+// Node is a struct for each CLUSTER NODES response line.
+type Node struct {
 	// 有别于 runID
 	ID   string
 	addr string
@@ -143,7 +135,7 @@ type node struct {
 	slots       []int
 }
 
-func parseNode(line string) (*node, error) {
+func parseNode(line string) (*Node, error) {
 	if len(strings.TrimSpace(line)) == 0 {
 		return nil, ErrEmptyNodeLine
 	}
@@ -151,7 +143,7 @@ func parseNode(line string) (*node, error) {
 	if len(fields) < 8 {
 		return nil, ErrAbsentField
 	}
-	n := &node{}
+	n := &Node{}
 	n.setID(fields[0])
 	n.setAddr(fields[1])
 	n.setFlags(fields[2])
@@ -164,10 +156,12 @@ func parseNode(line string) (*node, error) {
 	// i++
 	return n, nil
 }
-func (n *node) setID(val string) {
+
+func (n *Node) setID(val string) {
 	n.ID = strings.TrimSpace(val)
 }
-func (n *node) setAddr(val string) {
+
+func (n *Node) setAddr(val string) {
 	trimed := strings.TrimSpace(val)
 	// adaptor with 4.x
 	splited := strings.Split(trimed, "@")
@@ -177,7 +171,8 @@ func (n *node) setAddr(val string) {
 		n.gossipAddr = asp[0] + splited[1]
 	}
 }
-func (n *node) setFlags(val string) {
+
+func (n *Node) setFlags(val string) {
 	flags := strings.Split(val, ",")
 	n.flags = flags
 	if strings.Contains(val, roleMaster) {
@@ -186,34 +181,40 @@ func (n *node) setFlags(val string) {
 		n.role = roleSlave
 	}
 }
-func (n *node) setSlaveOf(val string) {
+
+func (n *Node) setSlaveOf(val string) {
 	n.slaveOf = val
 }
-func (n *node) setPingSent(val string) {
+
+func (n *Node) setPingSent(val string) {
 	ival, err := strconv.Atoi(val)
 	if err != nil {
 		n.pingSent = 0
 	}
 	n.pingSent = ival
 }
-func (n *node) setPongRecv(val string) {
+
+func (n *Node) setPongRecv(val string) {
 	ival, err := strconv.Atoi(val)
 	if err != nil {
 		n.pongRecv = 0
 	}
 	n.pongRecv = ival
 }
-func (n *node) setConfigEpoch(val string) {
+
+func (n *Node) setConfigEpoch(val string) {
 	ival, err := strconv.Atoi(val)
 	if err != nil {
 		n.configEpoch = 0
 	}
 	n.configEpoch = ival
 }
-func (n *node) setLinkState(val string) {
+
+func (n *Node) setLinkState(val string) {
 	n.linkState = val
 }
-func (n *node) setSlots(vals ...string) {
+
+func (n *Node) setSlots(vals ...string) {
 	slots := []int{}
 	for _, val := range vals {
 		subslots, ok := parseSlotField(val)
@@ -224,6 +225,7 @@ func (n *node) setSlots(vals ...string) {
 	//sort.IntSlice(slots).Sort()
 	n.slots = slots
 }
+
 func parseSlotField(val string) ([]int, bool) {
 	if len(val) == 0 || val == "-" {
 		return nil, false
@@ -250,27 +252,28 @@ func parseSlotField(val string) ([]int, bool) {
 	//sort.IntSlice(slots).Sort()
 	return slots, true
 }
-func (n *node) Addr() string {
+
+// Addr is a getter of attribute addr.
+func (n *Node) Addr() string {
 	return n.addr
 }
-func (n *node) Role() string {
+
+// Role is a getter of attribute role.
+func (n *Node) Role() string {
 	return n.role
 }
-func (n *node) SlaveOf() string {
+
+// SlaveOf is a getter of attribute slaveOf.
+func (n *Node) SlaveOf() string {
 	return n.slaveOf
 }
-func (n *node) Flags() []string {
+
+// Flags is a getter of attribute flags.
+func (n *Node) Flags() []string {
 	return n.flags
 }
-func (n *node) Slots() []int {
-	return n.slots
-}
 
-// Node is the interface of single redis node.
-type Node interface {
-	Addr() string
-	Role() string
-	SlaveOf() string
-	Flags() []string
-	Slots() []int
+// Slots is a getter of attribute slots.
+func (n *Node) Slots() []int {
+	return n.slots
 }
