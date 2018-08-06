@@ -14,6 +14,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rc "overlord/proto/redis/cluster"
 )
 
 const (
@@ -60,6 +61,12 @@ func NewCluster(ctx context.Context, cc *ClusterConfig) (c *Cluster) {
 		c.executor = exec
 	} else {
 		log.Info("start to init executor with redis cluster executor")
+		exec, err := rc.StartExecutor(c.cc.AsRedisClusterConfig())
+		if err != nil {
+			log.Errorf("fail to init redis cluster executor %s", err)
+			return
+		}
+		c.executor = exec
 	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	// if c.cc.PingAutoEject {

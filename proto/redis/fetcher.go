@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
+
+	"github.com/pkg/errors"
 )
 
 // Fetcher will execute `CLUSTER NODES` by the given address。
@@ -31,16 +33,24 @@ func NewFetcher(conn *libnet.Conn) *Fetcher {
 // Fetch new CLUSTER NODES result
 func (f *Fetcher) Fetch() (data []byte, err error) {
 	if err = f.bw.Write(cmdClusterNodesRawBytes); err != nil {
+		err = errors.Wrap(err, "while encode.")
+		return
+	}
+
+	if err = f.bw.Flush(); err != nil {
+		err = errors.Wrap(err, "while call writev")
 		return
 	}
 
 	err = f.br.Read()
 	if err != nil {
+		err = errors.Wrap(err, "while call read syscall")
 		return
 	}
 
 	reply := &resp{}
 	if err = reply.decode(f.br); err != nil {
+		err = errors.Wrap(err, "while decode")
 		return
 	}
 	if reply.rTp != respBulk {

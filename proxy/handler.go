@@ -62,7 +62,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		h.pc = memcache.NewProxyConn(h.conn)
 	case proto.CacheTypeMemcacheBinary:
 		h.pc = mcbin.NewProxyConn(h.conn)
-	case proto.CacheTypeRedis:
+	case proto.CacheTypeRedis, proto.CacheTypeRedisCluster:
 		h.pc = redis.NewProxyConn(h.conn)
 	default:
 		panic(proto.ErrNoSupportCacheType)

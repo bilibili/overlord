@@ -2,6 +2,9 @@ package proxy
 
 import (
 	"overlord/proto"
+	rc "overlord/proto/redis/cluster"
+
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -65,6 +68,21 @@ type ClusterConfig struct {
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
 	Servers          []string
+}
+
+// AsRedisClusterConfig convert self into RedisClusterConfig to avoid cycle import.
+func (cc *ClusterConfig) AsRedisClusterConfig() *rc.RedisClusterConfig {
+	return &rc.RedisClusterConfig{
+		Cluster: cc.Name,
+		Servers: cc.Servers,
+		HashTag: []byte(cc.HashTag),
+
+		NodeConnections: cc.NodeConnections,
+
+		ReadTimeout:  time.Millisecond * time.Duration(cc.ReadTimeout),
+		WriteTimeout: time.Millisecond * time.Duration(cc.WriteTimeout),
+		DialTimeout:  time.Millisecond * time.Duration(cc.DialTimeout),
+	}
 }
 
 // Validate validate config field value.

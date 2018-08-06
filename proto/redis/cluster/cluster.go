@@ -28,6 +28,7 @@ type RedisClusterConfig struct {
 	HashTag []byte
 
 	NodeConnections int32
+
 	// ReadTimeout is read timeout config of node connection.
 	ReadTimeout time.Duration
 	// WriteTimeout is write timeout config of node connection.
