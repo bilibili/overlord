@@ -16,3 +16,4 @@
 
 cmd/proxy/proxy
 coverage.txt
+.DS_Store

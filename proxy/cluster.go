@@ -176,7 +176,12 @@ func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
 }
 
 func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	var err error
 	for {
+		if err != nil {
+			log.Error("node conn err %v,create new node conn", err)
+			nc = newNodeConn(c.cc, addr)
+		}
 		var mb *proto.MsgBatch
 		select {
 		case mb = <-ch:
@@ -188,12 +193,12 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 			}
 			return
 		}
-		if err := nc.WriteBatch(mb); err != nil {
+		if err = nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
-		if err := nc.ReadBatch(mb); err != nil {
+		if err = nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
