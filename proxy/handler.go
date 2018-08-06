@@ -78,34 +78,20 @@ func (h *Handler) Handle() {
 	go h.handle()
 }
 
-func (h *Handler) toStr(p []byte) string {
-	h.str.Reset()
-	_, _ = h.str.Write(p)
-	return h.str.String()
-}
-
 func (h *Handler) handle() {
 	var (
-		dc       = make(chan struct{}, 1) // make only 1 buffered channel
-		messages = proto.GetMsgSlice(defaultConcurrent)
+		messages = proto.GetMsgs(defaultConcurrent)
 		// TODO: change timeout by config
-		mba  = proto.NewMsgBatchAllocator(dc, time.Minute)
+		dc   = make(chan struct{}, 1) // make only 1 buffered channel
+		mba  = proto.NewMsgBatchAllocator(dc, time.Second)
 		msgs []*proto.Message
 		err  error
 	)
 
-	defer func() {
-		for _, msg := range msgs {
-			msg.Clear()
-		}
-		mba.Put()
-		h.closeWithError(err)
-	}()
-
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-			// h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
 		if len(msgs) == 0 {
@@ -115,17 +101,20 @@ func (h *Handler) handle() {
 		// 2. send to cluster
 		err = h.cluster.Execute(mba, msgs)
 		if err != nil {
+			h.deferHandle(messages, mba, err)
 			return
 		}
+
 		// 3. wait to done
 		err = mba.Wait()
 		if err != nil {
 			return
 		}
+
 		// 4. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
-				// h.deferHandle(messages, mbatch, err)
+				h.deferHandle(messages, mba, err)
 				return
 			}
 			msg.MarkEnd()
@@ -135,9 +124,10 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
-			// h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
+
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
@@ -148,12 +138,12 @@ func (h *Handler) handle() {
 	}
 }
 
-// func (h *Handler) deferHandle(msgs []*proto.Message, mbs []*proto.MsgBatch, err error) {
-// 	proto.PutMsgs(msgs)
-// 	proto.PutMsgBatchs(mbs)
-// 	h.closeWithError(err)
-// 	return
-// }
+func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocator, err error) {
+	mba.Reset()
+	proto.PutMsgs(msgs)
+	mba.Put()
+	h.closeWithError(err)
+}
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
 	lm := len(msgs)

@@ -141,16 +141,6 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 	m.Done()
 }
 
-// DropMsgBatch put MsgBatch into recycle using pool.
-func DropMsgBatch(m *MsgBatch) {
-	m.buf.Reset()
-	m.msgs = m.msgs[:0]
-	m.count = 0
-	m.dc = nil
-	msgBatchPool.Put(m)
-	m = nil
-}
-
 // MsgBatchAllocator will manage and allocate the msg batches
 type MsgBatchAllocator struct {
 	mbMap   map[string]*MsgBatch
