@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.2.1
+1. fix message and request reuse bug
+
 ## Version 1.2.0
 1. add redis protocol support.
 
