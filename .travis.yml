@@ -7,6 +7,7 @@ go_import_path: overlord
 
 services:
   - memcached
+  - redis
 
 install:
   - go get -u github.com/alecthomas/gometalinter
