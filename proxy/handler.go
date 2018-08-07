@@ -87,11 +87,14 @@ func (h *Handler) handle() {
 		msgs []*proto.Message
 		err  error
 	)
-
+	defer func() {
+		proto.PutMsgs(messages)
+		mba.Put()
+		h.closeWithError(err)
+	}()
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-			h.deferHandle(messages, mba, err)
 			return
 		}
 		if len(msgs) == 0 {
@@ -101,7 +104,6 @@ func (h *Handler) handle() {
 		// 2. send to cluster
 		err = h.cluster.Execute(mba, msgs)
 		if err != nil {
-			h.deferHandle(messages, mba, err)
 			return
 		}
 
@@ -114,7 +116,6 @@ func (h *Handler) handle() {
 		// 4. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
-				h.deferHandle(messages, mba, err)
 				return
 			}
 			msg.MarkEnd()
@@ -124,10 +125,7 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
-			h.deferHandle(messages, mba, err)
-			return
 		}
-
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
@@ -136,13 +134,6 @@ func (h *Handler) handle() {
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
-}
-
-func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocator, err error) {
-	mba.Reset()
-	proto.PutMsgs(msgs)
-	mba.Put()
-	h.closeWithError(err)
 }
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
