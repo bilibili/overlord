@@ -61,6 +61,24 @@ type MsgBatch struct {
 
 	dc    chan struct{}
 	state uint32
+
+	parent *MsgBatch
+}
+
+// Fork for the MsgBatch's done channel.
+func (m *MsgBatch) Fork() *MsgBatch {
+	mb := NewMsgBatch()
+	mb.dc = m.dc
+	// 溯源回到 root 并设置
+	var p = m
+	for {
+		if p.parent == nil {
+			mb.parent = p
+			return mb
+		}
+		p = p.parent
+	}
+
 }
 
 // AddMsg will add new message reference to the buffer
@@ -93,7 +111,16 @@ func (m *MsgBatch) Buffer() *bufio.Buffer {
 
 // Done will set the total batch to done and notify the handler to check it.
 func (m *MsgBatch) Done() {
-	atomic.StoreUint32(&m.state, msgBatchStateDone)
+	// 溯源回到 root 节点设置 done
+	var p = m
+	for {
+		if p.parent == nil {
+			atomic.StoreUint32(&m.state, msgBatchStateDone)
+			break
+		}
+		p = p.parent
+	}
+
 	select {
 	case m.dc <- struct{}{}:
 	default:
@@ -102,9 +129,20 @@ func (m *MsgBatch) Done() {
 
 // Reset will reset all the field as initial value but msgs
 func (m *MsgBatch) Reset() {
-	atomic.StoreUint32(&m.state, msgBatchStateNotReady)
+	// 溯源会到 root 设置 NotReady
+	var p = m
+	for {
+		if p.parent == nil {
+			atomic.StoreUint32(&p.state, msgBatchStateNotReady)
+			break
+		}
+		p = p.parent
+	}
+
+	// atomic.StoreUint32(&m.state, msgBatchStateNotReady)
 	m.count = 0
 	m.buf.Reset()
+	m.parent = nil
 }
 
 // Msgs returns a slice of Msg
@@ -130,7 +168,7 @@ func (m *MsgBatch) BatchDone(cluster, addr string) {
 // BatchDoneWithError will set done with error and report prom ErrIncr.
 func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 	for _, msg := range m.Msgs() {
-		msg.DoneWithError(err)
+		msg.SetError(err)
 		if log.V(1) {
 			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
 		}

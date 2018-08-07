@@ -180,6 +180,9 @@ type Request struct {
 	resp  *resp
 	reply *resp
 	mType mergeType
+
+	isAsk    bool
+	Redirect *RedirectInfo
 }
 
 var reqPool = &sync.Pool{
@@ -194,7 +197,7 @@ func getReq() *Request {
 }
 
 func newReq() *Request {
-	r := &Request{}
+	r := &Request{isAsk: false}
 	r.resp = &resp{}
 	r.reply = &resp{}
 	return r
@@ -247,7 +250,7 @@ func (r *Request) isSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	return bytes.Index(reqReadCmdsBytes, r.resp.array[0].data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.array[0].data) > -1
+	return bytes.Contains(reqReadCmdsBytes, r.resp.array[0].data) || bytes.Contains(reqWriteCmdsBytes, r.resp.array[0].data)
 }
 
 // isCtl is control command.
@@ -255,5 +258,5 @@ func (r *Request) isCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	return bytes.Index(reqCtlCmdsBytes, r.resp.array[0].data) > -1
+	return bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
 }

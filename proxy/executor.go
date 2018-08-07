@@ -103,7 +103,7 @@ func (de *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.M
 			for _, subm := range m.Batch() {
 				addr, ok := de.getNode(subm.Request().Key())
 				if !ok {
-					m.DoneWithError(ErrProxyFail)
+					m.SetError(ErrProxyFail)
 					return ErrProxyFail
 				}
 				mba.AddMsg(addr, subm)
@@ -111,7 +111,7 @@ func (de *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.M
 		} else {
 			addr, ok := de.getNode(m.Request().Key())
 			if !ok {
-				m.DoneWithError(ErrProxyFail)
+				m.SetError(ErrProxyFail)
 				return ErrProxyFail
 			}
 			mba.AddMsg(addr, m)

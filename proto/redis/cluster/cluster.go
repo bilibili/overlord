@@ -114,13 +114,48 @@ func (re *redisClusterExecutor) processIO(cluster, addr string, ch <-chan *proto
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
 		}
-		if err := nc.ReadBatch(mb); err != nil {
+		err := nc.ReadBatch(mb)
+		if err == redis.ErrRedirect {
+			re.redirect(mb)
+			continue
+		} else if err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
 		}
+
 		mb.BatchDone(cluster, addr)
 	}
+}
+
+func (re *redisClusterExecutor) redirect(mb *proto.MsgBatch) {
+	redirectMap := make(map[string]*proto.MsgBatch)
+	for _, m := range mb.Msgs() {
+		req, _ := m.Request().(*redis.Request)
+		if req.Redirect != nil {
+			if !req.Redirect.IsAsk {
+				// is moved
+				re.locker.Lock()
+				re.smap.slots[req.Redirect.Slot] = req.Redirect.Addr
+				re.locker.Unlock()
+			}
+
+			// todo set and execute
+			if smb, ok := redirectMap[req.Redirect.Addr]; ok {
+				smb.AddMsg(m)
+			} else {
+				smb := mb.Fork()
+				smb.AddMsg(m)
+				redirectMap[req.Redirect.Addr] = smb
+			}
+		}
+	}
+
+	re.locker.Lock()
+	for node, mb := range redirectMap {
+		re.deliver(node, mb)
+	}
+	re.locker.Unlock()
 }
 
 // Execute impl proto.Executor
@@ -147,6 +182,16 @@ func (re *redisClusterExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*pr
 	}
 
 	return nil
+}
+
+func (re *redisClusterExecutor) deliver(node string, mb *proto.MsgBatch) {
+	if ch, ok := re.nodeMap[node]; ok {
+		ch.Push(mb)
+	} else {
+		ch := re.startProcess(node)
+		ch.Push(mb)
+		re.nodeMap[node] = ch
+	}
 }
 
 func (re *redisClusterExecutor) getMaster(key []byte) string {

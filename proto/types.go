@@ -45,6 +45,11 @@ type NodeConn interface {
 	Close() error
 }
 
+// RedisClusterNodeConn handle Msg to backend cache server and read response.
+type RedisClusterNodeConn interface {
+	NodeConn
+}
+
 // Executor is the interface for backend run and execute the messages.
 type Executor interface {
 	Execute(mba *MsgBatchAllocator, msgs []*Message) error

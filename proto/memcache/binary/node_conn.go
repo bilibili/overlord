@@ -67,7 +67,7 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		}
 		err = n.write(m)
 		if err != nil {
-			m.DoneWithError(err)
+			m.SetError(err)
 			return err
 		}
 		m.MarkWrite()
