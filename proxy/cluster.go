@@ -179,14 +179,16 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 	var err error
 	for {
 		if err != nil {
-			log.Error("node conn err %v,create new node conn", err)
-			nc = newNodeConn(c.cc, addr)
+			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
+				log.Errorf("node conn err %v,create new node conn", err)
+				nc = newNodeConn(c.cc, addr)
+			}
 		}
 		var mb *proto.MsgBatch
 		select {
 		case mb = <-ch:
 		case <-c.ctx.Done():
-			if err := nc.Close(); err != nil {
+			if err = nc.Close(); err != nil {
 				if log.V(1) {
 					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
 				}
