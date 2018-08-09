@@ -3,6 +3,7 @@ package redis
 import (
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,6 +31,6 @@ func TestFetcherWithBadResponse(t *testing.T) {
 	fetcher = NewFetcher(conn)
 	_, err = fetcher.Fetch()
 	if assert.Error(t, err) {
-		assert.Equal(t, ErrBadRequest, err)
+		assert.Equal(t, ErrBadRequest, errors.Cause(err))
 	}
 }
