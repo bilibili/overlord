@@ -98,6 +98,7 @@ func (h *Handler) handle() {
 		// 4. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
+				h.pc.Flush()
 				h.deferHandle(messages, mbatch, err)
 				return
 			}

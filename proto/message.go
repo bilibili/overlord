@@ -197,10 +197,18 @@ func (m *Message) Batch() []*Message {
 	}
 	return m.subs[:slen]
 }
-
+	
 // Err returns error.
 func (m *Message) Err() error {
-	return m.err
+	if m.err != nil {
+		return m.err
+	}
+	for _, s := range m.subs {
+		if s.err != nil {
+			return s.err
+		}
+	}
+	return nil
 }
 
 // ErrMessage return err Msg.
