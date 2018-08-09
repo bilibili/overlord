@@ -230,19 +230,32 @@ func parseSlotField(val string) ([]int, bool) {
 	if len(val) == 0 || val == "-" {
 		return nil, false
 	}
-	// TODO: check for migrating state
-	// if strings.Contains(val, "->-") {
-	// } else if strings.Contains(val, "-<-") {
-	// }
+
+	// for slot field: `[15495->-9a44630c1dbbf7c116e90f21d1746198d3a1305a]`
+	// we ignore for slots which is IMPORTING.
+	if strings.HasPrefix(val, "[") && strings.HasSuffix(val, "]") {
+		if strings.Contains(val, "->-") {
+			// MIGRATING, slots need store in there
+			vsp := strings.SplitN(val, "->-", 2)
+			slot, err := strconv.Atoi(vsp[0])
+			if err != nil {
+				return nil, false
+			}
+			return []int{slot}, true
+		}
+		return nil, false
+	}
 
 	vsp := strings.SplitN(val, "-", 2)
 	begin, err := strconv.Atoi(vsp[0])
 	if err != nil {
 		return nil, false
 	}
+	// for slot field: 15495
 	if len(vsp) == 1 {
 		return []int{begin}, true
 	}
+	// for slot field: 0-1902
 	end, err := strconv.Atoi(vsp[1])
 	if err != nil {
 		return nil, false

@@ -10,10 +10,15 @@ import (
 	"sync"
 	"time"
 
+	"math"
+
 	"github.com/pkg/errors"
 )
 
-const musk = 0x3fff
+const (
+	musk           = 0x3fff
+	crc16NoneValue = math.MaxUint16
+)
 
 // errors
 var (
@@ -35,6 +40,9 @@ type RedisClusterConfig struct {
 	WriteTimeout time.Duration
 	// DialTimeout is dial timeout config of node connection.
 	DialTimeout time.Duration
+
+	// FetchInterval is the duration for each fetch of overlord, default is 10 minutes.
+	FetchInterval time.Duration
 }
 
 type redisClusterExecutor struct {
@@ -50,6 +58,48 @@ func StartExecutor(rcc *RedisClusterConfig) (proto.Executor, error) {
 	re := &redisClusterExecutor{rcc: rcc}
 	err := re.start()
 	return re, err
+}
+
+func (re *redisClusterExecutor) tryFetch() (err error) {
+	var (
+		data []byte
+		ns   *redis.NodeSlots
+	)
+	for _, server := range re.rcc.Servers {
+		conn := libnet.DialWithTimeout(server, re.rcc.DialTimeout, re.rcc.ReadTimeout, re.rcc.WriteTimeout)
+		f := redis.NewFetcher(conn)
+		data, err = f.Fetch()
+		if err != nil {
+			log.Errorf("fail to fetch due to %s", err)
+			continue
+		}
+
+		ns, err = redis.ParseSlots(data)
+		if err != nil {
+			log.Errorf("fail to parse Cluster Nodes data due %s", err)
+			continue
+		}
+
+		sm := newSlotsMap(ns.GetSlots(), re.rcc.HashTag)
+		re.locker.Lock()
+		if sm.crc != re.smap.crc {
+			log.Info("update slotsMap due to crc flag is not the the same.")
+			re.smap = sm
+		}
+		re.locker.Unlock()
+	}
+	return
+}
+
+func (re *redisClusterExecutor) processFetch() {
+	var err error
+	for {
+		err = re.tryFetch()
+		if err != nil {
+			log.Errorf("fail to fetch for cluster %s with seeds %s", re.rcc.Cluster, re.rcc.Servers)
+		}
+		time.Sleep(re.rcc.FetchInterval)
+	}
 }
 
 func (re *redisClusterExecutor) start() error {
@@ -91,7 +141,8 @@ func (re *redisClusterExecutor) start() error {
 		nmap[node] = nbc
 	}
 	re.nodeMap = nmap
-
+	// Start Fetch process
+	go re.processFetch()
 	return nil
 }
 
@@ -137,7 +188,7 @@ func (re *redisClusterExecutor) redirect(mb *proto.MsgBatch) {
 				// is moved
 				re.locker.Lock()
 				re.smap.slots[req.Redirect.Slot] = req.Redirect.Addr
-				re.smap.crc = 0
+				re.smap.crc = crc16NoneValue
 				re.locker.Unlock()
 			}
 
@@ -211,13 +262,17 @@ type slotsMap struct {
 }
 
 func newSlotsMap(slots []string, hashTag []byte) *slotsMap {
-	s := &slotsMap{slots: slots, hashTag: hashTag}
+	s := &slotsMap{slots: slots, hashTag: hashTag, crc: crc16NoneValue}
+	s.calcCrc()
+	return s
+}
+
+func (sm *slotsMap) calcCrc() {
 	sb := new(strings.Builder)
-	for _, addr := range slots {
+	for _, addr := range sm.slots {
 		_, _ = sb.WriteString(addr)
 	}
-	s.crc = Crc16([]byte(sb.String()))
-	return s
+	sm.crc = Crc16([]byte(sb.String())) & musk
 }
 
 func (sm *slotsMap) getMaster(key []byte) string {
