@@ -99,6 +99,12 @@ func (de *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.M
 	defer de.locker.RUnlock()
 
 	for _, m := range msgs {
+		if m.Err() != nil {
+			// skip to dispatch with error commands
+			mba.Done()
+			continue
+		}
+
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
 				addr, ok := de.getNode(subm.Request().Key())

@@ -230,6 +230,11 @@ func parseSlotField(val string) ([]int, bool) {
 	if len(val) == 0 || val == "-" {
 		return nil, false
 	}
+	// TODO: check for migrating state
+	// if strings.Contains(val, "->-") {
+	// } else if strings.Contains(val, "-<-") {
+	// }
+
 	vsp := strings.SplitN(val, "-", 2)
 	begin, err := strconv.Atoi(vsp[0])
 	if err != nil {

@@ -121,6 +121,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 				return
 			}
 		}
+		req.Redirect = nil
 
 		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
 			nc.br.AdvanceTo(begin)
@@ -140,6 +141,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			if err != nil {
 				return
 			}
+			redirectFlag = true
 		}
 		now = nc.br.Mark()
 		i++

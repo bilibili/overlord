@@ -42,24 +42,30 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 		return
 	}
 
-	err = f.br.Read()
-	if err != nil {
-		err = errors.Wrap(err, "while call read syscall")
-		return
-	}
+	for {
+		err = f.br.Read()
+		if err != nil {
+			err = errors.Wrap(err, "while call read syscall")
+			return
+		}
 
-	reply := &resp{}
-	if err = reply.decode(f.br); err != nil {
-		err = errors.Wrap(err, "while decode")
+		reply := &resp{}
+		if err = reply.decode(f.br); err == bufio.ErrBufferFull {
+			continue
+		} else if err != nil {
+			err = errors.Wrap(err, "while decode")
+			return
+		}
+
+		if reply.rTp != respBulk {
+			err = ErrBadReplyType
+			return
+		}
+
+		idx := bytes.Index(reply.data, crlfBytes)
+		data = reply.data[idx+2:]
 		return
 	}
-	if reply.rTp != respBulk {
-		err = ErrBadReplyType
-		return
-	}
-	idx := bytes.Index(reply.data, crlfBytes)
-	data = reply.data[idx+2:]
-	return
 }
 
 // Close enable to close the conneciton of backend.

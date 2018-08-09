@@ -68,12 +68,12 @@ func (re *redisClusterExecutor) start() error {
 		f := redis.NewFetcher(conn)
 		data, err = f.Fetch()
 		if err != nil {
-			log.Errorf("failt to start new processIO goroutione of %s", err)
+			log.Errorf("fail to start new processIO goroutione of %s", err)
 			continue
 		}
 		ns, err = redis.ParseSlots(data)
 		if err != nil {
-			log.Errorf("failt to parse Cluster Nodes data due %s", err)
+			log.Errorf("fail to parse Cluster Nodes data due %s", err)
 			continue
 		}
 
@@ -137,10 +137,10 @@ func (re *redisClusterExecutor) redirect(mb *proto.MsgBatch) {
 				// is moved
 				re.locker.Lock()
 				re.smap.slots[req.Redirect.Slot] = req.Redirect.Addr
+				re.smap.crc = 0
 				re.locker.Unlock()
 			}
 
-			// todo set and execute
 			if smb, ok := redirectMap[req.Redirect.Addr]; ok {
 				smb.AddMsg(m)
 			} else {
@@ -151,19 +151,20 @@ func (re *redisClusterExecutor) redirect(mb *proto.MsgBatch) {
 		}
 	}
 
-	re.locker.Lock()
 	for node, mb := range redirectMap {
 		re.deliver(node, mb)
 	}
-	re.locker.Unlock()
 }
 
 // Execute impl proto.Executor
 func (re *redisClusterExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) (err error) {
-	re.locker.RLock()
-	defer re.locker.RUnlock()
-
 	for _, m := range msgs {
+		if m.Err() != nil {
+			// skip to dispatch with error commands
+			mba.Done()
+			continue
+		}
+
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
 				node := re.getMaster(subm.Request().Key())
@@ -177,7 +178,7 @@ func (re *redisClusterExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*pr
 
 	for node, mb := range mba.MsgBatchs() {
 		if mb.Count() > 0 {
-			re.nodeMap[node].Push(mb)
+			re.deliver(node, mb)
 		}
 	}
 
@@ -185,17 +186,22 @@ func (re *redisClusterExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*pr
 }
 
 func (re *redisClusterExecutor) deliver(node string, mb *proto.MsgBatch) {
+	re.locker.Lock()
 	if ch, ok := re.nodeMap[node]; ok {
 		ch.Push(mb)
 	} else {
 		ch := re.startProcess(node)
-		ch.Push(mb)
 		re.nodeMap[node] = ch
+		ch.Push(mb)
 	}
+	re.locker.Unlock()
 }
 
-func (re *redisClusterExecutor) getMaster(key []byte) string {
-	return re.smap.getMaster(key)
+func (re *redisClusterExecutor) getMaster(key []byte) (master string) {
+	re.locker.RLock()
+	master = re.smap.getMaster(key)
+	re.locker.RUnlock()
+	return
 }
 
 type slotsMap struct {

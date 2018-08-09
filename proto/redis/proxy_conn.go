@@ -132,6 +132,9 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	} else {
 		r := nextReq(m)
 		r.resp.copy(pc.resp)
+		if !r.isSupport() {
+			m.SetError(ErrNotSupportReq)
+		}
 	}
 	return
 }

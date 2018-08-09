@@ -159,9 +159,10 @@ var (
 
 // errors
 var (
-	ErrBadAssert  = errs.New("bad assert for redis")
-	ErrBadCount   = errs.New("bad count number")
-	ErrBadRequest = errs.New("bad request")
+	ErrBadAssert     = errs.New("bad assert for redis")
+	ErrBadCount      = errs.New("bad count number")
+	ErrBadRequest    = errs.New("bad request")
+	ErrNotSupportReq = errs.New("not supported request")
 )
 
 // mergeType is used to decript the merge operation.
@@ -242,6 +243,7 @@ func (r *Request) Put() {
 	r.resp.reset()
 	r.reply.reset()
 	r.mType = mergeTypeNo
+	r.Redirect = nil
 	reqPool.Put(r)
 }
 

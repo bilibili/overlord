@@ -18,6 +18,8 @@ const (
 	defaultMsgBatchSize = 2
 )
 
+const maxRetryTimes = 8
+
 const (
 	msgBatchStateNotReady = uint32(0)
 	msgBatchStateDone     = uint32(1)
@@ -115,7 +117,7 @@ func (m *MsgBatch) Done() {
 	var p = m
 	for {
 		if p.parent == nil {
-			atomic.StoreUint32(&m.state, msgBatchStateDone)
+			atomic.StoreUint32(&p.state, msgBatchStateDone)
 			break
 		}
 		p = p.parent
@@ -129,17 +131,9 @@ func (m *MsgBatch) Done() {
 
 // Reset will reset all the field as initial value but msgs
 func (m *MsgBatch) Reset() {
-	// 溯源会到 root 设置 NotReady
-	var p = m
-	for {
-		if p.parent == nil {
-			atomic.StoreUint32(&p.state, msgBatchStateNotReady)
-			break
-		}
-		p = p.parent
-	}
-
+	// never reset sub mb. let them fuck
 	// atomic.StoreUint32(&m.state, msgBatchStateNotReady)
+	atomic.StoreUint32(&m.state, msgBatchStateNotReady)
 	m.count = 0
 	m.buf.Reset()
 	m.parent = nil
@@ -220,7 +214,19 @@ func (m *MsgBatchAllocator) MsgBatchs() map[string]*MsgBatch {
 func (m *MsgBatchAllocator) Wait() error {
 	mbLen := len(m.mbMap)
 	to := time.After(m.timeout)
-	for i := 0; i < mbLen; i++ {
+	if mbLen == 0 {
+		select {
+		case <-m.dc:
+			if m.checkAllDone() {
+				return nil
+			}
+			return ErrMaxRetryReached
+		case <-to:
+			return ErrTimeout
+		}
+	}
+
+	for i := 0; i < mbLen+maxRetryTimes; i++ {
 		select {
 		case <-m.dc:
 			if m.checkAllDone() {
@@ -248,10 +254,20 @@ func (m *MsgBatchAllocator) Put() {
 	}
 }
 
+// Done will knock the done channel for errors command.
+func (m *MsgBatchAllocator) Done() {
+	select {
+	case m.dc <- struct{}{}:
+	default:
+	}
+}
+
 func (m *MsgBatchAllocator) checkAllDone() bool {
 	for _, mb := range m.MsgBatchs() {
-		if !mb.IsDone() {
-			return false
+		if mb.Count() > 0 {
+			if !mb.IsDone() {
+				return false
+			}
 		}
 	}
 	return true
