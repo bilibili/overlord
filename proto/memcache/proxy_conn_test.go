@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"overlord/proto"
@@ -194,4 +195,24 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			assert.Equal(t, tt.Except, string(buf[:size]))
 		})
 	}
+}
+
+func TestEncodeErr(t *testing.T) {
+	msg := proto.NewMessage()
+	msg.DoneWithError(fmt.Errorf("SERVER_ERR"))
+	conn := _createConn(nil)
+	p := NewProxyConn(conn)
+	err := p.Encode(msg)
+	assert.Error(t, err)
+	msg = proto.NewMessage()
+	msg.Type = proto.CacheTypeMemcache
+	msg.WithRequest(&mockReq{})
+	err = p.Encode(msg)
+	assert.NoError(t, err)
+	p.Flush()
+	c := conn.Conn.(*mockConn)
+	buf := make([]byte, 1024)
+	size, err := c.wbuf.Read(buf)
+	assert.NoError(t, err)
+	assert.Contains(t, string(buf[:size]), "SERVER_ERR")
 }

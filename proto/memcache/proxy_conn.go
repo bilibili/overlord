@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"fmt"
 
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
@@ -350,6 +351,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	} else {
 		var bs []byte
 		reqs := m.Requests()
+		fmt.Println("reqs", reqs)
 		for _, req := range reqs {
 			mcr, ok := req.(*MCRequest)
 			if !ok {
