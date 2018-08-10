@@ -179,10 +179,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 	var err error
 	for {
 		if err != nil {
-			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				log.Errorf("node conn err %v,create new node conn", err)
-				nc = newNodeConn(c.cc, addr)
-			}
+			nc = newNodeConn(c.cc, addr)
 		}
 		var mb *proto.MsgBatch
 		select {
