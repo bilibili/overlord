@@ -1,4 +1,7 @@
 # Overlord
+## Version 1.2.2
+1.fix batchdone err
+2.add node reconn 
 
 ## Version 1.2.1
 1. fix message and request reuse bug
