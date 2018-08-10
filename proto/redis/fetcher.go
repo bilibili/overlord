@@ -2,10 +2,8 @@ package redis
 
 import (
 	"bytes"
-	"fmt"
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
-	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -47,8 +45,6 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 	begin := f.br.Mark()
 	for {
 		err = f.br.Read()
-		fmt.Println("buffer:", len(f.br.Buffer().Bytes()), strconv.Quote(string(f.br.Buffer().Bytes())))
-		fmt.Println()
 		if err != nil {
 			err = errors.Wrap(err, "while call read syscall")
 			return
