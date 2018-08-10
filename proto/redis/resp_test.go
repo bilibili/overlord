@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"errors"
 	"testing"
 
 	"overlord/lib/bufio"
@@ -8,45 +9,60 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var _errNone = errors.New("error unknonw")
+
 func TestRespDecode(t *testing.T) {
 	ts := []struct {
-		Name       string
-		Bytes      []byte
-		ExpectTp   respType
-		ExpectLen  int
-		ExpectData []byte
-		ExpectArr  [][]byte
+		Name              string
+		Bytes             []byte
+		ExpectTp          respType
+		ExpectLen         int
+		ExpectData        []byte
+		ExpectArr         [][]byte
+		ExpectDecodeError error
 	}{
 		{
-			Name:       "ok",
+			Name:       "StringOk",
 			Bytes:      []byte("+OK\r\n"),
 			ExpectTp:   respString,
 			ExpectLen:  0,
 			ExpectData: []byte("OK"),
 		},
 		{
-			Name:       "error",
+			Name:       "ErrorOk",
 			Bytes:      []byte("-Error message\r\n"),
 			ExpectTp:   respError,
 			ExpectLen:  0,
 			ExpectData: []byte("Error message"),
 		},
 		{
-			Name:       "int",
+			Name:       "IntOk",
 			Bytes:      []byte(":1000\r\n"),
 			ExpectTp:   respInt,
 			ExpectLen:  0,
 			ExpectData: []byte("1000"),
 		},
 		{
-			Name:       "bulk",
+			Name:       "BulkOk",
 			Bytes:      []byte("$6\r\nfoobar\r\n"),
 			ExpectTp:   respBulk,
 			ExpectLen:  0,
 			ExpectData: []byte("6\r\nfoobar"),
 		},
 		{
-			Name:       "array1",
+			Name:              "BulkBadLenOk",
+			Bytes:             []byte("$abdce\r\nfoobar\r\n"),
+			ExpectDecodeError: _errNone,
+		},
+		{
+			Name:       "BulkNullOk",
+			Bytes:      []byte("$-1\r\n"),
+			ExpectTp:   respBulk,
+			ExpectLen:  0,
+			ExpectData: nil,
+		},
+		{
+			Name:       "ArrayWith2BulkOk",
 			Bytes:      []byte("*2\r\n$3\r\nfoo\r\n$4\r\nbara\r\n"),
 			ExpectTp:   respArray,
 			ExpectLen:  2,
@@ -57,7 +73,19 @@ func TestRespDecode(t *testing.T) {
 			},
 		},
 		{
-			Name:       "array2",
+			Name:       "ArrayNullOk",
+			Bytes:      []byte("*-1\r\n"),
+			ExpectTp:   respArray,
+			ExpectLen:  0,
+			ExpectData: nil,
+		},
+		{
+			Name:              "ArrayBadLenError",
+			Bytes:             []byte("*boynextdoor\r\n"),
+			ExpectDecodeError: _errNone,
+		},
+		{
+			Name:       "ArrayWtih3IntOk",
 			Bytes:      []byte("*3\r\n:1\r\n:2\r\n:3\r\n"),
 			ExpectTp:   respArray,
 			ExpectLen:  3,
@@ -69,7 +97,7 @@ func TestRespDecode(t *testing.T) {
 			},
 		},
 		{
-			Name:       "array3",
+			Name:       "ArrayRecursiveOk",
 			Bytes:      []byte("*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n"),
 			ExpectTp:   respArray,
 			ExpectLen:  2,
@@ -88,7 +116,15 @@ func TestRespDecode(t *testing.T) {
 			br := bufio.NewReader(conn, bufio.Get(1024))
 			br.Read()
 			if err := r.decode(br); err != nil {
-				t.Fatalf("decode error:%v", err)
+				if tt.ExpectDecodeError == _errNone {
+					return
+				}
+				if tt.ExpectDecodeError != nil {
+					assert.Equal(t, tt.ExpectDecodeError, err)
+					return
+				} else {
+					t.Fatalf("decode error:%v", err)
+				}
 			}
 			assert.Equal(t, tt.ExpectTp, r.rTp)
 			assert.Equal(t, tt.ExpectLen, r.arrayn)
@@ -109,7 +145,7 @@ func TestRespEncode(t *testing.T) {
 		Expect []byte
 	}{
 		{
-			Name: "ok",
+			Name: "RespStringOk",
 			Resp: &resp{
 				rTp:  respString,
 				data: []byte("OK"),
@@ -117,7 +153,7 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte("+OK\r\n"),
 		},
 		{
-			Name: "error",
+			Name: "RespErrorOk",
 			Resp: &resp{
 				rTp:  respError,
 				data: []byte("Error message"),
@@ -125,7 +161,7 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte("-Error message\r\n"),
 		},
 		{
-			Name: "int",
+			Name: "RespIntOk",
 			Resp: &resp{
 				rTp:  respInt,
 				data: []byte("1000"),
@@ -133,7 +169,7 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte(":1000\r\n"),
 		},
 		{
-			Name: "bulk",
+			Name: "BulkOk",
 			Resp: &resp{
 				rTp:  respBulk,
 				data: []byte("6\r\nfoobar"),
@@ -141,7 +177,15 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte("$6\r\nfoobar\r\n"),
 		},
 		{
-			Name: "array1",
+			Name: "NullBulkOk",
+			Resp: &resp{
+				rTp:  respBulk,
+				data: []byte(""),
+			},
+			Expect: []byte("$-1\r\n"),
+		},
+		{
+			Name: "RespArrayAsCommandOk",
 			Resp: &resp{
 				rTp:  respArray,
 				data: []byte("2"),
@@ -160,7 +204,17 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte("*2\r\n$3\r\nfoo\r\n$4\r\nbara\r\n"),
 		},
 		{
-			Name: "array2",
+			Name: "RespArrayNullOk",
+			Resp: &resp{
+				rTp:    respArray,
+				data:   []byte(""),
+				array:  []*resp{},
+				arrayn: 0,
+			},
+			Expect: []byte("*-1\r\n"),
+		},
+		{
+			Name: "RespArrayWith3IntOk",
 			Resp: &resp{
 				rTp:  respArray,
 				data: []byte("3"),
@@ -183,7 +237,7 @@ func TestRespEncode(t *testing.T) {
 			Expect: []byte("*3\r\n:1\r\n:2\r\n:3\r\n"),
 		},
 		{
-			Name: "array3",
+			Name: "RespArrayRecursiveOk",
 			Resp: &resp{
 				rTp:  respArray,
 				data: []byte("2"),

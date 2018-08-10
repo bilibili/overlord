@@ -15,7 +15,7 @@ type BatchChan struct {
 func NewBatchChan(n int32) *BatchChan {
 	chs := make([]chan *MsgBatch, n)
 	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *MsgBatch, 1)
+		chs[i] = make(chan *MsgBatch, 1024)
 	}
 	return &BatchChan{cnt: n, chs: chs}
 }

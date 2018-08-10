@@ -2,8 +2,10 @@ package redis
 
 import (
 	"bytes"
+	"fmt"
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
+	"strconv"
 
 	"github.com/pkg/errors"
 )
@@ -42,8 +44,11 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 		return
 	}
 
+	begin := f.br.Mark()
 	for {
 		err = f.br.Read()
+		fmt.Println("buffer:", len(f.br.Buffer().Bytes()), strconv.Quote(string(f.br.Buffer().Bytes())))
+		fmt.Println()
 		if err != nil {
 			err = errors.Wrap(err, "while call read syscall")
 			return
@@ -51,6 +56,7 @@ func (f *Fetcher) Fetch() (data []byte, err error) {
 
 		reply := &resp{}
 		if err = reply.decode(f.br); err == bufio.ErrBufferFull {
+			f.br.AdvanceTo(begin)
 			continue
 		} else if err != nil {
 			err = errors.Wrap(err, "while decode")

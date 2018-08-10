@@ -144,4 +144,18 @@ func TestParseSlotsOk(t *testing.T) {
 	assert.Len(t, s.GetSlots(), 16384)
 	assert.Len(t, s.GetSlaveSlots(), 16384)
 	assert.Len(t, s.GetNodes(), 6)
+	assert.Len(t, s.GetMasters(), 3)
+}
+
+var clusterNodesMigratingData = `[10922->-91240f5f82621d91d55b02d3bc1dcd1852dc42dd]`
+var clusterNodesImportingData = `[10922-<-ec433a34a97e09fc9c22dd4b4a301e2bca6602e0]`
+
+func TestClusterParseSlotFieldWithMigratingAndImporting(t *testing.T) {
+	migSlots, ok := parseSlotField(clusterNodesMigratingData)
+	assert.True(t, ok)
+	assert.Len(t, migSlots, 1)
+
+	impo, ok := parseSlotField(clusterNodesImportingData)
+	assert.False(t, ok)
+	assert.Len(t, impo, 0)
 }

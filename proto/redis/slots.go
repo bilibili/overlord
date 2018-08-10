@@ -237,7 +237,7 @@ func parseSlotField(val string) ([]int, bool) {
 		if strings.Contains(val, "->-") {
 			// MIGRATING, slots need store in there
 			vsp := strings.SplitN(val, "->-", 2)
-			slot, err := strconv.Atoi(vsp[0])
+			slot, err := strconv.Atoi(strings.TrimLeft(vsp[0], "["))
 			if err != nil {
 				return nil, false
 			}
