@@ -68,13 +68,27 @@ ec433a34a97e09fc9c22dd4b4a301e2bca6602e0 172.17.0.2:7001@17001 master - 0 152825
 a063bbdc2c4abdc60e09fdf1934dc8c8fb2d69df 172.17.0.2:7003@17003 slave a8f85c7b9a2e2cd24dda7a60f34fd889b61c9c00 0 1528252310506 4 connected
 a8f85c7b9a2e2cd24dda7a60f34fd889b61c9c00 172.17.0.2:7000@17000 myself,master - 0 1528252310000 1 connected 0-5460`
 
-func TestRedisCLusterExecutorDoFetchOk(t *testing.T) {
+func _createRData() string {
 	sb := new(strings.Builder)
 	sb.WriteString("$")
 	sb.WriteString(fmt.Sprintf("%d\r\n", len(clusterNodesData)))
 	sb.WriteString(clusterNodesData)
 	sb.WriteString("\r\n")
+	return sb.String()
+}
+
+func TestRedisCLusterExecutorDoFetchOk(t *testing.T) {
+	data := _createRData()
 	rc := &redisClusterExecutor{rcc: _testRCC, smap: &slotsMap{crc: crc16NoneValue}}
-	err := rc.doFetch(redis.NewFetcher(_createConn([]byte(sb.String()))))
+	err := rc.doFetch(redis.NewFetcher(_createConn([]byte(data))))
 	assert.NoError(t, err)
+}
+
+func TestRedisClusterGetMaster(t *testing.T) {
+	data := _createRData()
+	rc := &redisClusterExecutor{rcc: _testRCC, smap: &slotsMap{crc: crc16NoneValue}}
+	err := rc.doFetch(redis.NewFetcher(_createConn([]byte(data))))
+	assert.NoError(t, err)
+	node := rc.getMaster([]byte("a"))
+	assert.Equal(t, "172.17.0.2:7002", node)
 }
