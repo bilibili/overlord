@@ -318,7 +318,7 @@ func TestRedisClusterWithAssert(t *testing.T) {
 			Except: []string{"+OK\r\n"},
 		},
 		{Name: "MgetOk", Line: 1, Cmd: "*4\r\n$4\r\nMGET\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n", Except: []string{
-			""}},
+			"*3\r\n$5\r\nval-a\r\n$5\r\nval-b\r\n$5\r\nval-c\r\n"}},
 
 		// {Name: "GetMultiMissOneOk", Line: 5, Cmd: "get a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1\r\n1\r\n", "VALUE a_22 0 4\r\nhalo\r\n", "END\r\n"}},
 		// {Name: "GetsOneOk", Line: 3, Cmd: "gets a_11\r\n", Except: []string{"VALUE a_11 0 1 ", "\r\n1\r\nEND\r\n"}},
