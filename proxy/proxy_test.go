@@ -59,6 +59,45 @@ var (
 				// "127.0.0.1:11213:10",
 			},
 		},
+
+		&proxy.ClusterConfig{
+			Name:             "redis-hash-cluster",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("redis"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:21213",
+			RedisAuth:        "",
+			DialTimeout:      100,
+			ReadTimeout:      100,
+			NodeConnections:  10,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
+			Servers: []string{
+				"127.0.0.1:6379:10",
+			},
+		},
+
+		&proxy.ClusterConfig{
+			Name:            "redis-cluster-cluster",
+			HashTag:         "{}",
+			CacheType:       proto.CacheType("redis_cluster"),
+			ListenProto:     "tcp",
+			ListenAddr:      "127.0.0.1:21214",
+			RedisAuth:       "",
+			DialTimeout:     100,
+			ReadTimeout:     100,
+			NodeConnections: 10,
+			WriteTimeout:    1000,
+			PingFailLimit:   3,
+			PingAutoEject:   false,
+			FetchInterval:   1000,
+			Servers: []string{
+				"127.0.0.1:7000",
+			},
+		},
 	}
 
 	cmds = [][]byte{
@@ -206,14 +245,14 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 	}
 }
 
-func TestProxyFull(t *testing.T) {
+func TestMCProxyFull(t *testing.T) {
 	// for i := 0; i < 10; i++ {
 	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-	// testCmdBin(t, cmdBins[0], cmdBins[1])
+	testCmdBin(t, cmdBins[0], cmdBins[1])
 	// }
 }
 
-func TestProxyWithAssert(t *testing.T) {
+func TestMCProxyWithAssert(t *testing.T) {
 	ts := []struct {
 		Name   string
 		Cmd    string
@@ -262,6 +301,63 @@ func TestProxyWithAssert(t *testing.T) {
 		}
 		nc.Close()
 	}
+}
+
+func TestRedisClusterWithAssert(t *testing.T) {
+	ts := []struct {
+		Name   string
+		Cmd    string
+		Line   int
+		Except []string
+	}{
+
+		{Name: "SetLowerOk", Line: 1, Cmd: "*3\r\n$3\r\nset\r\n$1\r\na\r\n$5\r\nval-a\r\n", Except: []string{"+OK\r\n"}},
+
+		{Name: "MSetLowerOk", Line: 1,
+			Cmd:    "*5\r\n$4\r\nmset\r\n$1\r\nb\r\n$5\r\nval-b\r\n$1\r\nc\r\n$4\r\n1024\r\n",
+			Except: []string{"+OK\r\n"},
+		},
+		{Name: "MgetOk", Line: 1, Cmd: "*4\r\n$4\r\nMGET\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n", Except: []string{
+			""}},
+
+		// {Name: "GetMultiMissOneOk", Line: 5, Cmd: "get a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1\r\n1\r\n", "VALUE a_22 0 4\r\nhalo\r\n", "END\r\n"}},
+		// {Name: "GetsOneOk", Line: 3, Cmd: "gets a_11\r\n", Except: []string{"VALUE a_11 0 1 ", "\r\n1\r\nEND\r\n"}},
+		// {Name: "GetMultiCasMissOneOk", Line: 5, Cmd: "gets a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "VALUE a_22 0 4", "\r\nhalo\r\n", "END\r\n"}},
+		// {Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
+	}
+
+	for i := 0; i < 10; i++ {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:21214", time.Second)
+		if err != nil {
+			t.Errorf("net dial error:%v", err)
+		}
+		nc := libnet.NewConn(conn, time.Second, time.Second)
+		br := bufio.NewReader(nc)
+		for _, tt := range ts {
+			t.Run(tt.Name, func(t *testing.T) {
+				size, err := conn.Write([]byte(tt.Cmd))
+				assert.NoError(t, err)
+				assert.Equal(t, len(tt.Cmd), size)
+
+				buf := make([]byte, 0)
+				for i := 0; i < tt.Line; i++ {
+					data, err := br.ReadBytes('\n')
+					assert.NoError(t, err)
+					buf = append(buf, data...)
+				}
+				sb := string(buf)
+				if len(tt.Except) == 1 {
+					assert.Equal(t, sb, tt.Except[0], "CMD:%s", tt.Cmd)
+				} else {
+					for _, except := range tt.Except {
+						assert.Contains(t, sb, except, "CMD:%s", tt.Cmd)
+					}
+				}
+			})
+		}
+		nc.Close()
+	}
+
 }
 
 func BenchmarkCmdSet(b *testing.B) {

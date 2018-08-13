@@ -7,11 +7,12 @@ go_import_path: overlord
 
 services:
   - memcached
+  - redis-server
 
 install:
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
-
+  - make travis-install
 script:
   - gometalinter --vendor --disable-all --enable=gosimple --enable=golint --enable=vet --enable=ineffassign --enable=unconvert \
     --exclude="by other packages, and that stutters; consider calling this" \
@@ -19,7 +20,7 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
-  - ./codecov.sh
+  - make travis-run
   - cd cmd/proxy
   - go build
 
