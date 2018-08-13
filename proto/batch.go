@@ -76,7 +76,7 @@ func (m *MsgBatch) Count() int {
 	return m.count
 }
 
-// Nth will get the given positon, if not , nil will be return
+// Nth will get the given position, if not , nil will be return
 func (m *MsgBatch) Nth(i int) *Message {
 	if i < m.count {
 		return m.msgs[i]
