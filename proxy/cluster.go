@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	errs "errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -146,10 +147,20 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 		if msg.IsBatch() {
 			for _, sub := range msg.Batch() {
 				bidx = c.calculateBatchIndex(sub.Request().Key())
+				if bidx == -1 {
+					log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
+					msg.DoneWithError(fmt.Errorf("no avaliable node"))
+					return
+				}
 				mbs[bidx].AddMsg(sub)
 			}
 		} else {
 			bidx = c.calculateBatchIndex(msg.Request().Key())
+			if bidx == -1 {
+				log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
+				msg.DoneWithError(fmt.Errorf("no avaliable node"))
+				return
+			}
 			mbs[bidx].AddMsg(msg)
 		}
 	}
@@ -179,6 +190,7 @@ func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc prot
 	var err error
 	for {
 		if err != nil {
+			nc.Close()
 			nc = newNodeConn(c.cc, addr)
 		}
 		var mb *proto.MsgBatch
