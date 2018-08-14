@@ -133,6 +133,8 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 		}
 		return -1
 	}
+	fmt.Println("node", node)
+
 	if c.alias {
 		return c.aliasMap[node]
 	}
