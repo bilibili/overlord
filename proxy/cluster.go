@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	errs "errors"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -27,6 +26,7 @@ import (
 var (
 	ErrClusterServerFormat = errs.New("cluster servers format error")
 	ErrClusterHashNoNode   = errs.New("cluster hash no hit node")
+	ErrNotAvaiableNode     = errs.New("no avaliable node")
 )
 
 type pinger struct {
@@ -133,7 +133,6 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 		}
 		return -1
 	}
-	fmt.Println("node", node)
 
 	if c.alias {
 		return c.aliasMap[node]
@@ -151,7 +150,7 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 				bidx = c.calculateBatchIndex(sub.Request().Key())
 				if bidx == -1 {
 					log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
-					msg.DoneWithError(fmt.Errorf("no avaliable node"))
+					msg.DoneWithError(ErrNotAvaiableNode)
 					return
 				}
 				mbs[bidx].AddMsg(sub)
@@ -160,7 +159,7 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 			bidx = c.calculateBatchIndex(msg.Request().Key())
 			if bidx == -1 {
 				log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
-				msg.DoneWithError(fmt.Errorf("no avaliable node"))
+				msg.DoneWithError(ErrNotAvaiableNode)
 				return
 			}
 			mbs[bidx].AddMsg(msg)
