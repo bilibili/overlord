@@ -2,10 +2,15 @@ package proxy
 
 import (
 	"overlord/proto"
+	rc "overlord/proto/redis/cluster"
+
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 )
+
+const defaultFetchInterval = time.Duration(30) * time.Minute
 
 // Config proxy config.
 type Config struct {
@@ -64,7 +69,30 @@ type ClusterConfig struct {
 	NodeConnections  int32           `toml:"node_connections"`
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
-	Servers          []string
+	// FetchInterval is only for redis using
+	FetchInterval int `toml:"fetch_interval"`
+	Servers       []string
+}
+
+// AsRedisClusterConfig convert self into RedisClusterConfig to avoid cycle import.
+func (cc *ClusterConfig) AsRedisClusterConfig() *rc.RedisClusterConfig {
+	var fi = defaultFetchInterval
+	if cc.FetchInterval != 0 {
+		fi = time.Millisecond * time.Duration(cc.FetchInterval)
+	}
+
+	return &rc.RedisClusterConfig{
+		Cluster: cc.Name,
+		Servers: cc.Servers,
+		HashTag: []byte(cc.HashTag),
+
+		NodeConnections: cc.NodeConnections,
+
+		ReadTimeout:   time.Millisecond * time.Duration(cc.ReadTimeout),
+		WriteTimeout:  time.Millisecond * time.Duration(cc.WriteTimeout),
+		DialTimeout:   time.Millisecond * time.Duration(cc.DialTimeout),
+		FetchInterval: fi,
+	}
 }
 
 // Validate validate config field value.

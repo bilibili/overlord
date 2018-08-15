@@ -14,6 +14,28 @@ const (
 	closed = uint32(1)
 )
 
+var (
+	reqAskResp = &resp{
+		rTp:  respArray,
+		data: []byte("1"),
+		array: []*resp{
+			&resp{
+				rTp:    respBulk,
+				data:   []byte("6\r\nASKING"),
+				array:  nil,
+				arrayn: 0,
+			},
+		},
+		arrayn: 1,
+	}
+
+	ignoreReply = &resp{
+		data:   []byte{},
+		array:  []*resp{},
+		arrayn: 0,
+	}
+)
+
 type nodeConn struct {
 	cluster string
 	addr    string
@@ -44,16 +66,23 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 
 func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	for _, m := range mb.Msgs() {
+
 		req, ok := m.Request().(*Request)
 		if !ok {
-			m.DoneWithError(ErrBadAssert)
+			m.SetError(ErrBadAssert)
 			return ErrBadAssert
 		}
 		if !req.isSupport() || req.isCtl() {
 			continue
 		}
+		if req.Redirect != nil && req.Redirect.IsAsk {
+			if err = reqAskResp.encode(nc.bw); err != nil {
+				m.SetError(err)
+				return
+			}
+		}
 		if err = req.resp.encode(nc.bw); err != nil {
-			m.DoneWithError(err)
+			m.SetError(err)
 			return err
 		}
 		m.MarkWrite()
@@ -66,6 +95,8 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	defer nc.br.ResetBuffer(nil)
 	begin := nc.br.Mark()
 	now := nc.br.Mark()
+	redirectFlag := false
+
 	for i := 0; i < mb.Count(); {
 		m := mb.Nth(i)
 		req, ok := m.Request().(*Request)
@@ -76,6 +107,22 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			i++
 			continue
 		}
+
+		// if isAsk, an ask command will be send into backend
+		if req.Redirect != nil && req.Redirect.IsAsk {
+			if err = ignoreReply.decode(nc.br); err == bufio.ErrBufferFull {
+				nc.br.AdvanceTo(begin)
+				if err = nc.br.Read(); err != nil {
+					return
+				}
+				nc.br.AdvanceTo(now)
+				continue
+			} else if err != nil {
+				return
+			}
+		}
+		req.Redirect = nil
+
 		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
 			nc.br.AdvanceTo(begin)
 			if err = nc.br.Read(); err != nil {
@@ -87,8 +134,21 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			return
 		}
 		m.MarkRead()
+
+		// check if this call is redirect
+		if isRedirect(req.reply) {
+			req.Redirect, err = parseRedirectInfo(req.reply.data)
+			if err != nil {
+				return
+			}
+			redirectFlag = true
+		}
 		now = nc.br.Mark()
 		i++
+	}
+
+	if redirectFlag {
+		err = ErrRedirect
 	}
 	return
 }

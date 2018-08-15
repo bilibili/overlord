@@ -208,7 +208,7 @@ def delete_all(rc, keys):
 def run(i):
     keys = gen_items("keys-%04d" % (i, ), 501)
     vals = gen_items("vals-%04d" % (i, ), 60)
-    rc = StrictRedis(host=host, port=port)
+    rc = StrictRedis(host=host, port=port, socket_timeout=2)
     fake = FakeStrictRedis()
     cmds_list = list(gen_cmds(fake, rc, keys, vals))
     check(cmds_list)

@@ -122,8 +122,8 @@ func (m *Message) MarkEnd() {
 	m.et = time.Now()
 }
 
-// DoneWithError done with error.
-func (m *Message) DoneWithError(err error) {
+// SetError sets the message with given error
+func (m *Message) SetError(err error) {
 	m.err = err
 }
 

@@ -60,7 +60,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 		h.pc = memcache.NewProxyConn(h.conn)
 	case proto.CacheTypeMemcacheBinary:
 		h.pc = mcbin.NewProxyConn(h.conn)
-	case proto.CacheTypeRedis:
+	case proto.CacheTypeRedis, proto.CacheTypeRedisCluster:
 		h.pc = redis.NewProxyConn(h.conn)
 	default:
 		panic(proto.ErrNoSupportCacheType)
@@ -79,26 +79,40 @@ func (h *Handler) Handle() {
 func (h *Handler) handle() {
 	var (
 		messages = proto.GetMsgs(defaultConcurrent)
-		mbatch   = proto.GetMsgBatchs(len(h.cluster.nodeMap))
-		msgs     []*proto.Message
-		err      error
+		// TODO: change timeout by config
+		dc   = make(chan struct{}, 1) // make only 1 buffered channel
+		mba  = proto.NewMsgBatchAllocator(dc, time.Second)
+		msgs []*proto.Message
+		err  error
 	)
+
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-			h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
+		if len(msgs) == 0 {
+			continue
+		}
+
 		// 2. send to cluster
-		h.cluster.DispatchBatch(mbatch, msgs)
+		err = h.cluster.Execute(mba, msgs)
+		if err != nil {
+			h.deferHandle(messages, mba, err)
+			return
+		}
+
 		// 3. wait to done
-		for _, mb := range mbatch {
-			mb.Wait()
+		err = mba.Wait()
+		if err != nil {
+			h.deferHandle(messages, mba, err)
+			return
 		}
 		// 4. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
-				h.deferHandle(messages, mbatch, err)
+				h.deferHandle(messages, mba, err)
 				return
 			}
 			msg.MarkEnd()
@@ -108,26 +122,25 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
-			h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
+
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}
-		for _, mb := range mbatch {
-			mb.Reset()
-		}
+		mba.Reset()
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
 }
 
-func (h *Handler) deferHandle(msgs []*proto.Message, mbs []*proto.MsgBatch, err error) {
+func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocator, err error) {
+	mba.Reset()
 	proto.PutMsgs(msgs)
-	proto.PutMsgBatchs(mbs)
+	mba.Put()
 	h.closeWithError(err)
-	return
 }
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
