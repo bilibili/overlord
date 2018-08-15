@@ -63,7 +63,7 @@ func StartExecutor(rcc *RedisClusterConfig) (proto.Executor, error) {
 func (re *redisClusterExecutor) doFetch(f *redis.Fetcher) (err error) {
 	var (
 		data []byte
-		ns   *redis.NodeSlots
+		ns   *nodeSlots
 	)
 
 	data, err = f.Fetch()
@@ -72,13 +72,13 @@ func (re *redisClusterExecutor) doFetch(f *redis.Fetcher) (err error) {
 		return
 	}
 
-	ns, err = redis.ParseSlots(data)
+	ns, err = parseSlots(data)
 	if err != nil {
 		log.Errorf("fail to parse Cluster Nodes data due %s", err)
 		return
 	}
 
-	sm := newSlotsMap(ns.GetSlots(), re.rcc.HashTag)
+	sm := newSlotsMap(ns.slots, re.rcc.HashTag)
 	re.locker.Lock()
 	if sm.crc != re.smap.crc {
 		log.Info("update slotsMap due to crc flag is not the the same.")
@@ -116,7 +116,7 @@ func (re *redisClusterExecutor) start() error {
 	defer re.locker.Unlock()
 
 	var (
-		ns   *redis.NodeSlots
+		ns   *nodeSlots
 		sm   *slotsMap
 		data []byte
 		err  error
@@ -130,13 +130,13 @@ func (re *redisClusterExecutor) start() error {
 			log.Errorf("fail to start new processIO goroutione of %s", err)
 			continue
 		}
-		ns, err = redis.ParseSlots(data)
+		ns, err = parseSlots(data)
 		if err != nil {
 			log.Errorf("fail to parse Cluster Nodes data due %s", err)
 			continue
 		}
 
-		sm = newSlotsMap(ns.GetSlots(), re.rcc.HashTag)
+		sm = newSlotsMap(ns.slots, re.rcc.HashTag)
 		break
 	}
 	if sm == nil {
@@ -145,7 +145,7 @@ func (re *redisClusterExecutor) start() error {
 	re.smap = sm
 
 	nmap := make(map[string]*proto.BatchChan)
-	for _, node := range ns.GetMasters() {
+	for _, node := range ns.getMasters() {
 		nbc := re.startProcess(node)
 		nmap[node] = nbc
 	}

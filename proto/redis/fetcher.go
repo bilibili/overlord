@@ -17,6 +17,7 @@ type Fetcher struct {
 
 var (
 	cmdClusterNodesRawBytes = []byte("*2\r\n$7\r\nCLUSTER\r\n$5\r\nNODES\r\n")
+	ErrBadReplyType         = errors.New("bad reply type")
 )
 
 // NewFetcher will create new Fetcher
