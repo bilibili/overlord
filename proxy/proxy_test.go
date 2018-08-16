@@ -296,10 +296,10 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 
 func TestProxyFull(t *testing.T) {
 	// for i := 0; i < 10; i++ {
-	// testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
-	// testCmdRedis(t, cmdRedis...)
+	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
+	testCmdRedis(t, cmdRedis...)
 	testCmdNotAvaliabeNode(t, cmdRedis[1])
-	// testCmdBin(t, cmdBins[0], cmdBins[1])
+	testCmdBin(t, cmdBins[0], cmdBins[1])
 	// }
 }
 
