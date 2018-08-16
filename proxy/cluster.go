@@ -26,6 +26,7 @@ import (
 var (
 	ErrClusterServerFormat = errs.New("cluster servers format error")
 	ErrClusterHashNoNode   = errs.New("cluster hash no hit node")
+	ErrNotAvaiableNode     = errs.New("no avaliable node")
 )
 
 type pinger struct {
@@ -132,6 +133,7 @@ func (c *Cluster) calculateBatchIndex(key []byte) int {
 		}
 		return -1
 	}
+
 	if c.alias {
 		return c.aliasMap[node]
 	}
@@ -146,10 +148,20 @@ func (c *Cluster) DispatchBatch(mbs []*proto.MsgBatch, slice []*proto.Message) {
 		if msg.IsBatch() {
 			for _, sub := range msg.Batch() {
 				bidx = c.calculateBatchIndex(sub.Request().Key())
+				if bidx == -1 {
+					log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
+					msg.DoneWithError(ErrNotAvaiableNode)
+					return
+				}
 				mbs[bidx].AddMsg(sub)
 			}
 		} else {
 			bidx = c.calculateBatchIndex(msg.Request().Key())
+			if bidx == -1 {
+				log.Errorf("cluster (%s) has not avaliable node ", c.cc.Name)
+				msg.DoneWithError(ErrNotAvaiableNode)
+				return
+			}
 			mbs[bidx].AddMsg(msg)
 		}
 	}
@@ -176,24 +188,29 @@ func (c *Cluster) processBatch(nbc *batchChanel, addr string) {
 }
 
 func (c *Cluster) processBatchIO(addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	var err error
 	for {
+		if err != nil {
+			nc.Close()
+			nc = newNodeConn(c.cc, addr)
+		}
 		var mb *proto.MsgBatch
 		select {
 		case mb = <-ch:
 		case <-c.ctx.Done():
-			if err := nc.Close(); err != nil {
+			if err = nc.Close(); err != nil {
 				if log.V(1) {
 					log.Errorf("Cluster(%s) addr(%s) cancel with context", c.cc.Name, addr)
 				}
 			}
 			return
 		}
-		if err := nc.WriteBatch(mb); err != nil {
+		if err = nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue
 		}
-		if err := nc.ReadBatch(mb); err != nil {
+		if err = nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(c.cc.Name, addr, err)
 			continue

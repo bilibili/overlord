@@ -149,6 +149,10 @@ func nextReq(m *proto.Message) *Request {
 
 func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
+		se := errors.Cause(err).Error()
+		pc.bw.Write(respErrorBytes)
+		pc.bw.Write([]byte(se))
+		pc.bw.Write(crlfBytes)
 		return
 	}
 	req, ok := m.Request().(*Request)

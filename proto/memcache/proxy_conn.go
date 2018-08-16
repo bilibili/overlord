@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"bytes"
-	"strings"
 
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
@@ -343,9 +342,7 @@ func revSpacIdx(bs []byte) int {
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
-		if !strings.HasPrefix(se, errorPrefix) && !strings.HasPrefix(se, clientErrorPrefix) && !strings.HasPrefix(se, serverErrorPrefix) { // NOTE: the mc error protocol
-			_ = p.bw.Write(serverErrorBytes)
-		}
+		_ = p.bw.Write(serverErrorBytes)
 		_ = p.bw.Write([]byte(se))
 		_ = p.bw.Write(crlfBytes)
 	} else {
