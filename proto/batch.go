@@ -11,6 +11,70 @@ import (
 	"github.com/pkg/errors"
 )
 
+var msgBatchAllocPool = &sync.Pool{
+	New: func() interface{} {
+		return &MsgBatchAllocator{
+			mbMap: make(map[string]*MsgBatch),
+			wg:    &sync.WaitGroup{},
+		}
+	},
+}
+
+// GetMsgBatchAllocator get mb batch allocate.
+func GetMsgBatchAllocator() *MsgBatchAllocator {
+	return msgBatchAllocPool.Get().(*MsgBatchAllocator)
+}
+
+// PutMsgBatchAllocator all the resource back into pool
+func PutMsgBatchAllocator(mba *MsgBatchAllocator) {
+	for addr, mb := range mba.mbMap {
+		mb.Reset()
+		mb.msgs = nil
+		mb.wg = nil
+		delete(mba.mbMap, addr)
+		msgBatchPool.Put(mb)
+	}
+	msgBatchAllocPool.Put(mba)
+}
+
+// MsgBatchAllocator will manage and allocate the msg batches
+type MsgBatchAllocator struct {
+	mbMap map[string]*MsgBatch
+	wg    *sync.WaitGroup
+}
+
+// MsgBatchs will return the self mbMap for iterator
+func (m *MsgBatchAllocator) MsgBatchs() map[string]*MsgBatch {
+	return m.mbMap
+}
+
+// AddMsg will add new msg and create a new batch if node not exists.
+func (m *MsgBatchAllocator) AddMsg(node string, msg *Message) {
+	if mb, ok := m.mbMap[node]; ok {
+		mb.AddMsg(msg)
+	} else {
+		mb := NewMsgBatch()
+		mb.wg = m.wg
+		mb.AddMsg(msg)
+		m.mbMap[node] = mb
+		// wait group add one MsgBatch!!!
+		m.wg.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
+	}
+}
+
+// Wait waits until all the message was done
+func (m *MsgBatchAllocator) Wait() {
+	m.wg.Wait()
+}
+
+// Reset inner MsgBatchs
+func (m *MsgBatchAllocator) Reset() {
+	for addr, mb := range m.mbMap {
+		mb.Reset()
+		delete(m.mbMap, addr)
+	}
+}
+
 const (
 	defaultRespBufSize  = 1024
 	defaultMsgBatchSize = 2
@@ -23,28 +87,6 @@ var msgBatchPool = &sync.Pool{
 			buf:  bufio.Get(defaultRespBufSize),
 		}
 	},
-}
-
-// GetMsgBatchs returns new slice of msgs
-func GetMsgBatchs(n int) []*MsgBatch {
-	wg := &sync.WaitGroup{}
-	mbs := make([]*MsgBatch, n)
-	for i := 0; i < n; i++ {
-		mbs[i] = NewMsgBatch()
-		mbs[i].wg = wg
-	}
-	return mbs
-}
-
-// PutMsgBatchs put MsgBatchs into recycle using pool.
-func PutMsgBatchs(mbs []*MsgBatch) {
-	for _, mb := range mbs {
-		mb.buf.Reset()
-		mb.msgs = nil
-		mb.count = 0
-		mb.wg = nil
-		msgBatchPool.Put(mb)
-	}
 }
 
 // NewMsgBatch will get msg from pool
@@ -76,7 +118,7 @@ func (m *MsgBatch) Count() int {
 	return m.count
 }
 
-// Nth will get the given position, if not , nil will be return
+// Nth will get the given position, if not, nil will be return
 func (m *MsgBatch) Nth(i int) *Message {
 	if i < m.count {
 		return m.msgs[i]
@@ -95,21 +137,6 @@ func (m *MsgBatch) Reset() {
 	m.buf.Reset()
 }
 
-// Add adds n for WaitGroup
-func (m *MsgBatch) Add(n int) {
-	m.wg.Add(n)
-}
-
-// Done will set the total batch to done and notify the handler to check it.
-func (m *MsgBatch) Done() {
-	m.wg.Done()
-}
-
-// Wait waits until all the message was done
-func (m *MsgBatch) Wait() {
-	m.wg.Wait()
-}
-
 // Msgs returns a slice of Msg
 func (m *MsgBatch) Msgs() []*Message {
 	return m.msgs[:m.count]
@@ -122,13 +149,15 @@ func (m *MsgBatch) BatchDone(cluster, addr string) {
 			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 		}
 	}
-	m.Done()
+	if m.wg != nil {
+		m.wg.Done()
+	}
 }
 
 // BatchDoneWithError will set done with error and report prom ErrIncr.
 func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 	for _, msg := range m.Msgs() {
-		msg.DoneWithError(err)
+		msg.WithError(err)
 		if log.V(1) {
 			log.Errorf("cluster(%s) Msg(%s) cluster process handle error:%+v", cluster, msg.Request().Key(), err)
 		}
@@ -136,5 +165,7 @@ func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
 			prom.ErrIncr(cluster, addr, msg.Request().CmdString(), errors.Cause(err).Error())
 		}
 	}
-	m.Done()
+	if m.wg != nil {
+		m.wg.Done()
+	}
 }

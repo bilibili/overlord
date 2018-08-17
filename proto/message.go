@@ -122,8 +122,8 @@ func (m *Message) MarkEnd() {
 	m.et = time.Now()
 }
 
-// DoneWithError done with error.
-func (m *Message) DoneWithError(err error) {
+// WithError with error.
+func (m *Message) WithError(err error) {
 	m.err = err
 }
 
@@ -197,7 +197,7 @@ func (m *Message) Batch() []*Message {
 	}
 	return m.subs[:slen]
 }
-	
+
 // Err returns error.
 func (m *Message) Err() error {
 	if m.err != nil {

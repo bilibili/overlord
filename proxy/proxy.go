@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	errs "errors"
 	"sync"
 	"sync/atomic"
@@ -24,13 +23,10 @@ var (
 
 // Proxy is proxy.
 type Proxy struct {
-	c *Config
+	c   *Config
+	ccs []*ClusterConfig
 
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	ccs      []*ClusterConfig
-	clusters map[string]*Cluster
+	exectors map[string]proto.Executor
 	once     sync.Once
 
 	conns int32
@@ -47,7 +43,6 @@ func New(c *Config) (p *Proxy, err error) {
 	}
 	p = &Proxy{}
 	p.c = c
-	p.ctx, p.cancel = context.WithCancel(context.Background())
 	return
 }
 
@@ -55,8 +50,7 @@ func New(c *Config) (p *Proxy, err error) {
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
 		p.ccs = ccs
-		p.clusters = map[string]*Cluster{}
-
+		p.exectors = map[string]proto.Executor{}
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
@@ -67,9 +61,9 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 }
 
 func (p *Proxy) serve(cc *ClusterConfig) {
-	cluster := NewCluster(p.ctx, cc)
+	executor := NewExecutor(cc)
 	p.lock.Lock()
-	p.clusters[cc.Name] = cluster
+	p.exectors[cc.Name] = executor
 	p.lock.Unlock()
 	// listen
 	l, err := Listen(cc.ListenProto, cc.ListenAddr)
@@ -108,7 +102,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				continue
 			}
 		}
-		NewHandler(p.ctx, p.c, conn, cluster).Handle()
+		NewHandler(p, cc, conn, executor).Handle()
 	}
 }
 
@@ -119,9 +113,8 @@ func (p *Proxy) Close() error {
 	if p.closed {
 		return nil
 	}
-	p.cancel()
-	for _, cluster := range p.clusters {
-		_ = cluster.Close()
+	for _, executor := range p.exectors {
+		executor.Close()
 	}
 	return nil
 }

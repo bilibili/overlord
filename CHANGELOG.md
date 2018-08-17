@@ -1,17 +1,22 @@
 # Overlord
+
+## Version 1.3.0
+1. add executor interface.
+2. add pinger interface.
+
 ## Version 1.2.2
-1.fix batchdone err
-2.add node reconn 
+1. fix batchdone err.
+2. add node reconn.
 
 ## Version 1.2.1
-1. fix message and request reuse bug
+1. fix message and request reuse bug.
 
 ## Version 1.2.0
 1. add redis protocol support.
 
 ## Version 1.1.0
 1. add memcache binary protocol support.
-2. add conf file check
+2. add conf file check.
 
 ## Version 1.0.0
 1. compitable consist hash with twemproxy.

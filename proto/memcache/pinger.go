@@ -6,6 +6,7 @@ import (
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
+	"overlord/proto"
 
 	"github.com/pkg/errors"
 )
@@ -26,7 +27,8 @@ type mcPinger struct {
 	closed int32
 }
 
-func newMCPinger(nc *libnet.Conn) *mcPinger {
+// NewPinger new pinger.
+func NewPinger(nc *libnet.Conn) proto.Pinger {
 	return &mcPinger{
 		conn: nc,
 		bw:   bufio.NewWriter(nc),

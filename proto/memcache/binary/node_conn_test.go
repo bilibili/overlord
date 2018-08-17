@@ -2,7 +2,6 @@ package binary
 
 import (
 	"encoding/binary"
-	"io"
 	"net"
 	"testing"
 	"time"
@@ -19,10 +18,9 @@ func _createNodeConn(data []byte) *nodeConn {
 	nc := &nodeConn{
 		cluster: "clusterA",
 		addr:    "127.0.0.1:5000",
+		conn:    conn,
 		bw:      bufio.NewWriter(conn),
 		br:      bufio.NewReader(conn, nil),
-		pinger:  newMCPinger(conn),
-		conn:    conn,
 	}
 	return nc
 }
@@ -234,16 +232,6 @@ func TestNodeConnAssertError(t *testing.T) {
 	batch.AddMsg(req)
 	err := nc.ReadBatch(batch)
 	_causeEqual(t, ErrAssertReq, err)
-}
-
-func TestNocdConnPingOk(t *testing.T) {
-	nc := _createNodeConn(pongBs)
-	err := nc.Ping()
-	assert.NoError(t, err)
-	assert.NoError(t, nc.Close())
-	err = nc.Ping()
-	assert.Error(t, err)
-	_causeEqual(t, io.EOF, err)
 }
 
 func TestNewNodeConnWithClosedBinder(t *testing.T) {

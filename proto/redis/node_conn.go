@@ -21,8 +21,6 @@ type nodeConn struct {
 	bw      *bufio.Writer
 	br      *bufio.Reader
 	state   uint32
-
-	p *pinger
 }
 
 // NewNodeConn create the node conn from proxy to redis
@@ -35,10 +33,9 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	return &nodeConn{
 		cluster: cluster,
 		addr:    addr,
+		conn:    conn,
 		br:      bufio.NewReader(conn, nil),
 		bw:      bufio.NewWriter(conn),
-		conn:    conn,
-		p:       newPinger(conn),
 	}
 }
 
@@ -46,14 +43,14 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	for _, m := range mb.Msgs() {
 		req, ok := m.Request().(*Request)
 		if !ok {
-			m.DoneWithError(ErrBadAssert)
+			m.WithError(ErrBadAssert)
 			return ErrBadAssert
 		}
 		if !req.isSupport() || req.isCtl() {
 			continue
 		}
 		if err = req.resp.encode(nc.bw); err != nil {
-			m.DoneWithError(err)
+			m.WithError(err)
 			return err
 		}
 		m.MarkWrite()
@@ -91,10 +88,6 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		i++
 	}
 	return
-}
-
-func (nc *nodeConn) Ping() (err error) {
-	return nc.p.ping()
 }
 
 func (nc *nodeConn) Close() (err error) {

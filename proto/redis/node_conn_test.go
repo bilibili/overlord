@@ -102,12 +102,6 @@ func TestReadBatchWithNilError(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func TestPingOk(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createRepeatConn(pongBytes, 1))
-	err := nc.Ping()
-	assert.NoError(t, err)
-}
-
 func newRequest(cmd string, args ...string) *Request {
 	respObj := &resp{}
 	respObj.array = append(respObj.array, newresp(respBulk, []byte(fmt.Sprintf("%d\r\n%s", len(cmd), cmd))))
@@ -126,9 +120,8 @@ func newRequest(cmd string, args ...string) *Request {
 		reply: &resp{},
 	}
 }
+
 func getMergeType(cmd []byte) mergeType {
-	// fmt.Println("mtype :", strconv.Quote(string(cmd)))
-	// TODO: impl with tire tree to search quickly
 	if bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdGetBytes) {
 		return mergeTypeJoin
 	}

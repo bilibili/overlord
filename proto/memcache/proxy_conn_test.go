@@ -199,7 +199,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 
 func TestEncodeErr(t *testing.T) {
 	msg := proto.NewMessage()
-	msg.DoneWithError(fmt.Errorf("SERVER_ERR"))
+	msg.WithError(fmt.Errorf("SERVER_ERR"))
 	conn := _createConn(nil)
 	p := NewProxyConn(conn)
 	err := p.Encode(msg)

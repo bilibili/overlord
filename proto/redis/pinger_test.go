@@ -10,28 +10,28 @@ import (
 
 func TestPingerPingOk(t *testing.T) {
 	conn := _createConn(pongBytes)
-	p := newPinger(conn)
-	err := p.ping()
+	p := NewPinger(conn)
+	err := p.Ping()
 	assert.NoError(t, err)
 }
 
 func TestPingerClosed(t *testing.T) {
 	conn := _createRepeatConn(pongBytes, 10)
-	p := newPinger(conn)
+	p := NewPinger(conn)
 	assert.NoError(t, p.Close())
-	err := p.ping()
+	err := p.Ping()
 	assert.Equal(t, ErrPingClosed, err)
 	assert.NoError(t, p.Close())
 }
 
 func TestPingerWrongResp(t *testing.T) {
 	conn := _createConn([]byte("-Error: iam more than 7 bytes\r\n"))
-	p := newPinger(conn)
-	err := p.ping()
+	p := NewPinger(conn)
+	err := p.Ping()
 	assert.Equal(t, bufio.ErrBufferFull, err)
 
 	conn = _createConn([]byte("-Err\r\n"))
-	p = newPinger(conn)
-	err = p.ping()
+	p = NewPinger(conn)
+	err = p.Ping()
 	assert.Equal(t, ErrBadPong, err)
 }

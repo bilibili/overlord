@@ -10,7 +10,7 @@ var (
 )
 
 // CacheType memcache or redis
-type CacheType string
+type CacheType = string
 
 // Cache type: memcache or redis.
 const (
@@ -39,7 +39,17 @@ type ProxyConn interface {
 type NodeConn interface {
 	WriteBatch(*MsgBatch) error
 	ReadBatch(*MsgBatch) error
+	Close() error
+}
 
+// Pinger for executor ping node.
+type Pinger interface {
 	Ping() error
+	Close() error
+}
+
+// Executor is the interface for backend run and execute the messages.
+type Executor interface {
+	Execute(mba *MsgBatchAllocator, msgs []*Message) error
 	Close() error
 }

@@ -11,7 +11,7 @@ import (
 
 func TestPingerPingOk(t *testing.T) {
 	conn := _createConn(pongBs)
-	pinger := newMCPinger(conn)
+	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
 	assert.NoError(t, err)
@@ -19,7 +19,7 @@ func TestPingerPingOk(t *testing.T) {
 
 func TestPingerPingEOF(t *testing.T) {
 	conn := _createConn(pongBs)
-	pinger := newMCPinger(conn)
+	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
 	assert.NoError(t, err)
@@ -33,7 +33,7 @@ func TestPingerPingEOF(t *testing.T) {
 
 func TestPingerPing100Ok(t *testing.T) {
 	conn := _createRepeatConn(pongBs, 100)
-	pinger := newMCPinger(conn)
+	pinger := NewPinger(conn)
 
 	for i := 0; i < 100; i++ {
 		err := pinger.Ping()
@@ -47,7 +47,7 @@ func TestPingerPing100Ok(t *testing.T) {
 
 func TestPingerClosed(t *testing.T) {
 	conn := _createRepeatConn(pongBs, 100)
-	pinger := newMCPinger(conn)
+	pinger := NewPinger(conn)
 	err := pinger.Close()
 	assert.NoError(t, err)
 
@@ -58,13 +58,13 @@ func TestPingerClosed(t *testing.T) {
 
 func TestPingerNotReturnPong(t *testing.T) {
 	conn := _createConn([]byte("iam test bytes 24 length"))
-	pinger := newMCPinger(conn)
+	pinger := NewPinger(conn)
 	err := pinger.Ping()
 	assert.Error(t, err)
 	_causeEqual(t, ErrPingerPong, err)
 
 	conn = _createConn([]byte("less than 24 length"))
-	pinger = newMCPinger(conn)
+	pinger = NewPinger(conn)
 	err = pinger.Ping()
 	assert.Error(t, err)
 	_causeEqual(t, bufio.ErrBufferFull, err)
