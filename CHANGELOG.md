@@ -3,6 +3,7 @@
 ## Version 1.3.0
 1. add executor interface.
 2. add pinger interface.
+3. add MsgBatchAlloctor for one node WR.
 
 ## Version 1.2.2
 1. fix batchdone err.
