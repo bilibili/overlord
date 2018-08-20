@@ -10,7 +10,7 @@ var (
 )
 
 // CacheType memcache or redis
-type CacheType = string
+type CacheType string
 
 // Cache type: memcache or redis.
 const (

@@ -34,7 +34,7 @@ var (
 )
 
 var (
-	defaultForwardCacheTypes = map[string]struct{}{
+	defaultForwardCacheTypes = map[proto.CacheType]struct{}{
 		proto.CacheTypeMemcache:       struct{}{},
 		proto.CacheTypeMemcacheBinary: struct{}{},
 		proto.CacheTypeRedis:          struct{}{},
