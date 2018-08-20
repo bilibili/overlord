@@ -211,8 +211,8 @@ func (rt RequestType) String() string {
 	return unknownString
 }
 
-// ResopnseStatus is the protocol-agnostic identifier for the response status
-type ResopnseStatus byte
+// ResponseStatus is the protocol-agnostic identifier for the response status
+type ResponseStatus byte
 
 // all memcache response status
 const (
