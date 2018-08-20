@@ -85,9 +85,7 @@ func (h *Handler) handle() {
 		}
 		// 2. send to cluster
 		h.forward.Forward(mba, msgs)
-		// 3. wait to done
-		mba.Wait()
-		// 4. encode
+		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
@@ -104,12 +102,12 @@ func (h *Handler) handle() {
 			h.deferHandle(messages, mba, err)
 			return
 		}
-		// 5. release resource
+		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}
 		mba.Reset()
-		// 6. reset MaxConcurrent
+		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
 }
