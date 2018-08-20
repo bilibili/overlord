@@ -26,7 +26,7 @@ type Proxy struct {
 	c   *Config
 	ccs []*ClusterConfig
 
-	exectors map[string]proto.Executor
+	forwards map[string]proto.Forwarder
 	once     sync.Once
 
 	conns int32
@@ -50,7 +50,7 @@ func New(c *Config) (p *Proxy, err error) {
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
 		p.ccs = ccs
-		p.exectors = map[string]proto.Executor{}
+		p.forwards = map[string]proto.Forwarder{}
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
@@ -61,9 +61,9 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 }
 
 func (p *Proxy) serve(cc *ClusterConfig) {
-	executor := NewExecutor(cc)
+	forward := NewForward(cc)
 	p.lock.Lock()
-	p.exectors[cc.Name] = executor
+	p.forwards[cc.Name] = forward
 	p.lock.Unlock()
 	// listen
 	l, err := Listen(cc.ListenProto, cc.ListenAddr)
@@ -102,7 +102,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				continue
 			}
 		}
-		NewHandler(p, cc, conn, executor).Handle()
+		NewHandler(p, cc, conn, forward).Handle()
 	}
 }
 
@@ -113,8 +113,8 @@ func (p *Proxy) Close() error {
 	if p.closed {
 		return nil
 	}
-	for _, executor := range p.exectors {
-		executor.Close()
+	for _, forward := range p.forwards {
+		forward.Close()
 	}
 	return nil
 }

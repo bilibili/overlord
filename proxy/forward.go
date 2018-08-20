@@ -22,36 +22,36 @@ import (
 )
 
 const (
-	executorStateOpening = int32(0)
-	executorStateClosed  = int32(1)
+	forwardStateOpening = int32(0)
+	forwardStateClosed  = int32(1)
 )
 
 // errors
 var (
 	ErrConfigServerFormat = errs.New("servers config format error")
-	ErrExecutorHashNoNode = errs.New("executor hash no hit node")
-	ErrExecutorClosed     = errs.New("executor already closed")
+	ErrForwardHashNoNode  = errs.New("forward hash no hit node")
+	ErrForwardClosed      = errs.New("forward already closed")
 )
 
 var (
-	defaultExecCacheTypes = map[string]struct{}{
+	defaultForwardCacheTypes = map[string]struct{}{
 		proto.CacheTypeMemcache:       struct{}{},
 		proto.CacheTypeMemcacheBinary: struct{}{},
 		proto.CacheTypeRedis:          struct{}{},
 	}
 )
 
-// NewExecutor new a executor by cluster config.
-func NewExecutor(cc *ClusterConfig) (c proto.Executor) {
+// NewForward new a executor by cluster config.
+func NewForward(cc *ClusterConfig) (c proto.Forwarder) {
 	// new executor
-	if _, ok := defaultExecCacheTypes[cc.CacheType]; ok {
-		return newDefaultExecutor(cc)
+	if _, ok := defaultForwardCacheTypes[cc.CacheType]; ok {
+		return newDefaultForward(cc)
 	}
 	panic("unsupported protocol")
 }
 
 // defaultExecutor implement the default hashring router and msgbatch.
-type defaultExecutor struct {
+type defaultForward struct {
 	cc *ClusterConfig
 
 	ring    *hashkit.HashRing
@@ -66,96 +66,99 @@ type defaultExecutor struct {
 	state int32
 }
 
-// newDefaultExecutor must combine.
-func newDefaultExecutor(cc *ClusterConfig) proto.Executor {
-	e := &defaultExecutor{cc: cc}
+// newDefaultForward must combine.
+func newDefaultForward(cc *ClusterConfig) proto.Forwarder {
+	f := &defaultForward{cc: cc}
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
 		panic(err)
 	}
-	e.alias = alias
-	e.hashTag = []byte(cc.HashTag)
-	e.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	e.aliasMap = make(map[string]string)
+	f.alias = alias
+	f.hashTag = []byte(cc.HashTag)
+	f.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
+	f.aliasMap = make(map[string]string)
 	if alias {
 		for idx, aname := range ans {
-			e.aliasMap[aname] = addrs[idx]
+			f.aliasMap[aname] = addrs[idx]
 		}
-		e.ring.Init(ans, ws)
+		f.ring.Init(ans, ws)
 	} else {
-		e.ring.Init(addrs, ws)
+		f.ring.Init(addrs, ws)
 	}
 	// start nbc
-	e.nodeChan = make(map[string]*batchChan)
+	f.nodeChan = make(map[string]*batchChan)
 	for _, addr := range addrs {
-		e.nodeChan[addr] = e.process(cc, addr)
+		f.nodeChan[addr] = f.process(cc, addr)
 	}
 	if cc.PingAutoEject {
-		e.nodePing = make(map[string]*pinger)
+		f.nodePing = make(map[string]*pinger)
 		for idx, addr := range addrs {
 			w := ws[idx]
 			pc := newPingConn(cc, addr)
 			p := &pinger{ping: pc, cc: cc, node: addr, weight: w}
-			go e.processPing(p)
+			go f.processPing(p)
 		}
 	}
-	return e
+	return f
 }
 
-// Execute impl proto.Executor
-func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) error {
-	if closed := atomic.LoadInt32(&e.state); closed == executorStateClosed {
-		return ErrExecutorClosed
+// Forward impl proto.Forwarder
+func (f *defaultForward) Forward(mba *proto.MsgBatchAllocator, msgs []*proto.Message) error {
+	if closed := atomic.LoadInt32(&f.state); closed == forwardStateClosed {
+		return ErrForwardClosed
 	}
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
-				addr, ok := e.getAddr(subm.Request().Key())
+				addr, ok := f.getAddr(subm.Request().Key())
 				if !ok {
-					m.WithError(ErrExecutorHashNoNode)
-					return ErrExecutorHashNoNode
+					m.WithError(ErrForwardHashNoNode)
+					return ErrForwardHashNoNode
 				}
 				mba.AddMsg(addr, subm)
 			}
 		} else {
-			addr, ok := e.getAddr(m.Request().Key())
+			addr, ok := f.getAddr(m.Request().Key())
 			if !ok {
-				m.WithError(ErrExecutorHashNoNode)
-				return ErrExecutorHashNoNode
+				m.WithError(ErrForwardHashNoNode)
+				return ErrForwardHashNoNode
 			}
 			mba.AddMsg(addr, m)
 		}
 	}
 	for addr, mb := range mba.MsgBatchs() {
 		if mb.Count() > 0 {
-			e.nodeChan[addr].push(mb)
+			// WaitGroup add one MsgBatch!!!
+			mba.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
+			f.nodeChan[addr].push(mb)
 		}
 	}
+	mba.Wait()
 	return nil
 }
 
 // Close close executor.
-func (e *defaultExecutor) Close() error {
-	if !atomic.CompareAndSwapInt32(&e.state, executorStateOpening, executorStateClosed) {
+func (f *defaultForward) Close() error {
+	if !atomic.CompareAndSwapInt32(&f.state, forwardStateOpening, forwardStateClosed) {
 		return nil
 	}
 	return nil
 }
 
 // process will start the special backend connection.
-func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
+func (f *defaultForward) process(cc *ClusterConfig, addr string) *batchChan {
 	conns := cc.NodeConnections
 	nbc := newBatchChan(conns)
 	for i := int32(0); i < conns; i++ {
 		ch := nbc.get(i)
 		nc := newNodeConn(cc, addr)
-		go e.processIO(cc.Name, addr, ch, nc)
+		go f.processIO(cc.Name, addr, ch, nc)
 	}
 	return nbc
 }
 
-func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+func (f *defaultForward) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
 	for {
 		mb := <-ch
 		if err := nc.WriteBatch(mb); err != nil {
@@ -168,11 +171,11 @@ func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBa
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
 		}
-		mb.BatchDone(cluster, addr)
+		mb.Done(cluster, addr)
 	}
 }
 
-func (e *defaultExecutor) processPing(p *pinger) {
+func (f *defaultForward) processPing(p *pinger) {
 	del := false
 	for {
 		if err := p.ping.Ping(); err != nil {
@@ -186,12 +189,12 @@ func (e *defaultExecutor) processPing(p *pinger) {
 		} else {
 			p.failure = 0
 			if del {
-				e.ring.AddNode(p.node, p.weight)
+				f.ring.AddNode(p.node, p.weight)
 				del = false
 			}
 		}
-		if e.cc.PingAutoEject && p.failure >= e.cc.PingFailLimit {
-			e.ring.DelNode(p.node)
+		if f.cc.PingAutoEject && p.failure >= f.cc.PingFailLimit {
+			f.ring.DelNode(p.node)
 			del = true
 		}
 		select {
@@ -201,25 +204,25 @@ func (e *defaultExecutor) processPing(p *pinger) {
 	}
 }
 
-func (e *defaultExecutor) getAddr(key []byte) (addr string, ok bool) {
-	if addr, ok = e.ring.GetNode(e.trimHashTag(key)); !ok {
+func (f *defaultForward) getAddr(key []byte) (addr string, ok bool) {
+	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
 		return
 	}
-	if e.alias {
-		addr, ok = e.aliasMap[addr]
+	if f.alias {
+		addr, ok = f.aliasMap[addr]
 	}
 	return
 }
 
-func (e *defaultExecutor) trimHashTag(key []byte) []byte {
-	if len(e.hashTag) != 2 {
+func (f *defaultForward) trimHashTag(key []byte) []byte {
+	if len(f.hashTag) != 2 {
 		return key
 	}
-	bidx := bytes.IndexByte(key, e.hashTag[0])
+	bidx := bytes.IndexByte(key, f.hashTag[0])
 	if bidx == -1 {
 		return key
 	}
-	eidx := bytes.IndexByte(key[bidx+1:], e.hashTag[1])
+	eidx := bytes.IndexByte(key[bidx+1:], f.hashTag[1])
 	if eidx == -1 {
 		return key
 	}

@@ -57,9 +57,12 @@ func (m *MsgBatchAllocator) AddMsg(node string, msg *Message) {
 		mb.wg = m.wg
 		mb.AddMsg(msg)
 		m.mbMap[node] = mb
-		// wait group add one MsgBatch!!!
-		m.wg.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
 	}
+}
+
+// Add adds delta, which may be negative, to the WaitGroup counter.
+func (m *MsgBatchAllocator) Add(delta int) {
+	m.wg.Add(delta)
 }
 
 // Wait waits until all the message was done
@@ -69,9 +72,8 @@ func (m *MsgBatchAllocator) Wait() {
 
 // Reset inner MsgBatchs
 func (m *MsgBatchAllocator) Reset() {
-	for addr, mb := range m.mbMap {
+	for _, mb := range m.mbMap {
 		mb.Reset()
-		delete(m.mbMap, addr)
 	}
 }
 
@@ -142,8 +144,8 @@ func (m *MsgBatch) Msgs() []*Message {
 	return m.msgs[:m.count]
 }
 
-// BatchDone will set done and report prom HandleTime.
-func (m *MsgBatch) BatchDone(cluster, addr string) {
+// Done will set done and report prom HandleTime.
+func (m *MsgBatch) Done(cluster, addr string) {
 	if prom.On {
 		for _, msg := range m.Msgs() {
 			prom.HandleTime(cluster, addr, msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
