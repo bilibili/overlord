@@ -23,9 +23,14 @@ type mockConn struct {
 	wbuf   *bytes.Buffer
 	data   []byte
 	repeat int
+	err    error
 }
 
 func (m *mockConn) Read(b []byte) (n int, err error) {
+	if m.err != nil {
+		err = m.err
+		return
+	}
 	if m.repeat > 0 {
 		m.rbuf.Write(m.data)
 		m.repeat--
@@ -33,11 +38,18 @@ func (m *mockConn) Read(b []byte) (n int, err error) {
 	return m.rbuf.Read(b)
 }
 func (m *mockConn) Write(b []byte) (n int, err error) {
+	if m.err != nil {
+		err = m.err
+		return
+	}
 	return m.wbuf.Write(b)
 }
 
 // writeBuffers impl the net.buffersWriter to support writev
 func (m *mockConn) writeBuffers(buf *net.Buffers) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
 	return buf.WriteTo(m.wbuf)
 }
 

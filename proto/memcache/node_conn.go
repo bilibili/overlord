@@ -82,10 +82,10 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 		_ = n.bw.Write(mcr.data) // NOTE: exp time
 		_ = n.bw.Write(spaceBytes)
 		_ = n.bw.Write(mcr.key)
-		_ = n.bw.Write(crlfBytes)
+		err = n.bw.Write(crlfBytes)
 	} else {
 		_ = n.bw.Write(mcr.key)
-		_ = n.bw.Write(mcr.data)
+		err = n.bw.Write(mcr.data)
 	}
 	return
 }

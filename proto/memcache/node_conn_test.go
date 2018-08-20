@@ -89,7 +89,6 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 		},
 	}
 	for _, tt := range ts {
-
 		t.Run(fmt.Sprintf("%v ok", tt.rtype), func(t *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn(nil)
@@ -109,6 +108,38 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 		})
 
 	}
+}
+
+func TestNodeConnWriteBatchHasErr(t *testing.T) {
+	req := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn(nil)
+
+	ec := _createConn(nil)
+	ec.Conn.(*mockConn).err = errors.New("write error")
+	nc.bw = bufio.NewWriter(ec)
+	nc.bw.Write([]byte("err"))
+	nc.bw.Flush() // action err
+
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+
+	err := nc.WriteBatch(batch)
+	assert.EqualError(t, err, "write error")
+}
+
+func TestNodeConnWriteBatchFlushHasErr(t *testing.T) {
+	req := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn(nil)
+
+	ec := _createConn(nil)
+	ec.Conn.(*mockConn).err = errors.New("flush error")
+	nc.bw = bufio.NewWriter(ec)
+
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+
+	err := nc.WriteBatch(batch)
+	assert.EqualError(t, errors.Cause(err), "flush error")
 }
 
 func TestNodeConnWriteClosed(t *testing.T) {
@@ -191,7 +222,6 @@ func TestNodeConnReadOk(t *testing.T) {
 		},
 	}
 	for _, tt := range ts {
-
 		t.Run(fmt.Sprintf("%v%s", tt.rtype, tt.suffix), func(t *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn([]byte(tt.cData))
@@ -206,6 +236,29 @@ func TestNodeConnReadOk(t *testing.T) {
 		})
 
 	}
+}
+
+func TestNodeConnReadHasErr(t *testing.T) {
+	req := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn([]byte("END\r\n"))
+	ec := _createConn(nil)
+	ec.Conn.(*mockConn).err = errors.New("read error")
+	nc.br = bufio.NewReader(ec, bufio.Get(128))
+
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+	err := nc.ReadBatch(batch)
+	assert.EqualError(t, errors.Cause(err), "read error")
+}
+
+func TestNodeConnReadBufFull(t *testing.T) {
+	req := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn([]byte("END"))
+
+	batch := proto.NewMsgBatch()
+	batch.AddMsg(req)
+	err := nc.ReadBatch(batch) // NOTE: because "END" no "\r\n", so BufferFull first and break, then EOF
+	assert.EqualError(t, errors.Cause(err), "EOF")
 }
 
 func TestNodeConnAssertError(t *testing.T) {
