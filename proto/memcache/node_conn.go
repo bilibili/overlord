@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	handlerOpening = int32(0)
-	handlerClosed  = int32(1)
+	opened = int32(0)
+	closed = int32(1)
 )
 
 type nodeConn struct {
@@ -25,7 +25,7 @@ type nodeConn struct {
 	bw   *bufio.Writer
 	br   *bufio.Reader
 
-	closed int32
+	state int32
 }
 
 // NewNodeConn returns node conn.
@@ -42,6 +42,10 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 }
 
 func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+	if n.Closed() {
+		err = errors.Wrap(ErrClosed, "MC Writer conn closed")
+		return
+	}
 	var (
 		m   *proto.Message
 		idx int
@@ -67,10 +71,6 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (n *nodeConn) write(m *proto.Message) (err error) {
-	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Writer conn closed")
-		return
-	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
@@ -176,7 +176,7 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 }
 
 func (n *nodeConn) Close() error {
-	if atomic.CompareAndSwapInt32(&n.closed, handlerOpening, handlerClosed) {
+	if atomic.CompareAndSwapInt32(&n.state, opened, closed) {
 		err := n.conn.Close()
 		return err
 	}
@@ -184,5 +184,5 @@ func (n *nodeConn) Close() error {
 }
 
 func (n *nodeConn) Closed() bool {
-	return atomic.LoadInt32(&n.closed) == handlerClosed
+	return atomic.LoadInt32(&n.state) == closed
 }

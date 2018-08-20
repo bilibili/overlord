@@ -155,6 +155,9 @@ var (
 		"8\r\nCOMMANDS")
 
 	reqCtlCmdsBytes = []byte("4\r\nPING")
+
+	askBytes   = []byte("ASK")
+	movedBytes = []byte("MOVED")
 )
 
 // errors

@@ -28,6 +28,8 @@ var (
 	nullDataBytes = []byte("-1")
 )
 
+type RESP = resp
+
 // resp is a redis server protocol item.
 type resp struct {
 	rTp respType
@@ -69,7 +71,7 @@ func (r *resp) next() *resp {
 	return nr
 }
 
-func (r *resp) decode(br *bufio.Reader) (err error) {
+func (r *resp) Decode(br *bufio.Reader) (err error) {
 	r.reset()
 	// start read
 	line, err := br.ReadLine()
@@ -130,7 +132,7 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 	mark := br.Mark()
 	for i := 0; i < int(size); i++ {
 		nre := r.next()
-		if err = nre.decode(br); err != nil {
+		if err = nre.Decode(br); err != nil {
 			br.AdvanceTo(mark)
 			br.Advance(-ls)
 			return

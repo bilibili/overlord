@@ -64,7 +64,7 @@ type ClusterConfig struct {
 	NodeConnections  int32           `toml:"node_connections"`
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
-	Servers          []string
+	Servers          []string        `toml:"servers"`
 }
 
 // Validate validate config field value.

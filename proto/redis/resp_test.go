@@ -87,7 +87,7 @@ func TestRespDecode(t *testing.T) {
 			r.reset()
 			br := bufio.NewReader(conn, bufio.Get(1024))
 			br.Read()
-			if err := r.decode(br); err != nil {
+			if err := r.Decode(br); err != nil {
 				t.Fatalf("decode error:%v", err)
 			}
 			assert.Equal(t, tt.ExpectTp, r.rTp)

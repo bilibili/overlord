@@ -15,7 +15,7 @@ func TestRequestNewRequest(t *testing.T) {
 	br := bufio.NewReader(conn, bufio.Get(1024))
 	br.Read()
 	req := getReq()
-	err := req.resp.decode(br)
+	err := req.resp.Decode(br)
 	assert.Nil(t, err)
 	assert.Equal(t, mergeTypeNo, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)

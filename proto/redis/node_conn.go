@@ -1,17 +1,24 @@
 package redis
 
 import (
+	errs "errors"
 	"sync/atomic"
 	"time"
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
 	"overlord/proto"
+
+	"github.com/pkg/errors"
 )
 
 const (
-	opened = uint32(0)
-	closed = uint32(1)
+	opened = int32(0)
+	closed = int32(1)
+)
+
+var (
+	ErrNodeConnClosed = errs.New("redis node conn closed")
 )
 
 type nodeConn struct {
@@ -20,7 +27,8 @@ type nodeConn struct {
 	conn    *libnet.Conn
 	bw      *bufio.Writer
 	br      *bufio.Reader
-	state   uint32
+
+	state int32
 }
 
 // NewNodeConn create the node conn from proxy to redis
@@ -40,6 +48,10 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 }
 
 func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+	if nc.Closed() {
+		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		return
+	}
 	for _, m := range mb.Msgs() {
 		req, ok := m.Request().(*Request)
 		if !ok {
@@ -59,6 +71,10 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
+	if nc.Closed() {
+		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		return
+	}
 	nc.br.ResetBuffer(mb.Buffer())
 	defer nc.br.ResetBuffer(nil)
 	begin := nc.br.Mark()
@@ -73,7 +89,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			i++
 			continue
 		}
-		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
+		if err = req.reply.Decode(nc.br); err == bufio.ErrBufferFull {
 			nc.br.AdvanceTo(begin)
 			if err = nc.br.Read(); err != nil {
 				return
@@ -91,8 +107,12 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (nc *nodeConn) Close() (err error) {
-	if atomic.CompareAndSwapUint32(&nc.state, opened, closed) {
+	if atomic.CompareAndSwapInt32(&nc.state, opened, closed) {
 		return nc.conn.Close()
 	}
 	return
+}
+
+func (nc *nodeConn) Closed() bool {
+	return atomic.LoadInt32(&nc.state) == closed
 }
