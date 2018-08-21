@@ -28,7 +28,18 @@ var (
 	nullDataBytes = []byte("-1")
 )
 
+// RESP is resp export type.
 type RESP = resp
+
+// Type return resp type.
+func (r *RESP) Type() byte {
+	return r.rTp
+}
+
+// Data return resp data.
+func (r *RESP) Data() []byte {
+	return r.data
+}
 
 // resp is a redis server protocol item.
 type resp struct {

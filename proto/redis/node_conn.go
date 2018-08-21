@@ -18,6 +18,7 @@ const (
 )
 
 var (
+	// ErrNodeConnClosed err node conn closed.
 	ErrNodeConnClosed = errs.New("redis node conn closed")
 )
 

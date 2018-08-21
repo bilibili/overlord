@@ -155,9 +155,6 @@ var (
 		"8\r\nCOMMANDS")
 
 	reqCtlCmdsBytes = []byte("4\r\nPING")
-
-	askBytes   = []byte("ASK")
-	movedBytes = []byte("MOVED")
 )
 
 // errors
@@ -243,6 +240,11 @@ func (r *Request) Put() {
 	r.reply.reset()
 	r.mType = mergeTypeNo
 	reqPool.Put(r)
+}
+
+// Reply return request reply.
+func (r *Request) Reply() *RESP {
+	return r.reply
 }
 
 // isSupport check command support.
