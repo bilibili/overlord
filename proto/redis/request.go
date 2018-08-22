@@ -242,21 +242,26 @@ func (r *Request) Put() {
 	reqPool.Put(r)
 }
 
+// RESP return request resp.
+func (r *Request) RESP() *RESP {
+	return r.resp
+}
+
 // Reply return request reply.
 func (r *Request) Reply() *RESP {
 	return r.reply
 }
 
-// isSupport check command support.
-func (r *Request) isSupport() bool {
+// IsSupport check command support.
+func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
 	return bytes.Index(reqReadCmdsBytes, r.resp.array[0].data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.array[0].data) > -1
 }
 
-// isCtl is control command.
-func (r *Request) isCtl() bool {
+// IsCtl is control command.
+func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}

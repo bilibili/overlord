@@ -160,10 +160,10 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		return ErrBadAssert
 	}
 	if !m.IsBatch() {
-		if !req.isSupport() {
+		if !req.IsSupport() {
 			req.reply.rTp = respError
 			req.reply.data = notSupportDataBytes
-		} else if req.isCtl() {
+		} else if req.IsCtl() {
 			if bytes.Equal(req.Cmd(), pingBytes) {
 				req.reply.rTp = respString
 				req.reply.data = pongDataBytes

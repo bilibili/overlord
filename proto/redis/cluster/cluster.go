@@ -35,8 +35,8 @@ type cluster struct {
 	dto, rto, wto time.Duration
 	hashTag       []byte
 
-	ns       *nodeSlots
-	nodeChan map[string]*batchChan
+	slotNode atomic.Value
+	action   chan struct{}
 
 	state int32
 }
@@ -45,11 +45,7 @@ type cluster struct {
 func NewForward(name string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) proto.Forwarder {
 	c := &cluster{}
 	c.tryFetch()
-	c.nodeChan = make(map[string]*batchChan)
-	for _, addr := range c.ns.getMasters() {
-		bc := c.process(addr)
-		c.nodeChan[addr] = bc
-	}
+	go c.fetchproc()
 	return c
 }
 
@@ -72,7 +68,8 @@ func (c *cluster) Forward(mba *proto.MsgBatchAllocator, msgs []*proto.Message) e
 		if mb.Count() > 0 {
 			// WaitGroup add one MsgBatch!!!
 			mba.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
-			c.nodeChan[addr].push(mb)
+			sn := c.slotNode.Load().(*slotNode)
+			sn.nodeChan[addr].push(mb)
 		}
 	}
 	mba.Wait()
@@ -86,7 +83,17 @@ func (c *cluster) Close() error {
 	return nil
 }
 
-func (c *cluster) tryFetch() {
+func (c *cluster) fetchproc() {
+	for {
+		select {
+		case <-c.action:
+		case <-time.After(time.Minute):
+		}
+		c.tryFetch()
+	}
+}
+
+func (c *cluster) tryFetch() (changed bool) {
 	for _, server := range c.servers {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)
@@ -95,7 +102,7 @@ func (c *cluster) tryFetch() {
 			log.Errorf("fail to fetch due to %s", err)
 			continue
 		}
-		c.ns = ns
+		c.initSlotNode(ns)
 		return
 	}
 	log.Error("redis cluster all seed nodes fail to fetch")
@@ -132,7 +139,8 @@ func (c *cluster) processIO(name, addr string, ch <-chan *proto.MsgBatch, nc pro
 func (c *cluster) getAddr(key []byte) (addr string) {
 	realKey := c.trimHashTag(key)
 	crc := hashkit.Crc16(realKey) & musk
-	return c.ns.slots[crc]
+	sn := c.slotNode.Load().(*slotNode)
+	return sn.ns.slots[crc]
 }
 
 func (c *cluster) trimHashTag(key []byte) []byte {
@@ -148,6 +156,21 @@ func (c *cluster) trimHashTag(key []byte) []byte {
 		return key
 	}
 	return key[bidx+1 : bidx+1+eidx]
+}
+
+func (c *cluster) initSlotNode(ns *nodeSlots) {
+	sn := &slotNode{}
+	sn.nodeChan = make(map[string]*batchChan)
+	for _, addr := range ns.getMasters() {
+		bc := c.process(addr)
+		sn.nodeChan[addr] = bc
+	}
+	c.slotNode.Store(sn)
+}
+
+type slotNode struct {
+	ns       *nodeSlots
+	nodeChan map[string]*batchChan
 }
 
 type batchChan struct {

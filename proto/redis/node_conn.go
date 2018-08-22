@@ -22,6 +22,14 @@ var (
 	ErrNodeConnClosed = errs.New("redis node conn closed")
 )
 
+// NodeConn is export type by nodeConn for redis-cluster.
+type NodeConn = nodeConn
+
+// Bw return bufio.Writer.
+func (nc *NodeConn) Bw() *bufio.Writer {
+	return nc.bw
+}
+
 type nodeConn struct {
 	cluster string
 	addr    string
@@ -59,7 +67,7 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 			m.WithError(ErrBadAssert)
 			return ErrBadAssert
 		}
-		if !req.isSupport() || req.isCtl() {
+		if !req.IsSupport() || req.IsCtl() {
 			continue
 		}
 		if err = req.resp.encode(nc.bw); err != nil {
@@ -86,11 +94,11 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		if !req.isSupport() || req.isCtl() {
+		if !req.IsSupport() || req.IsCtl() {
 			i++
 			continue
 		}
-		if err = req.reply.Decode(nc.br); err == bufio.ErrBufferFull {
+		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
 			nc.br.AdvanceTo(begin)
 			if err = nc.br.Read(); err != nil {
 				return

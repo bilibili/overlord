@@ -3,7 +3,6 @@ package cluster
 import (
 	"bytes"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"overlord/lib/conv"
@@ -21,24 +20,36 @@ const (
 var (
 	askBytes   = []byte("ASK")
 	movedBytes = []byte("MOVED")
+
+	reqAskResp = &redis.RESP{
+		// rTp:  respArray,
+		// data: []byte("1"),
+		// array: []*resp{
+		// 	&resp{
+		// 		rTp:    respBulk,
+		// 		data:   []byte("6\r\nASKING"),
+		// 		array:  nil,
+		// 		arrayn: 0,
+		// 	},
+		// },
+		// arrayn: 1,
+	}
 )
 
 type nodeConn struct {
 	c  *cluster
 	nc proto.NodeConn
 
-	mnc   map[string]proto.NodeConn
-	mba   *proto.MsgBatchAllocator
-	sb    strings.Builder
-	mLock sync.Mutex
+	mnc map[string]*redis.NodeConn
+	mba *proto.MsgBatchAllocator
+	sb  strings.Builder
 
 	state int32
 }
 
 func newNodeConn(nc proto.NodeConn) proto.NodeConn {
 	return &nodeConn{
-		nc:  nc,
-		mba: proto.GetMsgBatchAllocator(),
+		nc: nc,
 	}
 }
 
@@ -51,6 +62,10 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	if err = nc.nc.ReadBatch(mb); err != nil {
 		return
 	}
+	var (
+		isRe     bool
+		moveAddr map[string]struct{}
+	)
 	for i := 0; i < mb.Count(); i++ {
 		m := mb.Nth(i)
 		req := m.Request().(*redis.Request)
@@ -62,35 +77,71 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !bytes.HasPrefix(data, askBytes) && !bytes.HasPrefix(data, movedBytes) {
 			continue
 		}
-		addrBs, slot, isAsk, err := parseRedirect(data)
-		nc.mLock.Lock()
+		addrBs, _, isAsk, _ := parseRedirect(data)
 		nc.sb.Reset()
 		nc.sb.Write(addrBs)
 		addr := nc.sb.String()
 		nc.mba.AddMsg(addr, m)
-		nc.mLock.Unlock()
+		if !isAsk {
+			if moveAddr == nil {
+				moveAddr = make(map[string]struct{})
+			}
+			moveAddr[addr] = struct{}{}
+		}
+		isRe = true
 	}
-	nc.redirectProcess()
+	if isRe {
+		nc.redirectProcess(moveAddr)
+	}
 	return
 }
 
-func (nc *nodeConn) redirectProcess() {
-	nc.mLock.Lock()
+func (nc *nodeConn) redirectProcess(moveAddr map[string]struct{}) (err error) {
 	for addr, mb := range nc.mba.MsgBatchs() {
 		if mb.Count() == 0 {
 			continue
 		}
 		rnc, ok := nc.mnc[addr]
 		if !ok {
-			rnc = redis.NewNodeConn(nc.c.name, addr, nc.c.dto, nc.c.rto, nc.c.wto)
-			nc.mnc[addr] = rnc
+			nc.mnc[addr] = redis.NewNodeConn(nc.c.name, addr, nc.c.dto, nc.c.rto, nc.c.wto).(*redis.NodeConn)
 		}
-
-		rnc.WriteBatch(mb)
-		rnc.ReadBatch(mb)
+		for _, m := range mb.Msgs() {
+			req, ok := m.Request().(*redis.Request)
+			if !ok {
+				m.WithError(redis.ErrBadAssert)
+				return redis.ErrBadAssert
+			}
+			if !req.IsSupport() || req.IsCtl() {
+				continue
+			}
+			if err = reqAskResp.Encode(rnc.Bw()); err != nil {
+				m.WithError(err)
+				return
+			}
+			if err = req.RESP().Encode(rnc.Bw()); err != nil {
+				m.WithError(err)
+				return err
+			}
+			m.MarkWrite()
+		}
+		if err = rnc.Bw().Flush(); err != nil {
+			return
+		}
+		if err = rnc.ReadBatch(mb); err != nil {
+			return
+		}
+		if moveAddr != nil { // NOTE: when ask finish, close addr conn.
+			if _, ok := moveAddr[addr]; ok {
+				rnc.Close()
+				delete(nc.mnc, addr)
+				select {
+				case nc.c.action <- struct{}{}:
+				default:
+				}
+			}
+		}
 	}
-
-	nc.mLock.Unlock()
+	return
 }
 
 func (nc *nodeConn) Close() (err error) {
