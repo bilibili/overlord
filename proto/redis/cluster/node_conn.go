@@ -21,26 +21,13 @@ var (
 	askBytes   = []byte("ASK")
 	movedBytes = []byte("MOVED")
 
-	reqAskResp = &redis.RESP{
-		// rTp:  respArray,
-		// data: []byte("1"),
-		// array: []*resp{
-		// 	&resp{
-		// 		rTp:    respBulk,
-		// 		data:   []byte("6\r\nASKING"),
-		// 		array:  nil,
-		// 		arrayn: 0,
-		// 	},
-		// },
-		// arrayn: 1,
-	}
+	askingResp = []byte("*\r\n1\r\n$6\r\nASKING\r\n")
 )
 
 type nodeConn struct {
 	c  *cluster
 	nc proto.NodeConn
 
-	mnc map[string]*redis.NodeConn
 	mba *proto.MsgBatchAllocator
 	sb  strings.Builder
 
@@ -114,7 +101,7 @@ func (nc *nodeConn) redirectProcess(moveAddr map[string]struct{}) (err error) {
 			if !req.IsSupport() || req.IsCtl() {
 				continue
 			}
-			if err = reqAskResp.Encode(rnc.Bw()); err != nil {
+			if err = rnc.Bw().Write(askingResp); err != nil {
 				m.WithError(err)
 				return
 			}

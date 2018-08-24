@@ -38,6 +38,8 @@ type cluster struct {
 	slotNode atomic.Value
 	action   chan struct{}
 
+	mnc map[string]*redis.NodeConn
+
 	state int32
 }
 
