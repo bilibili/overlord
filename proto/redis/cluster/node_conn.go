@@ -11,9 +11,6 @@ import (
 )
 
 const (
-	opened = int32(0)
-	closed = int32(1)
-
 	respRedirect = '-'
 )
 
@@ -88,10 +85,9 @@ func (nc *nodeConn) redirectProcess(moveAddr map[string]struct{}) (err error) {
 		if mb.Count() == 0 {
 			continue
 		}
-		rnc, ok := nc.mnc[addr]
-		if !ok {
-			nc.mnc[addr] = redis.NewNodeConn(nc.c.name, addr, nc.c.dto, nc.c.rto, nc.c.wto).(*redis.NodeConn)
-		}
+		rdt := nc.c.getRedirectNodeConn(addr)
+		rdt.lock.Lock()
+		rnc := rdt.nc
 		for _, m := range mb.Msgs() {
 			req, ok := m.Request().(*redis.Request)
 			if !ok {
@@ -117,16 +113,11 @@ func (nc *nodeConn) redirectProcess(moveAddr map[string]struct{}) (err error) {
 		if err = rnc.ReadBatch(mb); err != nil {
 			return
 		}
-		if moveAddr != nil { // NOTE: when ask finish, close addr conn.
-			if _, ok := moveAddr[addr]; ok {
-				rnc.Close()
-				delete(nc.mnc, addr)
-				select {
-				case nc.c.action <- struct{}{}:
-				default:
-				}
-			}
+		var isMove bool
+		if moveAddr != nil {
+			_, isMove = moveAddr[addr]
 		}
+		nc.c.closeRedirectNodeConn(addr, isMove)
 	}
 	return
 }
