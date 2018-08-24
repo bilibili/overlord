@@ -32,7 +32,7 @@ type Handler struct {
 	p  *Proxy
 	cc *ClusterConfig
 
-	forward proto.Forwarder
+	executor proto.Executor
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -42,11 +42,11 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forward proto.Forwarder) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Executor) (h *Handler) {
 	h = &Handler{
-		p:       p,
-		cc:      cc,
-		forward: forward,
+		p:        p,
+		cc:       cc,
+		executor: executor,
 	}
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
@@ -84,7 +84,7 @@ func (h *Handler) handle() {
 			return
 		}
 		// 2. send to cluster
-		h.forward.Forward(mba, msgs)
+		h.executor.Execute(mba, msgs)
 		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
