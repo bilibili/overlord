@@ -75,7 +75,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		addrAsk[addr] = isAsk
 	}
 	if isRe {
-		nc.redirectProcess(addrAsk)
+		err = nc.redirectProcess(addrAsk)
 	}
 	return
 }

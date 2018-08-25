@@ -39,21 +39,15 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		if !req.IsSupport() && !req.IsCtl() {
 			resp := req.RESP()
 			arr := resp.Array()
-			if len(arr) == 2 {
-				if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
-					conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
-					pcc := pc.pc.(*redis.ProxyConn)
-					if !bytes.Equal(arr[1].Data(), cmdNodesBytes) {
-						if err = pcc.Bw().Write(notSupportBytes); err != nil {
-							err = errors.Wrap(err, "Redis Cluster ProxyConn Encode Write not support resp")
-						}
-						return
-					}
-					if err = pcc.Bw().Write(flashyClusterNodesResp); err != nil {
-						err = errors.Wrap(err, "Redis Cluster ProxyConn Encode Write flashy resp")
-					}
+			if len(arr) == 2 && bytes.Equal(arr[0].Data(), cmdClusterBytes) {
+				conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
+				pcc := pc.pc.(*redis.ProxyConn)
+				if !bytes.Equal(arr[1].Data(), cmdNodesBytes) {
+					err = pcc.Bw().Write(notSupportBytes)
 					return
 				}
+				err = pcc.Bw().Write(flashyClusterNodesResp)
+				return
 			}
 		}
 	}
