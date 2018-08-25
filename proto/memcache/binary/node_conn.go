@@ -72,6 +72,10 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (n *nodeConn) write(m *proto.Message) (err error) {
+	if n.Closed() {
+		err = errors.Wrap(ErrClosed, "MC Writer write")
+		return
+	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
 		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
