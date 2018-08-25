@@ -7,6 +7,7 @@ import (
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
+	"overlord/proto"
 )
 
 // errors
@@ -29,7 +30,8 @@ type pinger struct {
 	state uint32
 }
 
-func newPinger(conn *libnet.Conn) *pinger {
+// NewPinger new pinger.
+func NewPinger(conn *libnet.Conn) proto.Pinger {
 	return &pinger{
 		conn:  conn,
 		br:    bufio.NewReader(conn, bufio.NewBuffer(7)),
@@ -38,7 +40,7 @@ func newPinger(conn *libnet.Conn) *pinger {
 	}
 }
 
-func (p *pinger) ping() (err error) {
+func (p *pinger) Ping() (err error) {
 	if atomic.LoadUint32(&p.state) == closed {
 		err = ErrPingClosed
 		return

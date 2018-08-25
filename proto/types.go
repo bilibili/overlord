@@ -39,7 +39,17 @@ type ProxyConn interface {
 type NodeConn interface {
 	WriteBatch(*MsgBatch) error
 	ReadBatch(*MsgBatch) error
+	Close() error
+}
 
+// Pinger for executor ping node.
+type Pinger interface {
 	Ping() error
+	Close() error
+}
+
+// Executor is the interface for backend run and process the messages.
+type Executor interface {
+	Execute(mba *MsgBatchAllocator, msgs []*Message) error
 	Close() error
 }

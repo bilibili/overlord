@@ -6,9 +6,12 @@ import (
 	"io"
 	"strconv"
 	"testing"
+	"time"
 
+	"overlord/lib/bufio"
 	"overlord/proto"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,6 +33,20 @@ func (*mockCmd) Key() []byte {
 func (*mockCmd) Put() {
 }
 
+func TestNodeConnNewNodeConn(t *testing.T) {
+	nc := NewNodeConn("test", "127.0.0.1:12345", time.Second, time.Second, time.Second)
+	assert.NotNil(t, nc)
+}
+
+func TestNodeConnClose(t *testing.T) {
+	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+
+	err := nc.Close()
+	assert.NoError(t, err)
+	err = nc.Close()
+	assert.NoError(t, err)
+}
+
 func TestNodeConnWriteBatchOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
@@ -43,7 +60,6 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 	mb.AddMsg(msg)
 	err := nc.WriteBatch(mb)
 	assert.NoError(t, err)
-	nc.Close()
 }
 
 func TestNodeConnWriteBadAssert(t *testing.T) {
@@ -56,6 +72,26 @@ func TestNodeConnWriteBadAssert(t *testing.T) {
 	err := nc.WriteBatch(mb)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadAssert, err)
+}
+
+func TestNodeConnWriteHasErr(t *testing.T) {
+	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	ncc := nc.(*nodeConn)
+	ec := _createConn(nil)
+	ec.Conn.(*mockConn).err = errors.New("write error")
+	ncc.bw = bufio.NewWriter(ec)
+	ncc.bw.Write([]byte("err"))
+	ncc.bw.Flush() // action err
+
+	mb := proto.NewMsgBatch()
+	msg := proto.NewMessage()
+	req := newRequest("GET", "AA")
+	msg.WithRequest(req)
+	mb.AddMsg(msg)
+
+	err := nc.WriteBatch(mb)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "write error")
 }
 
 func TestReadBatchOk(t *testing.T) {
@@ -85,6 +121,25 @@ func TestReadBatchWithBadAssert(t *testing.T) {
 	assert.Equal(t, ErrBadAssert, err)
 }
 
+func TestReadBatcHasErr(t *testing.T) {
+	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
+	ncc := nc.(*nodeConn)
+	ec := _createConn(nil)
+	ec.Conn.(*mockConn).err = errors.New("read error")
+	ncc.br = bufio.NewReader(ec, bufio.Get(128))
+	ncc.br.Read() // action err
+
+	mb := proto.NewMsgBatch()
+	msg := proto.NewMessage()
+	req := newRequest("GET", "a")
+	msg.WithRequest(req)
+	mb.AddMsg(msg)
+	err := nc.ReadBatch(mb)
+
+	assert.Error(t, err)
+	assert.EqualError(t, err, "read error")
+}
+
 func TestReadBatchWithNilError(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	mb := proto.NewMsgBatch()
@@ -100,12 +155,6 @@ func TestReadBatchWithNilError(t *testing.T) {
 	err := nc.ReadBatch(mb)
 	assert.Error(t, err)
 	assert.Equal(t, io.EOF, err)
-}
-
-func TestPingOk(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createRepeatConn(pongBytes, 1))
-	err := nc.Ping()
-	assert.NoError(t, err)
 }
 
 func newRequest(cmd string, args ...string) *Request {
@@ -126,9 +175,8 @@ func newRequest(cmd string, args ...string) *Request {
 		reply: &resp{},
 	}
 }
+
 func getMergeType(cmd []byte) mergeType {
-	// fmt.Println("mtype :", strconv.Quote(string(cmd)))
-	// TODO: impl with tire tree to search quickly
 	if bytes.Equal(cmd, cmdMGetBytes) || bytes.Equal(cmd, cmdGetBytes) {
 		return mergeTypeJoin
 	}

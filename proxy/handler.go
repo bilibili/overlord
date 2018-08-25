@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"io"
 	"net"
 	"sync/atomic"
@@ -19,43 +18,39 @@ import (
 const (
 	handlerOpening = int32(0)
 	handlerClosed  = int32(1)
-
-	messageChanBuffer = 1024 // TODO(felix): config???
 )
 
 // variables need to change
 var (
 	// TODO: config and reduce to small
-	defaultConcurrent = 2
-	maxConcurrent     = 1024
+	concurrent    = 2
+	maxConcurrent = 1024
 )
 
 // Handler handle conn.
 type Handler struct {
-	c      *Config
-	ctx    context.Context
-	cancel context.CancelFunc
+	p  *Proxy
+	cc *ClusterConfig
+
+	executor proto.Executor
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
-
-	cluster *Cluster
-	msgCh   *proto.MsgChan
 
 	closed int32
 	err    error
 }
 
 // NewHandler new a conn handler.
-func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Executor) (h *Handler) {
 	h = &Handler{
-		c:       c,
-		cluster: cluster,
+		p:        p,
+		cc:       cc,
+		executor: executor,
 	}
-	h.ctx, h.cancel = context.WithCancel(ctx)
-	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.c.Proxy.ReadTimeout), time.Second*time.Duration(h.c.Proxy.WriteTimeout))
+	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
-	switch cluster.cc.CacheType {
+	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
 		h.pc = memcache.NewProxyConn(h.conn)
 	case proto.CacheTypeMemcacheBinary:
@@ -65,8 +60,7 @@ func NewHandler(ctx context.Context, c *Config, conn net.Conn, cluster *Cluster)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
-	h.msgCh = proto.NewMsgChanBuffer(messageChanBuffer)
-	prom.ConnIncr(cluster.cc.Name)
+	prom.ConnIncr(cc.Name)
 	return
 }
 
@@ -78,57 +72,44 @@ func (h *Handler) Handle() {
 
 func (h *Handler) handle() {
 	var (
-		messages = proto.GetMsgs(defaultConcurrent)
-		mbatch   = proto.GetMsgBatchs(len(h.cluster.nodeMap))
+		messages = proto.GetMsgs(concurrent)
+		mba      = proto.GetMsgBatchAllocator()
 		msgs     []*proto.Message
 		err      error
 	)
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-			h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
 		// 2. send to cluster
-		h.cluster.DispatchBatch(mbatch, msgs)
-		// 3. wait to done
-		for _, mb := range mbatch {
-			mb.Wait()
-		}
-		// 4. encode
+		h.executor.Execute(mba, msgs)
+		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
-				h.deferHandle(messages, mbatch, err)
+				h.deferHandle(messages, mba, err)
 				return
 			}
 			msg.MarkEnd()
 			msg.ResetSubs()
 			if prom.On {
-				prom.ProxyTime(h.cluster.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+				prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
-			h.deferHandle(messages, mbatch, err)
+			h.deferHandle(messages, mba, err)
 			return
 		}
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}
-		for _, mb := range mbatch {
-			mb.Reset()
-		}
+		mba.Reset()
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
-}
-
-func (h *Handler) deferHandle(msgs []*proto.Message, mbs []*proto.MsgBatch, err error) {
-	proto.PutMsgs(msgs)
-	proto.PutMsgBatchs(mbs)
-	h.closeWithError(err)
-	return
 }
 
 func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
@@ -140,23 +121,24 @@ func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*pr
 	return msgs
 }
 
-// Closed return handler whether or not closed.
-func (h *Handler) Closed() bool {
-	return atomic.LoadInt32(&h.closed) == handlerClosed
+func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocator, err error) {
+	proto.PutMsgs(msgs)
+	proto.PutMsgBatchAllocator(mba)
+	h.closeWithError(err)
+	return
 }
 
 func (h *Handler) closeWithError(err error) {
 	if atomic.CompareAndSwapInt32(&h.closed, handlerOpening, handlerClosed) {
 		h.err = err
-		h.cancel()
-		h.msgCh.Close()
 		_ = h.conn.Close()
+		atomic.AddInt32(&h.p.conns, -1) // NOTE: decr!!!
 		if prom.On {
-			prom.ConnDecr(h.cluster.cc.Name)
+			prom.ConnDecr(h.cc.Name)
 		}
 		if log.V(3) {
 			if err != io.EOF {
-				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cluster.cc.Name, h.cluster.cc.ListenAddr, h.conn.RemoteAddr(), err)
+				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
 			}
 		}
 	}
