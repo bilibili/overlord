@@ -18,7 +18,7 @@ var (
 	askBytes   = []byte("ASK")
 	movedBytes = []byte("MOVED")
 
-	askingResp = []byte("*\r\n1\r\n$6\r\nASKING\r\n")
+	askingResp = []byte("*1\r\n$6\r\nASKING\r\n")
 )
 
 type nodeConn struct {
@@ -31,9 +31,11 @@ type nodeConn struct {
 	state int32
 }
 
-func newNodeConn(nc proto.NodeConn) proto.NodeConn {
+func newNodeConn(c *cluster, addr string) proto.NodeConn {
 	return &nodeConn{
-		nc: nc,
+		c:   c,
+		nc:  redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
+		mba: proto.GetMsgBatchAllocator(),
 	}
 }
 
@@ -47,8 +49,8 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		return
 	}
 	var (
-		isRe     bool
-		moveAddr map[string]struct{}
+		isRe    bool
+		addrAsk map[string]bool
 	)
 	for i := 0; i < mb.Count(); i++ {
 		m := mb.Nth(i)
@@ -66,64 +68,72 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		nc.sb.Write(addrBs)
 		addr := nc.sb.String()
 		nc.mba.AddMsg(addr, m)
-		if !isAsk {
-			if moveAddr == nil {
-				moveAddr = make(map[string]struct{})
-			}
-			moveAddr[addr] = struct{}{}
-		}
 		isRe = true
+		if addrAsk == nil {
+			addrAsk = make(map[string]bool)
+		}
+		addrAsk[addr] = isAsk
 	}
 	if isRe {
-		nc.redirectProcess(moveAddr)
+		nc.redirectProcess(addrAsk)
 	}
 	return
 }
 
-func (nc *nodeConn) redirectProcess(moveAddr map[string]struct{}) (err error) {
+func (nc *nodeConn) redirectProcess(addrAsk map[string]bool) (err error) {
 	for addr, mb := range nc.mba.MsgBatchs() {
 		if mb.Count() == 0 {
 			continue
 		}
 		rdt := nc.c.getRedirectNodeConn(addr)
 		rdt.lock.Lock()
+		if rdt.nc == nil {
+			rdt.lock.Unlock()       // NOTE: unlock
+			return ErrClusterClosed // FIXME(felix): when closed by closeRedirectNodeConn, how
+		}
 		rnc := rdt.nc
+		isAsk := addrAsk[addr]
 		for _, m := range mb.Msgs() {
 			req, ok := m.Request().(*redis.Request)
 			if !ok {
+				rdt.lock.Unlock() // NOTE: unlock
 				m.WithError(redis.ErrBadAssert)
 				return redis.ErrBadAssert
 			}
 			if !req.IsSupport() || req.IsCtl() {
 				continue
 			}
-			if err = rnc.Bw().Write(askingResp); err != nil {
-				m.WithError(err)
-				return
+			if isAsk {
+				if err = rnc.Bw().Write(askingResp); err != nil {
+					rdt.lock.Unlock() // NOTE: unlock
+					m.WithError(err)
+					return
+				}
 			}
 			if err = req.RESP().Encode(rnc.Bw()); err != nil {
+				rdt.lock.Unlock() // NOTE: unlock
 				m.WithError(err)
 				return err
 			}
 			m.MarkWrite()
 		}
 		if err = rnc.Bw().Flush(); err != nil {
+			rdt.lock.Unlock() // NOTE: unlock
 			return
 		}
 		if err = rnc.ReadBatch(mb); err != nil {
+			rdt.lock.Unlock() // NOTE: unlock
 			return
 		}
-		var isMove bool
-		if moveAddr != nil {
-			_, isMove = moveAddr[addr]
-		}
-		nc.c.closeRedirectNodeConn(addr, isMove)
+		rdt.lock.Unlock() // NOTE: unlock
+		nc.c.closeRedirectNodeConn(addr, isAsk)
 	}
+	nc.mba.Reset()
 	return
 }
 
 func (nc *nodeConn) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&nc.state, opened, closed) {
+	if atomic.CompareAndSwapInt32(&nc.state, opening, closed) {
 		return nc.nc.Close()
 	}
 	return

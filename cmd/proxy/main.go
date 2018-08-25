@@ -17,7 +17,7 @@ import (
 
 const (
 	// VERSION version
-	VERSION = "1.1.0"
+	VERSION = "1.4.0"
 )
 
 var (

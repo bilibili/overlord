@@ -17,6 +17,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rclstr "overlord/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -46,6 +47,12 @@ func NewExecutor(cc *ClusterConfig) (c proto.Executor) {
 	// new executor
 	if _, ok := defaultExecuteCacheTypes[cc.CacheType]; ok {
 		return newDefaultExecutor(cc)
+	}
+	if cc.CacheType == proto.CacheTypeRedisCluster {
+		dto := time.Duration(cc.DialTimeout) * time.Millisecond
+		rto := time.Duration(cc.ReadTimeout) * time.Millisecond
+		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
+		return rclstr.NewExecutor(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, dto, rto, wto, []byte(cc.HashTag))
 	}
 	panic("unsupported protocol")
 }

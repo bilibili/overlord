@@ -41,6 +41,11 @@ func (r *RESP) Data() []byte {
 	return r.data
 }
 
+// Array return resp array.
+func (r *RESP) Array() []*RESP {
+	return r.array
+}
+
 // Decode decode by Reader.
 func (r *RESP) Decode(br *bufio.Reader) (err error) {
 	return r.decode(br)
@@ -216,26 +221,3 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	}
 	return
 }
-
-// func (r *resp) String() string {
-// 	var sb strings.Builder
-// 	sb.Write([]byte{r.rTp})
-// 	switch r.rTp {
-// 	case respString, respInt, respError:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respBulk:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respArray:
-// 		sb.Write([]byte(strconv.Itoa(r.arrayn)))
-// 		sb.Write(crlfBytes)
-
-// 		for i := 0; i < r.arrayn; i++ {
-// 			sb.WriteString(r.array[i].String())
-// 		}
-// 	default:
-// 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
-// 	}
-// 	return sb.String()
-// }

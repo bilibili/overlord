@@ -19,6 +19,14 @@ var (
 	notSupportDataBytes = []byte("Error: command not support")
 )
 
+// ProxyConn is export for redis cluster.
+type ProxyConn = proxyConn
+
+// Bw return proxyConn Writer.
+func (pc *ProxyConn) Bw() *bufio.Writer {
+	return pc.bw
+}
+
 type proxyConn struct {
 	br        *bufio.Reader
 	bw        *bufio.Writer

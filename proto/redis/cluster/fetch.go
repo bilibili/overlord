@@ -1,11 +1,22 @@
 package cluster
 
 import (
+	"bytes"
+	errs "errors"
+
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
 	"overlord/proto/redis"
 
 	"github.com/pkg/errors"
+)
+
+const (
+	respFetch = '$'
+)
+
+var (
+	crlfBytes = []byte("\r\n")
 )
 
 // fetcher will execute `CLUSTER NODES` by the given address。
@@ -17,7 +28,9 @@ type fetcher struct {
 
 var (
 	cmdClusterNodesBytes = []byte("*2\r\n$7\r\nCLUSTER\r\n$5\r\nNODES\r\n")
-	// ErrBadReplyType      = errors.New("bad reply type")
+
+	// ErrBadReplyType error bad reply type
+	ErrBadReplyType = errs.New("fetcher CLUSTER NODES bad reply type")
 )
 
 // newFetcher will create new fetcher
@@ -33,11 +46,11 @@ func newFetcher(conn *libnet.Conn) *fetcher {
 // Fetch new CLUSTER NODES result
 func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 	if err = f.bw.Write(cmdClusterNodesBytes); err != nil {
-		err = errors.Wrap(err, "while encode.")
+		err = errors.Wrap(err, "fetch write CLUSTER NODES")
 		return
 	}
 	if err = f.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "while call writev")
+		err = errors.Wrap(err, "fetch flush")
 		return
 	}
 	var data []byte
@@ -45,7 +58,7 @@ func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 	for {
 		err = f.br.Read()
 		if err != nil {
-			err = errors.Wrap(err, "while call read syscall")
+			err = errors.Wrap(err, "fetch read")
 			return
 		}
 		reply := &redis.RESP{}
@@ -53,15 +66,16 @@ func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 			f.br.AdvanceTo(begin)
 			continue
 		} else if err != nil {
-			err = errors.Wrap(err, "while decode")
+			err = errors.Wrap(err, "fetch decode CLUSTER NODES")
 			return
 		}
-		// if reply.rTp != respBulk {
-		// 	err = ErrBadReplyType
-		// 	return
-		// }
-		// idx := bytes.Index(reply.data, crlfBytes)
-		// data = reply.data[idx+2:]
+		if reply.Type() != respFetch {
+			err = ErrBadReplyType
+			return
+		}
+		data = reply.Data()
+		idx := bytes.Index(data, crlfBytes)
+		data = data[idx+2:]
 		break
 	}
 	return parseSlots(data)

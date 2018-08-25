@@ -12,6 +12,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rclstr "overlord/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -91,9 +92,12 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 					encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case proto.CacheTypeRedis:
 					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+				case proto.CacheTypeRedisCluster:
+					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				}
 				if encoder != nil {
 					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns))
+					_ = encoder.Flush()
 				}
 				_ = conn.Close()
 				if log.V(3) {

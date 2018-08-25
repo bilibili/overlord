@@ -2,7 +2,7 @@ package redis
 
 import (
 	"bytes"
-	"errors"
+	errs "errors"
 	"sync/atomic"
 
 	"overlord/lib/bufio"
@@ -12,8 +12,8 @@ import (
 
 // errors
 var (
-	ErrPingClosed = errors.New("ping interface has been closed")
-	ErrBadPong    = errors.New("pong response payload is bad")
+	ErrPingClosed = errs.New("ping interface has been closed")
+	ErrBadPong    = errs.New("pong response payload is bad")
 )
 
 var (

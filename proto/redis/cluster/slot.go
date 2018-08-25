@@ -3,7 +3,7 @@ package cluster
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	errs "errors"
 	"io"
 	"strconv"
 	"strings"
@@ -13,8 +13,8 @@ const slotsCount = 16384
 
 // errors
 var (
-	ErrAbsentField   = errors.New("Node fields is absent")
-	ErrEmptyNodeLine = errors.New("empty line of cluster nodes")
+	ErrAbsentField   = errs.New("Node fields is absent")
+	ErrEmptyNodeLine = errs.New("empty line of cluster nodes")
 )
 
 var (
@@ -139,7 +139,6 @@ func parseNode(line string) (*node, error) {
 	n.setConfigEpoch(fields[6])
 	n.setLinkState(fields[7])
 	n.setSlots(fields[8:]...)
-	// i++
 	return n, nil
 }
 
@@ -163,7 +162,7 @@ func (n *node) setFlags(val string) {
 	n.flags = flags
 	if strings.Contains(val, roleMaster) {
 		n.role = roleMaster
-	} else if strings.Contains(val, "slave") {
+	} else if strings.Contains(val, roleSlave) {
 		n.role = roleSlave
 	}
 }

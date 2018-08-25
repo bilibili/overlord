@@ -13,6 +13,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rclstr "overlord/proto/redis/cluster"
 )
 
 const (
@@ -57,6 +58,8 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Execu
 		h.pc = mcbin.NewProxyConn(h.conn)
 	case proto.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
+	case proto.CacheTypeRedisCluster:
+		h.pc = rclstr.NewProxyConn(h.conn)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
