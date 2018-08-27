@@ -73,7 +73,9 @@ func NewExecutor(name, listen string, servers []string, conns int32, dto, rto, w
 		action:  make(chan struct{}),
 		redts:   make(map[string]*redirect),
 	}
-	c.tryFetch(true)
+	if !c.tryFetch() {
+		panic("redis cluster all seed nodes fail to fetch")
+	}
 	c.flashy(listen)
 	go c.fetchproc()
 	return c
@@ -176,11 +178,11 @@ func (c *cluster) fetchproc() {
 		case <-c.action:
 		case <-time.After(1 * time.Minute):
 		}
-		c.tryFetch(false)
+		c.tryFetch()
 	}
 }
 
-func (c *cluster) tryFetch(first bool) (changed bool) {
+func (c *cluster) tryFetch() bool {
 	for _, server := range c.servers {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)
@@ -190,13 +192,10 @@ func (c *cluster) tryFetch(first bool) (changed bool) {
 			continue
 		}
 		c.initSlotNode(nSlots)
-		return
-	}
-	if first {
-		panic("redis cluster all seed nodes fail to fetch")
+		return true
 	}
 	log.Error("redis cluster all seed nodes fail to fetch")
-	return
+	return false
 }
 
 func (c *cluster) initSlotNode(nSlots *nodeSlots) {
