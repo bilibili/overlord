@@ -33,9 +33,9 @@ var (
 
 const (
 	flashyClusterNodes = "" +
-		"b1798ba2171a4bd765846ddb5d5bdc9f3ca6fdf3 {} master - 0 0 1 connected 0-5460\r\n" +
-		"dff2f7b0fbda82c72d426eeb9616d9d6455bb4ff {} master - 0 0 2 connected 5461-10922\r\n" +
-		"828c400ea2b55c43e5af67af94bec4943b7b3d93 {} master - 0 0 3 connected 10923-16383\r\n"
+		"0000000000000000000000000000000000000001 {} master - 0 0 1 connected 0-5460\n" +
+		"0000000000000000000000000000000000000002 {} master - 0 0 2 connected 5461-10922\n" +
+		"0000000000000000000000000000000000000003 {} master - 0 0 3 connected 10923-16383\n"
 )
 
 var (
@@ -137,17 +137,35 @@ func (c *cluster) processIO(name, addr string, ncCh *ncChan) {
 			return
 		}
 		if err := nc.WriteBatch(mb); err != nil {
+			if c.isNodeConnIsClosed(err) {
+				c.dealWithRetry(name, addr, mb, ncCh.idx)
+				continue
+			}
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.DoneWithError(name, addr, err)
 			continue
 		}
 		if err := nc.ReadBatch(mb); err != nil {
+			if c.isNodeConnIsClosed(err) {
+				c.dealWithRetry(name, addr, mb, ncCh.idx)
+				continue
+			}
+
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.DoneWithError(name, addr, err)
 			continue
 		}
 		mb.Done(name, addr)
 	}
+}
+
+func (c *cluster) isNodeConnIsClosed(err error) bool {
+	return errors.Cause(err) == redis.ErrNodeConnClosed
+}
+
+func (c *cluster) dealWithRetry(name, addr string, mb *proto.MsgBatch, exclusive int32) {
+	sn := c.slotNode.Load().(*slotNode)
+	sn.nodeChan[addr].pushExclusive(mb, exclusive)
 }
 
 func (c *cluster) getAddr(key []byte) (addr string) {
@@ -255,7 +273,6 @@ func (c *cluster) closeRedirectNodeConn(addr string, isAsk bool) {
 	case c.action <- struct{}{}:
 	default:
 	}
-	return
 }
 
 func (c *cluster) flashy(listen string) {
@@ -307,6 +324,7 @@ type batchChan struct {
 }
 
 type ncChan struct {
+	idx  int32
 	ch   chan *proto.MsgBatch
 	nc   proto.NodeConn
 	stop chan struct{}
@@ -316,11 +334,29 @@ func newBatchChan(n int32) *batchChan {
 	ncChs := make([]*ncChan, n)
 	for i := int32(0); i < n; i++ {
 		ncChs[i] = &ncChan{
+			idx:  i,
 			ch:   make(chan *proto.MsgBatch, 1024),
 			stop: make(chan struct{}),
 		}
 	}
 	return &batchChan{cnt: n, ncChs: ncChs}
+}
+
+func (c *batchChan) pushExclusive(m *proto.MsgBatch, idx int32) {
+	if state := atomic.LoadInt32(&c.state); state == closed {
+		return
+	}
+
+	for {
+		i := atomic.AddInt32(&c.idx, 1)
+		i = i % c.cnt
+		if i == idx {
+			continue
+		}
+
+		c.ncChs[i].ch <- m
+		return
+	}
 }
 
 func (c *batchChan) push(m *proto.MsgBatch) {

@@ -8,6 +8,8 @@ import (
 	"overlord/lib/conv"
 	"overlord/proto"
 	"overlord/proto/redis"
+
+	pkgerrs "github.com/pkg/errors"
 )
 
 const (
@@ -41,11 +43,23 @@ func newNodeConn(c *cluster, addr string) proto.NodeConn {
 
 func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	err = nc.nc.WriteBatch(mb)
+	if err != nil {
+		if atomic.LoadInt32(&nc.state) == closed {
+			err = pkgerrs.Wrap(err, "maybe write closed")
+			return
+		}
+	}
 	return
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	if err = nc.nc.ReadBatch(mb); err != nil {
+		if err != nil {
+			if atomic.LoadInt32(&nc.state) == closed {
+				err = pkgerrs.Wrap(err, "maybe read closed")
+				return
+			}
+		}
 		return
 	}
 	var (
