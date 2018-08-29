@@ -166,12 +166,12 @@ func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBa
 			nc = newNodeConn(e.cc, addr)
 		}
 		mb := <-ch
-		if err := nc.WriteBatch(mb); err != nil {
+		if err = nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
 		}
-		if err := nc.ReadBatch(mb); err != nil {
+		if err = nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
