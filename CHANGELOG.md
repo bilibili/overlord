@@ -1,5 +1,6 @@
 # Overlord
-
+## Version 1.3.1
+1. hot fix  reconn. 
 ## Version 1.3.0
 1. add executor interface.
 2. add pinger interface.

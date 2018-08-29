@@ -159,7 +159,12 @@ func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
 }
 
 func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	var err error
 	for {
+		if err != nil {
+			nc.Close()
+			nc = newNodeConn(e.cc, addr)
+		}
 		mb := <-ch
 		if err := nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
