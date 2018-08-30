@@ -162,7 +162,7 @@ func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBa
 	var err error
 	for {
 		if err != nil {
-			nc.Close()
+			_ = nc.Close()
 			nc = newNodeConn(e.cc, addr)
 		}
 		mb := <-ch
@@ -188,7 +188,7 @@ func (e *defaultExecutor) processPing(p *pinger) {
 			p.retries = 0
 			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				p.ping.Close()
+				_ = p.ping.Close()
 				p.ping = newPingConn(p.cc, p.node)
 			}
 		} else {
@@ -202,10 +202,8 @@ func (e *defaultExecutor) processPing(p *pinger) {
 			e.ring.DelNode(p.node)
 			del = true
 		}
-		select {
-		case <-time.After(backoff.Backoff(p.retries)):
-			p.retries++
-		}
+		<-time.After(backoff.Backoff(p.retries))
+		p.retries++
 	}
 }
 
