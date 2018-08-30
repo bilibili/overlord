@@ -127,27 +127,35 @@ func (c *cluster) process(addr string) *batchChan {
 
 func (c *cluster) processIO(name, addr string, ncCh *ncChan) {
 	var (
-		ch = ncCh.ch
-		nc = ncCh.nc
+		ch  = ncCh.ch
+		nc  = ncCh.nc
+		err error
 	)
 	for {
+		if err != nil {
+			nc = newNodeConn(c, addr)
+			// TODO: there may be chaos with unexcepted closed of cluster.
+			ncCh.nc = nc
+		}
 		mb, ok := <-ch
 		if !ok {
 			close(ncCh.stop) // NOTE: close stop, make sure nc closed concurrent security!!!
 			return
 		}
-		if err := nc.WriteBatch(mb); err != nil {
+
+		if err = nc.WriteBatch(mb); err != nil {
 			if c.isNodeConnIsClosed(err) {
-				c.dealWithRetry(name, addr, mb, ncCh.idx)
+				c.dealWithRetry(name, addr, mb)
 				continue
 			}
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.DoneWithError(name, addr, err)
 			continue
 		}
+
 		if err := nc.ReadBatch(mb); err != nil {
 			if c.isNodeConnIsClosed(err) {
-				c.dealWithRetry(name, addr, mb, ncCh.idx)
+				c.dealWithRetry(name, addr, mb)
 				continue
 			}
 
@@ -163,9 +171,9 @@ func (c *cluster) isNodeConnIsClosed(err error) bool {
 	return errors.Cause(err) == redis.ErrNodeConnClosed
 }
 
-func (c *cluster) dealWithRetry(name, addr string, mb *proto.MsgBatch, exclusive int32) {
+func (c *cluster) dealWithRetry(name, addr string, mb *proto.MsgBatch) {
 	sn := c.slotNode.Load().(*slotNode)
-	sn.nodeChan[addr].pushExclusive(mb, exclusive)
+	sn.nodeChan[addr].push(mb)
 }
 
 func (c *cluster) getAddr(key []byte) (addr string) {
@@ -323,13 +331,6 @@ type batchChan struct {
 	state int32
 }
 
-type ncChan struct {
-	idx  int32
-	ch   chan *proto.MsgBatch
-	nc   proto.NodeConn
-	stop chan struct{}
-}
-
 func newBatchChan(n int32) *batchChan {
 	ncChs := make([]*ncChan, n)
 	for i := int32(0); i < n; i++ {
@@ -340,23 +341,6 @@ func newBatchChan(n int32) *batchChan {
 		}
 	}
 	return &batchChan{cnt: n, ncChs: ncChs}
-}
-
-func (c *batchChan) pushExclusive(m *proto.MsgBatch, idx int32) {
-	if state := atomic.LoadInt32(&c.state); state == closed {
-		return
-	}
-
-	for {
-		i := atomic.AddInt32(&c.idx, 1)
-		i = i % c.cnt
-		if i == idx {
-			continue
-		}
-
-		c.ncChs[i].ch <- m
-		return
-	}
 }
 
 func (c *batchChan) push(m *proto.MsgBatch) {
@@ -381,4 +365,11 @@ func (c *batchChan) close() {
 		<-c.ncChs[i].stop // NOTE: wait stop closed, make sure nc closed concurrent security!!!
 		c.ncChs[i].nc.Close()
 	}
+}
+
+type ncChan struct {
+	idx  int32
+	ch   chan *proto.MsgBatch
+	nc   proto.NodeConn
+	stop chan struct{}
 }
