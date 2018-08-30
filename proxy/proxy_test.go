@@ -250,10 +250,12 @@ func _createTcpProxy(t *testing.T, dist, origin int64) (cancel context.CancelFun
 	if !assert.NoError(t, err) {
 		return
 	}
+	defer listen.Close()
 	conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", dist))
 	if !assert.NoError(t, err) {
 		return
 	}
+	defer conn.Close()
 
 	go func() {
 		for {
@@ -265,6 +267,7 @@ func _createTcpProxy(t *testing.T, dist, origin int64) (cancel context.CancelFun
 
 			sock, err := listen.Accept()
 			assert.NoError(t, err)
+			defer sock.Close()
 
 			forward := func(rd io.Reader, wr io.Writer) {
 				for {

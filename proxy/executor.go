@@ -151,7 +151,7 @@ func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
 	conns := cc.NodeConnections
 	nbc := newBatchChan(conns)
 	for i := int32(0); i < conns; i++ {
-		ch := nbc.get(i)
+		ch := nbc.ch
 		nc := newNodeConn(cc, addr)
 		go e.processIO(cc.Name, addr, ch, nc)
 	}
@@ -233,26 +233,16 @@ func (e *defaultExecutor) trimHashTag(key []byte) []byte {
 }
 
 type batchChan struct {
-	idx int32
 	cnt int32
-	chs []chan *proto.MsgBatch
+	ch  chan *proto.MsgBatch
 }
 
 func newBatchChan(n int32) *batchChan {
-	chs := make([]chan *proto.MsgBatch, n)
-	for i := int32(0); i < n; i++ {
-		chs[i] = make(chan *proto.MsgBatch, 1024)
-	}
-	return &batchChan{cnt: n, chs: chs}
+	return &batchChan{cnt: n, ch: make(chan *proto.MsgBatch, 1024)}
 }
 
 func (c *batchChan) push(m *proto.MsgBatch) {
-	i := atomic.AddInt32(&c.idx, 1)
-	c.chs[i%c.cnt] <- m
-}
-
-func (c *batchChan) get(i int32) chan *proto.MsgBatch {
-	return c.chs[i%c.cnt]
+	c.ch <- m
 }
 
 type pinger struct {
