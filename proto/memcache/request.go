@@ -3,6 +3,8 @@ package memcache
 import (
 	errs "errors"
 	"fmt"
+	"overlord/proto"
+	"strings"
 	"sync"
 )
 
@@ -249,4 +251,24 @@ func (r *MCRequest) Key() []byte {
 
 func (r *MCRequest) String() string {
 	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.Bytes(), r.key, r.data)
+}
+
+// AsSlowlog will convert it self as slowlog string
+func (r *MCRequest) AsSlowlog() string {
+	var sb strings.Builder
+	_, _ = sb.Write(r.rTp.Bytes())
+	_ = sb.WriteByte(spaceByte)
+	_, _ = sb.Write(r.key)
+	_ = sb.WriteByte(spaceByte)
+	_, _ = sb.Write(r.data)
+	return sb.String()
+}
+
+// Clone will copy the data and anything.
+func (r *MCRequest) Clone() proto.Request {
+	return &MCRequest{
+		rTp:  r.rTp,
+		key:  r.key,
+		data: r.data,
+	}
 }

@@ -52,21 +52,24 @@ func (c *Config) Validate() error {
 
 // ClusterConfig cluster config.
 type ClusterConfig struct {
-	Name             string
-	HashMethod       string          `toml:"hash_method"`
-	HashDistribution string          `toml:"hash_distribution"`
-	HashTag          string          `toml:"hash_tag"`
-	CacheType        proto.CacheType `toml:"cache_type"`
-	ListenProto      string          `toml:"listen_proto"`
-	ListenAddr       string          `toml:"listen_addr"`
-	RedisAuth        string          `toml:"redis_auth"`
-	DialTimeout      int             `toml:"dial_timeout"`
-	ReadTimeout      int             `toml:"read_timeout"`
-	WriteTimeout     int             `toml:"write_timeout"`
-	NodeConnections  int32           `toml:"node_connections"`
-	PingFailLimit    int             `toml:"ping_fail_limit"`
-	PingAutoEject    bool            `toml:"ping_auto_eject"`
-	Servers          []string        `toml:"servers"`
+	Name              string
+	HashMethod        string          `toml:"hash_method"`
+	HashDistribution  string          `toml:"hash_distribution"`
+	HashTag           string          `toml:"hash_tag"`
+	CacheType         proto.CacheType `toml:"cache_type"`
+	ListenProto       string          `toml:"listen_proto"`
+	ListenAddr        string          `toml:"listen_addr"`
+	RedisAuth         string          `toml:"redis_auth"`
+	DialTimeout       int             `toml:"dial_timeout"`
+	ReadTimeout       int             `toml:"read_timeout"`
+	WriteTimeout      int             `toml:"write_timeout"`
+	NodeConnections   int32           `toml:"node_connections"`
+	PingFailLimit     int             `toml:"ping_fail_limit"`
+	PingAutoEject     bool            `toml:"ping_auto_eject"`
+	SlowlogMaxCount   int             `toml:"slowlog_max_count"`
+	SlowlogSlowerThan int             `toml:"slowlog_slower_than"`
+	SlowlogOutputFile string          `toml:"slowlog_output_file"`
+	Servers           []string        `toml:"servers"`
 }
 
 // Validate validate config field value.

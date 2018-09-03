@@ -16,25 +16,29 @@ import (
 	"overlord/proxy"
 
 	"github.com/stretchr/testify/assert"
+	"overlord/lib/slowlog"
 )
 
 var (
 	ccs = []*proxy.ClusterConfig{
 		&proxy.ClusterConfig{
-			Name:             "mc-cluster",
-			HashMethod:       "sha1",
-			HashDistribution: "ketama",
-			HashTag:          "",
-			CacheType:        proto.CacheType("memcache"),
-			ListenProto:      "tcp",
-			ListenAddr:       "127.0.0.1:21211",
-			RedisAuth:        "",
-			DialTimeout:      100,
-			ReadTimeout:      100,
-			NodeConnections:  10,
-			WriteTimeout:     1000,
-			PingFailLimit:    3,
-			PingAutoEject:    false,
+			Name:              "mc-cluster",
+			HashMethod:        "sha1",
+			HashDistribution:  "ketama",
+			HashTag:           "",
+			CacheType:         proto.CacheType("memcache"),
+			SlowlogSlowerThan: 10,
+			SlowlogOutputFile: "/tmp/slowlog.out",
+			SlowlogMaxCount:   1000,
+			ListenProto:       "tcp",
+			ListenAddr:        "127.0.0.1:21211",
+			RedisAuth:         "",
+			DialTimeout:       100,
+			ReadTimeout:       100,
+			NodeConnections:   10,
+			WriteTimeout:      1000,
+			PingFailLimit:     3,
+			PingAutoEject:     false,
 			Servers: []string{
 				"127.0.0.1:11211:10",
 				// "127.0.0.1:11212:10",
@@ -207,6 +211,7 @@ var (
 )
 
 func init() {
+	slowlog.Init("mc-cluster", "/tmp/slowlog.out", 1024)
 	mockProxy()
 	time.Sleep(1000 * time.Millisecond)
 }

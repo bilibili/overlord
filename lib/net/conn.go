@@ -15,6 +15,7 @@ var (
 // Add auto timeout setting.
 type Conn struct {
 	addr string
+	local string
 	net.Conn
 
 	dialTimeout  time.Duration
@@ -27,19 +28,25 @@ type Conn struct {
 // DialWithTimeout will create new auto timeout Conn
 func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (c *Conn) {
 	sock, _ := net.DialTimeout("tcp", addr, dialTimeout)
-	c = &Conn{addr: addr, Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout}
+	local := sock.LocalAddr().String()
+	c = &Conn{addr: addr, local: local, Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout}
 	return
 }
 
 // NewConn will create new Connection with given socket
 func NewConn(sock net.Conn, readTimeout, writeTimeout time.Duration) (c *Conn) {
-	c = &Conn{Conn: sock, readTimeout: readTimeout, writeTimeout: writeTimeout}
+	local := sock.LocalAddr().String()
+	c = &Conn{Conn: sock, local: local, readTimeout: readTimeout, writeTimeout: writeTimeout}
 	return
 }
 
 // Dup will re-dial to the given addr by using timeouts stored in itself.
 func (c *Conn) Dup() *Conn {
 	return DialWithTimeout(c.addr, c.dialTimeout, c.readTimeout, c.writeTimeout)
+}
+
+func (c *Conn) LocalAddrString() string {
+	return c.local
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {

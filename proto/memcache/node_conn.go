@@ -50,12 +50,16 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		m   *proto.Message
 		idx int
 	)
+	addr := n.conn.LocalAddrString()
 	for {
 		m = mb.Nth(idx)
 		if m == nil {
 			break
 		}
+		m.LocalAddr = addr
+		m.Bwt = time.Now()
 		err = n.write(m)
+		m.Awt = time.Now()
 		if err != nil {
 			m.WithError(err)
 			return err
@@ -64,9 +68,18 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		idx++
 	}
 
-	if err = n.bw.Flush(); err != nil {
+	for _, m := range mb.Msgs() {
+		m.Bft = time.Now()
+	}
+	err = n.bw.Flush()
+	for _, m := range mb.Msgs() {
+		m.Aft = time.Now()
+	}
+
+	if  err != nil {
 		err = errors.Wrap(err, "MC Writer handle flush Msg bytes")
 	}
+
 	return
 }
 
@@ -111,6 +124,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		ok  bool
 	)
 	m = mb.Nth(nth)
+	m.Brt = time.Now()
 
 	mcr, ok = m.Request().(*MCRequest)
 	if !ok {
@@ -123,6 +137,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			err = errors.Wrap(err, "MC Reader node conn while read")
 			return
 		}
+
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
@@ -130,6 +145,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			} else if err != nil {
 				return
 			}
+			m.Art = time.Now()
 			m.MarkRead()
 
 			cursor += size
@@ -139,6 +155,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			if m == nil {
 				return
 			}
+			m.Brt = time.Now()
 
 			mcr, ok = m.Request().(*MCRequest)
 			if !ok {

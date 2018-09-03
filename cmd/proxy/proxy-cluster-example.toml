@@ -57,6 +57,10 @@ read_timeout = 1000
 write_timeout = 1000
 # The number of connections that can be opened to each server. By default, we open at most 1 server connection.
 node_connections = 2
+# set slow low up threshold as 100 micro seconds.
+slowlog_max_count = 1024
+slowlog_slower_than = 50000
+slowlog_output_file = "/tmp/slowlog.log"
 # The number of consecutive failures on a server that would lead to it being temporarily ejected when auto_eject is set to true. Defaults to 3.
 ping_fail_limit = 3
 # A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.

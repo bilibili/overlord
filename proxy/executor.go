@@ -123,6 +123,7 @@ func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Me
 					m.WithError(ErrExecutorHashNoNode)
 					return ErrExecutorHashNoNode
 				}
+				subm.Node = addr
 				mba.AddMsg(addr, subm)
 			}
 		} else {
@@ -131,6 +132,7 @@ func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Me
 				m.WithError(ErrExecutorHashNoNode)
 				return ErrExecutorHashNoNode
 			}
+			m.Node = addr
 			mba.AddMsg(addr, m)
 		}
 	}

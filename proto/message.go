@@ -2,6 +2,8 @@ package proto
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -61,14 +63,20 @@ func putMsg(m *Message) {
 
 // Message read from client.
 type Message struct {
-	Type CacheType
+	Type            CacheType
+	Node, LocalAddr string
 
 	req  []Request
 	reqn int
 	subs []*Message
-	// Start Time, Write Time, ReadTime, EndTime
+	// Start Time, Write Time, Read Time, End Time
 	st, wt, rt, et time.Time
-	err            error
+
+	// TODO: mark time
+	// before and afeter time for write/flush/read.
+	Bwt, Awt, Bft, Aft, Brt, Art time.Time
+
+	err error
 }
 
 // NewMessage will create new message object.
@@ -82,6 +90,10 @@ func (m *Message) Reset() {
 	m.Type = CacheTypeUnknown
 	m.reqn = 0
 	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
+	m.Art, m.Aft, m.Awt = defaultTime, defaultTime, defaultTime
+	m.Brt, m.Bft, m.Bwt = defaultTime, defaultTime, defaultTime
+	m.LocalAddr = ""
+	m.Node = ""
 	m.err = nil
 }
 
@@ -90,6 +102,70 @@ func (m *Message) clear() {
 	m.Reset()
 	m.req = nil
 	m.subs = nil
+}
+
+// AsSlowlog will convert it self into slow log string.
+func (m *Message) AsSlowlog() string {
+	var sb strings.Builder
+	_, _ = sb.WriteString(fmt.Sprintf("start:%d total:%v remote:%v ", m.st.Unix(), m.TotalDur(), m.RemoteDur()))
+	if m.IsBatch() {
+		for i := 0; i < m.reqn; i++ {
+			req := m.req[i].Clone()
+			str := req.AsSlowlog()
+			wdur := m.subs[i].Awt.Sub(m.subs[i].Bwt) / time.Microsecond
+			fdur := m.subs[i].Aft.Sub(m.subs[i].Bft) / time.Microsecond
+			rdur := m.subs[i].Art.Sub(m.subs[i].Brt) / time.Microsecond
+			_, _ = sb.WriteString(fmt.Sprintf(
+				"\n\t\tsub-cmd(%d:%v->%v): sub-write-dur:%dus sub-flush-dur:%dus sub-read-dur:%dus sub-remote:%dus %s",
+				i, m.subs[i].LocalAddr, m.subs[i].Node, wdur, fdur, rdur, m.subs[i].RemoteDur()/time.Microsecond, strconv.Quote(str)))
+		}
+	} else {
+		req := m.req[0].Clone()
+		wdur := m.Awt.Sub(m.Bwt) / time.Microsecond
+		fdur := m.Aft.Sub(m.Bft) / time.Microsecond
+		rdur := m.Art.Sub(m.Brt) / time.Microsecond
+		_, _ = sb.WriteString(fmt.Sprintf("\n\t\tcmd(%s->%s): write-dur:%dus flush-dur:%dus read-dur:%dus %s",m.LocalAddr, m.Node, wdur, fdur, rdur, strconv.Quote(req.AsSlowlog())))
+	}
+	return sb.String()
+}
+
+// Clone is used for slowlog by clone data from request.
+func (m *Message) Clone() *Message {
+	req := make([]Request, m.reqn)
+	for i, r := range m.Requests() {
+		req[i] = r.Clone()
+	}
+	var subs []*Message
+	if m.IsBatch() {
+		subs = make([]*Message, m.reqn)
+		for i := 0; i < m.reqn; i++ {
+			subs[i] = m.subs[i].Clone()
+		}
+	}
+
+	nm := &Message{
+		Type:      m.Type,
+		LocalAddr: m.LocalAddr,
+		Node:      m.Node,
+		st:        m.st, wt: m.wt, rt: m.rt, et: m.et,
+		Awt: m.Awt, Aft: m.Aft, Art: m.Art,
+		Bwt: m.Bwt, Bft: m.Bft, Brt: m.Brt,
+		err:  m.err,
+		req:  req,
+		reqn: m.reqn,
+		subs: subs,
+	}
+	return nm
+}
+
+// StartTime is the time when message was decoded
+func (m *Message) StartTime() time.Time {
+	return m.st
+}
+
+// WriteTime is the time when message was sent back into backend node
+func (m *Message) WriteTime() time.Time {
+	return m.wt
 }
 
 // TotalDur will return the total duration of a command.

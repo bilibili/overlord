@@ -1,9 +1,12 @@
 package redis
 
 import (
+	"bytes"
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
 )
+
+const maxCloned = 16
 
 // respType is the type of redis resp
 type respType = byte
@@ -65,6 +68,47 @@ type resp struct {
 	array []*resp
 	// in order to reuse array.use arrayn to mark current obj.
 	arrayn int
+}
+
+func (r *resp) Clone() *resp {
+	nr := &resp{rTp: r.rTp}
+	// bulk
+	if r.rTp == respBulk {
+		idx := bytes.Index(r.data, crlfBytes)
+		if idx == -1 {
+			nr.data = make([]byte, len(r.data))
+			copy(nr.data, r.data)
+			return nr
+		}
+		nr.data = make([]byte, len(r.data)-idx-1)
+		copy(nr.data, r.data[idx+1:])
+		return nr
+	}
+
+	// array
+	if r.rTp == respArray {
+		nr.arrayn = r.arrayn
+		// TODO: copy ellipsized for avoid copy mulity
+		// if nr.arrayn >= maxCloned {
+		// 	nr.array = make([]*resp, maxCloned)
+		// }
+
+		nr.array = make([]*resp, r.arrayn)
+		for i := 0; i < r.arrayn; i++ {
+			sub := r.array[i]
+			if sub != nil {
+				nr.array[i] = sub.Clone()
+			} else {
+				nr.array[i] = &resp{rTp: respUnknown, data: []byte{}}
+			}
+		}
+		return nr
+	}
+
+	// Plain
+	nr.data = make([]byte, len(r.data))
+	copy(nr.data, r.data)
+	return nr
 }
 
 func (r *resp) reset() {

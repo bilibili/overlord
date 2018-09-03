@@ -3,12 +3,16 @@ package redis
 import (
 	"bytes"
 	errs "errors"
+	"overlord/proto"
+	"strings"
 	"sync"
 )
 
 var (
 	emptyBytes = []byte("")
 	crlfBytes  = []byte("\r\n")
+
+	blankByte = byte(' ')
 
 	arrayLenTwo   = []byte("2")
 	arrayLenThree = []byte("3")
@@ -198,6 +202,28 @@ func newReq() *Request {
 	r.resp = &resp{}
 	r.reply = &resp{}
 	return r
+}
+
+// AsSlowlog will convert it self as slowlog string
+func (r *Request) AsSlowlog() string {
+	var sb strings.Builder
+	_, _ = sb.Write(r.Cmd())
+	for i := 1; i < r.resp.arrayn-1; i++ {
+		_, _ = sb.Write(r.resp.array[i].data)
+		_ = sb.WriteByte(blankByte)
+	}
+	_, _ = sb.Write(r.resp.array[r.resp.arrayn-1].data)
+	return sb.String()
+}
+
+// Clone will copy the data and anything.
+func (r *Request) Clone() proto.Request {
+	nr := &Request{
+		resp:  r.resp.Clone(),
+		reply: nil,
+		mType: r.mType,
+	}
+	return nr
 }
 
 // CmdString get the cmd

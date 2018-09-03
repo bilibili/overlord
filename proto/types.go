@@ -27,6 +27,9 @@ type Request interface {
 	Cmd() []byte
 	Key() []byte
 	Put()
+
+	AsSlowlog() string
+	Clone() Request
 }
 
 // ProxyConn decode bytes from client and encode write to conn.

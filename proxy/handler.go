@@ -9,6 +9,7 @@ import (
 	"overlord/lib/log"
 	libnet "overlord/lib/net"
 	"overlord/lib/prom"
+	"overlord/lib/slowlog"
 	"overlord/proto"
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
@@ -40,14 +41,17 @@ type Handler struct {
 
 	closed int32
 	err    error
+
+	slowlogFunc slowlog.SendHandler
 }
 
 // NewHandler new a conn handler.
 func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Executor) (h *Handler) {
 	h = &Handler{
-		p:        p,
-		cc:       cc,
-		executor: executor,
+		p:           p,
+		cc:          cc,
+		executor:    executor,
+		slowlogFunc: slowlog.GetSendHandler(cc.Name),
 	}
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
@@ -79,7 +83,10 @@ func (h *Handler) handle() {
 		mba      = proto.GetMsgBatchAllocator()
 		msgs     []*proto.Message
 		err      error
+
+		slowlogSlowerThan = time.Microsecond * time.Duration(h.cc.SlowlogSlowerThan)
 	)
+
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
@@ -96,6 +103,12 @@ func (h *Handler) handle() {
 				return
 			}
 			msg.MarkEnd()
+
+			// 3.5. check and record slowlog
+			if slowlogSlowerThan != 0 && msg.TotalDur() > slowlogSlowerThan {
+				h.slowlogFunc(msg.Clone())
+			}
+
 			msg.ResetSubs()
 			if prom.On {
 				prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
@@ -105,11 +118,13 @@ func (h *Handler) handle() {
 			h.deferHandle(messages, mba, err)
 			return
 		}
+
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}
 		mba.Reset()
+
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}
@@ -128,7 +143,6 @@ func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocato
 	proto.PutMsgs(msgs)
 	proto.PutMsgBatchAllocator(mba)
 	h.closeWithError(err)
-	return
 }
 
 func (h *Handler) closeWithError(err error) {

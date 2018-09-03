@@ -173,6 +173,15 @@ func (*mockReq) Key() []byte {
 func (*mockReq) Put() {
 
 }
+
+func (*mockReq) Clone() proto.Request {
+	return nil
+}
+
+func (*mockReq) AsSlowlog() string {
+	return ""
+}
+
 func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	req := proto.NewMessage()
 	nc := _createNodeConn(nil)
