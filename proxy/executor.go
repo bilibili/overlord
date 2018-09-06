@@ -159,14 +159,19 @@ func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
 }
 
 func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	var err error
 	for {
+		if err != nil {
+			_ = nc.Close()
+			nc = newNodeConn(e.cc, addr)
+		}
 		mb := <-ch
-		if err := nc.WriteBatch(mb); err != nil {
+		if err = nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
 		}
-		if err := nc.ReadBatch(mb); err != nil {
+		if err = nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.BatchDoneWithError(cluster, addr, err)
 			continue
@@ -183,7 +188,7 @@ func (e *defaultExecutor) processPing(p *pinger) {
 			p.retries = 0
 			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				p.ping.Close()
+				_ = p.ping.Close()
 				p.ping = newPingConn(p.cc, p.node)
 			}
 		} else {
@@ -197,10 +202,8 @@ func (e *defaultExecutor) processPing(p *pinger) {
 			e.ring.DelNode(p.node)
 			del = true
 		}
-		select {
-		case <-time.After(backoff.Backoff(p.retries)):
-			p.retries++
-		}
+		<-time.After(backoff.Backoff(p.retries))
+		p.retries++
 	}
 }
 
