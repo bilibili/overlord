@@ -61,9 +61,12 @@ Congratulations! You've just run the overlord proxy.
 - [ ] hot reload: add/remove cluster/node...
 - [ ] QoS: limit/breaker...
 - [ ] L1&L2 cache
-- [ ] hot|cold cache???
-- [ ] broadcast???
-- [ ] double hashing???
+- [ ] hot|cold cache
+- [ ] broadcast
+
+## Architecture
+
+![architecture](doc/images/overlord_arch.png)
 
 # Contributing
 
