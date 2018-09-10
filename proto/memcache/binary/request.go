@@ -211,24 +211,24 @@ func (rt RequestType) String() string {
 	return unknownString
 }
 
-// ResopnseStatus is the protocol-agnostic identifier for the response status
-type ResopnseStatus byte
+// ResponseStatus is the protocol-agnostic identifier for the response status
+type ResponseStatus byte
 
 // all memcache response status
 const (
-	ResopnseStatusNoErr         = 0x0000
-	ResopnseStatusKeyNotFound   = 0x0001
-	ResopnseStatusKeyExists     = 0x0002
-	ResopnseStatusValueTooLarge = 0x0003
-	ResopnseStatusInvalidArg    = 0x0004
-	ResopnseStatusItemNotStored = 0x0005
-	ResopnseStatusNonNumeric    = 0x0006
-	ResopnseStatusUnknownCmd    = 0x0081
-	ResopnseStatusOutOfMem      = 0x0082
-	ResopnseStatusNotSupported  = 0x0083
-	ResopnseStatusInternalErr   = 0x0084
-	ResopnseStatusBusy          = 0x0085
-	ResopnseStatusTemporary     = 0x0086
+	ResponseStatusNoErr         = 0x0000
+	ResponseStatusKeyNotFound   = 0x0001
+	ResponseStatusKeyExists     = 0x0002
+	ResponseStatusValueTooLarge = 0x0003
+	ResponseStatusInvalidArg    = 0x0004
+	ResponseStatusItemNotStored = 0x0005
+	ResponseStatusNonNumeric    = 0x0006
+	ResponseStatusUnknownCmd    = 0x0081
+	ResponseStatusOutOfMem      = 0x0082
+	ResponseStatusNotSupported  = 0x0083
+	ResponseStatusInternalErr   = 0x0084
+	ResponseStatusBusy          = 0x0085
+	ResponseStatusTemporary     = 0x0086
 )
 
 var (

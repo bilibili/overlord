@@ -30,7 +30,7 @@ go build
 ```shell
 ./proxy -cluster=proxy-cluster-example.toml
 ```
-###### Please first run a memcache server, which bind 11211 port.
+###### Please first run a memcache or redis server, which bind 11211 or 6379 port.
 
 #### Test
 
@@ -58,12 +58,16 @@ Congratulations! You've just run the overlord proxy.
 - [x] hash tag: specify the part of the key used for hashing
 - [x] promethues stat metrics support
 - [ ] cache backup
-- [ ] hot reload: add/remove cluster/node...
-- [ ] QoS: limit/breaker...
+- [ ] hot reload: add/remove cache node
+- [ ] QoS: limit/breaker
 - [ ] L1&L2 cache
-- [ ] hot|cold cache???
-- [ ] broadcast???
-- [ ] double hashing???
+- [ ] hot|cold cache
+- [ ] broadcast
+- [ ] cache node scheduler
+
+## Architecture
+
+![architecture](doc/images/overlord_arch.png)
 
 # Contributing
 
