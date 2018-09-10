@@ -60,7 +60,7 @@ var (
 			},
 		},
 		&proxy.ClusterConfig{
-			Name:             "mcbin-cluster",
+			Name:             "redis",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
@@ -75,7 +75,30 @@ var (
 			PingFailLimit:    3,
 			PingAutoEject:    false,
 			Servers: []string{
-				"127.0.0.1:6379:10",
+				"127.0.0.1:7000",
+				"127.0.0.1:7001",
+				// "127.0.0.1:11212:10",
+				// "127.0.0.1:11213:10",
+			},
+		},
+		&proxy.ClusterConfig{
+			Name:             "redis-cluster",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("redis_cluster"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:27000",
+			RedisAuth:        "",
+			DialTimeout:      100,
+			ReadTimeout:      100,
+			NodeConnections:  10,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
+			Servers: []string{
+				"127.0.0.1:7000",
+				"127.0.0.1:7001",
 				// "127.0.0.1:11212:10",
 				// "127.0.0.1:11213:10",
 			},
@@ -197,6 +220,24 @@ func testCmdRedis(t testing.TB, cmds ...[]byte) {
 	}
 }
 
+func testCmdRedisCluster(t testing.TB, cmds ...[]byte) {
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:27000", time.Second)
+	if err != nil {
+		t.Errorf("net dial error:%v", err)
+	}
+	defer conn.Close()
+	br := bufio.NewReader(conn)
+	for _, cmd := range cmds {
+		// t.Logf("\n\nexecute cmd %s", cmd)
+		conn.SetWriteDeadline(time.Now().Add(time.Second))
+		_, err = conn.Write(cmd)
+		assert.NoError(t, err)
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		_, err = br.ReadBytes('\n')
+		assert.NoError(t, err)
+	}
+}
+
 func testCmdNotAvaliabeNode(t testing.TB, cmds ...[]byte) {
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:26380", time.Second)
 	if err != nil {
@@ -298,6 +339,7 @@ func TestProxyFull(t *testing.T) {
 	// for i := 0; i < 10; i++ {
 	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
 	testCmdRedis(t, cmdRedis...)
+	testCmdRedisCluster(t, cmdRedis...)
 	testCmdNotAvaliabeNode(t, cmdRedis[1])
 	testCmdBin(t, cmdBins[0], cmdBins[1])
 	// }

@@ -8,10 +8,13 @@ go_import_path: overlord
 services:
   - memcached
   - redis
+  - docker
 
 install:
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
+  - docker pull grokzen/redis-cluster:4.0.9
+  - docker run -e "IP=0.0.0.0" -d -p 7000-7007:7000-7007 grokzen/redis-cluster:4.0.9
 
 script:
   - gometalinter --vendor --disable-all --enable=gosimple --enable=golint --enable=vet --enable=ineffassign --enable=unconvert \
@@ -26,3 +29,7 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  
+after_script:
+- docker stop redis-cluster
+- docker rm redis-clust
