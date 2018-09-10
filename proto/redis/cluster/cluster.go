@@ -173,6 +173,10 @@ func (c *cluster) isNodeConnIsClosed(err error) bool {
 func (c *cluster) dealWithRetry(name, addr string, mb *proto.MsgBatch) {
 	sn := c.slotNode.Load().(*slotNode)
 	sn.nodeChan[addr].push(mb)
+	select {
+	case c.action <- struct{}{}:
+	default:
+	}
 }
 
 func (c *cluster) getAddr(key []byte) (addr string) {
