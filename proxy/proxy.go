@@ -93,7 +93,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 				case proto.CacheTypeRedis:
 					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case proto.CacheTypeRedisCluster:
-					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), nil)
 				}
 				if encoder != nil {
 					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns))

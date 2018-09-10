@@ -38,10 +38,6 @@ const (
 		"0000000000000000000000000000000000000003 {} master - 0 0 3 connected 10923-16383\n"
 )
 
-var (
-	flashyClusterNodesResp []byte
-)
-
 type cluster struct {
 	name          string
 	servers       []string
@@ -58,6 +54,9 @@ type cluster struct {
 	state int32
 
 	once sync.Once
+
+	fakeNodesBytes []byte
+	fakeSlotsBytes []byte
 }
 
 // NewExecutor new Executor.
@@ -303,10 +302,21 @@ func (c *cluster) flashy(listen string) {
 			}
 			for _, addr := range addrs {
 				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-					ipPort := net.JoinHostPort(ipnet.IP.String(), port)
+					ipStr := ipnet.IP.String()
+					ipStrLen := len(ipStr)
+					ipPort := net.JoinHostPort(ipStr, port)
+
+					addrStr := "*2\r\n" + "$" + strconv.Itoa(ipStrLen) + "\r\n" + ipStr + "\r\n" + ":" + port + "\r\n"
+					c.fakeSlotsBytes = []byte(
+						"*3\r\n" +
+							"*3\r\n:0\r\n:5460\r\n" + addrStr +
+							"*3\r\n:5460\r\n:10922\r\n" + addrStr +
+							"*3\r\n:10922\r\n:16383\r\n" + addrStr)
+
 					respStr := strings.Replace(flashyClusterNodes, "{}", ipPort, -1)
 					l := len(respStr)
-					flashyClusterNodesResp = []byte("$" + strconv.Itoa(l) + "\r\n" + respStr + "\r\n")
+					c.fakeNodesBytes = []byte("$" + strconv.Itoa(l) + "\r\n" + respStr + "\r\n")
+
 					return
 				}
 			}

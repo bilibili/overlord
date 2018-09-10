@@ -59,7 +59,7 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Execu
 	case proto.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
 	case proto.CacheTypeRedisCluster:
-		h.pc = rclstr.NewProxyConn(h.conn)
+		h.pc = rclstr.NewProxyConn(h.conn, executor)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
