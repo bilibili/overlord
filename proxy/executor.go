@@ -233,12 +233,11 @@ func (e *defaultExecutor) trimHashTag(key []byte) []byte {
 }
 
 type batchChan struct {
-	cnt int32
 	ch  chan *proto.MsgBatch
 }
 
 func newBatchChan(n int32) *batchChan {
-	return &batchChan{cnt: n, ch: make(chan *proto.MsgBatch, 1024)}
+	return &batchChan{ch: make(chan *proto.MsgBatch, n*1024)}
 }
 
 func (c *batchChan) push(m *proto.MsgBatch) {
