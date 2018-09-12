@@ -32,10 +32,16 @@ var (
 )
 
 const (
-	flashyClusterNodes = "" +
-		"0000000000000000000000000000000000000001 {} master - 0 0 1 connected 0-5460\n" +
-		"0000000000000000000000000000000000000002 {} master - 0 0 2 connected 5461-10922\n" +
-		"0000000000000000000000000000000000000003 {} master - 0 0 3 connected 10923-16383\n"
+	fakeClusterNodes = "" +
+		"0000000000000000000000000000000000000001 {ADDR} master - 0 0 1 connected 0-5460\n" +
+		"0000000000000000000000000000000000000002 {ADDR} master - 0 0 2 connected 5461-10922\n" +
+		"0000000000000000000000000000000000000003 {ADDR} master - 0 0 3 connected 10923-16383\n"
+
+	fakeClusterSlots = "" +
+		"*3\r\n" +
+		"*3\r\n:0\r\n:5460\r\n*2\r\n${IPLEN}\r\n{IP}\r\n:{PORT}\r\n" +
+		"*3\r\n:5460\r\n:10922\r\n*2\r\n${IPLEN}\r\n{IP}\r\n:{PORT}\r\n" +
+		"*3\r\n:10922\r\n:16383\r\n*2\r\n${IPLEN}\r\n{IP}\r\n:{PORT}\r\n"
 )
 
 type cluster struct {
@@ -75,7 +81,7 @@ func NewExecutor(name, listen string, servers []string, conns int32, dto, rto, w
 	if !c.tryFetch() {
 		panic("redis cluster all seed nodes fail to fetch")
 	}
-	c.flashy(listen)
+	c.fake(listen)
 	go c.fetchproc()
 	return c
 }
@@ -117,16 +123,15 @@ func (c *cluster) Close() error {
 func (c *cluster) process(addr string) *batchChan {
 	nbc := newBatchChan(c.conns)
 	for i := int32(0); i < c.conns; i++ {
-		nc := newNodeConn(c, addr)
-		ncCh := nbc.get(i, nc)
-		go c.processIO(c.name, addr, ncCh)
+		ncCh := &ncChan{nc: newNodeConn(c, addr), stop: make(chan struct{})}
+		nbc.add(i, ncCh)
+		go c.processIO(c.name, addr, nbc.ch, ncCh)
 	}
 	return nbc
 }
 
-func (c *cluster) processIO(name, addr string, ncCh *ncChan) {
+func (c *cluster) processIO(name, addr string, ch chan *proto.MsgBatch, ncCh *ncChan) {
 	var (
-		ch  = ncCh.ch
 		nc  = ncCh.nc
 		err error
 	)
@@ -141,41 +146,17 @@ func (c *cluster) processIO(name, addr string, ncCh *ncChan) {
 			close(ncCh.stop) // NOTE: close stop, make sure nc closed concurrent security!!!
 			return
 		}
-
 		if err = nc.WriteBatch(mb); err != nil {
-			if c.isNodeConnIsClosed(err) {
-				c.dealWithRetry(name, addr, mb)
-				continue
-			}
 			err = errors.Wrap(err, "Cluster batch write")
 			mb.DoneWithError(name, addr, err)
 			continue
 		}
-
 		if err := nc.ReadBatch(mb); err != nil {
-			if c.isNodeConnIsClosed(err) {
-				c.dealWithRetry(name, addr, mb)
-				continue
-			}
-
 			err = errors.Wrap(err, "Cluster batch read")
 			mb.DoneWithError(name, addr, err)
 			continue
 		}
 		mb.Done(name, addr)
-	}
-}
-
-func (c *cluster) isNodeConnIsClosed(err error) bool {
-	return errors.Cause(err) == redis.ErrNodeConnClosed
-}
-
-func (c *cluster) dealWithRetry(name, addr string, mb *proto.MsgBatch) {
-	sn := c.slotNode.Load().(*slotNode)
-	sn.nodeChan[addr].push(mb)
-	select {
-	case c.action <- struct{}{}:
-	default:
 	}
 }
 
@@ -286,7 +267,7 @@ func (c *cluster) closeRedirectNodeConn(addr string, isAsk bool) {
 	}
 }
 
-func (c *cluster) flashy(listen string) {
+func (c *cluster) fake(listen string) {
 	c.once.Do(func() {
 		_, port, err := net.SplitHostPort(listen)
 		if err != nil {
@@ -307,20 +288,16 @@ func (c *cluster) flashy(listen string) {
 			for _, addr := range addrs {
 				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
 					ipStr := ipnet.IP.String()
+
 					ipStrLen := len(ipStr)
-					ipPort := net.JoinHostPort(ipStr, port)
+					slotsStr := strings.Replace(fakeClusterSlots, "{IPLEN}", strconv.Itoa(ipStrLen), -1)
+					slotsStr = strings.Replace(slotsStr, "{IP}", ipStr, -1)
+					slotsStr = strings.Replace(slotsStr, "{PORT}", port, -1)
+					c.fakeSlotsBytes = []byte(slotsStr)
 
-					addrStr := "*2\r\n" + "$" + strconv.Itoa(ipStrLen) + "\r\n" + ipStr + "\r\n" + ":" + port + "\r\n"
-					c.fakeSlotsBytes = []byte(
-						"*3\r\n" +
-							"*3\r\n:0\r\n:5460\r\n" + addrStr +
-							"*3\r\n:5460\r\n:10922\r\n" + addrStr +
-							"*3\r\n:10922\r\n:16383\r\n" + addrStr)
-
-					respStr := strings.Replace(flashyClusterNodes, "{}", ipPort, -1)
-					l := len(respStr)
-					c.fakeNodesBytes = []byte("$" + strconv.Itoa(l) + "\r\n" + respStr + "\r\n")
-
+					nodesStr := strings.Replace(fakeClusterNodes, "{ADDR}", net.JoinHostPort(ipStr, port), -1)
+					nodesLen := len(nodesStr)
+					c.fakeNodesBytes = []byte("$" + strconv.Itoa(nodesLen) + "\r\n" + nodesStr + "\r\n")
 					return
 				}
 			}
@@ -339,51 +316,38 @@ type slotNode struct {
 }
 
 type batchChan struct {
-	idx   int32
-	cnt   int32
-	ncChs []*ncChan
+	ch    chan *proto.MsgBatch
+	ncChs map[int32]*ncChan
 	state int32
 }
 
 func newBatchChan(n int32) *batchChan {
-	ncChs := make([]*ncChan, n)
-	for i := int32(0); i < n; i++ {
-		ncChs[i] = &ncChan{
-			idx:  i,
-			ch:   make(chan *proto.MsgBatch, 1024),
-			stop: make(chan struct{}),
-		}
-	}
-	return &batchChan{cnt: n, ncChs: ncChs}
+	return &batchChan{ch: make(chan *proto.MsgBatch, n*1024), ncChs: make(map[int32]*ncChan)}
 }
 
 func (c *batchChan) push(m *proto.MsgBatch) {
 	if state := atomic.LoadInt32(&c.state); state == closed {
 		return
 	}
-	i := atomic.AddInt32(&c.idx, 1)
-	c.ncChs[i%c.cnt].ch <- m
+	c.ch <- m
 }
 
-func (c *batchChan) get(i int32, nc proto.NodeConn) *ncChan {
-	c.ncChs[i].nc = nc
-	return c.ncChs[i%c.cnt]
+func (c *batchChan) add(i int32, ncCh *ncChan) {
+	c.ncChs[i] = ncCh
 }
 
 func (c *batchChan) close() {
 	if !atomic.CompareAndSwapInt32(&c.state, opening, closed) {
 		return
 	}
-	for i := 0; i < len(c.ncChs); i++ {
-		close(c.ncChs[i].ch)
-		<-c.ncChs[i].stop // NOTE: wait stop closed, make sure nc closed concurrent security!!!
-		c.ncChs[i].nc.Close()
+	close(c.ch)
+	for _, ncCh := range c.ncChs {
+		<-ncCh.stop // NOTE: wait stop closed, make sure nc closed concurrent security!!!
+		ncCh.nc.Close()
 	}
 }
 
 type ncChan struct {
-	idx  int32
-	ch   chan *proto.MsgBatch
 	nc   proto.NodeConn
 	stop chan struct{}
 }

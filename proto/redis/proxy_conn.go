@@ -70,7 +70,7 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	mark := pc.br.Mark()
-	if err = pc.resp.Decode(pc.br); err != nil {
+	if err = pc.resp.decode(pc.br); err != nil {
 		if err == bufio.ErrBufferFull {
 			pc.br.AdvanceTo(mark)
 		}
