@@ -36,6 +36,9 @@ func (*mockCmd) Put() {
 func TestNodeConnNewNodeConn(t *testing.T) {
 	nc := NewNodeConn("test", "127.0.0.1:12345", time.Second, time.Second, time.Second)
 	assert.NotNil(t, nc)
+	rnc := nc.(*nodeConn)
+	assert.NotNil(t, rnc.Bw())
+	assert.NoError(t, rnc.Close())
 }
 
 func TestNodeConnClose(t *testing.T) {
@@ -60,7 +63,13 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 	mb.AddMsg(msg)
 	err := nc.WriteBatch(mb)
 	assert.NoError(t, err)
+
+	rnc := nc.(*nodeConn)
+	assert.NoError(t, rnc.Close())
+	assert.True(t, rnc.Closed())
+	assert.Error(t, rnc.WriteBatch(mb))
 }
+
 
 func TestNodeConnWriteBadAssert(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
@@ -155,6 +164,11 @@ func TestReadBatchWithNilError(t *testing.T) {
 	err := nc.ReadBatch(mb)
 	assert.Error(t, err)
 	assert.Equal(t, io.EOF, err)
+
+	rnc := nc.(*nodeConn)
+	assert.NoError(t, rnc.Close())
+	assert.True(t, rnc.Closed())
+	assert.Error(t, rnc.ReadBatch(mb))
 }
 
 func newRequest(cmd string, args ...string) *Request {

@@ -257,7 +257,10 @@ func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	return bytes.Index(reqReadCmdsBytes, r.resp.array[0].data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.array[0].data) > -1
+
+	return bytes.Contains(reqReadCmdsBytes, r.resp.array[0].data) ||
+		bytes.Contains(reqWriteCmdsBytes, r.resp.array[0].data) ||
+		bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
 }
 
 // IsCtl is control command.
@@ -265,5 +268,6 @@ func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	return bytes.Index(reqCtlCmdsBytes, r.resp.array[0].data) > -1
+
+	return bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
 }
