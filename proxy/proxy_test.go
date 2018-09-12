@@ -254,6 +254,7 @@ func _createTcpProxy(t *testing.T, dist, origin int64) (cancel context.CancelFun
 	if !assert.NoError(t, err) {
 		return
 	}
+	// defer conn.Close()
 
 	go func() {
 		for {
@@ -268,11 +269,6 @@ func _createTcpProxy(t *testing.T, dist, origin int64) (cancel context.CancelFun
 
 			forward := func(rd io.Reader, wr io.Writer) {
 				for {
-					select {
-					case <-sub.Done():
-						return
-					default:
-					}
 					_, err := io.Copy(wr, rd)
 					if !assert.NoError(t, err) {
 						return
