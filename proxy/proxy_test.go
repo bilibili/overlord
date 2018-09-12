@@ -126,6 +126,25 @@ var (
 				// "127.0.0.1:11213:10",
 			},
 		},
+		&proxy.ClusterConfig{
+			Name:             "reconn_test",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("memcache"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:21221",
+			RedisAuth:        "",
+			DialTimeout:      100,
+			ReadTimeout:      100,
+			NodeConnections:  1,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
+			Servers: []string{
+				"127.0.0.1:21220:1",
+			},
+		},
 	}
 
 	cmds = [][]byte{
@@ -325,7 +344,6 @@ func _execute(t *testing.T) (bs []byte) {
 }
 
 func TestReconnFeature(t *testing.T) {
-
 	cancel := _createTcpProxy(t, 11211, 21220)
 	defer cancel()
 	// 1. try to execute with error, but click reconn process
