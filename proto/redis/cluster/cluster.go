@@ -193,7 +193,13 @@ func (c *cluster) fetchproc() {
 }
 
 func (c *cluster) tryFetch() bool {
+	// for map's access is random in golang.
+	shuffleMap := make(map[string]struct{})
 	for _, server := range c.servers {
+		shuffleMap[server] = struct{}{}
+	}
+
+	for server := range shuffleMap {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)
 		nSlots, err := f.fetch()
