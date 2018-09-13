@@ -244,3 +244,12 @@ func TestRespEncode(t *testing.T) {
 		})
 	}
 }
+
+func TestRESPExportFunc(t *testing.T) {
+	var r = &RESP{
+		rTp:  respString,
+		data: []byte("abcde"),
+	}
+	assert.Equal(t, "abcde", string(r.Data()))
+	assert.Equal(t, respString, r.Type())
+}
