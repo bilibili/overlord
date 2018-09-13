@@ -28,7 +28,10 @@ type Conn struct {
 // DialWithTimeout will create new auto timeout Conn
 func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (c *Conn) {
 	sock, _ := net.DialTimeout("tcp", addr, dialTimeout)
-	local := sock.LocalAddr().String()
+	var local = ""
+	if sock != nil {
+		local = sock.LocalAddr().String()
+	}
 	c = &Conn{addr: addr, local: local, Conn: sock, dialTimeout: dialTimeout, readTimeout: readTimeout, writeTimeout: writeTimeout}
 	return
 }
@@ -45,6 +48,7 @@ func (c *Conn) Dup() *Conn {
 	return DialWithTimeout(c.addr, c.dialTimeout, c.readTimeout, c.writeTimeout)
 }
 
+// LocalAddrString returns cached addr string.
 func (c *Conn) LocalAddrString() string {
 	return c.local
 }
