@@ -13,6 +13,7 @@ var (
 	arrayLenTwo   = []byte("2")
 	arrayLenThree = []byte("3")
 
+	cmdQuitBytes   = []byte("4\r\nQUIT")
 	cmdPingBytes   = []byte("4\r\nPING")
 	cmdMSetBytes   = []byte("4\r\nMSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
@@ -148,13 +149,12 @@ var (
 		"4\r\nINFO" +
 		"5\r\nPROXY" +
 		"7\r\nSLOWLOG" +
-		"4\r\nQUIT" +
 		"6\r\nSELECT" +
 		"4\r\nTIME" +
 		"6\r\nCONFIG" +
 		"8\r\nCOMMANDS")
 
-	reqCtlCmdsBytes = []byte("4\r\nPING")
+	reqCtlCmdsBytes = []byte("4\r\nQUIT" + "4\r\nPING")
 )
 
 // errors

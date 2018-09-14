@@ -17,6 +17,7 @@ var (
 	nullBytes           = []byte("-1\r\n")
 	okBytes             = []byte("OK\r\n")
 	pongDataBytes       = []byte("PONG")
+	justOkBytes         = []byte("OK")
 	notSupportDataBytes = []byte("Error: command not support")
 )
 
@@ -175,10 +176,14 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 			copy(req.reply.data, notSupportDataBytes)
 			// req.reply.data = notSupportDataBytes
 		} else if req.IsCtl() {
-			if bytes.Equal(req.resp.array[0].data, cmdPingBytes) {
+			reqData := req.resp.array[0].data
+			if bytes.Equal(reqData, cmdPingBytes) {
 				req.reply.rTp = respString
 				copy(req.reply.data, pongDataBytes)
 				// req.reply.data = pongDataBytes
+			} else if bytes.Equal(reqData, cmdQuitBytes) {
+				req.reply.rTp = respString
+				copy(req.reply.data, justOkBytes)
 			}
 		}
 		err = req.reply.encode(pc.bw)
