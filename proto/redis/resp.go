@@ -43,7 +43,7 @@ func (r *RESP) Data() []byte {
 
 // Array return resp array.
 func (r *RESP) Array() []*RESP {
-	return r.array
+	return r.array[:r.arrayn]
 }
 
 // Decode decode by Reader.

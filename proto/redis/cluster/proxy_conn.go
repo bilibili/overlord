@@ -8,7 +8,9 @@ import (
 	"overlord/proto"
 	"overlord/proto/redis"
 
+	errs "errors"
 	"github.com/pkg/errors"
+	"overlord/lib/log"
 )
 
 var (
@@ -18,9 +20,14 @@ var (
 	notSupportBytes = []byte("-Error: command not support\r\n")
 )
 
+// errors
+var (
+	ErrInvalidArgument = errs.New("cluster command with wrong argument")
+)
+
 type proxyConn struct {
 	pc proto.ProxyConn
-	c *cluster
+	c  *cluster
 }
 
 // NewProxyConn creates new redis cluster Encoder and Decoder.
@@ -32,11 +39,10 @@ func NewProxyConn(conn *libnet.Conn, executer proto.Executor) proto.ProxyConn {
 
 	r := &proxyConn{
 		pc: redis.NewProxyConn(conn),
-		c: c,
+		c:  c,
 	}
 	return r
 }
-
 
 func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	return pc.pc.Decode(msgs)
@@ -48,18 +54,25 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		if !req.IsSupport() && !req.IsCtl() {
 			resp := req.RESP()
 			arr := resp.Array()
-			if len(arr) == 2 && bytes.Equal(arr[0].Data(), cmdClusterBytes) {
-				conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
-				pcc := pc.pc.(*redis.ProxyConn)
-				if bytes.Equal(arr[1].Data(), cmdNodesBytes) {
-					err = pcc.Bw().Write(pc.c.fakeNodesBytes)
-					return
-				} else if bytes.Equal(arr[1].Data(), cmdSlotsBytes) {
-					err = pcc.Bw().Write(pc.c.fakeSlotsBytes)
+			if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
+				if len(arr) == 2 {
+					// CLUSTER COMMANDS
+					conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
+					pcc := pc.pc.(*redis.ProxyConn)
+					if bytes.Equal(arr[1].Data(), cmdNodesBytes) {
+						// CLUSTER NODES
+						err = pcc.Bw().Write(pc.c.fakeNodesBytes)
+						return
+					} else if bytes.Equal(arr[1].Data(), cmdSlotsBytes) {
+						// CLUSTER SLOTS
+						err = pcc.Bw().Write(pc.c.fakeSlotsBytes)
+						return
+					}
+					err = pcc.Bw().Write(notSupportBytes)
 					return
 				}
-				err = pcc.Bw().Write(notSupportBytes)
-				return
+				log.Infof("wrong argument of resp %v", *resp)
+				m.WithError(ErrInvalidArgument)
 			}
 		}
 	}
