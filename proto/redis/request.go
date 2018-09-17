@@ -257,7 +257,6 @@ func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-
 	return bytes.Contains(reqReadCmdsBytes, r.resp.array[0].data) ||
 		bytes.Contains(reqWriteCmdsBytes, r.resp.array[0].data) ||
 		bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
@@ -268,6 +267,5 @@ func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-
 	return bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
 }

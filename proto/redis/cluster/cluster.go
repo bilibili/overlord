@@ -198,7 +198,6 @@ func (c *cluster) tryFetch() bool {
 	for _, server := range c.servers {
 		shuffleMap[server] = struct{}{}
 	}
-
 	for server := range shuffleMap {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)

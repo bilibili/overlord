@@ -2,15 +2,14 @@ package cluster
 
 import (
 	"bytes"
+	errs "errors"
 
 	"overlord/lib/conv"
 	libnet "overlord/lib/net"
 	"overlord/proto"
 	"overlord/proto/redis"
 
-	errs "errors"
 	"github.com/pkg/errors"
-	"overlord/lib/log"
 )
 
 var (
@@ -26,8 +25,8 @@ var (
 )
 
 type proxyConn struct {
-	pc proto.ProxyConn
 	c  *cluster
+	pc proto.ProxyConn
 }
 
 // NewProxyConn creates new redis cluster Encoder and Decoder.
@@ -36,10 +35,9 @@ func NewProxyConn(conn *libnet.Conn, executer proto.Executor) proto.ProxyConn {
 	if executer != nil {
 		c = executer.(*cluster)
 	}
-
 	r := &proxyConn{
-		pc: redis.NewProxyConn(conn),
 		c:  c,
+		pc: redis.NewProxyConn(conn),
 	}
 	return r
 }
@@ -71,7 +69,6 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 					err = pcc.Bw().Write(notSupportBytes)
 					return
 				}
-				log.Infof("wrong argument of resp %v", *resp)
 				m.WithError(ErrInvalidArgument)
 			}
 		}

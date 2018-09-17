@@ -100,7 +100,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 					_ = encoder.Flush()
 				}
 				_ = conn.Close()
-				if log.V(3) {
+				if log.V(5) {
 					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
 				}
 				continue
