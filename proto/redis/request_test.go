@@ -39,5 +39,5 @@ func TestReqeustCloneAndAsSlowlowgAndPut(t *testing.T) {
 	assert.Equal(t, 2, req.resp.arrayn)
 	slowlog := cloned.AsSlowlog()
 	assert.Equal(t, "LLEN mylist", slowlog)
-	cloned.Put()
+	req.Put()
 }
