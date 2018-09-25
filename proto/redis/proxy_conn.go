@@ -10,7 +10,6 @@ import (
 	"overlord/proto"
 
 	"github.com/pkg/errors"
-	"overlord/lib/log"
 )
 
 var (
@@ -171,18 +170,21 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	}
 	if !m.IsBatch() {
 		if !req.IsSupport() {
-			log.Infof("not support command %s", strconv.Quote(string(req.resp.array[0].data)))
+			// log.Infof("not support command %s", strconv.Quote(string(req.resp.array[0].data)))
 			req.reply.rTp = respError
+			req.reply.data = make([]byte, len(notSupportDataBytes))
 			copy(req.reply.data, notSupportDataBytes)
 			// req.reply.data = notSupportDataBytes
 		} else if req.IsCtl() {
 			reqData := req.resp.array[0].data
 			if bytes.Equal(reqData, cmdPingBytes) {
 				req.reply.rTp = respString
+				req.reply.data = make([]byte, len(pongDataBytes))
 				copy(req.reply.data, pongDataBytes)
 				// req.reply.data = pongDataBytes
 			} else if bytes.Equal(reqData, cmdQuitBytes) {
 				req.reply.rTp = respString
+				req.reply.data = make([]byte, len(justOkBytes))
 				copy(req.reply.data, justOkBytes)
 			}
 		}
