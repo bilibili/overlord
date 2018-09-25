@@ -49,3 +49,17 @@ func TestMCRequestFuncsOk(t *testing.T) {
 	assert.Nil(t, req.key)
 	assert.Nil(t, req.data)
 }
+
+func TestMCRequestCloneAndAsSlowlog(t *testing.T) {
+	req := &MCRequest{
+		rTp:  RequestTypeGet,
+		key:  []byte("abc"),
+		data: []byte("\r\n"),
+	}
+	assert.Equal(t, []byte("get"), req.Cmd())
+	assert.Equal(t, "abc", string(req.Key()))
+	assert.Equal(t, "type:get key:abc data:\r\n", req.String())
+	cloned := req.Clone()
+	assert.Equal(t, []byte("get"), cloned.Cmd())
+	assert.Equal(t, "get abc \r\n", cloned.AsSlowlog())
+}

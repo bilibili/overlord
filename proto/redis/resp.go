@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"bytes"
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
 )
@@ -72,19 +71,6 @@ type resp struct {
 
 func (r *resp) Clone() *resp {
 	nr := &resp{rTp: r.rTp}
-	// bulk
-	if r.rTp == respBulk {
-		idx := bytes.Index(r.data, crlfBytes)
-		if idx == -1 {
-			nr.data = make([]byte, len(r.data))
-			copy(nr.data, r.data)
-			return nr
-		}
-		nr.data = make([]byte, len(r.data)-idx-1)
-		copy(nr.data, r.data[idx+1:])
-		return nr
-	}
-
 	// array
 	if r.rTp == respArray {
 		nr.arrayn = r.arrayn
@@ -105,7 +91,7 @@ func (r *resp) Clone() *resp {
 		return nr
 	}
 
-	// Plain
+	// Plain and bulk
 	nr.data = make([]byte, len(r.data))
 	copy(nr.data, r.data)
 	return nr

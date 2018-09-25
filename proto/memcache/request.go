@@ -266,9 +266,11 @@ func (r *MCRequest) AsSlowlog() string {
 
 // Clone will copy the data and anything.
 func (r *MCRequest) Clone() proto.Request {
-	return &MCRequest{
+	nr := &MCRequest{
 		rTp:  r.rTp,
 		key:  r.key,
-		data: r.data,
+		data: make([]byte, len(r.data)),
 	}
+	copy(nr.data, r.data)
+	return nr
 }

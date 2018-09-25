@@ -208,11 +208,15 @@ func newReq() *Request {
 func (r *Request) AsSlowlog() string {
 	var sb strings.Builder
 	_, _ = sb.Write(r.Cmd())
-	for i := 1; i < r.resp.arrayn-1; i++ {
-		_, _ = sb.Write(r.resp.array[i].data)
+	for i := 1; i < r.resp.arrayn; i++ {
 		_ = sb.WriteByte(blankByte)
+		if r.resp.array[i].rTp == respBulk {
+			idx := bytes.Index(r.resp.array[i].data, crlfBytes)
+			_, _ = sb.Write(r.resp.array[i].data[idx+2:])
+		} else {
+			_, _ = sb.Write(r.resp.array[i].data)
+		}
 	}
-	_, _ = sb.Write(r.resp.array[r.resp.arrayn-1].data)
 	return sb.String()
 }
 
