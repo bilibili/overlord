@@ -103,7 +103,10 @@ func newDefaultExecutor(cc *ClusterConfig) proto.Executor {
 		for idx, addr := range addrs {
 			w := ws[idx]
 			pc := newPingConn(cc, addr)
-			p := &pinger{ping: pc, cc: cc, node: addr, alias: ans[idx], weight: w}
+			p := &pinger{ping: pc, cc: cc, node: addr, weight: w}
+			if e.alias {
+				p.alias = ans[idx]
+			}
 			go e.processPing(p)
 		}
 	}
