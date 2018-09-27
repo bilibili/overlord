@@ -103,7 +103,7 @@ func newDefaultExecutor(cc *ClusterConfig) proto.Executor {
 		for idx, addr := range addrs {
 			w := ws[idx]
 			pc := newPingConn(cc, addr)
-			p := &pinger{ping: pc, cc: cc, node: addr, weight: w}
+			p := &pinger{ping: pc, cc: cc, node: addr, alias: ans[idx], weight: w}
 			go e.processPing(p)
 		}
 	}
@@ -201,12 +201,20 @@ func (e *defaultExecutor) processPing(p *pinger) {
 		} else {
 			p.failure = 0
 			if del {
-				e.ring.AddNode(p.node, p.weight)
+				if p.alias != "" {
+					e.ring.AddNode(p.alias, p.weight)
+				} else {
+					e.ring.AddNode(p.node, p.weight)
+				}
 				del = false
 			}
 		}
 		if e.cc.PingAutoEject && p.failure >= e.cc.PingFailLimit {
-			e.ring.DelNode(p.node)
+			if p.alias != "" {
+				e.ring.DelNode(p.alias)
+			} else {
+				e.ring.DelNode(p.node)
+			}
 			del = true
 		}
 		<-time.After(backoff.Backoff(p.retries))
@@ -240,7 +248,7 @@ func (e *defaultExecutor) trimHashTag(key []byte) []byte {
 }
 
 type batchChan struct {
-	ch  chan *proto.MsgBatch
+	ch chan *proto.MsgBatch
 }
 
 func newBatchChan(n int32) *batchChan {
@@ -255,6 +263,7 @@ type pinger struct {
 	cc     *ClusterConfig
 	ping   proto.Pinger
 	node   string
+	alias  string
 	weight int
 
 	failure int
