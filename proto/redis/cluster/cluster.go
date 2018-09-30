@@ -81,8 +81,6 @@ func NewExecutor(name, listen string, servers []string, conns int32, dto, rto, w
 	if !c.tryFetch() {
 		panic("redis cluster all seed nodes fail to fetch")
 	}
-	slots := c.slotNode.Load().(*slotNode)
-	c.servers = slots.nSlots.getMasters()
 	c.fake(listen)
 	go c.fetchproc()
 	return c
@@ -205,34 +203,18 @@ func (c *cluster) tryFetch() bool {
 	for _, server := range c.servers {
 		shuffleMap[server] = struct{}{}
 	}
-	drainServers := make(map[string]struct{})
 	for server := range shuffleMap {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)
 		nSlots, err := f.fetch()
 		if err != nil {
-			drainServers[server] = struct{}{}
 			log.Errorf("fail to fetch due to %s", err)
 			continue
-		}
-		if len(drainServers) != 0 {
-			// remove unused servers
-			c.servers = make([]string, 0)
-			for server := range shuffleMap {
-				if _, ok := drainServers[server]; !ok {
-					c.servers = append(c.servers, server)
-				}
-			}
 		}
 		c.initSlotNode(nSlots)
 		return true
 	}
 
-	// refill the servers.
-	c.servers = make([]string, 0)
-	for server := range shuffleMap {
-		c.servers = append(c.servers, server)
-	}
 	log.Error("redis cluster all seed nodes fail to fetch")
 	return false
 }
@@ -247,7 +229,8 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 	}
 	sn := &slotNode{nSlots: nSlots}
 	sn.nodeChan = make(map[string]*batchChan)
-	for _, addr := range nSlots.getMasters() {
+	masters := nSlots.getMasters()
+	for _, addr := range masters {
 		bc, ok := onc[addr]
 		if !ok {
 			bc = c.process(addr)
@@ -256,6 +239,7 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		}
 		sn.nodeChan[addr] = bc
 	}
+	c.servers = masters
 	c.slotNode.Store(sn)
 	for _, bc := range onc {
 		bc.close()
@@ -284,7 +268,7 @@ func (c *cluster) closeRedirectNodeConn(addr string, isAsk bool) {
 	r, ok := c.redts[addr]
 	if ok {
 		r.lock.Lock()
-		r.nc.Close()
+		_ = r.nc.Close()
 		r.nc = nil
 		r.lock.Unlock() // FIXME(felix): when NodeConn have nc pointer in func redirectProcess
 		delete(c.redts, addr)
@@ -372,7 +356,7 @@ func (c *batchChan) close() {
 	close(c.ch)
 	for _, ncCh := range c.ncChs {
 		<-ncCh.stop // NOTE: wait stop closed, make sure nc closed concurrent security!!!
-		ncCh.nc.Close()
+		_ = ncCh.nc.Close()
 	}
 }
 
