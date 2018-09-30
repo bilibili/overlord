@@ -81,6 +81,8 @@ func NewExecutor(name, listen string, servers []string, conns int32, dto, rto, w
 	if !c.tryFetch() {
 		panic("redis cluster all seed nodes fail to fetch")
 	}
+	slots := c.slotNode.Load().(*slotNode)
+	c.servers = slots.nSlots.getMasters()
 	c.fake(listen)
 	go c.fetchproc()
 	return c
@@ -140,6 +142,11 @@ func (c *cluster) processIO(name, addr string, ch chan *proto.MsgBatch, ncCh *nc
 			nc = newNodeConn(c, addr)
 			// TODO: there may be chaos with unexcepted closed of cluster.
 			ncCh.nc = nc
+			// fire try fetch action
+			select {
+			case c.action <- struct{}{}:
+			default:
+			}
 		}
 		mb, ok := <-ch
 		if !ok {
@@ -198,16 +205,33 @@ func (c *cluster) tryFetch() bool {
 	for _, server := range c.servers {
 		shuffleMap[server] = struct{}{}
 	}
+	drainServers := make(map[string]struct{})
 	for server := range shuffleMap {
 		conn := libnet.DialWithTimeout(server, c.dto, c.rto, c.wto)
 		f := newFetcher(conn)
 		nSlots, err := f.fetch()
 		if err != nil {
+			drainServers[server] = struct{}{}
 			log.Errorf("fail to fetch due to %s", err)
 			continue
 		}
+		if len(drainServers) != 0 {
+			// remove unused servers
+			c.servers = make([]string, 0)
+			for server := range shuffleMap {
+				if _, ok := drainServers[server]; !ok {
+					c.servers = append(c.servers, server)
+				}
+			}
+		}
 		c.initSlotNode(nSlots)
 		return true
+	}
+
+	// refill the servers.
+	c.servers = make([]string, 0)
+	for server := range shuffleMap {
+		c.servers = append(c.servers, server)
 	}
 	log.Error("redis cluster all seed nodes fail to fetch")
 	return false
