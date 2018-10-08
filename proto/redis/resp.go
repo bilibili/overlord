@@ -3,6 +3,8 @@ package redis
 import (
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
+	"bytes"
+	"fmt"
 )
 
 // respType is the type of redis resp
@@ -114,7 +116,31 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	case respArray:
 		err = r.decodeArray(line, br)
 	default:
+		err = r.decodeInline(line)
+	}
+	return
+}
+
+func (r *resp) decodeInline(line []byte) (err error) {
+	fields := bytes.Fields(line)
+	flen := len(fields)
+	if flen == 0 {
 		err = ErrBadRequest
+		return
+	}
+
+	r.arrayn = flen
+	r.data = []byte(fmt.Sprintf("%d", flen))
+	r.array = make([]*resp, flen)
+	r.rTp = respArray
+
+	for i, field := range fields {
+		r.array[i] = &resp {
+			rTp: respBulk,
+			data: []byte(fmt.Sprintf("%d\r\n%c", len(field), field)),
+			array: nil,
+			arrayn: 0,
+		}
 	}
 	return
 }
