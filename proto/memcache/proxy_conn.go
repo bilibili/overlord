@@ -163,10 +163,12 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
 			return
 		}
-		p.withReq(m, reqType, ns[b:e], crlfBytes)
-		if e == len(ns)-2 {
+
+		if b == len(ns)-2 {
 			break
 		}
+
+		p.withReq(m, reqType, ns[b:e], crlfBytes)
 	}
 	return
 }

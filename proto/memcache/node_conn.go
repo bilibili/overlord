@@ -10,6 +10,8 @@ import (
 	"overlord/proto"
 
 	"github.com/pkg/errors"
+	"overlord/lib/log"
+	"strconv"
 )
 
 const (
@@ -165,8 +167,15 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if bytes.Equal(bs, endBytes) {
 		return
 	}
+
+	if bytes.Equal(bs, errorBytes) {
+		log.Errorf("parse bad with request %v mc response with data string %s and bytes %v and bs is %v", *mcr, strconv.Quote(string(data)), data, bs)
+		return
+	}
+
 	length, err := findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats)
 	if err != nil {
+		log.Errorf("parse bad with request %v mc response with data string %s and bytes %v and bs is %v", *mcr, strconv.Quote(string(data)), data, bs)
 		err = errors.Wrap(err, "MC Handler while parse length")
 		return
 	}
