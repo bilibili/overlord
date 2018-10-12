@@ -410,7 +410,6 @@ func (ed *executorDown) spawn() {
 				mb.DoneWithError(ed.cc.Name, ed.addr, err)
 			}
 			ed.local[count] = mb
-			ed.forward <- mb
 			count++
 			if count < 64 {
 				continue
@@ -419,21 +418,25 @@ func (ed *executorDown) spawn() {
 		}
 
 		if count != 0 {
-			count = 0
 			if err = ed.nc.Flush(); err != nil {
 				for _, mb := range ed.local {
 					mb.DoneWithError(ed.cc.Name, ed.addr, err)
 				}
+				count = 0
 				continue
 			}
+			for _, mb := range ed.local[:count] {
+				ed.forward <- mb
+			}
+			count = 0
 		} else {
 			mb := <-ed.input
 			if err = ed.nc.WriteBatch(mb); err != nil {
 				err = errors.Wrap(err, "Cluster batch write")
 				mb.DoneWithError(ed.cc.Name, ed.addr, err)
 			}
+			ed.local[count] = mb
 			count++
-			ed.forward <- mb
 		}
 	}
 }
