@@ -163,30 +163,68 @@ func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
 	for i := int32(0); i < conns; i++ {
 		ch := nbc.ch
 		nc := newNodeConn(cc, addr)
-		go e.processIO(cc.Name, addr, ch, nc)
+		go spwanPipe(addr, cc, ch, nc)
 	}
 	return nbc
 }
 
 func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	// TODO: merge msgbatch for backend
+	// TODO: split write and read for backend
+	// TODO: remove magic number
+	var mbs = make([]*proto.MsgBatch, 64)
+	var cursor = 0
+	var quick = false
 	var err error
 	for {
 		if err != nil {
 			_ = nc.Close()
 			nc = newNodeConn(e.cc, addr)
+			err = nil
 		}
-		mb := <-ch
-		if err = nc.WriteBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch write")
-			mb.DoneWithError(cluster, addr, err)
-			continue
+
+		select {
+		case mb := <-ch:
+			mbs[cursor] = mb
+			cursor++
+		default:
+			quick = true
 		}
-		if err = nc.ReadBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch read")
-			mb.DoneWithError(cluster, addr, err)
-			continue
+
+		if (quick && cursor > 0) || (cursor == 64) {
+			quick = false
+			for _, mb := range mbs[:cursor] {
+				if err = nc.WriteBatch(mb); err != nil {
+					err = errors.Wrap(err, "Cluster batch write")
+					mb.DoneWithError(cluster, addr, err)
+					goto deferReset
+				}
+			}
+
+			if err = nc.Flush(); err != nil {
+				err = errors.Wrap(err, "Cluster batch flush")
+				for _, mb := range mbs[:cursor] {
+					mb.DoneWithError(cluster, addr, err)
+				}
+				goto deferReset
+			}
+
+			for _, mb := range mbs[:cursor] {
+				if err = nc.ReadBatch(mb); err != nil {
+					err = errors.Wrap(err, "Cluster batch read")
+					mb.DoneWithError(cluster, addr, err)
+					continue
+				}
+				mb.Done(cluster, addr)
+			}
+		deferReset:
+			cursor = 0
+		} else {
+			mb := <-ch
+			mbs[cursor] = mb
+			cursor++
 		}
-		mb.Done(cluster, addr)
+
 	}
 }
 
@@ -344,4 +382,99 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		ws = append(ws, int(w))
 	}
 	return
+}
+
+type executorDown struct {
+	cc      *ClusterConfig
+	addr    string
+	input   <-chan *proto.MsgBatch
+	forward chan<- *proto.MsgBatch
+	nc      proto.NodeConn
+	local   []*proto.MsgBatch
+}
+
+func (ed *executorDown) spawn() {
+	var count int
+	var err error
+	for {
+		if err != nil {
+			_ = ed.nc.Close()
+			ed.nc = newNodeConn(ed.cc, ed.addr)
+			err = nil
+		}
+
+		select {
+		case mb := <-ed.input:
+			if err = ed.nc.WriteBatch(mb); err != nil {
+				err = errors.Wrap(err, "Cluster batch write")
+				mb.DoneWithError(ed.cc.Name, ed.addr, err)
+			}
+			ed.local[count] = mb
+			ed.forward <- mb
+			count++
+			if count < 64 {
+				continue
+			}
+		default:
+		}
+
+		if count != 0 {
+			count = 0
+			if err = ed.nc.Flush(); err != nil {
+				for _, mb := range ed.local {
+					mb.DoneWithError(ed.cc.Name, ed.addr, err)
+				}
+				continue
+			}
+		} else {
+			mb := <-ed.input
+			if err = ed.nc.WriteBatch(mb); err != nil {
+				err = errors.Wrap(err, "Cluster batch write")
+				mb.DoneWithError(ed.cc.Name, ed.addr, err)
+			}
+			count++
+			ed.forward <- mb
+		}
+	}
+}
+
+type executorRecv struct {
+	cluster string
+	addr    string
+	recv    <-chan *proto.MsgBatch
+	nc      proto.NodeConn
+}
+
+func (er *executorRecv) spawn() {
+	var err error
+	for {
+		mb := <-er.recv
+		if err = er.nc.ReadBatch(mb); err != nil {
+			err = errors.Wrap(err, "Cluster batch read")
+			mb.DoneWithError(er.cluster, er.addr, err)
+		} else {
+			mb.Done(er.cluster, er.addr)
+		}
+	}
+}
+
+func spwanPipe(addr string, cc *ClusterConfig, nb <-chan *proto.MsgBatch, nc proto.NodeConn) {
+	forward := make(chan *proto.MsgBatch, len(nb))
+	ed := &executorDown{
+		cc:      cc,
+		addr:    addr,
+		input:   nb,
+		forward: forward,
+		nc:      nc,
+		local: make([]*proto.MsgBatch, 64),
+	}
+	go ed.spawn()
+
+	er := &executorRecv{
+		cluster: cc.Name,
+		addr:    addr,
+		recv:    forward,
+		nc:      nc,
+	}
+	go er.spawn()
 }

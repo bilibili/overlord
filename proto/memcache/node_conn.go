@@ -38,7 +38,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		addr:    addr,
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(4096)),
 	}
 	return
 }
@@ -65,7 +65,11 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		m.MarkWrite()
 		idx++
 	}
+	return
+}
 
+
+func (n *nodeConn) Flush() (err error) {
 	if err = n.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Writer handle flush Msg bytes")
 	}
@@ -101,8 +105,8 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		err = errors.Wrap(ErrClosed, "MC Reader read batch message")
 		return
 	}
-	defer n.br.ResetBuffer(nil)
-	n.br.ResetBuffer(mb.Buffer())
+	// defer n.br.ResetBuffer(nil)
+	// n.br.ResetBuffer(mb.Buffer())
 	var (
 		size   int
 		cursor int
@@ -120,11 +124,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		return
 	}
 	for {
-		err = n.br.Read()
-		if err != nil {
-			err = errors.Wrap(err, "MC Reader node conn while read")
-			return
-		}
 		for {
 			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
 			if err == bufio.ErrBufferFull {
@@ -139,6 +138,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 
 			m = mb.Nth(nth)
 			if m == nil {
+				n.br.Advance(cursor)
 				return
 			}
 
@@ -147,6 +147,12 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 				err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
 				return
 			}
+		}
+
+		err = n.br.Read()
+		if err != nil {
+			err = errors.Wrap(err, "MC Reader node conn while read")
+			return
 		}
 	}
 }
@@ -159,12 +165,15 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 
 	bs := data[:pos+1]
 	size = len(bs)
-	mcr.data = bs
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
+		mcr.data = make([]byte, len(bs))
+		copy(mcr.data, bs)
 		return
 	}
 
 	if bytes.Equal(bs, endBytes) {
+		mcr.data = make([]byte, len(bs))
+		copy(mcr.data, bs)
 		return
 	}
 
@@ -184,7 +193,8 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < size {
 		return 0, bufio.ErrBufferFull
 	}
-	mcr.data = data[:size]
+	mcr.data = make([]byte, size)
+	copy(mcr.data, data[:size])
 	return
 }
 

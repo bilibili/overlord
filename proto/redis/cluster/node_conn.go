@@ -94,6 +94,11 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	return
 }
 
+
+func (nc *nodeConn) Flush() error {
+	return nc.nc.Flush()
+}
+
 func (nc *nodeConn) redirectProcess(addrAsk map[string]bool) (err error) {
 	for addr, mb := range nc.mba.MsgBatchs() {
 		if mb.Count() == 0 {

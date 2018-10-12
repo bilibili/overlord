@@ -76,6 +76,10 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		}
 		m.MarkWrite()
 	}
+	return
+}
+
+func (nc *nodeConn) Flush() error {
 	return nc.bw.Flush()
 }
 

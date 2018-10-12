@@ -65,11 +65,17 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		m.MarkWrite()
 		idx++
 	}
+	return
+}
+
+
+func (n *nodeConn) Flush() (err error) {
 	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Writer flush message bytes")
+		err = errors.Wrap(err, "MC binary Writer flush message bytes")
 	}
 	return
 }
+
 
 func (n *nodeConn) write(m *proto.Message) (err error) {
 	if n.Closed() {

@@ -40,6 +40,7 @@ type ProxyConn interface {
 type NodeConn interface {
 	WriteBatch(*MsgBatch) error
 	ReadBatch(*MsgBatch) error
+	Flush() error
 	Close() error
 }
 

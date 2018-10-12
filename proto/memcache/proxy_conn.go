@@ -285,7 +285,7 @@ func nextField(bs []byte) (begin, end int) {
 
 func findLength(bs []byte, cas bool) (int, error) {
 	pos := len(bs) - 2 // NOTE: trim right "\r\n"
-	ns := bs[:pos]
+	ns := bytes.TrimSpace(bs[:pos])
 	if cas {
 		// skip cas filed
 		si := revSpacIdx(ns)
@@ -294,6 +294,7 @@ func findLength(bs []byte, cas bool) (int, error) {
 		}
 		ns = ns[:si]
 	}
+
 	low := revSpacIdx(ns) + 1
 	if low == 0 {
 		return -1, ErrBadLength
