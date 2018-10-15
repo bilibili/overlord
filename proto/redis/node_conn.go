@@ -51,7 +51,7 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 		cluster: cluster,
 		addr:    addr,
 		conn:    conn,
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(4096)),
 		bw:      bufio.NewWriter(conn),
 	}
 }
@@ -88,10 +88,8 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
 		return
 	}
-	nc.br.ResetBuffer(mb.Buffer())
-	defer nc.br.ResetBuffer(nil)
-	begin := nc.br.Mark()
-	now := nc.br.Mark()
+	// nc.br.ResetBuffer(mb.Buffer())
+	// defer nc.br.ResetBuffer(nil)
 	for i := 0; i < mb.Count(); {
 		m := mb.Nth(i)
 		req, ok := m.Request().(*Request)
@@ -103,17 +101,13 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 			continue
 		}
 		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
-			nc.br.AdvanceTo(begin)
 			if err = nc.br.Read(); err != nil {
 				return
 			}
-			nc.br.AdvanceTo(now)
 			continue
 		} else if err != nil {
 			return
 		}
-		m.MarkRead()
-		now = nc.br.Mark()
 		i++
 	}
 	return

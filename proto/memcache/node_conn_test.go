@@ -19,7 +19,7 @@ func _createNodeConn(data []byte) *nodeConn {
 		cluster: "clusterA",
 		addr:    "127.0.0.1:5000",
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(2048)),
 		conn:    conn,
 	}
 	return nc
@@ -89,13 +89,15 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 		},
 	}
 	for _, tt := range ts {
-		t.Run(fmt.Sprintf("%v ok", tt.rtype), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v_ok", tt.rtype), func(t *testing.T) {
 			req := _createReqMsg(tt.rtype, []byte(tt.key), []byte(tt.data))
 			nc := _createNodeConn(nil)
 			batch := proto.NewMsgBatch()
 			batch.AddMsg(req)
 
 			err := nc.WriteBatch(batch)
+			assert.NoError(t, err)
+			err = nc.Flush()
 			assert.NoError(t, err)
 
 			c, ok := nc.conn.Conn.(*mockConn)
@@ -123,8 +125,9 @@ func TestNodeConnWriteBatchHasErr(t *testing.T) {
 	batch := proto.NewMsgBatch()
 	batch.AddMsg(req)
 
-	err := nc.WriteBatch(batch)
-	assert.EqualError(t, err, "write error")
+	_ = nc.WriteBatch(batch)
+	err := nc.Flush()
+	assert.EqualError(t, err, "MC Writer handle flush Msg bytes: write error")
 }
 
 func TestNodeConnWriteBatchFlushHasErr(t *testing.T) {
@@ -138,7 +141,8 @@ func TestNodeConnWriteBatchFlushHasErr(t *testing.T) {
 	batch := proto.NewMsgBatch()
 	batch.AddMsg(req)
 
-	err := nc.WriteBatch(batch)
+	_ = nc.WriteBatch(batch)
+	err := nc.Flush()
 	assert.EqualError(t, errors.Cause(err), "flush error")
 }
 

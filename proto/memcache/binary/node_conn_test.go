@@ -20,7 +20,7 @@ func _createNodeConn(data []byte) *nodeConn {
 		addr:    "127.0.0.1:5000",
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(2048)),
 	}
 	return nc
 }
@@ -97,6 +97,8 @@ func TestNodeConnBatchWriteOk(t *testing.T) {
 
 			err := nc.WriteBatch(batch)
 			assert.NoError(t, err)
+			err = nc.Flush()
+			assert.NoError(t, err)
 
 			m, ok := nc.conn.Conn.(*mockConn)
 			assert.True(t, ok)
@@ -119,7 +121,7 @@ func TestNodeConnWriteClosed(t *testing.T) {
 	assert.Error(t, err)
 	_causeEqual(t, ErrClosed, err)
 	assert.NoError(t, nc.Close())
-	_causeEqual(t, ErrClosed, nc.WriteBatch(nil))
+	_causeEqual(t, ErrClosed, nc.Flush())
 }
 
 type mockReq struct {
@@ -151,8 +153,9 @@ func TestNodeConnWriteTypeAssertFail(t *testing.T) {
 	batch := proto.NewMsgBatch()
 	batch.AddMsg(req)
 	err := nc.WriteBatch(batch)
-	nc.bw.Flush()
 	assert.Error(t, err)
+	err = nc.Flush()
+	assert.NoError(t, err)
 	_causeEqual(t, ErrAssertReq, err)
 }
 

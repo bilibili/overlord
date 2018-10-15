@@ -81,7 +81,8 @@ func (r *Reader) Read() error {
 
 // ReadLine will read until meet the first crlf bytes.
 func (r *Reader) ReadLine() (line []byte, err error) {
-	idx := bytes.Index(r.b.buf[r.b.r:r.b.w], crlfBytes)
+	data := r.b.buf[r.b.r:r.b.w]
+	idx := bytes.Index(data, crlfBytes)
 	if idx == -1 {
 		line = nil
 		err = ErrBufferFull
