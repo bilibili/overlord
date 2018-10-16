@@ -112,6 +112,7 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	case respString, respInt, respError:
 		// r.data = make([]byte, len(line) - 2 -1)
 		// copy(r.data, line[1 : len(line)-2])
+		r.data = r.data[:0]
 		r.data = append(r.data, line[1:len(line)-2]...)
 	case respBulk:
 		err = r.decodeBulk(line, br)
@@ -169,7 +170,8 @@ func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 	}
 	// r.data = make([]byte, len(data)-2)
 	// copy(r.data, data[:len(data)-2])
-	r.data = append(r.data, line[:len(data)-2]...)
+	r.data = r.data[:0]
+	r.data = append(r.data, data[:len(data)-2]...)
 	return
 }
 
@@ -186,6 +188,7 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 	}
 	// r.data = make([]byte, len(sBs))
 	// copy(r.data, sBs)
+	r.data = r.data[:0]
 	r.data = append(r.data, sBs...)
 	mark := br.Mark()
 	for i := 0; i < int(size); i++ {
