@@ -114,7 +114,7 @@ func newDefaultExecutor(cc *ClusterConfig) proto.Executor {
 }
 
 // Execute impl proto.Executor
-func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) error {
+func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message, nodem map[string]struct{}) error {
 	if closed := atomic.LoadInt32(&e.state); closed == executorStateClosed {
 		return ErrExecutorClosed
 	}
@@ -127,6 +127,7 @@ func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Me
 					return ErrExecutorHashNoNode
 				}
 				mba.AddMsg(addr, subm)
+				nodem[addr] = struct{}{}
 			}
 		} else {
 			addr, ok := e.getAddr(m.Request().Key())
@@ -135,15 +136,20 @@ func (e *defaultExecutor) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Me
 				return ErrExecutorHashNoNode
 			}
 			mba.AddMsg(addr, m)
+			nodem[addr] = struct{}{}
 		}
 	}
-	for addr, mb := range mba.MsgBatchs() {
-		if mb.Count() > 0 {
-			// WaitGroup add one MsgBatch!!!
-			mba.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
-			e.nodeChan[addr].push(mb)
-		}
+	for node := range nodem {
+		mba.Add(1)
+		e.nodeChan[node].push(mba.GetBatch(node))
 	}
+	// for addr, mb := range mba.MsgBatchs() {
+	// 	if mb.Count() > 0 {
+	// 		// WaitGroup add one MsgBatch!!!
+	// 		mba.Add(1) // NOTE: important!!! for wait all MsgBatch done!!!
+	// 		e.nodeChan[addr].push(mb)
+	// 	}
+	// }
 	mba.Wait()
 	return nil
 }
@@ -469,7 +475,7 @@ func spwanPipe(addr string, cc *ClusterConfig, nb <-chan *proto.MsgBatch, nc pro
 		input:   nb,
 		forward: forward,
 		nc:      nc,
-		local: make([]*proto.MsgBatch, 64),
+		local:   make([]*proto.MsgBatch, 64),
 	}
 	go ed.spawn()
 

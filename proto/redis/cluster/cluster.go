@@ -86,7 +86,7 @@ func NewExecutor(name, listen string, servers []string, conns int32, dto, rto, w
 	return c
 }
 
-func (c *cluster) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) error {
+func (c *cluster) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message, nodem map[string]struct{}) error {
 	if state := atomic.LoadInt32(&c.state); state == closed {
 		return ErrClusterClosed
 	}
@@ -95,10 +95,12 @@ func (c *cluster) Execute(mba *proto.MsgBatchAllocator, msgs []*proto.Message) e
 			for _, subm := range m.Batch() {
 				addr := c.getAddr(subm.Request().Key())
 				mba.AddMsg(addr, subm)
+				nodem[addr] = struct{}{}
 			}
 		} else {
 			addr := c.getAddr(m.Request().Key())
 			mba.AddMsg(addr, m)
+			nodem[addr] = struct{}{}
 		}
 	}
 	for addr, mb := range mba.MsgBatchs() {

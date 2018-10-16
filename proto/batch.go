@@ -48,6 +48,10 @@ func (m *MsgBatchAllocator) MsgBatchs() map[string]*MsgBatch {
 	return m.mbMap
 }
 
+func (m *MsgBatchAllocator) GetBatch(node string) *MsgBatch {
+	return m.mbMap[node]
+}
+
 // AddMsg will add new msg and create a new batch if node not exists.
 func (m *MsgBatchAllocator) AddMsg(node string, msg *Message) {
 	if mb, ok := m.mbMap[node]; ok {
@@ -71,10 +75,12 @@ func (m *MsgBatchAllocator) Wait() {
 }
 
 // Reset inner MsgBatchs
-func (m *MsgBatchAllocator) Reset() {
-	for _, mb := range m.mbMap {
-		mb.Reset()
-	}
+func (m *MsgBatchAllocator) Reset(node string) {
+	mb := m.mbMap[node]
+	mb.Reset()
+	// for _, mb := range m.mbMap {
+	// 	mb.Reset()
+	// }
 }
 
 const (

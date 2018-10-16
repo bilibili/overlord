@@ -79,6 +79,7 @@ func (h *Handler) handle() {
 		mba      = proto.GetMsgBatchAllocator()
 		msgs     []*proto.Message
 		err      error
+		nodem    = make(map[string]struct{})
 	)
 	for {
 		// 1. read until limit or error
@@ -87,7 +88,7 @@ func (h *Handler) handle() {
 			return
 		}
 		// 2. send to cluster
-		h.executor.Execute(mba, msgs)
+		h.executor.Execute(mba, msgs, nodem)
 		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
@@ -109,7 +110,10 @@ func (h *Handler) handle() {
 		for _, msg := range msgs {
 			msg.Reset()
 		}
-		mba.Reset()
+		for node := range nodem {
+			mba.Reset(node)
+			delete(nodem, node)
+		}
 		// 5. reset MaxConcurrent
 		messages = h.resetMaxConcurrent(messages, len(msgs))
 	}

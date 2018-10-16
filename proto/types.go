@@ -52,6 +52,6 @@ type Pinger interface {
 
 // Executor is the interface for backend run and process the messages.
 type Executor interface {
-	Execute(mba *MsgBatchAllocator, msgs []*Message) error
+	Execute(mba *MsgBatchAllocator, msgs []*Message, nodem map[string]struct{}) error
 	Close() error
 }

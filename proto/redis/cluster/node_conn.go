@@ -94,7 +94,6 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 	return
 }
 
-
 func (nc *nodeConn) Flush() error {
 	return nc.nc.Flush()
 }
@@ -146,8 +145,9 @@ func (nc *nodeConn) redirectProcess(addrAsk map[string]bool) (err error) {
 		}
 		rdt.lock.Unlock() // NOTE: unlock
 		nc.c.closeRedirectNodeConn(addr, isAsk)
+		nc.mba.Reset(addr)
 	}
-	nc.mba.Reset()
+	// nc.mba.Reset()
 	return
 }
 
