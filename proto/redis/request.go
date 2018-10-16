@@ -6,8 +6,6 @@ import (
 	"sync"
 )
 
-const evalArgsMinCount int = 4;
-
 var (
 	emptyBytes = []byte("")
 	crlfBytes  = []byte("\r\n")
@@ -124,7 +122,7 @@ var (
 		"15\r\nZREMRANGEBYRANK" +
 		"16\r\nZREMRANGEBYSCORE" +
 		"5\r\nPFADD" +
-		"7\r\nPFMERGE"+
+		"7\r\nPFMERGE" +
 		"4\r\nEVAL")
 
 	reqNotSupportCmdsBytes = []byte("" +
@@ -146,7 +144,6 @@ var (
 		"4\r\nSCAN" +
 		"4\r\nWAIT" +
 		"5\r\nBITOP" +
-		"4\r\nEVAL" +
 		"7\r\nEVALSHA" +
 		"4\r\nAUTH" +
 		"4\r\nECHO" +
@@ -233,8 +230,9 @@ func (r *Request) Key() []byte {
 
 	k := r.resp.array[1]
 	// SUPPORT EVAL command
+	const evalArgsMinCount int = 4
 	if r.resp.arrayn >= evalArgsMinCount {
-		if bytes.Equal(r.resp.array[0].data, []byte("4\r\nEVAL")) {
+		if bytes.Equal(r.resp.array[0].data, cmdEvalBytes) {
 			// find the 4th key with index 3
 			k = r.resp.array[3]
 		}

@@ -1,12 +1,13 @@
 package proxy
 
 import (
+	"fmt"
+	"strings"
+
 	"overlord/proto"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
-	"strings"
-	"fmt"
 )
 
 // Config proxy config.

@@ -2,16 +2,16 @@ package memcache
 
 import (
 	"bytes"
+	"strconv"
 	"sync/atomic"
 	"time"
 
 	"overlord/lib/bufio"
+	"overlord/lib/log"
 	libnet "overlord/lib/net"
 	"overlord/proto"
 
 	"github.com/pkg/errors"
-	"overlord/lib/log"
-	"strconv"
 )
 
 const (

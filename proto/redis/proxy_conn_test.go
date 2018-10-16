@@ -1,11 +1,11 @@
 package redis
 
 import (
+	"errors"
 	"testing"
 
 	"overlord/proto"
 
-	"errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -284,7 +284,7 @@ func TestEncodeWithPing(t *testing.T) {
 		rTp: respArray,
 		array: []*resp{
 			&resp{
-				rTp: respBulk,
+				rTp:  respBulk,
 				data: []byte("4\r\nPING"),
 			},
 		},
