@@ -9,7 +9,7 @@ import (
 func TestNewRingOk(t *testing.T) {
 	ring := NewRing("redis_cluster", "crc16")
 	assert.NotNil(t, ring)
-
+t.Parallel()
 	ring = NewRing("ketama", "fnv1a_64")
 	assert.NotNil(t, ring)
 }
