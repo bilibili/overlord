@@ -17,6 +17,7 @@ var (
 	oneBytes   = []byte{'1'}
 	crlfBytes  = []byte("\r\n")
 	endBytes   = []byte("END\r\n")
+	errorBytes   = []byte("ERROR\r\n")
 
 	setBytes     = []byte("set")
 	addBytes     = []byte("add")

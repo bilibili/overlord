@@ -17,6 +17,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rclstr "overlord/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -46,6 +47,12 @@ func NewExecutor(cc *ClusterConfig) (c proto.Executor) {
 	// new executor
 	if _, ok := defaultExecuteCacheTypes[cc.CacheType]; ok {
 		return newDefaultExecutor(cc)
+	}
+	if cc.CacheType == proto.CacheTypeRedisCluster {
+		dto := time.Duration(cc.DialTimeout) * time.Millisecond
+		rto := time.Duration(cc.ReadTimeout) * time.Millisecond
+		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
+		return rclstr.NewExecutor(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, dto, rto, wto, []byte(cc.HashTag))
 	}
 	panic("unsupported protocol")
 }
@@ -97,6 +104,9 @@ func newDefaultExecutor(cc *ClusterConfig) proto.Executor {
 			w := ws[idx]
 			pc := newPingConn(cc, addr)
 			p := &pinger{ping: pc, cc: cc, node: addr, weight: w}
+			if e.alias {
+				p.alias = ans[idx]
+			}
 			go e.processPing(p)
 		}
 	}
@@ -168,12 +178,12 @@ func (e *defaultExecutor) processIO(cluster, addr string, ch <-chan *proto.MsgBa
 		mb := <-ch
 		if err = nc.WriteBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch write")
-			mb.BatchDoneWithError(cluster, addr, err)
+			mb.DoneWithError(cluster, addr, err)
 			continue
 		}
 		if err = nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Cluster batch read")
-			mb.BatchDoneWithError(cluster, addr, err)
+			mb.DoneWithError(cluster, addr, err)
 			continue
 		}
 		mb.Done(cluster, addr)
@@ -194,12 +204,20 @@ func (e *defaultExecutor) processPing(p *pinger) {
 		} else {
 			p.failure = 0
 			if del {
-				e.ring.AddNode(p.node, p.weight)
+				if p.alias != "" {
+					e.ring.AddNode(p.alias, p.weight)
+				} else {
+					e.ring.AddNode(p.node, p.weight)
+				}
 				del = false
 			}
 		}
 		if e.cc.PingAutoEject && p.failure >= e.cc.PingFailLimit {
-			e.ring.DelNode(p.node)
+			if p.alias != "" {
+				e.ring.DelNode(p.alias)
+			} else {
+				e.ring.DelNode(p.node)
+			}
 			del = true
 		}
 		<-time.After(backoff.Backoff(p.retries))
@@ -233,7 +251,7 @@ func (e *defaultExecutor) trimHashTag(key []byte) []byte {
 }
 
 type batchChan struct {
-	ch  chan *proto.MsgBatch
+	ch chan *proto.MsgBatch
 }
 
 func newBatchChan(n int32) *batchChan {
@@ -248,6 +266,7 @@ type pinger struct {
 	cc     *ClusterConfig
 	ping   proto.Pinger
 	node   string
+	alias  string
 	weight int
 
 	failure int

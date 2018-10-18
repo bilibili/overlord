@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.4.0
+1. add redis cluster support.
+
 ## Version 1.3.2
 1. change round-chan to race-chan. 
 

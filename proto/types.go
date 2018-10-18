@@ -18,6 +18,7 @@ const (
 	CacheTypeMemcache       CacheType = "memcache"
 	CacheTypeMemcacheBinary CacheType = "memcache_binary"
 	CacheTypeRedis          CacheType = "redis"
+	CacheTypeRedisCluster   CacheType = "redis_cluster"
 )
 
 // Request request interface.

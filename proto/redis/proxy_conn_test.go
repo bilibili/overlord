@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"errors"
 	"testing"
 
 	"overlord/proto"
@@ -249,4 +250,58 @@ func TestEncodeCmdOk(t *testing.T) {
 
 		})
 	}
+}
+
+func TestEncodeWithError(t *testing.T) {
+	msg := proto.NewMessage()
+	req := getReq()
+	req.mType = mergeTypeNo
+	req.reply = nil
+	msg.WithRequest(req)
+	mockErr := errors.New("baka error")
+	msg.WithError(mockErr)
+
+	conn, buf := _createDownStreamConn()
+	pc := NewProxyConn(conn)
+	err := pc.Encode(msg)
+	assert.Error(t, err)
+	assert.Equal(t, mockErr, err)
+
+	err = pc.Flush()
+	assert.NoError(t, err)
+
+	data := make([]byte, 2048)
+	size, err := buf.Read(data)
+	assert.NoError(t, err)
+	assert.Equal(t, "-baka error\r\n", string(data[:size]))
+}
+
+func TestEncodeWithPing(t *testing.T) {
+	msg := proto.NewMessage()
+	req := getReq()
+	req.mType = mergeTypeNo
+	req.resp = &resp{
+		rTp: respArray,
+		array: []*resp{
+			&resp{
+				rTp:  respBulk,
+				data: []byte("4\r\nPING"),
+			},
+		},
+		arrayn: 1,
+	}
+	req.reply = &resp{}
+	msg.WithRequest(req)
+
+	conn, buf := _createDownStreamConn()
+	pc := NewProxyConn(conn)
+	err := pc.Encode(msg)
+	assert.NoError(t, err)
+	err = pc.Flush()
+	assert.NoError(t, err)
+
+	data := make([]byte, 2048)
+	size, err := buf.Read(data)
+	assert.NoError(t, err)
+	assert.Equal(t, "+PONG\r\n", string(data[:size]))
 }

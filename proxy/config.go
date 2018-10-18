@@ -1,6 +1,9 @@
 package proxy
 
 import (
+	"fmt"
+	"strings"
+
 	"overlord/proto"
 
 	"github.com/BurntSushi/toml"
@@ -64,7 +67,7 @@ type ClusterConfig struct {
 	NodeConnections  int32           `toml:"node_connections"`
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
-	Servers          []string
+	Servers          []string        `toml:"servers"`
 }
 
 // Validate validate config field value.
@@ -87,6 +90,18 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 	for _, cc := range ccs.Clusters {
 		if err = cc.Validate(); err != nil {
 			return err
+		}
+		if cc.CacheType == proto.CacheTypeRedisCluster {
+			servers := make([]string, len(cc.Servers))
+			for i, server := range cc.Servers {
+				ssp := strings.Split(server, ":")
+				if len(ssp) == 3 {
+					servers[i] = fmt.Sprintf("%s:%s", ssp[0], ssp[1])
+				} else {
+					servers[i] = server
+				}
+			}
+			cc.Servers = servers
 		}
 	}
 	return nil

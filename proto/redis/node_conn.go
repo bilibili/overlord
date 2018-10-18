@@ -1,18 +1,34 @@
 package redis
 
 import (
+	errs "errors"
 	"sync/atomic"
 	"time"
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
 	"overlord/proto"
+
+	"github.com/pkg/errors"
 )
 
 const (
-	opened = uint32(0)
-	closed = uint32(1)
+	opened = int32(0)
+	closed = int32(1)
 )
+
+var (
+	// ErrNodeConnClosed err node conn closed.
+	ErrNodeConnClosed = errs.New("redis node conn closed")
+)
+
+// NodeConn is export type by nodeConn for redis-cluster.
+type NodeConn = nodeConn
+
+// Bw return bufio.Writer.
+func (nc *NodeConn) Bw() *bufio.Writer {
+	return nc.bw
+}
 
 type nodeConn struct {
 	cluster string
@@ -20,7 +36,8 @@ type nodeConn struct {
 	conn    *libnet.Conn
 	bw      *bufio.Writer
 	br      *bufio.Reader
-	state   uint32
+
+	state int32
 }
 
 // NewNodeConn create the node conn from proxy to redis
@@ -40,13 +57,17 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 }
 
 func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+	if nc.Closed() {
+		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		return
+	}
 	for _, m := range mb.Msgs() {
 		req, ok := m.Request().(*Request)
 		if !ok {
 			m.WithError(ErrBadAssert)
 			return ErrBadAssert
 		}
-		if !req.isSupport() || req.isCtl() {
+		if !req.IsSupport() || req.IsCtl() {
 			continue
 		}
 		if err = req.resp.encode(nc.bw); err != nil {
@@ -59,6 +80,10 @@ func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
+	if nc.Closed() {
+		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		return
+	}
 	nc.br.ResetBuffer(mb.Buffer())
 	defer nc.br.ResetBuffer(nil)
 	begin := nc.br.Mark()
@@ -69,7 +94,7 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
-		if !req.isSupport() || req.isCtl() {
+		if !req.IsSupport() || req.IsCtl() {
 			i++
 			continue
 		}
@@ -91,8 +116,12 @@ func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 }
 
 func (nc *nodeConn) Close() (err error) {
-	if atomic.CompareAndSwapUint32(&nc.state, opened, closed) {
+	if atomic.CompareAndSwapInt32(&nc.state, opened, closed) {
 		return nc.conn.Close()
 	}
 	return
+}
+
+func (nc *nodeConn) Closed() bool {
+	return atomic.LoadInt32(&nc.state) == closed
 }

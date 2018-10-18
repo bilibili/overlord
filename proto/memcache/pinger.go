@@ -21,10 +21,11 @@ var (
 )
 
 type mcPinger struct {
-	conn   *libnet.Conn
-	bw     *bufio.Writer
-	br     *bufio.Reader
-	closed int32
+	conn *libnet.Conn
+	bw   *bufio.Writer
+	br   *bufio.Reader
+
+	state int32
 }
 
 // NewPinger new pinger.
@@ -37,7 +38,7 @@ func NewPinger(nc *libnet.Conn) proto.Pinger {
 }
 
 func (m *mcPinger) Ping() (err error) {
-	if atomic.LoadInt32(&m.closed) == handlerClosed {
+	if atomic.LoadInt32(&m.state) == closed {
 		err = ErrPingerPong
 		return
 	}
@@ -62,7 +63,7 @@ func (m *mcPinger) Ping() (err error) {
 }
 
 func (m *mcPinger) Close() error {
-	if atomic.CompareAndSwapInt32(&m.closed, handlerOpening, handlerClosed) {
+	if atomic.CompareAndSwapInt32(&m.state, opened, closed) {
 		return m.conn.Close()
 	}
 	return nil

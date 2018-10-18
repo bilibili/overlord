@@ -13,6 +13,7 @@ import (
 	"overlord/proto/memcache"
 	mcbin "overlord/proto/memcache/binary"
 	"overlord/proto/redis"
+	rclstr "overlord/proto/redis/cluster"
 )
 
 const (
@@ -57,6 +58,8 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Execu
 		h.pc = mcbin.NewProxyConn(h.conn)
 	case proto.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
+	case proto.CacheTypeRedisCluster:
+		h.pc = rclstr.NewProxyConn(h.conn, executor)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
@@ -136,7 +139,7 @@ func (h *Handler) closeWithError(err error) {
 		if prom.On {
 			prom.ConnDecr(h.cc.Name)
 		}
-		if log.V(3) {
+		if log.V(2) {
 			if err != io.EOF {
 				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
 			}

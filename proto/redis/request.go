@@ -13,6 +13,8 @@ var (
 	arrayLenTwo   = []byte("2")
 	arrayLenThree = []byte("3")
 
+	cmdEvalBytes   = []byte("4\r\nEVAL")
+	cmdQuitBytes   = []byte("4\r\nQUIT")
 	cmdPingBytes   = []byte("4\r\nPING")
 	cmdMSetBytes   = []byte("4\r\nMSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
@@ -120,7 +122,8 @@ var (
 		"15\r\nZREMRANGEBYRANK" +
 		"16\r\nZREMRANGEBYSCORE" +
 		"5\r\nPFADD" +
-		"7\r\nPFMERGE")
+		"7\r\nPFMERGE" +
+		"4\r\nEVAL")
 
 	reqNotSupportCmdsBytes = []byte("" +
 		"6\r\nMSETNX" +
@@ -141,20 +144,18 @@ var (
 		"4\r\nSCAN" +
 		"4\r\nWAIT" +
 		"5\r\nBITOP" +
-		"4\r\nEVAL" +
 		"7\r\nEVALSHA" +
 		"4\r\nAUTH" +
 		"4\r\nECHO" +
 		"4\r\nINFO" +
 		"5\r\nPROXY" +
 		"7\r\nSLOWLOG" +
-		"4\r\nQUIT" +
 		"6\r\nSELECT" +
 		"4\r\nTIME" +
 		"6\r\nCONFIG" +
 		"8\r\nCOMMANDS")
 
-	reqCtlCmdsBytes = []byte("4\r\nPING")
+	reqCtlCmdsBytes = []byte("4\r\nQUIT" + "4\r\nPING")
 )
 
 // errors
@@ -226,7 +227,17 @@ func (r *Request) Key() []byte {
 	if r.resp.arrayn == 1 {
 		return r.resp.array[0].data
 	}
+
 	k := r.resp.array[1]
+	// SUPPORT EVAL command
+	const evalArgsMinCount int = 4
+	if r.resp.arrayn >= evalArgsMinCount {
+		if bytes.Equal(r.resp.array[0].data, cmdEvalBytes) {
+			// find the 4th key with index 3
+			k = r.resp.array[3]
+		}
+	}
+
 	var pos int
 	if k.rTp == respBulk {
 		pos = bytes.Index(k.data, crlfBytes) + 2
@@ -242,18 +253,30 @@ func (r *Request) Put() {
 	reqPool.Put(r)
 }
 
-// isSupport check command support.
-func (r *Request) isSupport() bool {
-	if r.resp.arrayn < 1 {
-		return false
-	}
-	return bytes.Index(reqReadCmdsBytes, r.resp.array[0].data) > -1 || bytes.Index(reqWriteCmdsBytes, r.resp.array[0].data) > -1
+// RESP return request resp.
+func (r *Request) RESP() *RESP {
+	return r.resp
 }
 
-// isCtl is control command.
-func (r *Request) isCtl() bool {
+// Reply return request reply.
+func (r *Request) Reply() *RESP {
+	return r.reply
+}
+
+// IsSupport check command support.
+func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	return bytes.Index(reqCtlCmdsBytes, r.resp.array[0].data) > -1
+	return bytes.Contains(reqReadCmdsBytes, r.resp.array[0].data) ||
+		bytes.Contains(reqWriteCmdsBytes, r.resp.array[0].data) ||
+		bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
+}
+
+// IsCtl is control command.
+func (r *Request) IsCtl() bool {
+	if r.resp.arrayn < 1 {
+		return false
+	}
+	return bytes.Contains(reqCtlCmdsBytes, r.resp.array[0].data)
 }

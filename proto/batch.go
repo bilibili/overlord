@@ -156,8 +156,8 @@ func (m *MsgBatch) Done(cluster, addr string) {
 	}
 }
 
-// BatchDoneWithError will set done with error and report prom ErrIncr.
-func (m *MsgBatch) BatchDoneWithError(cluster, addr string, err error) {
+// DoneWithError will set done with error and report prom ErrIncr.
+func (m *MsgBatch) DoneWithError(cluster, addr string, err error) {
 	for _, msg := range m.Msgs() {
 		msg.WithError(err)
 		if log.V(1) {

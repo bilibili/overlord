@@ -152,6 +152,7 @@ func TestNodeConnWriteClosed(t *testing.T) {
 	assert.Error(t, err)
 	_causeEqual(t, ErrClosed, err)
 	assert.NoError(t, nc.Close())
+	_causeEqual(t, ErrClosed, nc.WriteBatch(nil))
 }
 
 type mockReq struct {

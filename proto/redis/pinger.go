@@ -2,7 +2,7 @@ package redis
 
 import (
 	"bytes"
-	"errors"
+	errs "errors"
 	"sync/atomic"
 
 	"overlord/lib/bufio"
@@ -12,8 +12,8 @@ import (
 
 // errors
 var (
-	ErrPingClosed = errors.New("ping interface has been closed")
-	ErrBadPong    = errors.New("pong response payload is bad")
+	ErrPingClosed = errs.New("ping interface has been closed")
+	ErrBadPong    = errs.New("pong response payload is bad")
 )
 
 var (
@@ -27,7 +27,7 @@ type pinger struct {
 	br *bufio.Reader
 	bw *bufio.Writer
 
-	state uint32
+	state int32
 }
 
 // NewPinger new pinger.
@@ -41,7 +41,7 @@ func NewPinger(conn *libnet.Conn) proto.Pinger {
 }
 
 func (p *pinger) Ping() (err error) {
-	if atomic.LoadUint32(&p.state) == closed {
+	if atomic.LoadInt32(&p.state) == closed {
 		err = ErrPingClosed
 		return
 	}
@@ -61,7 +61,7 @@ func (p *pinger) Ping() (err error) {
 }
 
 func (p *pinger) Close() error {
-	if atomic.CompareAndSwapUint32(&p.state, opened, closed) {
+	if atomic.CompareAndSwapInt32(&p.state, opened, closed) {
 		return p.conn.Close()
 	}
 	return nil

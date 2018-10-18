@@ -1,6 +1,9 @@
 package redis
 
 import (
+	"bytes"
+	"fmt"
+
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
 )
@@ -27,6 +30,34 @@ var (
 
 	nullDataBytes = []byte("-1")
 )
+
+// RESP is resp export type.
+type RESP = resp
+
+// Type return resp type.
+func (r *RESP) Type() byte {
+	return r.rTp
+}
+
+// Data return resp data.
+func (r *RESP) Data() []byte {
+	return r.data
+}
+
+// Array return resp array.
+func (r *RESP) Array() []*RESP {
+	return r.array[:r.arrayn]
+}
+
+// Decode decode by Reader.
+func (r *RESP) Decode(br *bufio.Reader) (err error) {
+	return r.decode(br)
+}
+
+// Encode encode into Writer.
+func (r *RESP) Encode(w *bufio.Writer) (err error) {
+	return r.encode(w)
+}
 
 // resp is a redis server protocol item.
 type resp struct {
@@ -86,7 +117,31 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	case respArray:
 		err = r.decodeArray(line, br)
 	default:
+		err = r.decodeInline(line)
+	}
+	return
+}
+
+func (r *resp) decodeInline(line []byte) (err error) {
+	fields := bytes.Fields(line)
+	flen := len(fields)
+	if flen == 0 {
 		err = ErrBadRequest
+		return
+	}
+
+	r.arrayn = flen
+	r.data = []byte(fmt.Sprintf("%d", flen))
+	r.array = make([]*resp, flen)
+	r.rTp = respArray
+
+	for i, field := range fields {
+		r.array[i] = &resp{
+			rTp:    respBulk,
+			data:   []byte(fmt.Sprintf("%d\r\n%c", len(field), field)),
+			array:  nil,
+			arrayn: 0,
+		}
 	}
 	return
 }
@@ -193,26 +248,3 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	}
 	return
 }
-
-// func (r *resp) String() string {
-// 	var sb strings.Builder
-// 	sb.Write([]byte{r.rTp})
-// 	switch r.rTp {
-// 	case respString, respInt, respError:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respBulk:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respArray:
-// 		sb.Write([]byte(strconv.Itoa(r.arrayn)))
-// 		sb.Write(crlfBytes)
-
-// 		for i := 0; i < r.arrayn; i++ {
-// 			sb.WriteString(r.array[i].String())
-// 		}
-// 	default:
-// 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
-// 	}
-// 	return sb.String()
-// }

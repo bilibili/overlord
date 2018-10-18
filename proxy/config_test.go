@@ -1,3 +1,12 @@
+package proxy
+
+import (
+	"github.com/stretchr/testify/assert"
+	"os"
+	"testing"
+)
+
+const exampleCluster = `
 [[clusters]]
 # This be used to specify the name of cache cluster.
 name = "test-mc"
@@ -26,10 +35,10 @@ node_connections = 2
 # The number of consecutive failures on a server that would lead to it being temporarily ejected when auto_eject is set to true. Defaults to 3.
 ping_fail_limit = 3
 # A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.
-ping_auto_eject = true
+ping_auto_eject = false
 # A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
-    "127.0.0.1:11211:1 mc1",
+    "127.0.0.1:11211:1",
 ]
 
 [[clusters]]
@@ -63,7 +72,7 @@ ping_fail_limit = 3
 ping_auto_eject = false
 # A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
-    "127.0.0.1:6379:1 redis1",
+    "127.0.0.1:6379:1",
 ]
 
 [[clusters]]
@@ -95,8 +104,28 @@ node_connections = 2
 ping_fail_limit = 3
 # A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.
 ping_auto_eject = false
-# A list of server address, port (name:port or ip:port) for this server pool when cache type is redis_cluster.
+# A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
-    "127.0.0.1:7000",
-    "127.0.0.1:7001",
+    "127.0.0.1:7000:1 abc",
+    "127.0.0.1:7001:2",
 ]
+`
+
+func TestClusterConfigLoadFromFile(t *testing.T) {
+	path := "/tmp/overlord-proxy-test-example.toml"
+	fd, err := os.Create(path)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	_, err = fd.WriteString(exampleCluster)
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.NoError(t, fd.Close())
+
+	ccs := &ClusterConfigs{}
+	err = ccs.LoadFromFile(path)
+	assert.NoError(t, err)
+	assert.Len(t, ccs.Clusters, 3)
+}

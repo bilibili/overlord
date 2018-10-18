@@ -15,9 +15,18 @@ import (
 var (
 	nullBytes           = []byte("-1\r\n")
 	okBytes             = []byte("OK\r\n")
-	pongDataBytes       = []byte("+PONG")
+	pongDataBytes       = []byte("PONG")
+	justOkBytes         = []byte("OK")
 	notSupportDataBytes = []byte("Error: command not support")
 )
+
+// ProxyConn is export for redis cluster.
+type ProxyConn = proxyConn
+
+// Bw return proxyConn Writer.
+func (pc *ProxyConn) Bw() *bufio.Writer {
+	return pc.bw
+}
 
 type proxyConn struct {
 	br        *bufio.Reader
@@ -160,13 +169,17 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		return ErrBadAssert
 	}
 	if !m.IsBatch() {
-		if !req.isSupport() {
+		if !req.IsSupport() {
 			req.reply.rTp = respError
 			req.reply.data = notSupportDataBytes
-		} else if req.isCtl() {
-			if bytes.Equal(req.Cmd(), pingBytes) {
+		} else if req.IsCtl() {
+			reqData := req.resp.array[0].data
+			if bytes.Equal(reqData, cmdPingBytes) {
 				req.reply.rTp = respString
 				req.reply.data = pongDataBytes
+			} else if bytes.Equal(reqData, cmdQuitBytes) {
+				req.reply.rTp = respString
+				req.reply.data = justOkBytes
 			}
 		}
 		err = req.reply.encode(pc.bw)

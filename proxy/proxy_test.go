@@ -1,8 +1,9 @@
-package proxy_test
+package proxy
 
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -12,16 +13,33 @@ import (
 
 	libnet "overlord/lib/net"
 	"overlord/proto"
-	"overlord/proxy"
-
-	"context"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	ccs = []*proxy.ClusterConfig{
-		&proxy.ClusterConfig{
+	ccs = []*ClusterConfig{
+		&ClusterConfig{
+			Name:             "eject-cluster",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("memcache"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:22211",
+			RedisAuth:        "",
+			DialTimeout:      100,
+			ReadTimeout:      100,
+			NodeConnections:  10,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    true,
+			Servers: []string{
+				"127.0.0.1:11211:10 mc1",
+				// "127.0.0.1:11213:10",
+			},
+		},
+		&ClusterConfig{
 			Name:             "mc-cluster",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
@@ -37,12 +55,12 @@ var (
 			PingFailLimit:    3,
 			PingAutoEject:    false,
 			Servers: []string{
-				"127.0.0.1:11211:10",
-				// "127.0.0.1:11212:10",
+				"127.0.0.1:11211:10 mc1",
+				"127.0.0.1:11211:10 mc2",
 				// "127.0.0.1:11213:10",
 			},
 		},
-		&proxy.ClusterConfig{
+		&ClusterConfig{
 			Name:             "mcbin-cluster",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
@@ -63,8 +81,8 @@ var (
 				// "127.0.0.1:11213:10",
 			},
 		},
-		&proxy.ClusterConfig{
-			Name:             "mcbin-cluster",
+		&ClusterConfig{
+			Name:             "redis",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
@@ -84,7 +102,29 @@ var (
 				// "127.0.0.1:11213:10",
 			},
 		},
-		&proxy.ClusterConfig{
+		&ClusterConfig{
+			Name:             "redis-cluster",
+			HashMethod:       "sha1",
+			HashDistribution: "ketama",
+			HashTag:          "",
+			CacheType:        proto.CacheType("redis_cluster"),
+			ListenProto:      "tcp",
+			ListenAddr:       "127.0.0.1:27000",
+			RedisAuth:        "",
+			DialTimeout:      100,
+			ReadTimeout:      100,
+			NodeConnections:  10,
+			WriteTimeout:     1000,
+			PingFailLimit:    3,
+			PingAutoEject:    false,
+			Servers: []string{
+				"127.0.0.1:7000",
+				"127.0.0.1:7001",
+				// "127.0.0.1:11212:10",
+				// "127.0.0.1:11213:10",
+			},
+		},
+		&ClusterConfig{
 			Name:             "no avaliable node ",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
@@ -105,8 +145,7 @@ var (
 				// "127.0.0.1:11213:10",
 			},
 		},
-
-		&proxy.ClusterConfig{
+		&ClusterConfig{
 			Name:             "reconn_test",
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
@@ -191,8 +230,11 @@ func init() {
 	time.Sleep(1000 * time.Millisecond)
 }
 
+var p *Proxy
+
 func mockProxy() {
-	p, err := proxy.New(proxy.DefaultConfig())
+	var err error
+	p, err = New(DefaultConfig())
 	if err != nil {
 		panic(err)
 	}
@@ -218,6 +260,24 @@ func testCmdRedis(t testing.TB, cmds ...[]byte) {
 			t.Errorf("conn read cmd:%s error:%s ", cmd, err)
 			continue
 		}
+	}
+}
+
+func testCmdRedisCluster(t testing.TB, cmds ...[]byte) {
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:27000", time.Second)
+	if err != nil {
+		t.Errorf("net dial error:%v", err)
+	}
+	defer conn.Close()
+	br := bufio.NewReader(conn)
+	for _, cmd := range cmds {
+		// t.Logf("\n\nexecute cmd %s", cmd)
+		conn.SetWriteDeadline(time.Now().Add(time.Second))
+		_, err = conn.Write(cmd)
+		assert.NoError(t, err)
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		_, err = br.ReadBytes('\n')
+		assert.NoError(t, err)
 	}
 }
 
@@ -306,7 +366,6 @@ func _execute(t *testing.T) (bs []byte) {
 }
 
 func TestReconnFeature(t *testing.T) {
-
 	cancel := _createTcpProxy(t, 11211, 21220)
 	defer cancel()
 	// 1. try to execute with error, but click reconn process
@@ -397,6 +456,7 @@ func TestProxyFull(t *testing.T) {
 	// for i := 0; i < 10; i++ {
 	testCmd(t, cmds[0], cmds[1], cmds[2], cmds[10], cmds[11])
 	testCmdRedis(t, cmdRedis...)
+	testCmdRedisCluster(t, cmdRedis...)
 	testCmdNotAvaliabeNode(t, cmdRedis[1])
 	testCmdBin(t, cmdBins[0], cmdBins[1])
 	// }
@@ -477,4 +537,95 @@ func BenchmarkCmdMGet(b *testing.B) {
 			testCmd(b, cmds[2])
 		}
 	})
+}
+
+func TestEject(t *testing.T) {
+	ts := []struct {
+		Name   string
+		Cmd    string
+		Line   int
+		eject  bool
+		Except []string
+	}{
+
+		{Name: "SetLowerOneOk", Line: 1, Cmd: "set a_11 0 1024 1\r\n2\r\n", eject: true, Except: []string{"SERVER_ERROR executor hash no hit node\r\n"}},
+		{Name: "SetLowerTwoOk", Line: 1, Cmd: "set a_22 0 1024 4\r\nhalo\r\n", Except: []string{"STORED\r\n"}},
+		{Name: "SetUpperOk", Line: 1, Cmd: "SET a_11 0 1024 1\r\n1\r\n", Except: []string{"STORED\r\n"}},
+
+		{Name: "GetMultiMissOneOk", Line: 5, Cmd: "get a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1\r\n1\r\n", "VALUE a_22 0 4\r\nhalo\r\n", "END\r\n"}},
+		{Name: "GetsOneOk", Line: 3, Cmd: "gets a_11\r\n", Except: []string{"VALUE a_11 0 1 ", "\r\n1\r\nEND\r\n"}},
+		{Name: "GetMultiCasMissOneOk", Line: 5, Cmd: "gets a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "VALUE a_22 0 4", "\r\nhalo\r\n", "END\r\n"}},
+		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
+	}
+	eject := ccs[0]
+	exec := p.executors["eject-cluster"].(*defaultExecutor)
+	mp := &mockPing{}
+	ping := &pinger{ping: mp, cc: eject, weight: 10, alias: "mc1"}
+	go exec.processPing(ping)
+
+	for _, tt := range ts {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:22211", time.Second)
+		if err != nil {
+			t.Errorf("net dial error:%v", err)
+		}
+		nc := libnet.NewConn(conn, time.Second, time.Second)
+		br := bufio.NewReader(nc)
+		if tt.eject {
+			mp.SetErr(&mockErr{})
+			time.Sleep(time.Second * 3)
+		} else {
+			mp.SetErr(nil)
+			time.Sleep(time.Second * 1)
+		}
+		t.Run(tt.Name, func(t *testing.T) {
+			size, err := conn.Write([]byte(tt.Cmd))
+			assert.NoError(t, err)
+			assert.Equal(t, len(tt.Cmd), size)
+
+			buf := make([]byte, 0)
+			for i := 0; i < tt.Line; i++ {
+				data, err := br.ReadBytes('\n')
+				assert.NoError(t, err)
+				buf = append(buf, data...)
+			}
+			sb := string(buf)
+			if len(tt.Except) == 1 {
+				assert.Equal(t, tt.Except[0], sb, "CMD:%s", tt.Cmd)
+			} else {
+				for _, except := range tt.Except {
+					assert.Contains(t, sb, except, "CMD:%s", tt.Cmd)
+				}
+			}
+		})
+	}
+}
+
+type mockPing struct {
+	err error
+}
+
+func (mp *mockPing) Ping() error {
+	return mp.err
+}
+
+func (mp *mockPing) Close() error {
+	return nil
+}
+
+func (mp *mockPing) SetErr(err error) {
+	mp.err = err
+}
+
+type mockErr struct {
+	err error
+}
+
+func (e *mockErr) Error() string {
+	return "mock err"
+}
+func (e *mockErr) Timeout() bool {
+	return true
+}
+func (e *mockErr) Temporary() bool {
+	return true
 }
