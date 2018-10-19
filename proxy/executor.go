@@ -169,7 +169,7 @@ func (e *defaultExecutor) process(cc *ClusterConfig, addr string) *batchChan {
 	for i := int32(0); i < conns; i++ {
 		ch := nbc.ch
 		nc := newNodeConn(cc, addr)
-		go spwanPipe(addr, cc, ch, nc)
+		spawnPipe(addr, cc, ch, nc)
 	}
 	return nbc
 }
@@ -467,7 +467,7 @@ func (er *executorRecv) spawn() {
 	}
 }
 
-func spwanPipe(addr string, cc *ClusterConfig, nb <-chan *proto.MsgBatch, nc proto.NodeConn) {
+func spawnPipe(addr string, cc *ClusterConfig, nb <-chan *proto.MsgBatch, nc proto.NodeConn) {
 	forward := make(chan *proto.MsgBatch, len(nb))
 	ed := &executorDown{
 		cc:      cc,
