@@ -68,7 +68,6 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 	return
 }
 
-
 func (n *nodeConn) Flush() (err error) {
 	if err = n.bw.Flush(); err != nil {
 		err = errors.Wrap(err, "MC Writer handle flush Msg bytes")
@@ -166,14 +165,14 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	bs := data[:pos+1]
 	size = len(bs)
 	if _, ok := withValueTypes[mcr.rTp]; !ok {
-		mcr.data = make([]byte, len(bs))
-		copy(mcr.data, bs)
+		mcr.data = mcr.data[:0]
+		mcr.data = append(mcr.data, bs...)
 		return
 	}
 
 	if bytes.Equal(bs, endBytes) {
-		mcr.data = make([]byte, len(bs))
-		copy(mcr.data, bs)
+		mcr.data = mcr.data[:0]
+		mcr.data = append(mcr.data, bs...)
 		return
 	}
 
@@ -193,8 +192,8 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 	if len(data) < size {
 		return 0, bufio.ErrBufferFull
 	}
-	mcr.data = make([]byte, size)
-	copy(mcr.data, data[:size])
+	mcr.data = mcr.data[:0]
+	mcr.data = append(mcr.data, data[:size]...)
 	return
 }
 

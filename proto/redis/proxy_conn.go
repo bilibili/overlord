@@ -142,6 +142,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 		r := nextReq(m)
 		r.resp.copy(pc.resp)
 	}
+
 	return
 }
 
