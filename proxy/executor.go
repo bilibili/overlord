@@ -395,11 +395,12 @@ type executorDown struct {
 	addr    string
 	input   <-chan *proto.MsgBatch
 	forward chan<- *proto.MsgBatch
+	recv    chan *proto.MsgBatch
 	nc      proto.NodeConn
 	local   []*proto.MsgBatch
 }
 
-func (ed *executorDown) spawn() {
+func (ed *executorDown) spawnDown() {
 	var count int
 	var err error
 	for {
@@ -447,22 +448,15 @@ func (ed *executorDown) spawn() {
 	}
 }
 
-type executorRecv struct {
-	cluster string
-	addr    string
-	recv    <-chan *proto.MsgBatch
-	nc      proto.NodeConn
-}
-
-func (er *executorRecv) spawn() {
+func (ed *executorDown) spawnRecv() {
 	var err error
 	for {
-		mb := <-er.recv
-		if err = er.nc.ReadBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch read")
-			mb.DoneWithError(er.cluster, er.addr, err)
+		mb := <-ed.recv
+		if err = ed.nc.ReadBatch(mb); err != nil {
+			err = errors.Wrap(err, "Clusted batch read")
+			mb.DoneWithError(ed.cc.Name, ed.addr, err)
 		} else {
-			mb.Done(er.cluster, er.addr)
+			mb.Done(ed.cc.Name, ed.addr)
 		}
 	}
 }
@@ -477,13 +471,6 @@ func spawnPipe(addr string, cc *ClusterConfig, nb <-chan *proto.MsgBatch, nc pro
 		nc:      nc,
 		local:   make([]*proto.MsgBatch, 64),
 	}
-	go ed.spawn()
-
-	er := &executorRecv{
-		cluster: cc.Name,
-		addr:    addr,
-		recv:    forward,
-		nc:      nc,
-	}
-	go er.spawn()
+	go ed.spawnDown()
+	go ed.spawnRecv()
 }
