@@ -394,7 +394,7 @@ type executorDown struct {
 	cc      *ClusterConfig
 	addr    string
 	input   <-chan *proto.MsgBatch
-	forward chan<- *proto.MsgBatch
+	forward chan *proto.MsgBatch
 	nc      proto.NodeConn
 	local   []*proto.MsgBatch
 }
