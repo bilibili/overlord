@@ -395,7 +395,6 @@ type executorDown struct {
 	addr    string
 	input   <-chan *proto.MsgBatch
 	forward chan<- *proto.MsgBatch
-	recv    chan *proto.MsgBatch
 	nc      proto.NodeConn
 	local   []*proto.MsgBatch
 }
@@ -451,7 +450,7 @@ func (ed *executorDown) spawnDown() {
 func (ed *executorDown) spawnRecv() {
 	var err error
 	for {
-		mb := <-ed.recv
+		mb := <-ed.forward
 		if err = ed.nc.ReadBatch(mb); err != nil {
 			err = errors.Wrap(err, "Clusted batch read")
 			mb.DoneWithError(ed.cc.Name, ed.addr, err)
