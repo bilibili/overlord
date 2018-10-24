@@ -21,16 +21,148 @@
 			"revisionTime": "2018-02-21T22:46:20Z"
 		},
 		{
+			"checksumSHA1": "2XtrajUc7LktpQETiH+H2hbd200=",
+			"path": "github.com/gogo/protobuf/gogoproto",
+			"revision": "fcdc5011193ff531a548e9b0301828d5a5b97fd8",
+			"revisionTime": "2017-08-15T08:56:58Z"
+		},
+		{
+			"checksumSHA1": "haZp9uoO6N2UX4RwEtnlm9nR/AU=",
+			"path": "github.com/gogo/protobuf/proto",
+			"revision": "fcdc5011193ff531a548e9b0301828d5a5b97fd8",
+			"revisionTime": "2017-08-15T08:56:58Z"
+		},
+		{
+			"checksumSHA1": "cAGpgiuPZ+oBOBBKU/wfOLWwnJY=",
+			"path": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"revision": "fcdc5011193ff531a548e9b0301828d5a5b97fd8",
+			"revisionTime": "2017-08-15T08:56:58Z"
+		},
+		{
 			"checksumSHA1": "WX1+2gktHcBmE9MGwFSGs7oqexU=",
 			"path": "github.com/golang/protobuf/proto",
 			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
 			"revisionTime": "2018-02-02T18:43:18Z"
 		},
 		{
+			"checksumSHA1": "yNyE9MrpDJQAxOxSipSIBgBhuNQ=",
+			"path": "github.com/google/uuid",
+			"revision": "9b3b1e0f5f99ae461456d768e7d301a7acdaa2d8",
+			"revisionTime": "2018-09-17T14:00:05Z"
+		},
+		{
 			"checksumSHA1": "bKMZjd2wPw13VwoE7mBeSv5djFA=",
 			"path": "github.com/matttproud/golang_protobuf_extensions/pbutil",
 			"revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
 			"revisionTime": "2016-04-24T11:30:07Z"
+		},
+		{
+			"checksumSHA1": "//FiFl9qHPtrh9kOhLX6ut/s6Qo=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "i2TWjUBdHoCYBo9ELgMzcKe+k2k=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/client",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "NX7/5ZsqbW00uMYZLteBuQvElTA=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/debug",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "iaRobGVI1/zpGgMA4RtmzNyDmoc=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/encoding",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "XFHw82eYnXFB/EdYH5+4mOSxnMo=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/encoding/codecs",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "fXVt4WlBosCqgx3fCBiDjJIXdsg=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/encoding/framing",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "bkCus5kMpZgbfa3oH2ScaUNt+NU=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/encoding/json",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "F/TWolYqRyoQb724ocIqeZrTpjE=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/encoding/proto",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "IYQ2OYUqvax3jKiCLcQSkgECG+8=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/executor",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "3fEgsvui92A0MwHxsZAo+qU5KSg=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/executor/calls",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "H7ilqR/2nXwbH8LGESa/0iYI2fk=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/executor/config",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "MdjTeFy94yrgpVFwARhH73Kecu8=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/httpcli",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "2953AuPcu8szmScGfEW0k2FbLhs=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/httpcli/apierrors",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "oUCsG4g3WLMNWtEd5nc5F+umLYU=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/httpcli/httpexec",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "JWq0l5YcTgsXJ4cS66MLiDpS5vI=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/recordio",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "L6VrxVse+dNNEw8NARqfLOa0YEA=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/roles",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "iVxVu9Iz9F9zUUYYh+vdrr2xU2U=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/time",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "UruiaCPpVcDKfBTQhAM6UomufIw=",
+			"path": "github.com/pborman/uuid",
+			"revision": "8b1b92947f46224e3b97bb1a3a5b0382be00d31e",
+			"revisionTime": "2018-09-18T08:52:46Z"
 		},
 		{
 			"checksumSHA1": "ljd3FhYRJ91cLZz3wsH9BQQ2JbA=",
@@ -43,6 +175,18 @@
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
 			"revisionTime": "2016-01-10T10:55:54Z"
+		},
+		{
+			"checksumSHA1": "GFOW0PwdTfizeH2VVqBnt8f3Ya0=",
+			"path": "github.com/pquerna/ffjson/fflib/v1",
+			"revision": "af8b230fcd2007c7095168ca8ab94c68b60840c6",
+			"revisionTime": "2018-07-17T14:41:49Z"
+		},
+		{
+			"checksumSHA1": "iZHmHPBzKJiS6ROUaVOf4DVOhbA=",
+			"path": "github.com/pquerna/ffjson/fflib/v1/internal",
+			"revision": "af8b230fcd2007c7095168ca8ab94c68b60840c6",
+			"revisionTime": "2018-07-17T14:41:49Z"
 		},
 		{
 			"checksumSHA1": "I87tkF1e/hrl4d/XIKFfkPRq1ww=",

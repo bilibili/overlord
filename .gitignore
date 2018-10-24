@@ -15,4 +15,5 @@
 .glide/
 
 cmd/proxy/proxy
+cmd/executor/executor
 coverage.txt
