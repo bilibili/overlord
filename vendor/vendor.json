@@ -15,6 +15,12 @@
 			"revisionTime": "2016-08-04T10:47:26Z"
 		},
 		{
+			"checksumSHA1": "97BsbXOiZ8+Kr+LIuZkQFtSj7H4=",
+			"path": "github.com/coreos/go-semver/semver",
+			"revision": "e214231b295a8ea9479f11b70b35d5acf3556d9b",
+			"revisionTime": "2018-01-08T23:09:05Z"
+		},
+		{
 			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
@@ -253,6 +259,42 @@
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
 			"revisionTime": "2018-05-06T18:05:49Z"
+		},
+		{
+			"checksumSHA1": "uLN9Ecm/pL2MRyu+/5tJqZNDjWM=",
+			"path": "github.com/ugorji/go/codec",
+			"revision": "e5e69e061d4f7ee3a69b793cf9c1b41afe21918e",
+			"revisionTime": "2018-10-22T19:04:02Z"
+		},
+		{
+			"checksumSHA1": "VtM227FLn5y81r3dwSX9pSJKT9Y=",
+			"path": "go.etcd.io/etcd/client",
+			"revision": "86b933311d239aeba576fac32077e41157d328eb",
+			"revisionTime": "2018-10-22T23:07:27Z"
+		},
+		{
+			"checksumSHA1": "Q4ZZnZeTbMHrXKZxTd6EQjSf4uY=",
+			"path": "go.etcd.io/etcd/pkg/pathutil",
+			"revision": "86b933311d239aeba576fac32077e41157d328eb",
+			"revisionTime": "2018-10-22T23:07:27Z"
+		},
+		{
+			"checksumSHA1": "jF9R5QbAMut5PvZMIy9+zDPf6NU=",
+			"path": "go.etcd.io/etcd/pkg/srv",
+			"revision": "86b933311d239aeba576fac32077e41157d328eb",
+			"revisionTime": "2018-10-22T23:07:27Z"
+		},
+		{
+			"checksumSHA1": "VL9HsNKbbCb1Ntj9VcFCfiTmjmM=",
+			"path": "go.etcd.io/etcd/pkg/types",
+			"revision": "86b933311d239aeba576fac32077e41157d328eb",
+			"revisionTime": "2018-10-22T23:07:27Z"
+		},
+		{
+			"checksumSHA1": "Vyt9fFWEV2/sagq9KmkVbPn+LFM=",
+			"path": "go.etcd.io/etcd/version",
+			"revision": "86b933311d239aeba576fac32077e41157d328eb",
+			"revisionTime": "2018-10-22T23:07:27Z"
 		}
 	],
 	"rootPath": "overlord"
