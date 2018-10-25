@@ -49,7 +49,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Len(t, nmsgs, 5)
 	// MGET baka
 	assert.Len(t, nmsgs[0].Batch(), 2)
-	req := msgs[0].Requests()[0].(*Request)
+	req := nmsgs[0].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
@@ -59,7 +59,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nbaka"), req.resp.array[1].data)
 	// MGET kaba
-	req = msgs[0].Requests()[1].(*Request)
+	req = nmsgs[0].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
@@ -70,7 +70,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("4\r\nkaba"), req.resp.array[1].data)
 	// MSET a b
 	assert.Len(t, nmsgs[1].Batch(), 2)
-	req = msgs[1].Requests()[0].(*Request)
+	req = nmsgs[1].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeOK, req.mType)
 	assert.Equal(t, 3, req.resp.arrayn)
 	assert.Equal(t, "MSET", req.CmdString())
@@ -81,7 +81,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("1\r\na"), req.resp.array[1].data)
 	assert.Equal(t, []byte("1\r\nb"), req.resp.array[2].data)
 	// MSET eee 12345
-	req = msgs[1].Requests()[1].(*Request)
+	req = nmsgs[1].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeOK, req.mType)
 	assert.Equal(t, 3, req.resp.arrayn)
 	assert.Equal(t, "MSET", req.CmdString())
@@ -93,7 +93,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("5\r\n12345"), req.resp.array[2].data)
 	// MGET enen
 	assert.Len(t, nmsgs[0].Batch(), 2)
-	req = msgs[2].Requests()[0].(*Request)
+	req = nmsgs[2].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
@@ -103,7 +103,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nenen"), req.resp.array[1].data)
 	// MGET nime
-	req = msgs[2].Requests()[1].(*Request)
+	req = nmsgs[2].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
@@ -113,7 +113,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nnime"), req.resp.array[1].data)
 	// GET abcde
-	req = msgs[3].Requests()[0].(*Request)
+	req = nmsgs[3].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
@@ -123,7 +123,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("5\r\nabcde"), req.resp.array[1].data)
 
-	req = msgs[4].Requests()[0].(*Request)
+	req = nmsgs[4].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeCount, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "DEL", req.CmdString())

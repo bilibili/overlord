@@ -99,6 +99,8 @@ func TestNodeConnWriteHasErr(t *testing.T) {
 	mb.AddMsg(msg)
 
 	err := nc.WriteBatch(mb)
+	assert.NoError(t, err)
+	err = nc.Flush()
 	assert.Error(t, err)
 	assert.EqualError(t, err, "write error")
 }
@@ -157,7 +159,7 @@ func TestReadBatchWithNilError(t *testing.T) {
 	req.mType = mergeTypeJoin
 	req.reply = &resp{}
 	req.resp = newresp(respArray, []byte("2"))
-	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("GET")))
+	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("3\r\nGET")))
 	req.resp.arrayn++
 	msg.WithRequest(req)
 	mb.AddMsg(msg)

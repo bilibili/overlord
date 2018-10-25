@@ -379,7 +379,7 @@ func (pe *pipeExecutor) spawnDown() {
 
 		if count != 0 {
 			if err = nc.Flush(); err != nil {
-				for _, mb := range pe.local {
+				for _, mb := range pe.local[:count] {
 					mb.DoneWithError(pe.cc.Name, pe.addr, err)
 				}
 				count = 0

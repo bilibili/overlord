@@ -79,7 +79,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	}
 	if pc.resp.arrayn < 1 {
 		r := nextReq(m)
-		r.resp.copy(pc.resp)
+		r.resp.swap(pc.resp)
 		return
 	}
 	conv.UpdateToUpper(pc.resp.array[0].data)
@@ -103,10 +103,10 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			nre1.data = cmdMSetBytes
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.copy(pc.resp.array[i*2+1])
+			nre2.swap(pc.resp.array[i*2+1])
 			// array resp: value
 			nre3 := r.resp.next() // NOTE: $vlen\r\nvalue\r\n
-			nre3.copy(pc.resp.array[i*2+2])
+			nre3.swap(pc.resp.array[i*2+2])
 		}
 	} else if bytes.Equal(cmd, cmdMGetBytes) {
 		for i := 1; i < pc.resp.arrayn; i++ {
@@ -122,7 +122,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			nre1.data = cmdGetBytes
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.copy(pc.resp.array[i])
+			nre2.swap(pc.resp.array[i])
 		}
 	} else if bytes.Equal(cmd, cmdDelBytes) || bytes.Equal(cmd, cmdExistsBytes) {
 		for i := 1; i < pc.resp.arrayn; i++ {
@@ -133,14 +133,14 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.resp.data = arrayLenTwo
 			// array resp: get
 			nre1 := r.resp.next() // NOTE: $3\r\nDEL\r\n | $6\r\nEXISTS\r\n
-			nre1.copy(pc.resp.array[0])
+			nre1.swap(pc.resp.array[0])
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
-			nre2.copy(pc.resp.array[i])
+			nre2.swap(pc.resp.array[i])
 		}
 	} else {
 		r := nextReq(m)
-		r.resp.copy(pc.resp)
+		r.resp.swap(pc.resp)
 	}
 
 	return
