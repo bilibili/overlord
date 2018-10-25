@@ -4,6 +4,14 @@ import (
 	"context"
 )
 
+// etcd dir.
+const (
+	BASEDIR    = "/overlord"
+	CLUSTERDIR = "/overlord/clusters"
+	CONFIGDIR  = "/overlord/config"
+	TASKDIR    = "/overlord/task"
+)
+
 // DB store interface.
 type DB interface {
 	//Perform the initial setup of the database/KV store by creating DB/Namespace etc that are important for running MrRedis

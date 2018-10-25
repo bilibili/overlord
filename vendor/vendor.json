@@ -69,6 +69,12 @@
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},
 		{
+			"checksumSHA1": "FvP8dBBeOWYlE1eP4/jfS6rMSNI=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/backoff",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
 			"checksumSHA1": "i2TWjUBdHoCYBo9ELgMzcKe+k2k=",
 			"path": "github.com/mesos/mesos-go/api/v1/lib/client",
 			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
@@ -129,6 +135,36 @@
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},
 		{
+			"checksumSHA1": "BP8SN/n4ggExpDOpGi6pmminfuM=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/extras/metrics",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "Mk+h9KMUGzzTQk/6keXSoOnDkto=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/callrules",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "tcyQ7mocLFw6mGtoDVxiKpqJEbE=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/controller",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "DmT0gJ15PvMAWj7v5W7LKgCcnN8=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/eventrules",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "TiGZJN4M7Ay21F7YGEGkNszVPkE=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/extras/store",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
 			"checksumSHA1": "MdjTeFy94yrgpVFwARhH73Kecu8=",
 			"path": "github.com/mesos/mesos-go/api/v1/lib/httpcli",
 			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
@@ -147,6 +183,12 @@
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},
 		{
+			"checksumSHA1": "OqB/lgwg2mbuMNIw2ouZRIkOHOs=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
 			"checksumSHA1": "JWq0l5YcTgsXJ4cS66MLiDpS5vI=",
 			"path": "github.com/mesos/mesos-go/api/v1/lib/recordio",
 			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
@@ -155,6 +197,24 @@
 		{
 			"checksumSHA1": "L6VrxVse+dNNEw8NARqfLOa0YEA=",
 			"path": "github.com/mesos/mesos-go/api/v1/lib/roles",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "wWhqFuOGEXMWPcLMFq0ibjgpNao=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/scheduler",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "BiBnzBa4PEsk0JkW/8wZwSe86P8=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/scheduler/calls",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "SL+E2lg/WJabFWpkrVrmPsq0YtE=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/scheduler/events",
 			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},

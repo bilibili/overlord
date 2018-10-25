@@ -8,6 +8,7 @@ const (
 	taskTypeMemcache
 )
 
+// Task detail
 type Task struct {
 	Name string
 	Type taskType
@@ -15,8 +16,19 @@ type Task struct {
 	I    *Instance
 }
 
+// Instance  detail.
 type Instance struct {
 	Name   string
 	Memory int     // capacity of memory of the instance in MB
 	CPU    float32 // num of cpu cors if the instance
+}
+
+// Config scheduler config.
+type Config struct {
+	User       string // Supply a username
+	Name       string // Supply a frameworkname
+	Master     string //MesosMaster's endpoint zk://mesos.master/2181 or 10.11.12.13:5050
+	DBType     string //Type of the database etcd/zk
+	DBEndPoint string //Endpoint of the database
+	URL        string // mesos master scheduler url.
 }

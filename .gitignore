@@ -16,4 +16,5 @@
 
 cmd/proxy/proxy
 cmd/executor/executor
+cmd/scheduler/scheduler
 coverage.txt

@@ -7,13 +7,9 @@ import (
 	"strings"
 	"time"
 
-	cli "go.etcd.io/etcd/client"
-)
+	"overlord/lib/store"
 
-const (
-	baseDir     = "/overlord"
-	instanceDir = baseDir + "/%s" + "/instances" // %s is cluster name
-	configDir   = baseDir + "/%s" + "/config"
+	cli "go.etcd.io/etcd/client"
 )
 
 type etcd struct {
@@ -54,15 +50,19 @@ func (db *etcd) Setup(ctx context.Context, config string) (err error) {
 	if err != nil {
 		return
 	}
-	err = db.CreateSection(ctx, baseDir)
+	err = db.CreateSection(ctx, store.BASEDIR)
 	if err != nil && strings.Contains(err.Error(), "Key already exists") != true {
 		return
 	}
-	err = db.CreateSection(ctx, instanceDir)
+	err = db.CreateSection(ctx, store.CLUSTERDIR)
 	if err != nil && strings.Contains(err.Error(), "Key already exists") != true {
 		return
 	}
-	err = db.CreateSection(ctx, configDir)
+	err = db.CreateSection(ctx, store.CONFIGDIR)
+	if err != nil && strings.Contains(err.Error(), "Key already exists") != true {
+		return
+	}
+	err = db.CreateSection(ctx, store.TASKDIR)
 	if err != nil && strings.Contains(err.Error(), "Key already exists") != true {
 		return
 	}
@@ -100,6 +100,7 @@ func (db *etcd) Watch(ctx context.Context, k string) (ch chan string, err error)
 	go func() {
 		for {
 			resp, err := watcher.Next(ctx)
+			// TODO:rewatch if err.
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", k, err)
 			}
