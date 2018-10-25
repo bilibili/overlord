@@ -127,14 +127,21 @@ func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 	if isDecode {
 		req.rTp = RequestType(bs[1])
 	}
-	req.keyLen = bs[2:4]
-	req.extraLen = bs[4:5]
+	req.keyLen = []byte{bs[2], bs[3]}
+	// req.keyLen = bs[2:4]
+	req.extraLen = []byte{bs[4]}
+	// req.extraLen = bs[4:5]
 	if !isDecode {
-		req.status = bs[6:8]
+		req.status = []byte{bs[6], bs[7]}
+		// req.status = bs[6:8]
 	}
-	req.bodyLen = bs[8:12]
-	req.opaque = bs[12:16]
-	req.cas = bs[16:24]
+	req.bodyLen = []byte{bs[8], bs[9], bs[10], bs[11]}
+	// req.bodyLen = bs[8:12]
+	// req.opaque = bs[12:16]
+	req.opaque = []byte{bs[12], bs[13], bs[14], bs[15]}
+	req.cas = make([]byte, 8)
+	copy(req.cas, bs[16:24])
+	// req.cas = bs[16:24]
 }
 
 // Encode encode response and write into writer.

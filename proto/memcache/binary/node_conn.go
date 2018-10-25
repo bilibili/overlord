@@ -38,7 +38,7 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		addr:    addr,
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(2048)),
 	}
 	return
 }
@@ -112,8 +112,8 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		err = errors.Wrap(ErrClosed, "MC Reader read batch message")
 		return
 	}
-	defer n.br.ResetBuffer(nil)
-	n.br.ResetBuffer(mb.Buffer())
+	// defer n.br.ResetBuffer(nil)
+	// n.br.ResetBuffer(mb.Buffer())
 	var (
 		size   int
 		cursor int
@@ -176,7 +176,9 @@ func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err err
 		return 0, bufio.ErrBufferFull
 	}
 	size = requestHeaderLen + int(bl)
-	mcr.data = data[requestHeaderLen : requestHeaderLen+bl]
+	mcr.data = make([]byte, bl)
+	copy(mcr.data, data[requestHeaderLen : requestHeaderLen+bl])
+	// mcr.data = data[requestHeaderLen : requestHeaderLen+bl]
 
 	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetK || mcr.rTp == RequestTypeGetKQ {
 		if prom.On {
