@@ -372,7 +372,7 @@ func (pe *pipeExecutor) spawnDown() {
 				mb.DoneWithError(pe.cc.Name, pe.addr, err)
 			}
 			mb = nil
-			if count < 64 {
+			if count >= 64 {
 				break
 			}
 		}

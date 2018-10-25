@@ -378,7 +378,7 @@ func (pe *pipeExecutor) spawnDown() {
 			pe.local[count] = mb
 			count++
 			mb = nil
-			if count < 64 {
+			if count >= 64 {
 				break
 			}
 		}
