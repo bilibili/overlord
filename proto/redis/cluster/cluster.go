@@ -133,40 +133,6 @@ func (c *cluster) process(addr string) *batchChan {
 	return nbc
 }
 
-func (c *cluster) processIO(name, addr string, ch chan *proto.MsgBatch, ncCh *ncChan) {
-	var (
-		nc  = ncCh.nc
-		err error
-	)
-	for {
-		if err != nil {
-			nc = newNodeConn(c, addr)
-			// TODO: there may be chaos with unexcepted closed of cluster.
-			ncCh.nc = nc
-			// fire try fetch action
-			select {
-			case c.action <- struct{}{}:
-			default:
-			}
-		}
-		mb, ok := <-ch
-		if !ok {
-			close(ncCh.stop) // NOTE: close stop, make sure nc closed concurrent security!!!
-			return
-		}
-		if err = nc.WriteBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch write")
-			mb.DoneWithError(name, addr, err)
-			continue
-		}
-		if err := nc.ReadBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch read")
-			mb.DoneWithError(name, addr, err)
-			continue
-		}
-		mb.Done(name, addr)
-	}
-}
 
 func (c *cluster) getAddr(key []byte) (addr string) {
 	realKey := c.trimHashTag(key)
@@ -368,106 +334,102 @@ type ncChan struct {
 	stop chan struct{}
 }
 
-
-type executorDown struct {
-	c *cluster
-	addr    string
-	input   <-chan *proto.MsgBatch
-	forward chan<- *proto.MsgBatch
-	ncCh *ncChan
+type pipeExecutor struct {
+	cc *cluster
+	addr  string
+	input <-chan *proto.MsgBatch
+	// if nil was send, click the pipeExecutor recv reconnect
+	forward chan *proto.MsgBatch
+	ncCh      atomic.Value
 	local   []*proto.MsgBatch
 }
 
-func (ed *executorDown) spawn() {
+func (pe *pipeExecutor) spawnDown() {
 	var count int
 	var err error
+	var ncCh = pe.ncCh.Load().(*ncChan)
+	var mb *proto.MsgBatch
 	for {
 		if err != nil {
-			nc := newNodeConn(ed.c, ed.addr)
-			// TODO: there may be chaos with unexcepted closed of cluster.
-			ed.ncCh.nc = nc
-			// fire try fetch action
-			select {
-			case ed.c.action <- struct{}{}:
-			default:
-			}
+			_ = ncCh.nc.Close()
+			nc := newNodeConn(pe.cc, pe.addr)
+			newNcCh := &ncChan{nc: nc, stop: ncCh.stop}
+			pe.ncCh.Store(newNcCh)
+			ncCh = newNcCh
+			pe.forward <- nil
+			err = nil
 		}
 
-		select {
-		case mb := <-ed.input:
-			if err = ed.ncCh.nc.WriteBatch(mb); err != nil {
+		for {
+			if mb == nil {
+				select {
+				case mb = <-pe.input:
+				default:
+				}
+				if mb == nil {
+					break
+				}
+			}
+
+			if err = ncCh.nc.WriteBatch(mb); err != nil {
 				err = errors.Wrap(err, "Cluster batch write")
-				mb.DoneWithError(ed.c.name, ed.addr, err)
+				mb.DoneWithError(pe.cc.name, pe.addr, err)
 			}
-			ed.local[count] = mb
+			pe.local[count] = mb
 			count++
+			mb = nil
 			if count < 64 {
-				continue
+				break
 			}
-		default:
 		}
 
 		if count != 0 {
-			if err = ed.ncCh.nc.Flush(); err != nil {
-				for _, mb := range ed.local {
-					mb.DoneWithError(ed.c.name, ed.addr, err)
+			if err = ncCh.nc.Flush(); err != nil {
+				for _, mb := range pe.local[:count] {
+					mb.DoneWithError(pe.cc.name, pe.addr, err)
 				}
 				count = 0
 				continue
 			}
-			for _, mb := range ed.local[:count] {
-				ed.forward <- mb
+			for _, mb := range pe.local[:count] {
+				pe.forward <- mb
 			}
 			count = 0
-		} else {
-			mb := <-ed.input
-			if err = ed.ncCh.nc.WriteBatch(mb); err != nil {
-				err = errors.Wrap(err, "Cluster batch write")
-				mb.DoneWithError(ed.c.name, ed.addr, err)
-			}
-			ed.local[count] = mb
-			count++
+			continue
 		}
+
+		mb = <-pe.input
 	}
 }
 
-type executorRecv struct {
-	cluster string
-	addr    string
-	recv    <-chan *proto.MsgBatch
-	ncCh  *ncChan
-}
-
-func (er *executorRecv) spawn() {
+func (pe *pipeExecutor) spawnRecv() {
 	var err error
+	var ncCh = pe.ncCh.Load().(*ncChan)
 	for {
-		mb := <-er.recv
-		if err = er.ncCh.nc.ReadBatch(mb); err != nil {
-			err = errors.Wrap(err, "Cluster batch read")
-			mb.DoneWithError(er.cluster, er.addr, err)
+		mb := <-pe.forward
+		if mb == nil {
+			ncCh = pe.ncCh.Load().(*ncChan)
+			continue
+		}
+		if err = ncCh.nc.ReadBatch(mb); err != nil {
+			err = errors.Wrap(err, "Clusted batch read")
+			mb.DoneWithError(pe.cc.name, pe.addr, err)
 		} else {
-			mb.Done(er.cluster, er.addr)
+			mb.Done(pe.cc.name, pe.addr)
 		}
 	}
 }
 
-func spawnPipe(addr string, c *cluster, nb <-chan *proto.MsgBatch, ncCh *ncChan) {
+func spawnPipe(addr string, cc *cluster, nb <-chan *proto.MsgBatch, nc *ncChan) {
 	forward := make(chan *proto.MsgBatch, len(nb))
-	ed := &executorDown{
-		c:      c,
+	pe := &pipeExecutor{
+		cc:      cc,
 		addr:    addr,
 		input:   nb,
 		forward: forward,
-		ncCh:      ncCh,
 		local:   make([]*proto.MsgBatch, 64),
 	}
-	go ed.spawn()
-
-	er := &executorRecv{
-		cluster: c.name,
-		addr:    addr,
-		recv:    forward,
-		ncCh: ncCh,
-	}
-	go er.spawn()
+	pe.ncCh.Store(nc)
+	go pe.spawnDown()
+	go pe.spawnRecv()
 }

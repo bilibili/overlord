@@ -365,12 +365,12 @@ func (pe *pipeExecutor) spawnDown() {
 				}
 			}
 
+			pe.local[count] = mb
+			count++
 			if err = nc.WriteBatch(mb); err != nil {
 				err = errors.Wrap(err, "Cluster batch write")
 				mb.DoneWithError(pe.cc.Name, pe.addr, err)
 			}
-			pe.local[count] = mb
-			count++
 			mb = nil
 			if count < 64 {
 				break

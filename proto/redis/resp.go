@@ -71,7 +71,7 @@ type resp struct {
 
 func (r *resp) reset() {
 	r.rTp = respUnknown
-	r.data = r.data[:0]
+	r.data = nil
 	r.arrayn = 0
 }
 
@@ -169,8 +169,6 @@ func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 	} else if err != nil {
 		return
 	}
-	// r.data = make([]byte, len(data)-2)
-	// swap(r.data, data[:len(data)-2])
 	r.data = r.data[:0]
 	r.data = append(r.data, data[:len(data)-2]...)
 	return
@@ -187,8 +185,6 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 		r.data = nil
 		return
 	}
-	// r.data = make([]byte, len(sBs))
-	// swap(r.data, sBs)
 	r.data = r.data[:0]
 	r.data = append(r.data, sBs...)
 	mark := br.Mark()

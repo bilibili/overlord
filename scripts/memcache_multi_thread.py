@@ -9,7 +9,7 @@ def run(_x):
     sets = [("key_{}".format(x), x) for x in range(1000)]
     cmds = gets + sets
     mc = memcache.Client(["127.0.0.1:21211"])
-    for x in range(100000):
+    for x in range(1000):
         item = random.choice(cmds)
         if isinstance(item, basestring):
             _value = mc.get(item)
