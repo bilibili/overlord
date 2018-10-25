@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"overlord/lib/bufio"
 	"overlord/lib/log"
 	"overlord/lib/prom"
 
@@ -92,7 +91,6 @@ var msgBatchPool = &sync.Pool{
 	New: func() interface{} {
 		return &MsgBatch{
 			msgs: make([]*Message, defaultMsgBatchSize),
-			buf:  bufio.Get(defaultRespBufSize),
 		}
 	},
 }
@@ -104,7 +102,6 @@ func NewMsgBatch() *MsgBatch {
 
 // MsgBatch is a single execute unit
 type MsgBatch struct {
-	buf   *bufio.Buffer
 	msgs  []*Message
 	count int
 
@@ -134,15 +131,9 @@ func (m *MsgBatch) Nth(i int) *Message {
 	return nil
 }
 
-// Buffer will send back buffer to executor
-func (m *MsgBatch) Buffer() *bufio.Buffer {
-	return m.buf
-}
-
 // Reset will reset all the field as initial value but msgs
 func (m *MsgBatch) Reset() {
 	m.count = 0
-	m.buf.Reset()
 }
 
 // Msgs returns a slice of Msg

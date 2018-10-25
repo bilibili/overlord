@@ -60,7 +60,7 @@ func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
 		err = n.write(m)
 		if err != nil {
 			m.WithError(err)
-			return err
+			return
 		}
 		m.MarkWrite()
 		idx++
@@ -130,7 +130,6 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 		return
 	}
 	for {
-		err = n.br.Read()
 		if err != nil {
 			err = errors.Wrap(err, "MC Reader while read")
 			return
@@ -158,6 +157,7 @@ func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
 				return
 			}
 		}
+		err = n.br.Read()
 	}
 }
 
