@@ -195,6 +195,18 @@
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},
 		{
+			"checksumSHA1": "RYycY5Qw4XV1H3hHIn/EeTgsYJ8=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/resourcefilters",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
+			"checksumSHA1": "NQEfox2YFl0wNs4m21v1XuTtVdk=",
+			"path": "github.com/mesos/mesos-go/api/v1/lib/resources",
+			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",
+			"revisionTime": "2018-10-03T15:22:44Z"
+		},
+		{
 			"checksumSHA1": "L6VrxVse+dNNEw8NARqfLOa0YEA=",
 			"path": "github.com/mesos/mesos-go/api/v1/lib/roles",
 			"revision": "90e013eb50785c101af369fef1ac8e5b9f10a216",

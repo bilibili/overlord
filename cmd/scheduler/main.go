@@ -8,7 +8,10 @@ import (
 
 func main() {
 	db := etcd.New()
-	db.Setup(context.TODO(), "127.0.0.1:2379")
-	sched := mesos.NewScheduler(&mesos.Config{}, db)
+	err := db.Setup(context.TODO(), "http://127.0.0.1:2379")
+	if err != nil {
+		panic(err)
+	}
+	sched := mesos.NewScheduler(&mesos.Config{User: "root", Name: "test"}, db)
 	sched.Run()
 }

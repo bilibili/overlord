@@ -3,10 +3,11 @@ package etcd
 
 import (
 	"context"
-	"overlord/lib/log"
+	"fmt"
 	"strings"
 	"time"
 
+	"overlord/lib/log"
 	"overlord/lib/store"
 
 	cli "go.etcd.io/etcd/client"
@@ -30,7 +31,6 @@ func (db *etcd) Login() error {
 	var err error
 	db.C, err = cli.New(db.Cfg)
 	if err != nil {
-
 		return err
 	}
 	db.Kapi = cli.NewKeysAPI(db.C)
@@ -67,7 +67,7 @@ func (db *etcd) Setup(ctx context.Context, config string) (err error) {
 		return
 	}
 	db.isSetup = true
-	return
+	return nil
 }
 
 func (db *etcd) IsSetup() bool {
@@ -95,11 +95,13 @@ func (db *etcd) Get(ctx context.Context, k string) (v string, err error) {
 }
 
 func (db *etcd) Watch(ctx context.Context, k string) (ch chan string, err error) {
-	watcher := db.Kapi.Watcher(k, nil)
+	watcher := db.Kapi.Watcher(k, &cli.WatcherOptions{Recursive: true})
+
 	ch = make(chan string)
 	go func() {
 		for {
 			resp, err := watcher.Next(ctx)
+			fmt.Println(resp, err)
 			// TODO:rewatch if err.
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", k, err)
