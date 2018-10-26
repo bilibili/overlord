@@ -12,6 +12,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	sched := mesos.NewScheduler(&mesos.Config{User: "root", Name: "test"}, db)
+	sched := mesos.NewScheduler(&mesos.Config{User: "root", Name: "test", ExecutorURL: "http://127.0.0.1:8000/executor"}, db)
 	sched.Run()
 }

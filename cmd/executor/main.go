@@ -8,7 +8,7 @@ import (
 
 func main() {
 	redis := proc.NewRedis(&proc.Config{
-		Path: "redis-server -p 11211",
+		Path: "redis-server",
 	})
 	ec := mesos.New(redis)
 	ec.Subscribe(context.Background())

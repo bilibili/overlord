@@ -187,8 +187,9 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
-		fmt.Println("resource offer", offers)
+		fmt.Println("resource offer", len(offers))
 		for i, offer := range offers {
+			fmt.Println("offer", i, offer)
 			memRes := filterResource(offer.Resources, "mem")
 			mems := 0.0
 			for _, mem := range memRes {
