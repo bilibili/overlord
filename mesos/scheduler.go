@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -47,27 +48,18 @@ func NewScheduler(c *Config, db store.DB) *Scheduler {
 
 // Run scheduler and watch at task dir for task info.
 func (s *Scheduler) Run() (err error) {
+	// watch task dir to get new task.
 	ch, err := s.db.Watch(context.Background(), store.TASKDIR)
 	if err != nil {
 		log.Errorf("start watch task fail err %v", err)
 		return
 	}
 	s.Tchan = ch
-	t := Task{
-		Name: "11",
-		Type: taskTypeRedis,
-		Num:  3,
-		I: &Instance{
-			Name:   "redis",
-			Memory: 100,
-		},
-	}
-	s.task.PushBack(t)
 	go s.taskEvent()
 	fidStore := mstore.DecorateSingleton(
 		mstore.NewInMemorySingleton(),
 		mstore.DoSet().AndThen(func(_ mstore.Setter, v string, _ error) error {
-			fmt.Println("FrameworkID", v)
+			log.Info("FrameworkID", v)
 			return nil
 		}))
 	s.cli = buildHTTPSched(s.c)
@@ -77,6 +69,7 @@ func (s *Scheduler) Run() (err error) {
 		buildFrameworkInfo(s.c),
 		s.cli,
 		controller.WithEventHandler(s.buildEventHandle(fidStore)),
+		controller.WithFrameworkID(mstore.GetIgnoreErrors(fidStore)),
 	)
 	return
 }
@@ -84,13 +77,12 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
+		_ = v
 		var t Task
-		fmt.Println(v)
 		// if err := json.Unmarshal([]byte(v), &t); err != nil {
 		// 	log.Errorf("err task info err %v", err)
 		// 	continue
 		// }
-		// mock task
 		t = Task{
 			Name: "11",
 			Type: taskTypeRedis,
@@ -108,7 +100,7 @@ func (s *Scheduler) taskEvent() {
 
 func buildHTTPSched(cfg *Config) calls.Caller {
 	cli := httpcli.New(
-		httpcli.Endpoint("http://:5050/api/v1/scheduler"),
+		httpcli.Endpoint(fmt.Sprintf("http://%s/api/v1/scheduler", cfg.Master)),
 		httpcli.Codec(codecs.ByMediaType[codecs.MediaTypeProtobuf]),
 		httpcli.Do(httpcli.With(httpcli.Timeout(time.Second))),
 	)
@@ -120,6 +112,13 @@ func buildFrameworkInfo(cfg *Config) *ms.FrameworkInfo {
 	frameworkInfo := &ms.FrameworkInfo{
 		User: cfg.User,
 		Name: cfg.Name,
+	}
+	if cfg.FailVoer > 0 {
+		failOverTimeout := cfg.FailVoer.Seconds()
+		frameworkInfo.FailoverTimeout = &failOverTimeout
+	}
+	if cfg.Role != "" {
+		frameworkInfo.Role = &cfg.Role
 	}
 	return frameworkInfo
 }
@@ -143,7 +142,6 @@ func (s *Scheduler) buildEventHandle(fid mstore.Singleton) events.Handler {
 func logAllEvents() eventrules.Rule {
 	return func(ctx context.Context, e *scheduler.Event, err error, ch eventrules.Chain) (context.Context, *scheduler.Event, error) {
 		log.Infof("%+v\n", *e)
-		fmt.Printf("%+v\n", *e)
 		return ch(ctx, e, err)
 	}
 }
@@ -152,7 +150,6 @@ func (s *Scheduler) trackOffersReceived() eventrules.Rule {
 	return func(ctx context.Context, e *scheduler.Event, err error, chain eventrules.Chain) (context.Context, *scheduler.Event, error) {
 		if err == nil {
 			log.Infof("offer %v ", e.GetOffers().GetOffers())
-			fmt.Printf("offer %v ", e.GetOffers().GetOffers())
 		}
 		return chain(ctx, e, err)
 	}
@@ -181,29 +178,24 @@ func failure(_ context.Context, e *scheduler.Event) error {
 }
 
 func (s *Scheduler) resourceOffers() events.HandlerFunc {
-	fmt.Println("resource offer")
 	return func(ctx context.Context, e *scheduler.Event) error {
 		var (
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
-		fmt.Println("resource offer", len(offers))
 		for i, offer := range offers {
-			fmt.Println("offer", i, offer)
 			memRes := filterResource(offer.Resources, "mem")
 			mems := 0.0
 			for _, mem := range memRes {
 				mems += mem.GetScalar().GetValue()
 			}
 			log.Infof("Recived offer with MEM=%v", mems)
-			fmt.Printf("Recived offer with MEM=%v\n", mems)
 			var tasks []ms.TaskInfo
 			for taskEle := s.task.Front(); taskEle != nil; {
 				task := taskEle.Value.(Task)
 				tkMem := float64(task.I.Memory)
 				if tkMem <= mems {
-
-					tskID := ms.TaskID{Value: task.Name}
+					tskID := ms.TaskID{Value: strconv.FormatInt(rand.Int63(), 10)}
 					memsosTsk := ms.TaskInfo{
 						Name:     task.Name,
 						TaskID:   tskID,
@@ -212,7 +204,6 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 						// TODO:find suitable resource.
 						Resources: buildWantsExecutorResources(task.I.CPU, task.I.Memory),
 					}
-					fmt.Println("lanch tash", memsosTsk)
 					cTask := taskEle
 					taskEle = taskEle.Next()
 					s.task.Remove(cTask)
@@ -228,8 +219,10 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				err := calls.CallNoData(ctx, s.cli, accept)
 				if err != nil {
 					log.Errorf("failed to lanch task :%v", err)
-					fmt.Printf("failed to lanch task :%v\n", err)
 				}
+			} else {
+				decli := calls.Decline(offers[i].ID)
+				calls.CallNoData(ctx, s.cli, decli)
 			}
 		}
 		return nil
@@ -250,9 +243,9 @@ func buildWantsExecutorResources(cpu, mem float64) (r ms.Resources) {
 		resources.NewCPUs(cpu).Resource,
 		resources.NewMemory(mem).Resource,
 	)
-	fmt.Println("wants-executor-resources = " + r.String())
 	return
 }
+
 func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo {
 	executorUris := []ms.CommandInfo_URI{}
 	executorUris = append(executorUris, ms.CommandInfo_URI{Value: s.c.ExecutorURL, Executable: proto.Bool(true)})
