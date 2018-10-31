@@ -62,8 +62,8 @@ overlord
 ### 目录约定
 一些约定：
 
-1. redis server binary 的存放路径为 /data/lib/redis/4.0.8/bin/redis-server
-2. memcache 的存放路径为 /data/lib/memcache/1.5.10/bin/memcached
+1. redis server binary 的存放路径为 `/data/lib/redis/4.0.8/bin/redis-server`
+2. memcache 的存放路径为 `/data/lib/memcache/1.5.10/bin/memcached`
 3. 多版本共存请修改 4.0.8(1.5.10) 到对应版本
 4. redis 的 working dir 位置 /data/redis[_cluster]/${port}
 5. redis 节点的配置文件约定为 /data/redis/${port}/redis.conf
@@ -73,7 +73,7 @@ overlord
 9. 所有缓存服务都需要在 working dir 下维持一个 meta.toml 文件，用来存储类似 "cluster name"等节点信息。严格禁止并发修改这个文件。
 10. mesos 的 executor 的 tmp dir 目录为 /data/var/overlord/tmp/{task_id}/
 
-所有文件（目录）的权限均为 755，用户恒为 root.root
+所有文件（目录）的权限均为 `0755`，用户恒为 `root.root`
 
 
 一个典型的 redis 目录为：
@@ -86,4 +86,3 @@ overlord
 ├── redis.conf  # redis 配置文件
 └── redis.pid   # redis 的 pid 
 ```
->>>>>>> add create executor implmented
