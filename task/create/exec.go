@@ -13,6 +13,7 @@ import (
 	"overlord/config"
 
 	"github.com/BurntSushi/toml"
+	"github.com/google/shlex"
 )
 
 func getDefaultServiceWorkDir() string {
@@ -20,7 +21,7 @@ func getDefaultServiceWorkDir() string {
 		return "/data/%s/%d"
 	}
 
-	return "./tmp/data/%s/%d"
+	return "/tmp/data/%s/%d"
 }
 
 // DeployInfo is the struct to communicate between etcd and executor
@@ -86,13 +87,13 @@ func renderMetaIntoFile(workdir string, di *DeployInfo) error {
 	return encoder.Encode(di)
 }
 
-func shlex(cmd string) (command string, args []string) {
-	return "bash", []string{"-c", `"` + cmd + `"`}
-}
-
 func outputIntoFile(workdir string, data []byte) error {
 	console := fmt.Sprintf("%s/console.log", workdir)
 	return ioutil.WriteFile(console, data, 0755)
+}
+
+func wrapCmdWithBash(cmd string) string {
+	return fmt.Sprintf("bash -c \"%s\"", cmd)
 }
 
 // SetupCacheService will create new cache service
@@ -125,9 +126,12 @@ func SetupCacheService(info *DeployInfo) error {
 	//   2.1 spawn new executor with given ExecStart
 	//   2.2 NOTICE: all the cache progress must be working with cache
 	//   2.3 anyway defer p.Wait() wait for service is started.
-	command, args := shlex(info.ExecStart)
+	argv, err := shlex.Split(wrapCmdWithBash(info.ExecStart))
+	if err != nil {
+		return err
+	}
 
-	cmd := exec.Command(command, args...)
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = workdir
 
 	// must wait for remove defunc progress
@@ -141,6 +145,7 @@ func SetupCacheService(info *DeployInfo) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Errorf("fail to create output file %s", err)
+		_ = outputIntoFile(workdir, output)
 		return err
 	}
 

@@ -44,7 +44,7 @@ overlord
 #### scheduler 主体流程
 
 1. 连接到etcd/zk 获取 `/overlord/task` 目录下未完成的task并监听目录实时获取api-server下发的任务信息并保存到本地任务队列
-2. 注册到mesos master 并订阅mesos event。
+2. 注册到mesos master 并订阅 mesos event。
 3. 监听event_offer事件，并判断当前任务队列是否有未完成任务
 4. oferr resources 是否符合task任务资源描述需求 （判断依据 mem cpu balance）
 5. 接受offer，并下发executor任务给agent
@@ -57,7 +57,7 @@ overlord
 
 ### 注意
 
-无论是服务，还是缓存配置还是目录，始终用 memcache 指代 memcache 服务。仅在表示 memcached 这个 binary 本身的时候使用 memcached
+无论是服务，还是缓存配置还是目录，始终用 `memcache` 指代 memcache 服务。仅在表示 memcached 这个 binary 本身的时候使用 memcached
 
 ### 目录约定
 一些约定：
@@ -65,10 +65,10 @@ overlord
 1. redis server binary 的存放路径为 `/data/lib/redis/4.0.8/bin/redis-server`
 2. memcache 的存放路径为 `/data/lib/memcache/1.5.10/bin/memcached`
 3. 多版本共存请修改 4.0.8(1.5.10) 到对应版本
-4. redis 的 working dir 位置 /data/redis[_cluster]/${port}
-5. redis 节点的配置文件约定为 /data/redis/${port}/redis.conf
-6. redis_cluster 节点的nodes.conf文件约定为 /data/redis_cluster/${port}/nodes.conf
-7. redis 的 pid 文件为 redis.pid 放在 working dir 目录下。
+4. redis 的 working dir 位置 `/data/redis[_cluster]/${port}`
+5. redis 节点的配置文件约定为 `/data/redis/${port}/redis.conf`
+6. redis_cluster 节点的 `nodes.conf` 文件约定为 `/data/redis_cluster/${port}/nodes.conf`
+7. redis 的 pid 文件为 `redis.pid` 放在 working dir 目录下。
 8. memcache 类似。
 9. 所有缓存服务都需要在 working dir 下维持一个 meta.toml 文件，用来存储类似 "cluster name"等节点信息。严格禁止并发修改这个文件。
 10. mesos 的 executor 的 tmp dir 目录为 /data/var/overlord/tmp/{task_id}/
