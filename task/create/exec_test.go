@@ -9,7 +9,7 @@ func TestCreateCatSleepOk(t *testing.T) {
 		CacheType: "redis",
 		Port:      4399,
 
-		ExecStart:   "sleep 1 && cat meta.toml",
+		ExecStart:   "sleep 1",
 		ExecStop:    "echo stopping...",
 		ExecRestart: "echo restarting...",
 		TplTree: map[string]string{

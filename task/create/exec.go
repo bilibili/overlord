@@ -20,7 +20,6 @@ func getDefaultServiceWorkDir() string {
 	if config.GetRunMode() != config.RunModeTest {
 		return "/data/%s/%d"
 	}
-
 	return "/tmp/data/%s/%d"
 }
 
@@ -92,9 +91,9 @@ func outputIntoFile(workdir string, data []byte) error {
 	return ioutil.WriteFile(console, data, 0755)
 }
 
-func wrapCmdWithBash(cmd string) string {
-	return fmt.Sprintf("bash -c \"%s\"", cmd)
-}
+// func wrapCmdWithBash(cmd string) string {
+// 	return fmt.Sprintf("bash -c \"%s\"", cmd)
+// }
 
 // SetupCacheService will create new cache service
 func SetupCacheService(info *DeployInfo) error {
@@ -126,7 +125,7 @@ func SetupCacheService(info *DeployInfo) error {
 	//   2.1 spawn new executor with given ExecStart
 	//   2.2 NOTICE: all the cache progress must be working with cache
 	//   2.3 anyway defer p.Wait() wait for service is started.
-	argv, err := shlex.Split(wrapCmdWithBash(info.ExecStart))
+	argv, err := shlex.Split(info.ExecStart)
 	if err != nil {
 		return err
 	}
