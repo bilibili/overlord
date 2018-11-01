@@ -25,7 +25,7 @@ type ClusterInfo struct {
 	Chunks []*chunk.Chunk
 }
 
-// SchedulerCreateCluster creates new cluster and wait for cluster done
-func SchedulerCreateCluster(info *ClusterInfo) error {
+// ServerCreateCluster creates new cluster and wait for cluster done
+func ServerCreateCluster(info *ClusterInfo) error {
 	return nil
 }

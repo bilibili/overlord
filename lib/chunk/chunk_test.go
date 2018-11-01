@@ -103,3 +103,24 @@ func TestChunksCalcByLowCPU(t *testing.T) {
 	assert.Equal(t, err, ErrNotEnoughResource)
 	assert.Len(t, chunks, 0)
 }
+
+func TestNodeIntoConfLineOk(t *testing.T) {
+	node := &Node{
+		Name:    "127.0.0.1",
+		Port:    7000,
+		Role:    RoleMaster,
+		RunID:   "001",
+		SlaveOf: "-",
+		Slots: []Slot{
+			{1, 1},
+			{12, 20},
+			{700, 800},
+		},
+	}
+
+	line := node.IntoConfLine(true)
+	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 myself,master - 0 0 0 connected 1 12-20 700-800", line)
+
+	line = node.IntoConfLine(false)
+	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 master - 0 0 0 connected 1 12-20 700-800", line)
+}

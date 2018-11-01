@@ -194,17 +194,6 @@ type link struct {
 	LinkTo string
 }
 
-// Node is the type for a cache node.
-type Node struct {
-	Name string
-	Port int
-	Role string
-}
-
-func (n *Node) String() string {
-	return fmt.Sprintf("Node<Name=%s, Port=%d, Role=%s>", n.Name, n.Port, n.Role)
-}
-
 // Chunk is the chunk unit for 2 master, 2 slave
 type Chunk struct {
 	Nodes []*Node
@@ -226,10 +215,10 @@ func links2Chuks(links []link, portsMap map[string][]int) []*Chunk {
 	chunks := make([]*Chunk, len(links))
 	for i, link := range links {
 		nodes := []*Node{
-			{link.Base, portsMap[link.Base][0], RoleMaster},
-			{link.Base, portsMap[link.Base][1], RoleSlave},
-			{link.LinkTo, portsMap[link.LinkTo][0], RoleMaster},
-			{link.LinkTo, portsMap[link.LinkTo][1], RoleSlave},
+			{Name: link.Base, Port: portsMap[link.Base][0], Role: RoleMaster},
+			{Name: link.Base, Port: portsMap[link.Base][1], Role: RoleSlave},
+			{Name: link.LinkTo, Port: portsMap[link.LinkTo][0], Role: RoleMaster},
+			{Name: link.LinkTo, Port: portsMap[link.LinkTo][1], Role: RoleSlave},
 		}
 		chunks[i] = &Chunk{nodes}
 	}
