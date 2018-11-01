@@ -1,9 +1,13 @@
-package mesos
+package chunk
 
 import (
 	"errors"
 
 	"sort"
+
+	"strings"
+
+	"fmt"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 )
@@ -99,18 +103,6 @@ func maxHost(hrs []*hostRes) (string, int) {
 	return name, count
 }
 
-func minHost(hrs []*hostRes) (string, int) {
-	var name = hrs[0].name
-	var count = hrs[0].count
-	for _, hr := range hrs {
-		if count > hr.count {
-			name = hr.name
-			count = hr.count
-		}
-	}
-	return name, count
-}
-
 func minInt(vals ...int) int {
 	var val = vals[0]
 	for _, v := range vals[1:] {
@@ -128,7 +120,7 @@ func mapIntoHostRes(offers []ms.Offer, mem float64, cpu float64) (hosts []*hostR
 		m, _ := getOfferScalar(offer, ResNameMem)
 		memNode := int((m * 100.0) / (mem * 100.0))
 
-		c, _ := getOfferScalar(offer, ResNameMem)
+		c, _ := getOfferScalar(offer, ResNameCPUs)
 		cpuNode := int((c * 100.0) / (cpu * 100.0))
 
 		ports := getOfferRange(offer, ResNamePorts)
@@ -209,9 +201,25 @@ type Node struct {
 	Role string
 }
 
+func (n *Node) String() string {
+	return fmt.Sprintf("Node<Name=%s, Port=%d, Role=%s>", n.Name, n.Port, n.Role)
+}
+
 // Chunk is the chunk unit for 2 master, 2 slave
 type Chunk struct {
 	Nodes []*Node
+}
+
+func (c *Chunk) String() string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("Chunk<")
+	nodes := make([]string, len(c.Nodes))
+	for i, node := range c.Nodes {
+		nodes[i] = node.String()
+	}
+	_, _ = sb.WriteString(strings.Join(nodes, ", "))
+	_, _ = sb.WriteString(">")
+	return sb.String()
 }
 
 func links2Chuks(links []link, portsMap map[string][]int) []*Chunk {
@@ -246,8 +254,8 @@ func checkDist(hrs []*hostRes, count int) bool {
 	return true
 }
 
-// ChunkIt will chunks the given offer.
-func ChunkIt(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*Chunk, err error) {
+// Chunks will chunks the given offer.
+func Chunks(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*Chunk, err error) {
 	if masterNum%2 != 0 {
 		err = ErrBadMasterNum
 		return
@@ -265,10 +273,6 @@ func ChunkIt(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*
 	}
 
 	hrs := mapIntoHostRes(offers, memory, cpu)
-	if !checkDist(hrs, masterNum*2) {
-		err = ErrBadDist
-		return
-	}
 
 	if !checkIfEnough(hrs, masterNum*2) {
 		err = ErrNotEnoughResource
@@ -277,6 +281,11 @@ func ChunkIt(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*
 	sort.Sort(byCountDesc(hrs))
 
 	hrs = dpFillHostRes(hrs, masterNum*2) // NOTICE: each master is a half chunk
+
+	if !checkDist(hrs, masterNum*2) {
+		err = ErrBadDist
+		return
+	}
 
 	hrmap := make(map[string]int)
 	for i, hr := range hrs {
@@ -302,33 +311,14 @@ func ChunkIt(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*
 		llh := findMinLink(linkTable, m)
 		llHost := hrs[llh]
 		links = append(links, link{Base: name, LinkTo: llHost.name})
+		linkTable[llh][m]++
 		linkTable[m][llh]++
 		hrs[m].count -= 2
 		hrs[llh].count -= 2
 	}
+	fmt.Printf("links %v", links)
 
 	portsMap := mapIntoPortsMap(offers)
 	chunks = links2Chuks(links, portsMap)
 	return
 }
-
-// // FilterFunc is the type which used for filter
-// type FilterFunc func(offer ms.Offer) bool
-
-// func filter(offers []ms.Offer, filters ...FilterFunc) []ms.Offer {
-// 	noffers := []ms.Offer{}
-// 	for _, offer := range offers {
-// 		var ok = true
-// 		for _, f := range filters {
-// 			ok = ok && f(offer)
-// 			if !ok {
-// 				break
-// 			}
-// 		}
-
-// 		if ok {
-// 			noffers = append(noffers, offer)
-// 		}
-// 	}
-// 	return noffers
-// }
