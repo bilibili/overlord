@@ -29,15 +29,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+all:	install
+
 install:
-	go install
+	go install ./proto ./jsonpb ./ptypes ./protoc-gen-go
 
-test: install generate-test-pbs
-	go test
+test:
+	go test ./... ./protoc-gen-go/testdata
+	go test -tags purego ./... ./protoc-gen-go/testdata
+	go build ./protoc-gen-go/testdata/grpc/grpc.pb.go
+	make -C conformance test
 
+clean:
+	go clean ./...
 
-generate-test-pbs:
-	make install
-	make -C testdata
-	protoc --go_out=Mtestdata/test.proto=github.com/golang/protobuf/proto/testdata,Mgoogle/protobuf/any.proto=github.com/golang/protobuf/ptypes/any:. proto3_proto/proto3.proto
-	make
+nuke:
+	go clean -i ./...
+
+regenerate:
+	./regenerate.sh

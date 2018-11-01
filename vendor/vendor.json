@@ -57,10 +57,16 @@
 			"revisionTime": "2017-08-15T08:56:58Z"
 		},
 		{
-			"checksumSHA1": "WX1+2gktHcBmE9MGwFSGs7oqexU=",
+			"checksumSHA1": "1tHv5R6mmtslLSToOV/gpr2skHw=",
+			"path": "github.com/golang/protobuf",
+			"revision": "1918e1ff6ffd2be7bed0553df8650672c3bfe80d",
+			"revisionTime": "2018-10-30T15:47:21Z"
+		},
+		{
+			"checksumSHA1": "GaJLoEuMGnP5ofXvuweAI4wx06U=",
 			"path": "github.com/golang/protobuf/proto",
-			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
-			"revisionTime": "2018-02-02T18:43:18Z"
+			"revision": "1918e1ff6ffd2be7bed0553df8650672c3bfe80d",
+			"revisionTime": "2018-10-30T15:47:21Z"
 		},
 		{
 			"checksumSHA1": "tkJPssYejSjuAwE2tdEnoEIj93Q=",
