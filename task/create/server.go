@@ -2,15 +2,20 @@ package create
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"overlord/config"
 	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
+	"strings"
+	"text/template"
 )
 
 // maybe global defines
 const (
 	ClusterInstancesPath = "/clusters/%s/instances/"
+	InstancePath         = "/instances/%s:%d"
 	ClusterSlotsCount    = 16384
 )
 
@@ -36,8 +41,6 @@ type RedisClusterInfo struct {
 	Chunks []*chunk.Chunk
 
 	IDMap map[string]map[int]int
-
-	TplTree map[string]string `json:"-"`
 }
 
 // RedisClusterTask description a task for create new cluster.
@@ -47,13 +50,74 @@ type RedisClusterTask struct {
 
 // ServerCreateCluster creates new cluster and wait for cluster done
 func (c *RedisClusterTask) ServerCreateCluster(info *RedisClusterInfo) error {
-	err := c.genIDMap(info)
+	err := c.setupIDMap(info)
 	if err != nil {
 		return err
 	}
 	c.divideSlots(info)
 	c.setupSlaveOf(info)
 	// create new redis etcd tpl files
+	return c.buildTplTree(info)
+}
+
+func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for _, cc := range info.Chunks {
+		for _, node := range cc.Nodes {
+			instanceDir := fmt.Sprintf(InstancePath, node.Name, node.Port)
+
+			err := c.e.Mkdir(ctx, instanceDir)
+			if err != nil {
+				return err
+			}
+
+			content := chunk.GenNodesConfFile(node.Name, node.Port, info.Chunks)
+			err = c.e.Set(ctx, fmt.Sprintf("%s/nodes.conf", instanceDir), content)
+			if err != nil {
+				return err
+			}
+
+			tpl, err := template.New("redis.conf").Parse(config.RedisConfTpl)
+			if err != nil {
+				return err
+			}
+
+			var sb strings.Builder
+			err = tpl.Execute(&sb, map[string]interface{}{
+				"Port":             node.Port,
+				"MaxMemoryInBytes": info.MaxMemory * 1024 * 1024,
+			})
+			if err != nil {
+				return err
+			}
+
+			err = c.e.Set(ctx, fmt.Sprintf("%s/redis.conf", instanceDir), sb.String())
+			if err != nil {
+				return err
+			}
+			sb.Reset()
+			err = json.NewEncoder(&sb).Encode(info)
+			if err != nil {
+				return err
+			}
+			err = c.e.Set(ctx, fmt.Sprintf("%s/info", instanceDir), sb.String())
+			if err != nil {
+				return err
+			}
+
+			err = c.e.Set(ctx, fmt.Sprintf("%s/taskid", instanceDir), info.TaskID)
+			if err != nil {
+				return err
+			}
+
+			err = c.e.Set(ctx, fmt.Sprintf("%s/version", instanceDir), info.Version)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -64,8 +128,8 @@ func (c *RedisClusterTask) divideSlots(info *RedisClusterInfo) {
 	base := 0
 	cursor := 0
 
-	for _, c := range info.Chunks {
-		for _, node := range c.Nodes {
+	for _, cc := range info.Chunks {
+		for _, node := range cc.Nodes {
 			sc := per
 			if cursor <= left {
 				sc++
@@ -89,7 +153,7 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 	}
 }
 
-func (c *RedisClusterTask) genIDMap(info *RedisClusterInfo) error {
+func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
 	path := fmt.Sprintf(ClusterInstancesPath, info.ClusterName)
 	hostmap := chunk.GetHostCountInChunks(info.Chunks)
 	idMap := make(map[string]map[int]int)

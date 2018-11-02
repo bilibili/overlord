@@ -51,8 +51,8 @@ func New(endpoint string) (e *Etcd, err error) {
 	return
 }
 
-// CreateDir will create a directory in Etcd store
-func (e *Etcd) CreateDir(ctx context.Context, k string) (err error) {
+// Mkdir will create a directory in Etcd store
+func (e *Etcd) Mkdir(ctx context.Context, k string) (err error) {
 	_, err = e.kapi.Set(ctx, k, "", &cli.SetOptions{Dir: true, PrevExist: cli.PrevNoExist})
 	return err
 }
