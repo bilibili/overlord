@@ -10,8 +10,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
+	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"overlord/lib/store"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 
@@ -33,12 +33,12 @@ type Scheduler struct {
 	c     *Config
 	Tchan chan string
 	task  *list.List
-	db    store.DB
+	db    etcd.Etcd
 	cli   calls.Caller
 }
 
 // NewScheduler new scheduler instance.
-func NewScheduler(c *Config, db store.DB) *Scheduler {
+func NewScheduler(c *Config, db etcd.Etcd) *Scheduler {
 	return &Scheduler{
 		db:   db,
 		c:    c,
@@ -49,7 +49,7 @@ func NewScheduler(c *Config, db store.DB) *Scheduler {
 // Run scheduler and watch at task dir for task info.
 func (s *Scheduler) Run() (err error) {
 	// watch task dir to get new task.
-	ch, err := s.db.Watch(context.Background(), store.TASKDIR)
+	ch, err := s.db.Watch(context.Background(), etcd.TASKDIR)
 	if err != nil {
 		log.Errorf("start watch task fail err %v", err)
 		return

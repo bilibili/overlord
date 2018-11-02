@@ -43,7 +43,7 @@ const (
 )
 
 // New Executor instance.
-func New(p proc.Procer) *Executor {
+func New() *Executor {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		panic(err)
@@ -69,7 +69,6 @@ func New(p proc.Procer) *Executor {
 		)
 	)
 	ec := &Executor{
-		task:           p,
 		subscriber:     subscriber,
 		unackedTasks:   make(map[ms.TaskID]ms.TaskInfo),
 		unackedUpdates: make(map[string]executor.Call_Update),
@@ -101,6 +100,7 @@ func (ec *Executor) subcribe(e *executor.Event) {
 
 func (ec *Executor) lanch(e *executor.Event) {
 	// TODO:lanch task from even msg detail.
+	e.GetLaunch().Task.GetCommand()
 	ec.task.Start()
 	fmt.Println("start task")
 	task := e.Launch.Task

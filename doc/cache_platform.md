@@ -22,7 +22,8 @@ overlord
         /info
         /nodes.conf
         /server.conf
-        /latestPing #记录最后一次ping的时间
+    /heartbeat
+        /$ip:$port #维持服务心跳，通过refresh刷新ttl
 ```
 #### 目录说明
 

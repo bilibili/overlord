@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"overlord/lib/chunk"
-	"overlord/lib/etcdhelper"
+	"overlord/lib/etcd"
 	"overlord/lib/log"
 )
 
@@ -42,7 +42,7 @@ type RedisClusterInfo struct {
 
 // RedisClusterTask description a task for create new cluster.
 type RedisClusterTask struct {
-	e *etcdhelper.EtcdHelper
+	e *etcd.Etcd
 }
 
 // ServerCreateCluster creates new cluster and wait for cluster done
