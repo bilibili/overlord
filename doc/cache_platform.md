@@ -86,3 +86,26 @@ overlord
 ├── redis.conf  # redis 配置文件
 └── redis.pid   # redis 的 pid 
 ```
+
+### 服务启动约定
+服务使用systemd进行托管启动
+systemd模板文件
+```redis5-0-0.service
+[Unit]
+Description=Redis Server 5.0.0
+After=syslog.target network.target
+Conflicts=sendmail.service exim.service
+
+[Service]
+Type=simple
+PIDFile=/data/redis/%i/redis.pid
+ExecStart=/data/lib/redis/5.0.0/bin/redis-server /data/redis/%i/redis.conf
+
+[Install]
+WantedBy=multi-user.target
+```
+systemd uint文件名约定为 服务名[版本号].service
+```eg
+redis5-0-0.service
+redis4-0-3.service
+```
