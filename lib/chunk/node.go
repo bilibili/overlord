@@ -46,3 +46,18 @@ func (n *Node) IntoConfLine(myself bool) string {
 func (n *Node) String() string {
 	return fmt.Sprintf("Node<Name=%s, Port=%d, Role=%s>", n.Name, n.Port, n.Role)
 }
+
+const epochSet = "vars currentEpoch 0 lastVoteEpoch 0"
+
+// GenNodesConfFile will gennerate nodes.conf file content
+func GenNodesConfFile(name string, port int, chunks []*Chunk) string {
+	var sb strings.Builder
+	for _, chunk := range chunks {
+		for _, node := range chunk.Nodes {
+			myself := node.Name == name && node.Port == port
+			_, _ = sb.WriteString(node.IntoConfLine(myself))
+		}
+	}
+	_, _ = sb.WriteString(epochSet)
+	return sb.String()
+}

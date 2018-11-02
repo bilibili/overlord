@@ -2,11 +2,13 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"overlord/lib/dir"
+	"overlord/lib/etcdhelper"
 	"overlord/lib/log"
 	"path/filepath"
 
@@ -18,9 +20,9 @@ import (
 
 func getDefaultServiceWorkDir() string {
 	if config.GetRunMode() != config.RunModeTest {
-		return "/data/%s/%d"
+		return "/data/%d"
 	}
-	return "/tmp/data/%s/%d"
+	return "/tmp/data/%d"
 }
 
 // DeployInfo is the struct to communicate between etcd and executor
@@ -29,17 +31,57 @@ type DeployInfo struct {
 	// TaskID is the id of task
 	TaskID string
 
-	CacheType string
-	Port      int
-
-	// for golang executor to spawn that
-	ExecStart   string
-	ExecStop    string
-	ExecRestart string
+	Port    int
+	Version string
 
 	// TplTree is the Tree which contains a key as path of the file,
 	// and value as the content of the file.
 	TplTree map[string]string
+}
+
+// GenDeployInfo will create new deploy info from etcd
+func GenDeployInfo(e *etcdhelper.EtcdHelper, ip string, port int) (info *DeployInfo, err error) {
+	var (
+		val         string
+		instanceDir = fmt.Sprintf(InstancePath, ip, port)
+		workdir     = fmt.Sprintf(getDefaultServiceWorkDir(), port)
+	)
+
+	tplTree := make(map[string]string)
+
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
+
+	if err != nil {
+		return
+	}
+
+	tplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
+
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/nodes.conf", instanceDir))
+	if err != nil {
+		return
+	}
+	tplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
+
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
+	if err != nil {
+		return
+	}
+	taskid := val
+
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/version", instanceDir))
+	if err != nil {
+		return
+	}
+
+	info = &DeployInfo{
+		TaskID:  taskid,
+		Port:    port,
+		TplTree: tplTree,
+		Version: val,
+	}
+
+	return
 }
 
 func renderTplTree(tplTree map[string]string) (err error) {
@@ -110,7 +152,7 @@ func SetupCacheService(info *DeployInfo) error {
 
 	// 2. execute given command
 	//   2.0 mk working dir
-	workdir := fmt.Sprintf(getDefaultServiceWorkDir(), info.CacheType, info.Port)
+	workdir := fmt.Sprintf(getDefaultServiceWorkDir(), info.Port)
 	err = dir.MkDirAll(workdir)
 	if err != nil {
 		log.Errorf("fail to create working dir")
