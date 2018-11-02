@@ -260,6 +260,7 @@ func TestEncodeWithError(t *testing.T) {
 	msg.WithRequest(req)
 	mockErr := errors.New("baka error")
 	msg.WithError(mockErr)
+	msg.Done()
 
 	conn, buf := _createDownStreamConn()
 	pc := NewProxyConn(conn)

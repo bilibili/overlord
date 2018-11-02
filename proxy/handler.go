@@ -3,6 +3,7 @@ package proxy
 import (
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,7 +34,7 @@ type Handler struct {
 	p  *Proxy
 	cc *ClusterConfig
 
-	executor proto.Executor
+	forwarder proto.Forwarder
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -43,11 +44,11 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Executor) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forwarder proto.Forwarder) (h *Handler) {
 	h = &Handler{
-		p:        p,
-		cc:       cc,
-		executor: executor,
+		p:         p,
+		cc:        cc,
+		forwarder: forwarder,
 	}
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
@@ -59,7 +60,7 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, executor proto.Execu
 	case proto.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
 	case proto.CacheTypeRedisCluster:
-		h.pc = rclstr.NewProxyConn(h.conn, executor)
+		h.pc = rclstr.NewProxyConn(h.conn, forwarder)
 	default:
 		panic(proto.ErrNoSupportCacheType)
 	}
@@ -75,24 +76,26 @@ func (h *Handler) Handle() {
 
 func (h *Handler) handle() {
 	var (
-		messages = proto.GetMsgs(concurrent)
-		mba      = proto.GetMsgBatchAllocator()
+		messages []*proto.Message
 		msgs     []*proto.Message
+		wg       = &sync.WaitGroup{}
 		err      error
 	)
+	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-			h.deferHandle(messages, mba, err)
+			h.deferHandle(messages, err)
 			return
 		}
 		// 2. send to cluster
-		h.executor.Execute(mba, msgs)
+		h.forwarder.Forward(msgs)
+		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
-				h.deferHandle(messages, mba, err)
+				h.deferHandle(messages, err)
 				return
 			}
 			msg.MarkEnd()
@@ -102,31 +105,37 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
-			h.deferHandle(messages, mba, err)
+			h.deferHandle(messages, err)
 			return
 		}
 		// 4. release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}
-		mba.Reset()
-		// 5. reset MaxConcurrent
-		messages = h.resetMaxConcurrent(messages, len(msgs))
+		// 5. alloc MaxConcurrent
+		messages = h.allocMaxConcurrent(wg, messages, len(msgs))
 	}
 }
 
-func (h *Handler) resetMaxConcurrent(msgs []*proto.Message, lastCount int) []*proto.Message {
-	lm := len(msgs)
-	if lm < maxConcurrent && lm == lastCount {
+func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, lastCount int) []*proto.Message {
+	var alloc int
+	if lm := len(msgs); lm == 0 {
+		alloc = concurrent
+	} else if lm < maxConcurrent && lm == lastCount {
+		alloc = lm * concurrent
+	}
+	if alloc > 0 {
 		proto.PutMsgs(msgs)
-		msgs = proto.GetMsgs(lm * 2) // TODO: change the msgs by lastCount trending
+		msgs = proto.GetMsgs(alloc) // TODO: change the msgs by lastCount trending
+		for _, msg := range msgs {
+			msg.WithWaitGroup(wg)
+		}
 	}
 	return msgs
 }
 
-func (h *Handler) deferHandle(msgs []*proto.Message, mba *proto.MsgBatchAllocator, err error) {
+func (h *Handler) deferHandle(msgs []*proto.Message, err error) {
 	proto.PutMsgs(msgs)
-	proto.PutMsgBatchAllocator(mba)
 	h.closeWithError(err)
 	return
 }

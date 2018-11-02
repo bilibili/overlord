@@ -37,7 +37,7 @@ var (
 func newFetcher(conn *libnet.Conn) *fetcher {
 	f := &fetcher{
 		conn: conn,
-		br:   bufio.NewReader(conn, bufio.Get(1024)),
+		br:   bufio.NewReader(conn, bufio.Get(4096)),
 		bw:   bufio.NewWriter(conn),
 	}
 	return f
@@ -46,11 +46,11 @@ func newFetcher(conn *libnet.Conn) *fetcher {
 // Fetch new CLUSTER NODES result
 func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 	if err = f.bw.Write(cmdClusterNodesBytes); err != nil {
-		err = errors.Wrap(err, "fetch write CLUSTER NODES")
+		err = errors.WithStack(err)
 		return
 	}
 	if err = f.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "fetch flush")
+		err = errors.WithStack(err)
 		return
 	}
 	var data []byte
@@ -58,7 +58,7 @@ func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 	for {
 		err = f.br.Read()
 		if err != nil {
-			err = errors.Wrap(err, "fetch read")
+			err = errors.WithStack(err)
 			return
 		}
 		reply := &redis.RESP{}
@@ -66,11 +66,11 @@ func (f *fetcher) fetch() (ns *nodeSlots, err error) {
 			f.br.AdvanceTo(begin)
 			continue
 		} else if err != nil {
-			err = errors.Wrap(err, "fetch decode CLUSTER NODES")
+			err = errors.WithStack(err)
 			return
 		}
 		if reply.Type() != respFetch {
-			err = ErrBadReplyType
+			err = errors.WithStack(ErrBadReplyType)
 			return
 		}
 		data = reply.Data()

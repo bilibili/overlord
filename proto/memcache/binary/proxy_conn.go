@@ -69,13 +69,13 @@ NEXTGET:
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
-		err = errors.Wrap(err, "MC decoder while reading text line")
+		err = errors.WithStack(err)
 		return
 	}
 	req := p.request(m)
 	parseHeader(head, req, true)
 	if err != nil {
-		err = errors.Wrap(err, "MC decoder while parse header")
+		err = errors.WithStack(err)
 		return
 	}
 	switch req.rTp {
@@ -93,7 +93,7 @@ NEXTGET:
 		}
 		goto NEXTGET
 	}
-	err = errors.Wrap(ErrBadRequest, "MC decoder unsupport command")
+	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command:%x", req.rTp)
 	return
 }
 
@@ -103,13 +103,16 @@ func (p *proxyConn) decodeCommon(m *proto.Message, req *MCRequest) (err error) {
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
-		err = errors.Wrap(err, "MC decodeCommon read exact body")
+		err = errors.WithStack(err)
 		return
 	}
 	el := uint8(req.extraLen[0])
 	kl := binary.BigEndian.Uint16(req.keyLen)
-	req.key = body[int(el) : int(el)+int(kl)]
-	req.data = body
+	// copy
+	req.key = req.key[:0]
+	req.key = append(req.key, body[int(el):int(el)+int(kl)]...)
+	req.data = req.data[:0]
+	req.data = append(req.data, body...)
 	return
 }
 
@@ -127,14 +130,29 @@ func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 	if isDecode {
 		req.rTp = RequestType(bs[1])
 	}
-	req.keyLen = bs[2:4]
-	req.extraLen = bs[4:5]
+	req.keyLen[0] = bs[2]
+	req.keyLen[1] = bs[3]
+	req.extraLen[0] = bs[4]
 	if !isDecode {
-		req.status = bs[6:8]
+		req.status[0] = bs[6]
+		req.status[1] = bs[7]
 	}
-	req.bodyLen = bs[8:12]
-	req.opaque = bs[12:16]
-	req.cas = bs[16:24]
+	req.bodyLen[0] = bs[8]
+	req.bodyLen[1] = bs[9]
+	req.bodyLen[2] = bs[10]
+	req.bodyLen[3] = bs[11]
+	req.opaque[0] = bs[12]
+	req.opaque[1] = bs[13]
+	req.opaque[2] = bs[14]
+	req.opaque[3] = bs[15]
+	req.cas[0] = bs[16]
+	req.cas[1] = bs[17]
+	req.cas[2] = bs[18]
+	req.cas[3] = bs[19]
+	req.cas[4] = bs[20]
+	req.cas[5] = bs[21]
+	req.cas[6] = bs[22]
+	req.cas[7] = bs[23]
 }
 
 // Encode encode response and write into writer.
@@ -143,7 +161,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	for _, req := range reqs {
 		mcr, ok := req.(*MCRequest)
 		if !ok {
-			err = errors.Wrap(ErrAssertReq, "MC Encoder assert request")
+			err = errors.WithStack(ErrAssertReq)
 			return
 		}
 		_ = p.bw.Write(magicRespBytes) // NOTE: magic
@@ -168,8 +186,5 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 }
 
 func (p *proxyConn) Flush() (err error) {
-	if err = p.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
-	}
-	return
+	return p.bw.Flush()
 }

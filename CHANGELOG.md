@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.5.0
+1. refactor message pipeline.
+
 ## Version 1.4.0
 1. add redis cluster support.
 

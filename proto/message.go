@@ -66,6 +66,8 @@ type Message struct {
 	req  []Request
 	reqn int
 	subs []*Message
+	wg   *sync.WaitGroup
+
 	// Start Time, Write Time, ReadTime, EndTime
 	st, wt, rt, et time.Time
 	err            error
@@ -89,6 +91,7 @@ func (m *Message) Reset() {
 func (m *Message) clear() {
 	m.Reset()
 	m.req = nil
+	m.wg = nil
 	m.subs = nil
 }
 
@@ -120,11 +123,6 @@ func (m *Message) MarkRead() {
 // MarkEnd will set the end time of the command to now.
 func (m *Message) MarkEnd() {
 	m.et = time.Now()
-}
-
-// WithError with error.
-func (m *Message) WithError(err error) {
-	m.err = err
 }
 
 // ResetSubs will return the Msg data to flush and reset
@@ -193,9 +191,34 @@ func (m *Message) Batch() []*Message {
 		msg := getMsg()
 		msg.Type = m.Type
 		msg.setRequest(m.req[min+i])
+		msg.WithWaitGroup(m.wg)
 		m.subs = append(m.subs, msg)
 	}
 	return m.subs[:slen]
+}
+
+// WithWaitGroup with wait group.
+func (m *Message) WithWaitGroup(wg *sync.WaitGroup) {
+	m.wg = wg
+}
+
+// Add add wait group.
+func (m *Message) Add() {
+	if m.wg != nil {
+		m.wg.Add(1)
+	}
+}
+
+// Done mark handle message done.
+func (m *Message) Done() {
+	if m.wg != nil {
+		m.wg.Done()
+	}
+}
+
+// WithError with error.
+func (m *Message) WithError(err error) {
+	m.err = err
 }
 
 // Err returns error.
