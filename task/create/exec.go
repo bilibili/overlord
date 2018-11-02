@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"overlord/lib/dir"
 	"overlord/lib/etcdhelper"
 	"overlord/lib/log"
@@ -15,7 +14,6 @@ import (
 	"overlord/config"
 
 	"github.com/BurntSushi/toml"
-	"github.com/google/shlex"
 )
 
 func getDefaultServiceWorkDir() string {
