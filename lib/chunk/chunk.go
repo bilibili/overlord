@@ -7,8 +7,6 @@ import (
 
 	"strings"
 
-	"fmt"
-
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 )
 
@@ -215,9 +213,9 @@ func links2Chuks(links []link, portsMap map[string][]int) []*Chunk {
 	chunks := make([]*Chunk, len(links))
 	for i, link := range links {
 		nodes := []*Node{
-			{Name: link.Base, Port: portsMap[link.Base][0], Role: RoleMaster},
+			{Name: link.Base, Port: portsMap[link.Base][0], Role: RoleMaster, SlaveOf: "-"},
 			{Name: link.Base, Port: portsMap[link.Base][1], Role: RoleSlave},
-			{Name: link.LinkTo, Port: portsMap[link.LinkTo][0], Role: RoleMaster},
+			{Name: link.LinkTo, Port: portsMap[link.LinkTo][0], Role: RoleMaster, SlaveOf: "-"},
 			{Name: link.LinkTo, Port: portsMap[link.LinkTo][1], Role: RoleSlave},
 		}
 		chunks[i] = &Chunk{nodes}
@@ -305,9 +303,24 @@ func Chunks(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*C
 		hrs[m].count -= 2
 		hrs[llh].count -= 2
 	}
-	fmt.Printf("links %v", links)
 
 	portsMap := mapIntoPortsMap(offers)
 	chunks = links2Chuks(links, portsMap)
 	return
+}
+
+// GetHostCountInChunks will calc hosts table
+func GetHostCountInChunks(chunks []*Chunk) map[string][]int {
+	hostmap := make(map[string][]int)
+	for _, chunk := range chunks {
+		for _, node := range chunk.Nodes {
+			if ports, ok := hostmap[node.Name]; ok {
+				ports = append(ports, node.Port)
+				hostmap[node.Name] = ports
+			} else {
+				hostmap[node.Name] = []int{node.Port}
+			}
+		}
+	}
+	return hostmap
 }

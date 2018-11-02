@@ -31,10 +31,14 @@ func (n *Node) IntoConfLine(myself bool) string {
 	for i, s := range n.Slots {
 		slots[i] = s.String()
 	}
+	slaveOf := n.SlaveOf
+	if n.Role == RoleSlave {
+		slaveOf = fmt.Sprintf("%040s", n.SlaveOf)
+	}
 
 	line := fmt.Sprintf(nodesConfLine,
 		n.RunID, n.Name, n.Port, n.Port+10000,
-		flags, n.SlaveOf, strings.Join(slots, " "))
+		flags, slaveOf, strings.Join(slots, " "))
 	log.Infof("generated nodes.conf line as: %s", line)
 	return line
 }
