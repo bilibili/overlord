@@ -164,31 +164,36 @@ func SetupCacheService(info *DeployInfo) error {
 		return err
 	}
 
-	//   2.1 spawn new executor with given ExecStart
-	//   2.2 NOTICE: all the cache progress must be working with cache
-	//   2.3 anyway defer p.Wait() wait for service is started.
-	argv, err := shlex.Split(info.ExecStart)
-	if err != nil {
-		return err
-	}
+	// 2. setup systemd serivce
+	//   2.1 check if binary was exists
+	//   2.2 if not, pull it from scheduler and then setup systemd config
 
-	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Dir = workdir
+	// 3. spawn a new redis cluster service
 
-	// must wait for remove defunc progress
-	defer func() {
-		err := cmd.Wait()
-		if err != nil {
-			log.Warnf("spawn wait sub command fail due to %s", err)
-		}
-	}()
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Errorf("fail to create output file %s", err)
-		_ = outputIntoFile(workdir, output)
-		return err
-	}
+	// argv, err := shlex.Split(info.ExecStart)
+	// if err != nil {
+	// 	return err
+	// }
 
-	return outputIntoFile(workdir, output)
+	// cmd := exec.Command(argv[0], argv[1:]...)
+	// cmd.Dir = workdir
+
+	// // must wait for remove defunc progress
+	// defer func() {
+	// 	err := cmd.Wait()
+	// 	if err != nil {
+	// 		log.Warnf("spawn wait sub command fail due to %s", err)
+	// 	}
+	// }()
+
+	// output, err := cmd.CombinedOutput()
+	// if err != nil {
+	// 	log.Errorf("fail to create output file %s", err)
+	// 	_ = outputIntoFile(workdir, output)
+	// 	return err
+	// }
+
+	// return outputIntoFile(workdir, output)
+	return nil
 }
