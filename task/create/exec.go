@@ -232,6 +232,7 @@ func downloadBinary(info *DeployInfo) error {
 		return err
 	}
 	targetDir := fmt.Sprintf("/data/lib/%s/%s/", cacheType, info.Version)
+
 	return os.Rename(tmp, targetDir)
 }
 
@@ -293,6 +294,11 @@ func buildServiceName(cacheType proto.CacheType, port int) string {
 	return fmt.Sprintf("redis@%d.service", port)
 }
 
+func setupSystemdServiceFile(info *DeployInfo) error {
+	// TODO: impl it
+	return nil
+}
+
 // SetupCacheService will create new cache service
 func SetupCacheService(info *DeployInfo) error {
 
@@ -326,6 +332,9 @@ func SetupCacheService(info *DeployInfo) error {
 	if !exists {
 		//   2.2 if not, pull it from scheduler and then setup systemd config
 		if err = downloadBinary(info); err != nil {
+			return err
+		}
+		if err = setupSystemdServiceFile(info); err != nil {
 			return err
 		}
 	}
