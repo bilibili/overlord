@@ -54,6 +54,7 @@ type cluster struct {
 
 	redts map[string]*redirect
 	rLock sync.Mutex
+	// latestRedt int64
 
 	fakeNodesBytes []byte
 	fakeSlotsBytes []byte
@@ -90,12 +91,12 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
-				mps := c.getPipe(subm.Request().Key())
-				mps.Push(subm)
+				ncp := c.getPipe(subm.Request().Key())
+				ncp.Push(subm)
 			}
 		} else {
-			mps := c.getPipe(m.Request().Key())
-			mps.Push(m)
+			ncp := c.getPipe(m.Request().Key())
+			ncp.Push(m)
 		}
 	}
 	return nil
@@ -137,6 +138,7 @@ func (c *cluster) fetchproc() {
 		select {
 		case <-c.action:
 		case <-time.After(1 * time.Minute):
+			// c.closeRedirectNodeConn()
 		}
 		c.tryFetch()
 	}
@@ -174,8 +176,8 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 	osn, ok := c.slotNode.Load().(*slotNode) // old slotNode
 	oncp := map[string]*proto.NodeConnPipe{} // old nodeConn
 	if ok && osn != nil {
-		for addr, mps := range osn.nodePipe {
-			oncp[addr] = mps // COPY
+		for addr, ncp := range osn.nodePipe {
+			oncp[addr] = ncp // COPY
 		}
 	}
 	sn := &slotNode{nSlots: nSlots}
@@ -184,15 +186,19 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 	for _, addr := range masters {
 		ncp, ok := oncp[addr]
 		if !ok {
+			toAddr := addr // NOTE: avoid closure
 			ncp = proto.NewNodeConnPipe(c.conns, func() proto.NodeConn {
-				return newNodeConn(c, addr)
+				return newNodeConn(c, toAddr)
 			})
 			go c.pipeEvent(ncp.ErrorEvent())
 			if log.V(4) {
-				log.Infof("Redis Cluster renew slot node and add addr:%s", addr)
+				log.Infof("Redis Cluster renew slot node and add addr:%s", toAddr)
 			}
 		} else {
 			delete(oncp, addr)
+			if log.V(5) {
+				log.Infof("Redis Cluster renew slot node addr:%s", addr)
+			}
 		}
 		sn.nodePipe[addr] = ncp
 	}
@@ -219,45 +225,43 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 	}
 }
 
-func (c *cluster) getRedirectNodeConn(addr string) (r *redirect) {
-	c.rLock.Lock()
-	r, ok := c.redts[addr]
-	if ok {
-		c.rLock.Unlock()
-		return
-	}
-	rnc := redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto).(*redis.NodeConn)
-	r = &redirect{nc: rnc}
-	c.redts[addr] = r
-	c.rLock.Unlock()
-	if log.V(3) {
-		log.Infof("Redis Cluster occur redirect addr:%s", addr)
-	}
-	return
-}
+// func (c *cluster) getRedirectNodeConn(addr string) (r *redirect) {
+// 	atomic.StoreInt64(&c.latestRedt, time.Now().Unix())
+// 	c.rLock.Lock()
+// 	r, ok := c.redts[addr]
+// 	if ok {
+// 		c.rLock.Unlock()
+// 		return
+// 	}
+// 	rnc := redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto).(*redis.NodeConn)
+// 	r = &redirect{nc: rnc}
+// 	c.redts[addr] = r
+// 	c.rLock.Unlock()
+// 	if log.V(3) {
+// 		log.Infof("Redis Cluster occur redirect addr:%s", addr)
+// 	}
+// 	return
+// }
 
-func (c *cluster) closeRedirectNodeConn(addr string, isAsk bool) {
-	if isAsk {
-		return
-	}
-	c.rLock.Lock()
-	r, ok := c.redts[addr]
-	if ok {
-		r.lock.Lock()
-		_ = r.nc.Close()
-		r.nc = nil
-		delete(c.redts, addr)
-		r.lock.Unlock()
-	}
-	c.rLock.Unlock()
-	if log.V(3) {
-		log.Infof("Redis Cluster end redirect addr:%s", addr)
-	}
-	select {
-	case c.action <- struct{}{}:
-	default:
-	}
-}
+// func (c *cluster) closeRedirectNodeConn() {
+// 	lr := atomic.LoadInt64(&c.latestRedt)
+// 	now := time.Now().Unix()
+// 	if lr == 0 || now-lr > 60*2 { // NOTE: more than 1min in tryFetch
+// 		return
+// 	}
+// 	c.rLock.Lock()
+// 	for addr, r := range c.redts {
+// 		r.lock.Lock()
+// 		r.nc.Close()
+// 		r.nc = nil
+// 		r.lock.Unlock()
+// 		delete(c.redts, addr)
+// 		if log.V(4) {
+// 			log.Infof("Redis Cluster close redirect addr:%s", addr)
+// 		}
+// 	}
+// 	c.rLock.Unlock()
+// }
 
 func (c *cluster) fake(listen string) {
 	c.once.Do(func() {

@@ -18,6 +18,7 @@ var (
 )
 
 var (
+	roleMyself = "myself"
 	roleMaster = "master"
 	roleSlave  = "slave"
 )
@@ -96,7 +97,7 @@ type nodeSlots struct {
 func (ns *nodeSlots) getMasters() []string {
 	masters := make([]string, 0)
 	for _, node := range ns.nodes {
-		if node.role == roleMaster {
+		if node.role == roleMaster && node.isNormal() {
 			masters = append(masters, node.addr)
 		}
 	}
@@ -209,6 +210,18 @@ func (n *node) setSlots(vals ...string) {
 	}
 	//sort.IntSlice(slots).Sort()
 	n.slots = slots
+}
+
+func (n *node) isNormal() bool {
+	for _, f := range n.flags {
+		if f != roleMaster && f != roleSlave && f != roleMyself {
+			return false
+		}
+	}
+	if n.linkState != "connected" {
+		return false
+	}
+	return true
 }
 
 func parseSlotField(val string) ([]int, bool) {
