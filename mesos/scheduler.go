@@ -206,10 +206,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				for _, ck := range chunks {
 					for _, node := range ck.Nodes {
 						task := ms.TaskInfo{
-							Name:    node.Name,
-							TaskID:  ms.TaskID{Value: node.RunID},
-							AgentID: ofm[node.Name].AgentID,
-							// TODO:create executor
+							Name:      node.Name,
+							TaskID:    ms.TaskID{Value: node.RunID},
+							AgentID:   ofm[node.Name].AgentID,
+							Executor:  s.buildExcutor(node.Name, []ms.Resource{}),
+							Resources: makeResources(icpu, imem, uint64(node.Port)),
+							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						offerid[ofm[node.Name].ID] = struct{}{}
 						tasks = append(tasks, task)
@@ -297,10 +299,11 @@ func filterResource(rs []ms.Resource, filter string) (fs []ms.Resource) {
 	return
 }
 
-func buildWantsExecutorResources(cpu, mem float64) (r ms.Resources) {
+func makeResources(cpu, mem float64, port uint64) (r ms.Resources) {
 	r.Add(
 		resources.NewCPUs(cpu).Resource,
 		resources.NewMemory(mem).Resource,
+		resources.Build().Ranges(ms.NewRanges(port)).Resource,
 	)
 	return
 }

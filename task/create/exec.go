@@ -13,8 +13,9 @@ import (
 
 	"overlord/config"
 
-	"github.com/BurntSushi/toml"
 	"overlord/proto"
+
+	"github.com/BurntSushi/toml"
 )
 
 func getDefaultServiceWorkDir() string {
@@ -54,7 +55,6 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		return
 	}
 
-
 	if proto.CacheType(info.CacheType) == proto.CacheTypeRedisCluster {
 		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
 
@@ -77,7 +77,6 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	} else {
 		log.Errorf("unsupported cachetype %s", info.CacheType)
 	}
-
 
 	info.TaskID, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
 	if err != nil {

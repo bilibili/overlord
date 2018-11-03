@@ -1,9 +1,10 @@
 package mesos
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"net/url"
+	"strconv"
 
 	"time"
 
@@ -11,8 +12,9 @@ import (
 
 	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
 
+	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"overlord/lib/proc"
+	"overlord/task/create"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding"
@@ -25,12 +27,12 @@ import (
 
 // Executor define overlord mesos executor.
 type Executor struct {
-	task           proc.Procer
 	cli            calls.Sender
 	cfg            config.Config
 	framework      ms.FrameworkInfo
 	executor       ms.ExecutorInfo
 	agent          ms.AgentInfo
+	db             *etcd.Etcd
 	subscriber     calls.SenderFunc
 	unackedTasks   map[ms.TaskID]ms.TaskInfo
 	unackedUpdates map[string]executor.Call_Update
@@ -99,14 +101,30 @@ func (ec *Executor) subcribe(e *executor.Event) {
 }
 
 func (ec *Executor) lanch(e *executor.Event) {
-	// TODO:lanch task from even msg detail.
-	e.GetLaunch().Task.GetCommand()
-	ec.task.Start()
+	data := e.GetLaunch().Task.GetData()
+	idx := bytes.IndexByte(data, ':')
+	if idx == -1 {
+		log.Error("err data")
+		return
+	}
+	port, err := strconv.ParseInt(string(data[idx:]), 10, 64)
+	if err != nil {
+		log.Error("err data")
+		return
+	}
+	dpinfo, err := create.GenDeployInfo(ec.db, string(data[:idx]), int(port))
+	if err != nil {
+		return
+	}
+	err = create.SetupCacheService(dpinfo)
+	if err != nil {
+		log.Errorf("start cache service err %v", err)
+		return
+	}
 	task := e.Launch.Task
 	status := ec.newStatus(task.TaskID)
 	status.State = ms.TASK_RUNNING.Enum()
-	err := ec.update(status)
-	fmt.Println("update status", err)
+	err = ec.update(status)
 	if err != nil {
 		log.Errorf("update lanch status fail %v ", err)
 	}
