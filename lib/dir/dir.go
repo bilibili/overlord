@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"overlord/config"
+
 	pkgerr "github.com/pkg/errors"
 )
 
@@ -12,6 +14,22 @@ var (
 	ErrNotFile = pkgerr.New("path must be a File")
 	ErrNotDir  = pkgerr.New("path must be a Dir")
 )
+
+//IsExists check if the file or dir was exists
+func IsExists(path string) (bool, error) {
+	if config.GetRunMode() == config.RunModeTest {
+		return true, nil
+	}
+
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
 
 // GetAbsDir will get the file's dir absolute path.
 func GetAbsDir(path string) (absDir string, err error) {

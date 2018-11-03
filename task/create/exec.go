@@ -2,9 +2,14 @@
 package create
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"overlord/lib/dir"
 	"overlord/lib/etcd"
@@ -15,6 +20,7 @@ import (
 
 	"overlord/proto"
 
+	"overlord/lib/systemd"
 	"github.com/BurntSushi/toml"
 )
 
@@ -31,14 +37,15 @@ type DeployInfo struct {
 	// TaskID is the id of task
 	TaskID string
 
-	CacheType string
+	CacheType proto.CacheType
 
 	Port    int
 	Version string
 
 	// TplTree is the Tree which contains a key as path of the file,
 	// and value as the content of the file.
-	TplTree map[string]string
+	TplTree    map[string]string
+	FileServer string
 }
 
 // GenDeployInfo will create new deploy info from etcd
@@ -50,12 +57,13 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	)
 
 	info.TplTree = make(map[string]string)
-	info.CacheType, err = e.Get(context.TODO(), fmt.Sprintf("%s/CacheType", instanceDir))
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/CacheType", instanceDir))
 	if err != nil {
 		return
 	}
+	info.CacheType = proto.CacheType(val)
 
-	if proto.CacheType(info.CacheType) == proto.CacheTypeRedisCluster {
+	if info.CacheType == proto.CacheTypeRedisCluster {
 		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
 
 		if err != nil {
@@ -68,16 +76,26 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
-	} else if proto.CacheType(info.CacheType) == proto.CacheTypeRedis {
+	} else if info.CacheType == proto.CacheTypeRedis {
 		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
 		if err != nil {
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
+	} else if info.CacheType == proto.CacheTypeMemcache {
+		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/memcached.conf", instanceDir))
+		if err != nil {
+			return
+		}
+		info.TplTree[fmt.Sprintf("%s/memcached.conf", workdir)] = val
 	} else {
 		log.Errorf("unsupported cachetype %s", info.CacheType)
 	}
 
+	info.FileServer, err = e.Get(context.TODO(), "/fileserver")
+	if err != nil {
+		return
+	}
 	info.TaskID, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
 	if err != nil {
 		return
@@ -135,14 +153,145 @@ func renderMetaIntoFile(workdir string, di *DeployInfo) error {
 	return encoder.Encode(di)
 }
 
-// func outputIntoFile(workdir string, data []byte) error {
-// 	console := fmt.Sprintf("%s/console.log", workdir)
-// 	return ioutil.WriteFile(console, data, 0755)
-// }
+func checkBinaryVersion(cacheType proto.CacheType, version string) bool {
+	var path string
+	if cacheType == proto.CacheTypeMemcache {
+		path = fmt.Sprintf("/data/lib/memcache/%s/bin/memcached", version)
+	} else {
+		path = fmt.Sprintf("/data/lib/redis/%s/bin/redis-server", version)
+	}
 
-// func wrapCmdWithBash(cmd string) string {
-// 	return fmt.Sprintf("bash -c \"%s\"", cmd)
-// }
+	exits, err := dir.IsExists(path)
+	if err != nil {
+		log.Warnf("check exists fail due to %s", err)
+		return false
+	}
+	return exits
+}
+
+func downloadFile(filepath string, url string) (err error) {
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check server response
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	// Writer the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func downloadBinary(info *DeployInfo) error {
+	var cacheType string
+	if info.CacheType == proto.CacheTypeMemcache {
+		cacheType = "memcache"
+	} else {
+		cacheType = "redis"
+	}
+	url := fmt.Sprintf("%s/%s/%s.tar.gz", info.FileServer, cacheType, info.Version)
+
+	fileName := fmt.Sprintf("/tmp/overlord/%s-%s.tar.gz", cacheType, info.Version)
+	err := downloadFile(fileName, url)
+	if err != nil {
+		return err
+	}
+
+	baseDir, err := dir.GetAbsDir(fileName)
+	if err != nil {
+		return err
+	}
+	fd, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	tmp := fmt.Sprintf("%s/%s-%s", baseDir, cacheType, info.Version)
+	err = extractTarGz(tmp, fd)
+	if err != nil {
+		return err
+	}
+
+	err = dir.MkDirAll(fmt.Sprintf("/data/lib/%s", cacheType))
+	if err != nil {
+		return err
+	}
+	targetDir := fmt.Sprintf("/data/lib/%s/%s/", cacheType, info.Version)
+	return os.Rename(tmp, targetDir)
+}
+
+func extractTarGz(baseDir string, gzipStream io.Reader) error {
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return err
+	}
+	tarReader := tar.NewReader(uncompressedStream)
+	err = dir.MkDirAll(baseDir)
+	if err != nil {
+		return err
+	}
+
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Errorf("ExtractTarGz: Next() failed: %s", err.Error())
+			return err
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(fmt.Sprintf("%s/%s", baseDir, header.Name), 0755); err != nil {
+				log.Errorf("ExtractTarGz: Mkdir() failed: %s", err.Error())
+				return err
+			}
+		case tar.TypeReg:
+			outFile, err := os.Create(fmt.Sprintf("%s/%s", baseDir, header.Name))
+			if err != nil {
+				log.Errorf("ExtractTarGz: Create() failed: %s", err.Error())
+				return err
+			}
+			defer outFile.Close()
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				log.Errorf("ExtractTarGz: Copy() failed: %s", err.Error())
+				return err
+			}
+		default:
+			log.Errorf(
+				"ExtractTarGz: uknown type: %s in %s",
+				header.Typeflag,
+				header.Name)
+			return errors.New("uknown compression type")
+		}
+	}
+	return nil
+}
+
+func buildServiceName(cacheType proto.CacheType, port int) string {
+	if cacheType == proto.CacheTypeMemcache {
+		return fmt.Sprintf("memcache@%d.service", port)
+	}
+	return fmt.Sprintf("redis@%d.service", port)
+}
 
 // SetupCacheService will create new cache service
 func SetupCacheService(info *DeployInfo) error {
@@ -173,33 +322,14 @@ func SetupCacheService(info *DeployInfo) error {
 
 	// 2. setup systemd serivce
 	//   2.1 check if binary was exists
-	//   2.2 if not, pull it from scheduler and then setup systemd config
-
+	exists := checkBinaryVersion(info.CacheType, info.Version)
+	if !exists {
+		//   2.2 if not, pull it from scheduler and then setup systemd config
+		if err = downloadBinary(info); err != nil {
+			return err
+		}
+	}
 	// 3. spawn a new redis cluster service
-
-	// argv, err := shlex.Split(info.ExecStart)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// cmd := exec.Command(argv[0], argv[1:]...)
-	// cmd.Dir = workdir
-
-	// // must wait for remove defunc progress
-	// defer func() {
-	// 	err := cmd.Wait()
-	// 	if err != nil {
-	// 		log.Warnf("spawn wait sub command fail due to %s", err)
-	// 	}
-	// }()
-
-	// output, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	log.Errorf("fail to create output file %s", err)
-	// 	_ = outputIntoFile(workdir, output)
-	// 	return err
-	// }
-
-	// return outputIntoFile(workdir, output)
-	return nil
+	serviceName := buildServiceName(info.CacheType, info.Port)
+	return systemd.Start(serviceName)
 }

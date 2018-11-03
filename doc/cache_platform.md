@@ -25,6 +25,7 @@ overlord
     /heartbeat
         /$ip:$port #维持服务心跳，通过refresh刷新ttl
     /framework #store framework id,in case of framework fault recover.
+    /fileserver # file server is the url for http download binary, e.g. "http://127.0.0.1/fs"
 ```
 #### 目录说明
 
