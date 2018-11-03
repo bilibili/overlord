@@ -21,7 +21,9 @@ import (
 	"overlord/proto"
 
 	"overlord/lib/systemd"
+
 	"github.com/BurntSushi/toml"
+	"text/template"
 )
 
 func getDefaultServiceWorkDir() string {
@@ -295,7 +297,23 @@ func buildServiceName(cacheType proto.CacheType, port int) string {
 }
 
 func setupSystemdServiceFile(info *DeployInfo) error {
-	// TODO: impl it
+	if info.CacheType == proto.CacheTypeRedis || info.CacheType == proto.CacheTypeRedisCluster {
+		fname := fmt.Sprintf("/etc/systemd/system/redis-%s@.service", info.Version)
+		fd, err := os.Create(fname)
+		if err != nil {
+			return err
+		}
+		tpl, err := template.New("service").Parse(config.RedisServiceTpl)
+		if err != nil {
+			return err
+		}
+		err = tpl.Execute(fd, map[string]string{"Version": info.Version})
+		if err != nil {
+			return err
+		}
+	} else if info.CacheType == proto.CacheTypeMemcache {
+		// TODO: impl it
+	}
 	return nil
 }
 
