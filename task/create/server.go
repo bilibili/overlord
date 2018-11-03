@@ -48,6 +48,12 @@ type RedisClusterTask struct {
 	e *etcd.Etcd
 }
 
+func NewRedisClusterTask(e *etcd.Etcd) *RedisClusterTask {
+	return &RedisClusterTask{
+		e: e,
+	}
+}
+
 // ServerCreateCluster creates new cluster and wait for cluster done
 func (c *RedisClusterTask) ServerCreateCluster(info *RedisClusterInfo) error {
 	err := c.setupIDMap(info)

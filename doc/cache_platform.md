@@ -24,6 +24,7 @@ overlord
         /server.conf
     /heartbeat
         /$ip:$port #维持服务心跳，通过refresh刷新ttl
+    /framework #store framework id,in case of framework fault recover.
 ```
 #### 目录说明
 
@@ -56,6 +57,8 @@ overlord
 8. event为failed时，scheduler 需要重新调度重新分配task
 9. 当running数为task需要部署的instance数时，表示所有任务部署成功，scheduler更新task状态为完成并写入将状态写入ectd
 
+#### TaskInfo 约定
+taskInfo.Data 存储 ip:port ,executor根据ip:port 定位到etcd获取对应的配置以及生成相关启动命令
 ## Executor 约定
 
 ### 注意

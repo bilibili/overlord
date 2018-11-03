@@ -14,7 +14,7 @@ const (
 type Task struct {
 	Name string
 	Type taskType
-	Num  int // num of instances
+	Num  int // num of instances ,if redis-cluster,mean master number
 	I    *Instance
 }
 

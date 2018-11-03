@@ -102,7 +102,6 @@ func (ec *Executor) lanch(e *executor.Event) {
 	// TODO:lanch task from even msg detail.
 	e.GetLaunch().Task.GetCommand()
 	ec.task.Start()
-	fmt.Println("start task")
 	task := e.Launch.Task
 	status := ec.newStatus(task.TaskID)
 	status.State = ms.TASK_RUNNING.Enum()

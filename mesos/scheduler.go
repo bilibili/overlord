@@ -3,15 +3,17 @@ package mesos
 import (
 	"container/list"
 	"context"
+	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 
+	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
+	"overlord/task/create"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 
@@ -33,17 +35,27 @@ type Scheduler struct {
 	c     *Config
 	Tchan chan string
 	task  *list.List
-	db    etcd.Etcd
+	db    *etcd.Etcd
 	cli   calls.Caller
 }
 
 // NewScheduler new scheduler instance.
-func NewScheduler(c *Config, db etcd.Etcd) *Scheduler {
+func NewScheduler(c *Config, db *etcd.Etcd) *Scheduler {
 	return &Scheduler{
 		db:   db,
 		c:    c,
 		task: list.New(),
 	}
+}
+
+// Get get framework id from etcd if set.
+func (s *Scheduler) Get() (fid string, err error) {
+	return s.db.Get(context.TODO(), etcd.FRAMEWORK)
+}
+
+// Set framework id into etcd.
+func (s *Scheduler) Set(fid string) (err error) {
+	return s.db.Set(context.TODO(), etcd.FRAMEWORK, fid)
 }
 
 // Run scheduler and watch at task dir for task info.
@@ -56,20 +68,14 @@ func (s *Scheduler) Run() (err error) {
 	}
 	s.Tchan = ch
 	go s.taskEvent()
-	fidStore := mstore.DecorateSingleton(
-		mstore.NewInMemorySingleton(),
-		mstore.DoSet().AndThen(func(_ mstore.Setter, v string, _ error) error {
-			log.Info("FrameworkID", v)
-			return nil
-		}))
 	s.cli = buildHTTPSched(s.c)
-	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(fidStore))).Caller(s.cli)
+	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
 
 	controller.Run(context.TODO(),
 		buildFrameworkInfo(s.c),
 		s.cli,
-		controller.WithEventHandler(s.buildEventHandle(fidStore)),
-		controller.WithFrameworkID(mstore.GetIgnoreErrors(fidStore)),
+		controller.WithEventHandler(s.buildEventHandle()),
+		controller.WithFrameworkID(mstore.GetIgnoreErrors(s)),
 	)
 	return
 }
@@ -77,20 +83,10 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
-		_ = v
 		var t Task
-		// if err := json.Unmarshal([]byte(v), &t); err != nil {
-		// 	log.Errorf("err task info err %v", err)
-		// 	continue
-		// }
-		t = Task{
-			Name: "11",
-			Type: taskTypeRedis,
-			Num:  3,
-			I: &Instance{
-				Name:   "redis",
-				Memory: 100,
-			},
+		if err := json.Unmarshal([]byte(v), &t); err != nil {
+			log.Errorf("err task info err %v", err)
+			continue
 		}
 		for i := 0; i < t.Num; i++ {
 			s.task.PushBack(t)
@@ -123,7 +119,7 @@ func buildFrameworkInfo(cfg *Config) *ms.FrameworkInfo {
 	return frameworkInfo
 }
 
-func (s *Scheduler) buildEventHandle(fid mstore.Singleton) events.Handler {
+func (s *Scheduler) buildEventHandle() events.Handler {
 	logger := controller.LogEvents(nil)
 	return eventrules.New(
 		logAllEvents(),
@@ -133,7 +129,7 @@ func (s *Scheduler) buildEventHandle(fid mstore.Singleton) events.Handler {
 		scheduler.Event_UPDATE:  controller.AckStatusUpdates(s.cli).AndThen().HandleF(s.statusUpdate()),
 		scheduler.Event_SUBSCRIBED: eventrules.New(
 			logger,
-			controller.TrackSubscription(fid, time.Second),
+			controller.TrackSubscription(s, time.Second),
 		),
 	}.Otherwise(logger.HandleEvent))
 }
@@ -183,51 +179,114 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
-		for i, offer := range offers {
-			memRes := filterResource(offer.Resources, "mem")
-			mems := 0.0
-			for _, mem := range memRes {
-				mems += mem.GetScalar().GetValue()
-			}
-			log.Infof("Recived offer with MEM=%v", mems)
-			var tasks []ms.TaskInfo
-			for taskEle := s.task.Front(); taskEle != nil; {
-				task := taskEle.Value.(Task)
-				tkMem := float64(task.I.Memory)
-				if tkMem <= mems {
-					tskID := ms.TaskID{Value: strconv.FormatInt(rand.Int63(), 10)}
-					memsosTsk := ms.TaskInfo{
-						Name:     task.Name,
-						TaskID:   tskID,
-						AgentID:  offer.AgentID,
-						Executor: s.buildExcutor(task.Name, buildWantsExecutorResources(task.I.CPU, task.I.Memory)),
-						// TODO:find suitable resource.
-						Resources: buildWantsExecutorResources(task.I.CPU, task.I.Memory),
-					}
-					cTask := taskEle
-					taskEle = taskEle.Next()
-					s.task.Remove(cTask)
-					tasks = append(tasks, memsosTsk)
-				} else {
-					taskEle = taskEle.Next()
-				}
-			}
-			if len(tasks) > 0 {
-				accept := calls.Accept(
-					calls.OfferOperations{calls.OpLaunch(tasks...)}.WithOffers(offers[i].ID),
-				) //.With(callOption)
-				err := calls.CallNoData(ctx, s.cli, accept)
+		for taskEle := s.task.Front(); taskEle != nil; {
+			task := taskEle.Value.(Task)
+			imem := task.I.Memory
+			icpu := task.I.CPU
+			inum := task.Num
+			if task.Type == taskTypeRedisCluster {
+				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
 				if err != nil {
-					log.Errorf("failed to lanch task :%v", err)
+					taskEle = taskEle.Next()
+					continue
 				}
-			} else {
-				decli := calls.Decline(offers[i].ID)
-				calls.CallNoData(ctx, s.cli, decli)
+				var (
+					ofm     = make(map[string]ms.Offer)
+					tasks   []ms.TaskInfo
+					offerid = make(map[ms.OfferID]struct{})
+				)
+				rtask := create.NewRedisClusterTask(s.db)
+				// TODO:set other redis cluster info
+				rtask.ServerCreateCluster(&create.RedisClusterInfo{
+					Chunks: chunks,
+				})
+				for _, offer := range offers {
+					ofm[offer.GetHostname()] = offer
+				}
+				for _, ck := range chunks {
+					for _, node := range ck.Nodes {
+						task := ms.TaskInfo{
+							Name:    node.Name,
+							TaskID:  ms.TaskID{Value: node.RunID},
+							AgentID: ofm[node.Name].AgentID,
+							// TODO:create executor
+						}
+						offerid[ofm[node.Name].ID] = struct{}{}
+						tasks = append(tasks, task)
+					}
+				}
+				offerids := make([]ms.OfferID, len(offerid))
+				for id := range offerid {
+					offerids = append(offerids, id)
+				}
+				accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks...)}.WithOffers(offerids...))
+				err = calls.CallNoData(ctx, s.cli, accept)
+				if err != nil {
+					log.Errorf("fail to lanch task err %v", err)
+					taskEle = taskEle.Next()
+					continue
+				}
+				ttask := taskEle
+				taskEle = taskEle.Next()
+				s.task.Remove(ttask)
+				return nil
 			}
 		}
 		return nil
 	}
 }
+
+// func (s *Scheduler) resourceOffers() events.HandlerFunc {
+// 	return func(ctx context.Context, e *scheduler.Event) error {
+// 		var (
+// 			offers = e.GetOffers().GetOffers()
+// 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
+// 		)
+// 		for i, offer := range offers {
+// 			memRes := filterResource(offer.Resources, "mem")
+// 			mems := 0.0
+// 			for _, mem := range memRes {
+// 				mems += mem.GetScalar().GetValue()
+// 			}
+// 			log.Infof("Recived offer with MEM=%v", mems)
+// 			var tasks []ms.TaskInfo
+// 			for taskEle := s.task.Front(); taskEle != nil; {
+// 				task := taskEle.Value.(Task)
+// 				tkMem := float64(task.I.Memory)
+// 				if tkMem <= mems {
+// 					tskID := ms.TaskID{Value: strconv.FormatInt(rand.Int63(), 10)}
+// 					memsosTsk := ms.TaskInfo{
+// 						Name:     task.Name,
+// 						TaskID:   tskID,
+// 						AgentID:  offer.AgentID,
+// 						Executor: s.buildExcutor(task.Name, []ms.Resource{}),
+// 						// TODO:find suitable resource.
+// 						Resources: buildWantsExecutorResources(task.I.CPU, task.I.Memory),
+// 					}
+// 					cTask := taskEle
+// 					taskEle = taskEle.Next()
+// 					s.task.Remove(cTask)
+// 					tasks = append(tasks, memsosTsk)
+// 				} else {
+// 					taskEle = taskEle.Next()
+// 				}
+// 			}
+// 			if len(tasks) > 0 {
+// 				accept := calls.Accept(
+// 					calls.OfferOperations{calls.OpLaunch(tasks...)}.WithOffers(offers[i].ID),
+// 				) //.With(callOption)
+// 				err := calls.CallNoData(ctx, s.cli, accept)
+// 				if err != nil {
+// 					log.Errorf("failed to lanch task :%v", err)
+// 				}
+// 			} else {
+// 				decli := calls.Decline(offers[i].ID)
+// 				calls.CallNoData(ctx, s.cli, decli)
+// 			}
+// 		}
+// 		return nil
+// 	}
+// }
 
 func filterResource(rs []ms.Resource, filter string) (fs []ms.Resource) {
 	for _, r := range rs {

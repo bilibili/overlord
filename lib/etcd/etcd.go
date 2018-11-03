@@ -18,6 +18,7 @@ const (
 	CLUSTERDIR = "/overlord/clusters"
 	CONFIGDIR  = "/overlord/config"
 	TASKDIR    = "/overlord/task"
+	FRAMEWORK  = "/overlord/framework"
 )
 
 // Node etcd kv info.
