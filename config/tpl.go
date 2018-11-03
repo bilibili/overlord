@@ -1,12 +1,28 @@
 package config
 
+// MemcacheServiceTpl was used to render a unit file
+// keys:
+//  - Version
+const MemcacheServiceTpl = `
+[Unit]
+Description=Cache Memcache node.
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/data/%i/memcache.pid
+ExecStart=/data/lib/memcache/{{.Version}}/bin/memcached /data/%i/memcache.conf
+
+[Install]
+WantedBy=multi-user.target
+`
 // RedisServiceTpl was used to render a unit file
 // keys:
 //  - Version
 const RedisServiceTpl = `
 [Unit]
 Description=Cache Redis node.
-After=syslog.target network.target
+After=network.target
 
 [Service]
 Type=forking

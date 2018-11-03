@@ -104,10 +104,6 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	}
 
 	info.Version, err = e.Get(context.TODO(), fmt.Sprintf("%s/version", instanceDir))
-	if err != nil {
-		return
-	}
-
 	return
 }
 
@@ -297,24 +293,28 @@ func buildServiceName(cacheType proto.CacheType, port int) string {
 }
 
 func setupSystemdServiceFile(info *DeployInfo) error {
+	var (
+		fname string
+		tplBody string
+	)
+
 	if info.CacheType == proto.CacheTypeRedis || info.CacheType == proto.CacheTypeRedisCluster {
-		fname := fmt.Sprintf("/etc/systemd/system/redis-%s@.service", info.Version)
-		fd, err := os.Create(fname)
-		if err != nil {
-			return err
-		}
-		tpl, err := template.New("service").Parse(config.RedisServiceTpl)
-		if err != nil {
-			return err
-		}
-		err = tpl.Execute(fd, map[string]string{"Version": info.Version})
-		if err != nil {
-			return err
-		}
+		fname = fmt.Sprintf("/etc/systemd/system/redis-%s@.service", info.Version)
+		tplBody = config.RedisServiceTpl
 	} else if info.CacheType == proto.CacheTypeMemcache {
-		// TODO: impl it
+		fname = fmt.Sprintf("/etc/systemd/system/memcache-%s@.service", info.Version)
+		tplBody = config.MemcacheServiceTpl
 	}
-	return nil
+
+	fd, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	tpl, err := template.New("service").Parse(tplBody)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(fd, map[string]string{"Version": info.Version})
 }
 
 // SetupCacheService will create new cache service
