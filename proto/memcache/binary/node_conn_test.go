@@ -49,43 +49,40 @@ func _causeEqual(t *testing.T, except, actual error) {
 }
 
 func TestNodeConnWriteOk(t *testing.T) {
+	var (
+		getQBs = []byte{
+			0x80,       // magic
+			0x0d,       // cmd // NOTE: cmd will change
+			0x00, 0x03, // key len
+			0x00,       // extra len
+			0x00,       // data type
+			0x00, 0x00, // vbucket
+			0x00, 0x00, 0x00, 0x03, // body len
+			0x00, 0x00, 0x00, 0x00, // opaque
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+			0x41, 0x42, 0x43, // key: ABC
+		}
+		getQRespBs = []byte{
+			0x80,       // magic
+			0x0c,       // cmd // NOTE: cmd changed
+			0x00, 0x03, // key len
+			0x00,       // extra len
+			0x00,       // data type
+			0x00, 0x00, // vbucket
+			0x00, 0x00, 0x00, 0x03, // body len
+			0x00, 0x00, 0x00, 0x00, // opaque
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+			0x41, 0x42, 0x43, // key: ABC
+		}
+	)
+
 	ts := []struct {
 		name   string
 		req    []byte
 		except []byte
 	}{
 		{name: "get", req: getTestData, except: getTestData},
-		{name: "set", req: setTestData, except: setTestData},
-	}
-
-	for _, tt := range ts {
-		t.Run(tt.name, func(subt *testing.T) {
-			msg := _createReqMsg(tt.req)
-			nc := _createNodeConn(nil)
-
-			err := nc.Write(msg)
-			assert.NoError(t, err)
-			err = nc.Flush()
-			assert.NoError(t, err)
-
-			m, ok := nc.conn.Conn.(*mockConn)
-			assert.True(t, ok)
-
-			buf := make([]byte, 1024)
-			size, err := m.wbuf.Read(buf)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.except, buf[:size])
-		})
-	}
-}
-
-func TestNodeConnBatchWriteOk(t *testing.T) {
-	ts := []struct {
-		name   string
-		req    []byte
-		except []byte
-	}{
-		{name: "get", req: getTestData, except: getTestData},
+		{name: "getq", req: getQBs, except: getQRespBs},
 		{name: "set", req: setTestData, except: setTestData},
 	}
 
@@ -117,6 +114,9 @@ func TestNodeConnWriteClosed(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, nc.Closed())
 	err = nc.Write(msg)
+	assert.Error(t, err)
+	_causeEqual(t, ErrClosed, err)
+	err = nc.Flush()
 	assert.Error(t, err)
 	_causeEqual(t, ErrClosed, err)
 	assert.NoError(t, nc.Close())

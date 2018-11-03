@@ -50,7 +50,7 @@ func TestNodeConnClose(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestNodeConnWriteBatchOk(t *testing.T) {
+func TestNodeConnWriteOk(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	msg := proto.NewMessage()
 	req := newRequest("GET", "AA")
@@ -101,7 +101,7 @@ func TestNodeConnWriteHasErr(t *testing.T) {
 	assert.EqualError(t, err, "write error")
 }
 
-func TestReadBatchOk(t *testing.T) {
+func TestReadOk(t *testing.T) {
 	data := ":1\r\n"
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(data)))
 	msg := proto.NewMessage()
@@ -111,7 +111,7 @@ func TestReadBatchOk(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestReadBatchWithBadAssert(t *testing.T) {
+func TestReadWithBadAssert(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
 	msg := proto.NewMessage()
 	msg.WithRequest(&mockCmd{})
@@ -120,7 +120,7 @@ func TestReadBatchWithBadAssert(t *testing.T) {
 	assert.Equal(t, ErrBadAssert, errors.Cause(err))
 }
 
-func TestReadBatcHasErr(t *testing.T) {
+func TestReadHasErr(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
 	ncc := nc.(*nodeConn)
 	ec := _createConn(nil)
@@ -137,19 +137,18 @@ func TestReadBatcHasErr(t *testing.T) {
 	assert.EqualError(t, err, "read error")
 }
 
-func TestReadBatchWithNilError(t *testing.T) {
+func TestReadWithEofError(t *testing.T) {
 	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
 	msg := proto.NewMessage()
 	req := getReq()
 	req.mType = mergeTypeJoin
 	req.reply = &resp{}
 	req.resp = newresp(respArray, []byte("2"))
-	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("GET")))
+	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("3\r\nGET")))
 	req.resp.arrayn++
 	msg.WithRequest(req)
 
 	err := nc.Read(msg)
-	assert.Error(t, err)
 	assert.Equal(t, io.EOF, errors.Cause(err))
 
 	rnc := nc.(*nodeConn)
