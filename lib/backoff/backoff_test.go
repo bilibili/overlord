@@ -1,10 +1,8 @@
-package backoff_test
+package backoff
 
 import (
 	"testing"
 	"time"
-
-	"overlord/lib/backoff"
 )
 
 func TestBackoff(t *testing.T) {
@@ -12,7 +10,7 @@ func TestBackoff(t *testing.T) {
 		if i == 10 {
 			j = 0
 		}
-		tm := backoff.Backoff(j)
+		tm := Backoff(j)
 		j++
 		t.Logf("backoff second: %d", tm/time.Second)
 	}

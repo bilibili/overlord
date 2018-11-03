@@ -12,7 +12,7 @@ func NewRing(des, method string) *HashRing {
 	case HashMethodFnv1a:
 		fallthrough
 	default:
-		hash = NewFnv1a64().fnv1a64
+		hash = fnv1a64
 	}
 	return newRingWithHash(hash)
 }
