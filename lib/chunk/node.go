@@ -19,7 +19,7 @@ type Node struct {
 }
 
 // 0c415ea9a9244803d33f8ce97cf6f5b30f862904 127.0.0.1:7020@17020 master - 0 1540462008000 11 connected 13654-15018
-const nodesConfLine = "%040s %s:%d@%d %s %s 0 0 0 connected %s"
+const nodesConfLine = "%040s %s:%d@%d %s %s 0 0 0 connected %s\n"
 
 // IntoConfLine will genenrate line for this node in nodes.conf
 func (n *Node) IntoConfLine(myself bool) string {

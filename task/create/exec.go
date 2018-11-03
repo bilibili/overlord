@@ -14,6 +14,7 @@ import (
 	"overlord/config"
 
 	"github.com/BurntSushi/toml"
+	"overlord/proto"
 )
 
 func getDefaultServiceWorkDir() string {
@@ -28,6 +29,8 @@ func getDefaultServiceWorkDir() string {
 type DeployInfo struct {
 	// TaskID is the id of task
 	TaskID string
+
+	CacheType string
 
 	Port    int
 	Version string
@@ -45,38 +48,45 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		workdir     = fmt.Sprintf(getDefaultServiceWorkDir(), port)
 	)
 
-	tplTree := make(map[string]string)
-
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
-
+	info.TplTree = make(map[string]string)
+	info.CacheType, err = e.Get(context.TODO(), fmt.Sprintf("%s/CacheType", instanceDir))
 	if err != nil {
 		return
 	}
 
-	tplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
 
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/nodes.conf", instanceDir))
+	if proto.CacheType(info.CacheType) == proto.CacheTypeRedisCluster {
+		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
+
+		if err != nil {
+			return
+		}
+		info.TplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
+
+		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/nodes.conf", instanceDir))
+		if err != nil {
+			return
+		}
+		info.TplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
+	} else if proto.CacheType(info.CacheType) == proto.CacheTypeRedis {
+		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
+		if err != nil {
+			return
+		}
+		info.TplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
+	} else {
+		log.Errorf("unsupported cachetype %s", info.CacheType)
+	}
+
+
+	info.TaskID, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
 	if err != nil {
 		return
 	}
-	tplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
 
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
+	info.Version, err = e.Get(context.TODO(), fmt.Sprintf("%s/version", instanceDir))
 	if err != nil {
 		return
-	}
-	taskid := val
-
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/version", instanceDir))
-	if err != nil {
-		return
-	}
-
-	info = &DeployInfo{
-		TaskID:  taskid,
-		Port:    port,
-		TplTree: tplTree,
-		Version: val,
 	}
 
 	return
@@ -126,10 +136,10 @@ func renderMetaIntoFile(workdir string, di *DeployInfo) error {
 	return encoder.Encode(di)
 }
 
-func outputIntoFile(workdir string, data []byte) error {
-	console := fmt.Sprintf("%s/console.log", workdir)
-	return ioutil.WriteFile(console, data, 0755)
-}
+// func outputIntoFile(workdir string, data []byte) error {
+// 	console := fmt.Sprintf("%s/console.log", workdir)
+// 	return ioutil.WriteFile(console, data, 0755)
+// }
 
 // func wrapCmdWithBash(cmd string) string {
 // 	return fmt.Sprintf("bash -c \"%s\"", cmd)
