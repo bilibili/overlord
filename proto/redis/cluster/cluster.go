@@ -14,7 +14,6 @@ import (
 	"overlord/lib/log"
 	libnet "overlord/lib/net"
 	"overlord/proto"
-	"overlord/proto/redis"
 )
 
 const (
@@ -52,10 +51,6 @@ type cluster struct {
 	slotNode atomic.Value
 	action   chan struct{}
 
-	redts map[string]*redirect
-	rLock sync.Mutex
-	// latestRedt int64
-
 	fakeNodesBytes []byte
 	fakeSlotsBytes []byte
 	once           sync.Once
@@ -74,7 +69,6 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		wto:     wto,
 		hashTag: hashTag,
 		action:  make(chan struct{}),
-		redts:   make(map[string]*redirect),
 	}
 	if !c.tryFetch() {
 		panic("redis cluster all seed nodes fail to fetch")
@@ -225,44 +219,6 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 	}
 }
 
-// func (c *cluster) getRedirectNodeConn(addr string) (r *redirect) {
-// 	atomic.StoreInt64(&c.latestRedt, time.Now().Unix())
-// 	c.rLock.Lock()
-// 	r, ok := c.redts[addr]
-// 	if ok {
-// 		c.rLock.Unlock()
-// 		return
-// 	}
-// 	rnc := redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto).(*redis.NodeConn)
-// 	r = &redirect{nc: rnc}
-// 	c.redts[addr] = r
-// 	c.rLock.Unlock()
-// 	if log.V(3) {
-// 		log.Infof("Redis Cluster occur redirect addr:%s", addr)
-// 	}
-// 	return
-// }
-
-// func (c *cluster) closeRedirectNodeConn() {
-// 	lr := atomic.LoadInt64(&c.latestRedt)
-// 	now := time.Now().Unix()
-// 	if lr == 0 || now-lr > 60*2 { // NOTE: more than 1min in tryFetch
-// 		return
-// 	}
-// 	c.rLock.Lock()
-// 	for addr, r := range c.redts {
-// 		r.lock.Lock()
-// 		r.nc.Close()
-// 		r.nc = nil
-// 		r.lock.Unlock()
-// 		delete(c.redts, addr)
-// 		if log.V(4) {
-// 			log.Infof("Redis Cluster close redirect addr:%s", addr)
-// 		}
-// 	}
-// 	c.rLock.Unlock()
-// }
-
 func (c *cluster) fake(listen string) {
 	c.once.Do(func() {
 		_, port, err := net.SplitHostPort(listen)
@@ -299,11 +255,6 @@ func (c *cluster) fake(listen string) {
 			}
 		}
 	})
-}
-
-type redirect struct {
-	nc   *redis.NodeConn
-	lock sync.Mutex
 }
 
 type slotNode struct {

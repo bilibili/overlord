@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"sync/atomic"
 
@@ -35,16 +34,6 @@ type nodeConn struct {
 }
 
 func newNodeConn(c *cluster, addr string) (nc proto.NodeConn) {
-	defer func() {
-		if e := recover(); e != nil {
-			fmt.Println("jiuzhemepanic:", e)
-			fmt.Println("shenmenil:", c)
-			nc = &nodeConn{
-				c:  c,
-				nc: redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
-			}
-		}
-	}()
 	nc = &nodeConn{
 		c:  c,
 		nc: redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
@@ -93,13 +82,6 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 }
 
 func (nc *nodeConn) redirectProcess(m *proto.Message, req *redis.Request, addr string, isAsk bool) (err error) {
-	// rdt := nc.c.getRedirectNodeConn(addr)
-	// rdt.lock.Lock()
-	// defer rdt.lock.Unlock()
-	// if rdt.nc == nil {
-	// 	err = errors.WithStack(ErrClusterClosed)
-	// 	return
-	// }
 	nnc := newNodeConn(nc.c, addr)
 	tmp := nnc.(*nodeConn)
 	rnc := tmp.nc.(*redis.NodeConn)
@@ -119,9 +101,6 @@ func (nc *nodeConn) redirectProcess(m *proto.Message, req *redis.Request, addr s
 		err = errors.WithStack(err)
 		return
 	}
-	// if err = rnc.Read(m); err != nil {
-	// 	err = errors.WithStack(err)
-	// }
 	// NOTE: even if the client waits a long time before reissuing the query, and in the meantime the cluster configuration
 	// changed, the destination node will reply again with a MOVED error if the hash slot is now served by another node.
 	if err = nnc.Read(m); err != nil {
