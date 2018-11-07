@@ -12,6 +12,7 @@ After=network.target
 Type=forking
 PIDFile=/data/%i/memcache.pid
 ExecStart=/data/lib/memcache/{{.Version}}/bin/memcached /data/%i/memcache.conf
+WorkingDirectory=/data/%i/
 
 [Install]
 WantedBy=multi-user.target
@@ -30,6 +31,7 @@ Type=forking
 PIDFile=/data/%i/redis.pid
 ExecStart=/data/lib/redis/{{.Version}}/bin/redis-server /data/%i/redis.conf
 ExecStop=/data/lib/redis/{{.Version}}/bin/redis-cli -p %i shutdown
+WorkingDirectory=/data/%i/
 
 [Install]
 WantedBy=multi-user.target

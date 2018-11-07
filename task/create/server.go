@@ -48,6 +48,7 @@ type RedisClusterTask struct {
 	e *etcd.Etcd
 }
 
+// NewRedisClusterTask will create new Redis cluster.
 func NewRedisClusterTask(e *etcd.Etcd) *RedisClusterTask {
 	return &RedisClusterTask{
 		e: e,
