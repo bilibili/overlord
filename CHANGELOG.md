@@ -2,6 +2,7 @@
 
 ## Version 1.5.0
 1. refactor message pipeline.
+2. non-persistent connection for cluster redirect.
 
 ## Version 1.4.0
 1. add redis cluster support.
