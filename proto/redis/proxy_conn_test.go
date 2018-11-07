@@ -131,7 +131,44 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Equal(t, []byte("2"), req.resp.data)
 }
 
-func TestEncodeCmdOk(t *testing.T) {
+func TestEncodeNotSupportCtl(t *testing.T) {
+	msg := proto.NewMessage()
+	req := getReq()
+	req.resp = &resp{
+		rTp:  respArray,
+		data: []byte("2"),
+		array: []*resp{
+			&resp{
+				rTp:  respBulk,
+				data: []byte("3\r\nfoo"),
+			},
+			&resp{
+				rTp:  respBulk,
+				data: []byte("4\r\nbara"),
+			},
+		},
+		arrayn: 2,
+	}
+	msg.WithRequest(req)
+	conn := _createConn([]byte(nil))
+	pc := NewProxyConn(conn)
+	err := pc.Encode(msg)
+	assert.NoError(t, err)
+	assert.Equal(t, req.reply.data, notSupportDataBytes)
+
+	req.resp.next()
+	req.resp.array[0].data = cmdPingBytes
+	err = pc.Encode(msg)
+	assert.NoError(t, err)
+	assert.Equal(t, req.reply.data, pongDataBytes)
+
+	req.resp.array[0].data = cmdQuitBytes
+	err = pc.Encode(msg)
+	assert.NoError(t, err)
+	assert.Equal(t, req.reply.data, justOkBytes)
+}
+
+func TestEncodeMergeOk(t *testing.T) {
 	ts := []struct {
 		Name   string
 		MType  mergeType
@@ -149,28 +186,6 @@ func TestEncodeCmdOk(t *testing.T) {
 			},
 			Expect: "-Error: command not support\r\n",
 		},
-		// {
-		// 	Name:  "mergeCtl",
-		// 	MType: mergeTypeNo,
-		// 	Reply: []*resp{
-		// 		&resp{
-		// 			rTp:  respInt,
-		// 			data: []byte("12"),
-		// 		},
-		// 	},
-		// 	Expect: ":12\r\n",
-		// },
-		// {
-		// 	Name:  "mergeError",
-		// 	MType: mergeTypeNo,
-		// 	Reply: []*resp{
-		// 		&resp{
-		// 			rTp:  respError,
-		// 			data: []byte("i am error"),
-		// 		},
-		// 	},
-		// 	Expect: "-i am error\r\n",
-		// },
 		{
 			Name:  "mergeOK",
 			MType: mergeTypeOK,

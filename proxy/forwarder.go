@@ -156,10 +156,12 @@ func (f defaultForwarder) processPing(p *pinger) {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
 			p.retries = 0
-			log.Warnf("node ping fail:%d times with err:%v", p.failure, err)
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
 				_ = p.ping.Close()
 				p.ping = newPingConn(p.cc, p.node)
+			}
+			if log.V(3) {
+				log.Warnf("node ping node:%s fail:%d times with err:%v", p.node, p.failure, err)
 			}
 		} else {
 			p.failure = 0
@@ -170,6 +172,9 @@ func (f defaultForwarder) processPing(p *pinger) {
 					f.ring.AddNode(p.node, p.weight)
 				}
 				del = false
+				if log.V(4) {
+					log.Infof("node ping node:%s success and readd", p.node)
+				}
 			}
 		}
 		if f.cc.PingAutoEject && p.failure >= f.cc.PingFailLimit {
@@ -179,6 +184,9 @@ func (f defaultForwarder) processPing(p *pinger) {
 				f.ring.DelNode(p.node)
 			}
 			del = true
+			if log.V(2) {
+				log.Errorf("node ping node:%s fail times equals limit:%d then del", p.node, f.cc.PingFailLimit)
+			}
 		}
 		<-time.After(backoff.Backoff(p.retries))
 		p.retries++
