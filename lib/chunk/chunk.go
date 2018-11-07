@@ -2,9 +2,7 @@ package chunk
 
 import (
 	"errors"
-
 	"sort"
-
 	"strings"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
@@ -29,7 +27,7 @@ var (
 	ErrNotEnoughResource = errors.New("resource is not fully satisfied by the offers")
 
 	ErrBadMasterNum = errors.New("master number must be even")
-	ErrNot3Not4     = errors.New("not allow by 'not 3 not 4' principle")
+	ErrNot3Not4     = errors.New("can not deploy 4 instance with 3 host")
 	ErrBadDist      = errors.New("distribution is not allow for some host have more than half nodes")
 )
 

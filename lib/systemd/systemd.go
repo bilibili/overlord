@@ -36,10 +36,7 @@ func Run(serviceName string, action ActionType) error {
 		return ErrNotSupportAction
 	}
 	cmd := exec.Command("systemctl", string(action), serviceName)
-	defer cmd.Wait()
-
-	err := cmd.Run()
-	return err
+	return cmd.Run()
 }
 
 // Start service
@@ -60,8 +57,5 @@ func Restart(serviceName string) error {
 // DaemonReload systemd
 func DaemonReload() error {
 	cmd := exec.Command("systemctl", string(ActionDaemonReload))
-	defer cmd.Wait()
-
-	err := cmd.Run()
-	return err
+	return cmd.Run()
 }

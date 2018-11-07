@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-
 	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
+	"overlord/proto"
+	"overlord/task"
 	"overlord/task/create"
 
+	pb "github.com/golang/protobuf/proto"
 	ms "github.com/mesos/mesos-go/api/v1/lib"
-
 	"github.com/mesos/mesos-go/api/v1/lib/encoding/codecs"
 	"github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/callrules"
 	"github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/controller"
@@ -83,14 +83,12 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
-		var t Task
+		var t task.Task
 		if err := json.Unmarshal([]byte(v), &t); err != nil {
 			log.Errorf("err task info err %v", err)
 			continue
 		}
-		for i := 0; i < t.Num; i++ {
-			s.task.PushBack(t)
-		}
+		s.task.PushBack(t)
 	}
 }
 
@@ -145,7 +143,7 @@ func logAllEvents() eventrules.Rule {
 func (s *Scheduler) trackOffersReceived() eventrules.Rule {
 	return func(ctx context.Context, e *scheduler.Event, err error, chain eventrules.Chain) (context.Context, *scheduler.Event, error) {
 		if err == nil {
-			log.Infof("offer %v ", e.GetOffers().GetOffers())
+			log.Infof("get offer %v ", e.GetOffers().GetOffers())
 		}
 		return chain(ctx, e, err)
 	}
@@ -180,13 +178,15 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
 		for taskEle := s.task.Front(); taskEle != nil; {
-			task := taskEle.Value.(Task)
-			imem := task.I.Memory
-			icpu := task.I.CPU
-			inum := task.Num
-			if task.Type == taskTypeRedisCluster {
+			t := taskEle.Value.(task.Task)
+			imem := t.I.Memory
+			icpu := t.I.CPU
+			inum := t.Num
+			switch {
+			case t.CacheType == proto.CacheTypeRedisCluster:
 				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
 				if err != nil {
+					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
 					taskEle = taskEle.Next()
 					continue
 				}
@@ -196,9 +196,13 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					offerid = make(map[ms.OfferID]struct{})
 				)
 				rtask := create.NewRedisClusterTask(s.db)
-				// TODO:set other redis cluster info
-				rtask.ServerCreateCluster(&create.RedisClusterInfo{
-					Chunks: chunks,
+				rtask.CreateCluster(&create.RedisClusterInfo{
+					Chunks:      chunks,
+					MaxMemory:   t.MaxMem,
+					ClusterName: t.Name,
+					TaskID:      t.ID,
+					Version:     t.Version,
+					MasterNum:   t.Num,
 				})
 				for _, offer := range offers {
 					ofm[offer.GetHostname()] = offer
@@ -232,6 +236,8 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				taskEle = taskEle.Next()
 				s.task.Remove(ttask)
 				return nil
+			case t.CacheType == proto.CacheTypeRedis:
+			case t.CacheType == proto.CacheTypeMemcache:
 			}
 		}
 		return nil
@@ -310,13 +316,13 @@ func makeResources(cpu, mem float64, port uint64) (r ms.Resources) {
 
 func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo {
 	executorUris := []ms.CommandInfo_URI{}
-	executorUris = append(executorUris, ms.CommandInfo_URI{Value: s.c.ExecutorURL, Executable: proto.Bool(true)})
+	executorUris = append(executorUris, ms.CommandInfo_URI{Value: s.c.ExecutorURL, Executable: pb.Bool(true)})
 	exec := &ms.ExecutorInfo{
 		Type:       ms.ExecutorInfo_CUSTOM,
 		ExecutorID: ms.ExecutorID{Value: "default"},
 		Name:       &name,
 		Command: &ms.CommandInfo{
-			Value: proto.String("./executor"),
+			Value: pb.String("./executor"),
 			URIs:  executorUris,
 		},
 		Resources: rs,

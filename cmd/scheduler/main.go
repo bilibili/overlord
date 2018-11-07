@@ -1,7 +1,32 @@
 package main
 
+import (
+	"flag"
+	"overlord/lib/etcd"
+	"overlord/mesos"
+
+	"github.com/BurntSushi/toml"
+)
+
+var confPath string
+var defConf = &mesos.Config{
+	User:        "root",
+	Name:        "test",
+	Master:      "127.0.0.1:5050",
+	ExecutorURL: "http://127.0.0.1:8000/executor",
+	DBEndPoint:  "http://127.0.0.1:2379",
+}
+
 func main() {
-	// db, _ := etcd.New("http://127.0.0.1:2379")
-	// sched := mesos.NewScheduler(&mesos.Config{User: "root", Name: "test", Master: "127.0.0.1:5050", ExecutorURL: "http://127.0.0.1:8000/executor"}, db)
-	// sched.Run()
+	flag.StringVar(&confPath, "conf", "", "scheduler conf")
+	flag.Parse()
+	conf := new(mesos.Config)
+	if confPath != "" {
+		toml.DecodeFile(confPath, &conf)
+	} else {
+		conf = defConf
+	}
+	db, _ := etcd.New(conf.DBEndPoint)
+	sched := mesos.NewScheduler(conf, db)
+	sched.Run()
 }

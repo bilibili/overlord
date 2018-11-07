@@ -54,8 +54,8 @@ func NewRedisClusterTask(e *etcd.Etcd) *RedisClusterTask {
 	}
 }
 
-// ServerCreateCluster creates new cluster and wait for cluster done
-func (c *RedisClusterTask) ServerCreateCluster(info *RedisClusterInfo) error {
+// CreateCluster creates new cluster and wait for cluster done
+func (c *RedisClusterTask) CreateCluster(info *RedisClusterInfo) error {
 	err := c.setupIDMap(info)
 	if err != nil {
 		return err

@@ -11,19 +11,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"text/template"
+
+	"overlord/config"
 	"overlord/lib/dir"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"path/filepath"
-
-	"overlord/config"
-
+	"overlord/lib/systemd"
 	"overlord/proto"
 
-	"overlord/lib/systemd"
-
 	"github.com/BurntSushi/toml"
-	"text/template"
 )
 
 func getDefaultServiceWorkDir() string {
@@ -294,7 +292,7 @@ func buildServiceName(cacheType proto.CacheType, port int) string {
 
 func setupSystemdServiceFile(info *DeployInfo) error {
 	var (
-		fname string
+		fname   string
 		tplBody string
 	)
 

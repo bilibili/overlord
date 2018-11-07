@@ -116,3 +116,8 @@ systemd uint文件名约定为 服务名[版本号].service
 redis5-0-0.service
 redis4-0-3.service
 ```
+通过使用端口号渲染启动多个对应进程
+```eg
+systemctl start redis5-0-0@6379.service // 启动监听端口为6379的redis
+systemctl start redis5-0-0@16379.service // 启动监听端口为16379的redis
+```
