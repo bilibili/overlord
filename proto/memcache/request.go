@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	// delim     = '\n'
 	spaceByte = ' '
 )
 

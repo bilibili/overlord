@@ -120,7 +120,6 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			nre1.reset()
 			nre1.rTp = respBulk
 			nre1.data = append(nre1.data, cmdGetBytes...)
-			// nre1.data = cmdGetBytes
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i])
@@ -132,7 +131,6 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.resp.reset() // NOTE: *2\r\n
 			r.resp.rTp = respArray
 			r.resp.data = append(r.resp.data, arrayLenTwo...)
-			// r.resp.data = arrayLenTwo
 			// array resp: get
 			nre1 := r.resp.next() // NOTE: $3\r\nDEL\r\n | $6\r\nEXISTS\r\n
 			nre1.copy(pc.resp.array[0])

@@ -101,7 +101,6 @@ REREAD:
 		mcr.data = append(mcr.data, bs...)
 		return
 	}
-	// NOTE: here mean command in (withValueTypes)
 	var length int
 	if length, err = findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats); err != nil {
 		err = errors.WithStack(err)

@@ -132,7 +132,6 @@ func (c *cluster) fetchproc() {
 		select {
 		case <-c.action:
 		case <-time.After(1 * time.Minute):
-			// c.closeRedirectNodeConn()
 		}
 		c.tryFetch()
 	}
