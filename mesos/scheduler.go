@@ -73,7 +73,7 @@ func (s *Scheduler) Run() (err error) {
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
 
 	controller.Run(context.TODO(),
-		buildFrameworkInfo(s.c),
+		s.buildFrameworkInfo(),
 		s.cli,
 		controller.WithEventHandler(s.buildEventHandle()),
 		controller.WithFrameworkID(mstore.GetIgnoreErrors(s)),
@@ -103,17 +103,19 @@ func buildHTTPSched(cfg *Config) calls.Caller {
 	}))
 }
 
-func buildFrameworkInfo(cfg *Config) *ms.FrameworkInfo {
+func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	frameworkInfo := &ms.FrameworkInfo{
-		User: cfg.User,
-		Name: cfg.Name,
+		User:       s.c.User,
+		Name:       s.c.Name,
+		ID:         &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
+		Checkpoint: &s.c.Checkpoint,
 	}
-	if cfg.FailVoer > 0 {
-		failOverTimeout := cfg.FailVoer.Seconds()
+	if s.c.FailVoer > 0 {
+		failOverTimeout := s.c.FailVoer.Seconds()
 		frameworkInfo.FailoverTimeout = &failOverTimeout
 	}
-	if cfg.Role != "" {
-		frameworkInfo.Role = &cfg.Role
+	if s.c.Role != "" {
+		frameworkInfo.Role = &s.c.Role
 	}
 	return frameworkInfo
 }

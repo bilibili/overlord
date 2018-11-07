@@ -4,6 +4,7 @@ import (
 	"flag"
 	"overlord/lib/etcd"
 	"overlord/mesos"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -15,6 +16,8 @@ var defConf = &mesos.Config{
 	Master:      "127.0.0.1:5050",
 	ExecutorURL: "http://127.0.0.1:8000/executor",
 	DBEndPoint:  "http://127.0.0.1:2379",
+	Checkpoint:  true,
+	FailVoer:    time.Hour,
 }
 
 func main() {
