@@ -57,7 +57,7 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	)
 
 	info.TplTree = make(map[string]string)
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/CacheType", instanceDir))
+	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/type", instanceDir))
 	if err != nil {
 		return
 	}

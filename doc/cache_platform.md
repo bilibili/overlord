@@ -15,13 +15,13 @@ overlord
     /config
         /cluster1
     /task
-        /task1
-            /$taskid/ # id was auto gen by etcd
+        /$taskid # id was auto gen by etcd
 
     /instances/$ip:$port/
+        /type (cache type,eg:redis,memcached,redis-cluster)
         /info
         /nodes.conf
-        /server.conf
+        /server.conf (服务配置文件 eg:redis.conf memcached.conf)
     /heartbeat
         /$ip:$port #维持服务心跳，通过refresh刷新ttl
     /framework #store framework id,in case of framework fault recover.
@@ -41,7 +41,7 @@ overlord
 * /cluster$i 为集群的具体配置
 
 * /task 为mesos的任务目录
-* /task$i 为任务id，value是任务详情 
+* /$taskid 为任务id，value是任务详情 
 * /instances 为单独设计的 instance 路径，辅助 ip/port 为后缀路径辅助定位
 			
 ## sheduler 设计
@@ -72,9 +72,9 @@ taskInfo.Data 存储 ip:port ,executor根据ip:port 定位到etcd获取对应的
 1. redis server binary 的存放路径为 `/data/lib/redis/4.0.8/bin/redis-server`
 2. memcache 的存放路径为 `/data/lib/memcache/1.5.10/bin/memcached`
 3. 多版本共存请修改 4.0.8(1.5.10) 到对应版本
-4. redis 的 working dir 位置 `/data/redis[_cluster]/${port}`
-5. redis 节点的配置文件约定为 `/data/redis/${port}/redis.conf`
-6. redis_cluster 节点的 `nodes.conf` 文件约定为 `/data/redis_cluster/${port}/nodes.conf`
+4. redis 的 working dir 位置 `/data/${port}`
+5. redis 节点的配置文件约定为 `/data/${port}/redis.conf`
+6. redis_cluster 节点的 `nodes.conf` 文件约定为 `/data/${port}/nodes.conf`
 7. redis 的 pid 文件为 `redis.pid` 放在 working dir 目录下。
 8. memcache 类似。
 9. 所有缓存服务都需要在 working dir 下维持一个 meta.toml 文件，用来存储类似 "cluster name"等节点信息。严格禁止并发修改这个文件。

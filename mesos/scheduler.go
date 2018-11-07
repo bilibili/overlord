@@ -50,7 +50,8 @@ func NewScheduler(c *Config, db *etcd.Etcd) *Scheduler {
 
 // Get get framework id from etcd if set.
 func (s *Scheduler) Get() (fid string, err error) {
-	return s.db.Get(context.TODO(), etcd.FRAMEWORK)
+	fid, _ = s.db.Get(context.TODO(), etcd.FRAMEWORK)
+	return
 }
 
 // Set framework id into etcd.
@@ -127,7 +128,7 @@ func (s *Scheduler) buildEventHandle() events.Handler {
 		scheduler.Event_UPDATE:  controller.AckStatusUpdates(s.cli).AndThen().HandleF(s.statusUpdate()),
 		scheduler.Event_SUBSCRIBED: eventrules.New(
 			logger,
-			controller.TrackSubscription(s, time.Second),
+			controller.TrackSubscription(s, time.Second*30),
 		),
 	}.Otherwise(logger.HandleEvent))
 }
