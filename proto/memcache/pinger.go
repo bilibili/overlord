@@ -42,10 +42,7 @@ func (m *mcPinger) Ping() (err error) {
 		err = errors.WithStack(ErrPingerPong)
 		return
 	}
-	if err = m.bw.Write(pingBytes); err != nil {
-		err = errors.WithStack(err)
-		return
-	}
+	m.bw.Write(pingBytes)
 	if err = m.bw.Flush(); err != nil {
 		err = errors.WithStack(err)
 		return

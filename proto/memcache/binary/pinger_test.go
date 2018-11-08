@@ -45,6 +45,15 @@ func TestPingerPing100Ok(t *testing.T) {
 	_causeEqual(t, bufio.ErrBufferFull, err)
 }
 
+func TestPingerFlushErr(t *testing.T) {
+	conn := _createRepeatConn(pongBs, 100)
+	c := conn.Conn.(*mockConn)
+	c.err = errors.New("some error")
+	pinger := NewPinger(conn)
+	err := pinger.Ping()
+	assert.EqualError(t, err, "some error")
+}
+
 func TestPingerClosed(t *testing.T) {
 	conn := _createRepeatConn(pongBs, 100)
 	pinger := NewPinger(conn)

@@ -62,14 +62,17 @@ func TestNodeConnWriteOk(t *testing.T) {
 	msg = proto.NewMessage()
 	req = newRequest("unsupport")
 	msg.WithRequest(req)
-	rnc := nc.(*nodeConn)
-	assert.NoError(t, rnc.Close())
-	assert.True(t, rnc.Closed())
-
 	err = nc.Write(msg)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+
+	msg = proto.NewMessage()
+	req = newRequest("GET")
+	msg.WithRequest(req)
+	nc.Close()
+	err = nc.Write(msg)
+	assert.Equal(t, ErrNodeConnClosed, errors.Cause(err))
 	err = nc.Flush()
-	assert.Error(t, err)
+	assert.Equal(t, ErrNodeConnClosed, errors.Cause(err))
 }
 
 func TestNodeConnWriteBadAssert(t *testing.T) {
@@ -108,6 +111,12 @@ func TestReadOk(t *testing.T) {
 	req := newRequest("GET", "a")
 	msg.WithRequest(req)
 	err := nc.Read(msg)
+	assert.NoError(t, err)
+
+	msg = proto.NewMessage()
+	req = newRequest("unsupport")
+	msg.WithRequest(req)
+	err = nc.Read(msg)
 	assert.NoError(t, err)
 }
 

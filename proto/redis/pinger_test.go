@@ -36,3 +36,12 @@ func TestPingerWrongResp(t *testing.T) {
 	err = p.Ping()
 	assert.Equal(t, ErrBadPong, errors.Cause(err))
 }
+
+func TestPingerPingErr(t *testing.T) {
+	conn := _createConn(pongBytes)
+	c := conn.Conn.(*mockConn)
+	c.err = errors.New("some error")
+	p := NewPinger(conn)
+	err := p.Ping()
+	assert.EqualError(t, err, "some error")
+}

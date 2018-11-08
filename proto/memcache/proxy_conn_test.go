@@ -28,6 +28,30 @@ func TestFindLengthParseLengthError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
+
+	i, err = findLength([]byte("VALUE\r\n"), true)
+	assert.Error(t, err)
+	assert.Equal(t, ErrBadLength, err)
+	assert.Equal(t, -1, i)
+
+	i, err = findLength([]byte("VALUE 0\r\n"), true)
+	assert.Error(t, err)
+	assert.Equal(t, ErrBadLength, err)
+	assert.Equal(t, -1, i)
+}
+
+func TestNextFeild(t *testing.T) {
+	b, e := nextField([]byte(" "))
+	assert.Equal(t, 1, b)
+	assert.Equal(t, 1, e)
+
+	b, e = nextField([]byte("get\r\n"))
+	assert.Equal(t, 0, b)
+	assert.Equal(t, 3, e)
+
+	b, e = nextField([]byte("get a\r\n"))
+	assert.Equal(t, 0, b)
+	assert.Equal(t, 3, e)
 }
 
 func TestLegalKeyOk(t *testing.T) {
