@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"errors"
 	"testing"
 
 	"overlord/proto"
@@ -351,4 +352,24 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			assert.Equal(t, tt.Except, buf[:size])
 		})
 	}
+}
+
+func TestProxyConnEncodeErr(t *testing.T) {
+	conn := _createConn(nil)
+	p := NewProxyConn(conn)
+	msg := proto.NewMessage()
+	msg.WithRequest(&mockReq{})
+	err := p.Encode(msg)
+	_causeEqual(t, ErrAssertReq, err)
+
+	msg = proto.NewMessage()
+	msg.WithRequest(newReq())
+	msg.WithError(errors.New("some error"))
+	err = p.Encode(msg)
+	assert.NoError(t, err)
+	p.Flush()
+	c := conn.Conn.(*mockConn)
+	buf := make([]byte, 1024)
+	c.wbuf.Read(buf)
+	assert.Equal(t, resopnseStatusInternalErrBytes, buf[6:8])
 }

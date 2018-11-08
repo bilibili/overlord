@@ -154,17 +154,17 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		_ = p.bw.Write(mcr.keyLen)
 		_ = p.bw.Write(mcr.extraLen)
 		_ = p.bw.Write(zeroBytes)
-		if err = m.Err(); err != nil {
+		if me := m.Err(); me != nil {
 			_ = p.bw.Write(resopnseStatusInternalErrBytes)
 		} else {
 			_ = p.bw.Write(mcr.status)
 		}
 		_ = p.bw.Write(mcr.bodyLen)
 		_ = p.bw.Write(mcr.opaque)
-		_ = p.bw.Write(mcr.cas)
+		err = p.bw.Write(mcr.cas)
 
 		if err == nil && !bytes.Equal(mcr.bodyLen, zeroFourBytes) {
-			_ = p.bw.Write(mcr.data)
+			err = p.bw.Write(mcr.data)
 		}
 	}
 	return
