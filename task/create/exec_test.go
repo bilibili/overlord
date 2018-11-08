@@ -1,17 +1,18 @@
 package create
 
-import "testing"
-import "github.com/stretchr/testify/assert"
+import (
+	"fmt"
+	"overlord/lib/etcd"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestCreateCatSleepOk(t *testing.T) {
 	info := &DeployInfo{
 		TaskID:    "12345",
 		CacheType: "redis",
 		Port:      4399,
-
-		ExecStart:   "sleep 1",
-		ExecStop:    "echo stopping...",
-		ExecRestart: "echo restarting...",
 		TplTree: map[string]string{
 			"/tmp/data/redis/4399/boynextdoor.md": "ass we can",
 		},
@@ -19,4 +20,11 @@ func TestCreateCatSleepOk(t *testing.T) {
 
 	err := SetupCacheService(info)
 	assert.NoError(t, err, "fail to create CatSleep process")
+}
+func TestGetDeployInfo(t *testing.T) {
+	etcd, err := etcd.New("http://172.22.33.167:2379")
+	assert.NoError(t, err)
+	info, err := GenDeployInfo(etcd, "172.22.33.175", 31000)
+	assert.NoError(t, err)
+	fmt.Printf("%v", info)
 }

@@ -3,7 +3,6 @@ package mesos
 import (
 	"container/list"
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -84,11 +83,25 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
-		var t task.Task
-		if err := json.Unmarshal([]byte(v), &t); err != nil {
-			log.Errorf("err task info err %v", err)
-			continue
+		fmt.Println(v)
+		t := task.Task{
+			Name:      v,
+			Version:   "4.0.11",
+			ID:        v,
+			CacheType: proto.CacheTypeRedisCluster,
+			Num:       6,
+			MaxMem:    1024,
+			I: &task.Instance{
+				Name:   v,
+				Memory: 1,
+				CPU:    0.01,
+			},
 		}
+		// var t task.Task
+		// if err := json.Unmarshal([]byte(v), &t); err != nil {
+		// 	log.Errorf("err task info err %v", err)
+		// 	continue
+		// }
 		s.task.PushBack(t)
 	}
 }
@@ -180,6 +193,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
+		fmt.Println("resource offer", offers)
 		for taskEle := s.task.Front(); taskEle != nil; {
 			t := taskEle.Value.(task.Task)
 			imem := t.I.Memory
@@ -188,6 +202,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			switch {
 			case t.CacheType == proto.CacheTypeRedisCluster:
 				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
+				fmt.Println("chunk", chunks, err)
 				if err != nil {
 					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
 					taskEle = taskEle.Next()
@@ -195,11 +210,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				}
 				var (
 					ofm     = make(map[string]ms.Offer)
-					tasks   []ms.TaskInfo
+					tasks   = make(map[string][]ms.TaskInfo)
 					offerid = make(map[ms.OfferID]struct{})
 				)
 				rtask := create.NewRedisClusterTask(s.db)
-				rtask.CreateCluster(&create.RedisClusterInfo{
+				err = rtask.CreateCluster(&create.RedisClusterInfo{
 					Chunks:      chunks,
 					MaxMemory:   t.MaxMem,
 					ClusterName: t.Name,
@@ -207,6 +222,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					Version:     t.Version,
 					MasterNum:   t.Num,
 				})
+				if err != nil {
+					fmt.Println(err)
+					return nil
+				}
+				fmt.Println(chunks)
 				for _, offer := range offers {
 					ofm[offer.GetHostname()] = offer
 				}
@@ -221,19 +241,21 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						offerid[ofm[node.Name].ID] = struct{}{}
-						tasks = append(tasks, task)
+						tasks[node.Name] = append(tasks[node.Name], task)
 					}
 				}
-				offerids := make([]ms.OfferID, len(offerid))
+				offerids := make([]ms.OfferID, 0, len(offerid))
 				for id := range offerid {
 					offerids = append(offerids, id)
 				}
-				accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks...)}.WithOffers(offerids...))
-				err = calls.CallNoData(ctx, s.cli, accept)
-				if err != nil {
-					log.Errorf("fail to lanch task err %v", err)
-					taskEle = taskEle.Next()
-					continue
+				for _, offer := range offers {
+					accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+					err = calls.CallNoData(ctx, s.cli, accept)
+					if err != nil {
+						log.Errorf("fail to lanch task err %v", err)
+						taskEle = taskEle.Next()
+						continue
+					}
 				}
 				ttask := taskEle
 				taskEle = taskEle.Next()
@@ -243,6 +265,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			case t.CacheType == proto.CacheTypeMemcache:
 			}
 		}
+		ofid := make([]ms.OfferID, len(offers))
+		for _, offer := range offers {
+			ofid = append(ofid, offer.ID)
+		}
+		decli := calls.Decline(ofid...)
+		calls.CallNoData(ctx, s.cli, decli)
 		return nil
 	}
 }
@@ -325,8 +353,9 @@ func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo
 		ExecutorID: ms.ExecutorID{Value: "default"},
 		Name:       &name,
 		Command: &ms.CommandInfo{
-			Value: pb.String("./executor"),
-			URIs:  executorUris,
+			Value:     pb.String("./executor"),
+			Arguments: []string{"-debug -log-vl 5 -std"},
+			URIs:      executorUris,
 		},
 		Resources: rs,
 	}

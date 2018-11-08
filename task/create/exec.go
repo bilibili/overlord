@@ -55,7 +55,8 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		instanceDir = fmt.Sprintf(InstancePath, ip, port)
 		workdir     = fmt.Sprintf(getDefaultServiceWorkDir(), port)
 	)
-
+	info = new(DeployInfo)
+	info.Port = port
 	info.TplTree = make(map[string]string)
 	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/type", instanceDir))
 	if err != nil {
@@ -274,7 +275,7 @@ func extractTarGz(baseDir string, gzipStream io.Reader) error {
 			}
 		default:
 			log.Errorf(
-				"ExtractTarGz: uknown type: %s in %s",
+				"ExtractTarGz: uknown type: %v in %s",
 				header.Typeflag,
 				header.Name)
 			return errors.New("uknown compression type")

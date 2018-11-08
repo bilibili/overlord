@@ -4,7 +4,7 @@ package etcd
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"strings"
 	"time"
 
 	"overlord/lib/log"
@@ -105,17 +105,17 @@ func (e *Etcd) Watch(ctx context.Context, k string) (ch chan string, err error) 
 	return
 }
 
-// GenID will generate new id with cas operation.
-func (e *Etcd) GenID(ctx context.Context, path string, value string) (int, error) {
+// GenID will generate new id str with cas operation.
+func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, error) {
 	resp, err := e.kapi.CreateInOrder(ctx, path, value, nil)
 	if err != nil {
-		return -1, err
+		return "", err
 	}
-	order, err := strconv.ParseInt(resp.Node.Key, 10, 64)
-	if err != nil {
-		return -1, err
+	idx := strings.LastIndexByte(resp.Node.Key, '/')
+	if idx == -1 {
+		return resp.Node.Key, nil
 	}
-	return int(order), nil
+	return resp.Node.Key[idx+1:], nil
 }
 
 // WatchOnExpire watch expire action in this dir.

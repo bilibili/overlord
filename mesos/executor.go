@@ -3,6 +3,7 @@ package mesos
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 
@@ -79,6 +80,7 @@ func New() *Executor {
 			callOptions...,
 		),
 	}
+	ec.db, _ = etcd.New("http://172.22.33.167:2379")
 	return ec
 }
 
@@ -86,8 +88,10 @@ func New() *Executor {
 func (ec *Executor) handleEvent(e *executor.Event) {
 	switch e.GetType() {
 	case executor.Event_SUBSCRIBED:
+		fmt.Println("lanch")
 		ec.subcribe(e)
 	case executor.Event_LAUNCH:
+		fmt.Println("event")
 		ec.lanch(e)
 	case executor.Event_SHUTDOWN:
 
@@ -107,16 +111,18 @@ func (ec *Executor) lanch(e *executor.Event) {
 		log.Error("err data")
 		return
 	}
-	port, err := strconv.ParseInt(string(data[idx:]), 10, 64)
+	port, err := strconv.ParseInt(string(data[idx+1:]), 10, 64)
 	if err != nil {
 		log.Error("err data")
 		return
 	}
 	dpinfo, err := create.GenDeployInfo(ec.db, string(data[:idx]), int(port))
+	fmt.Println("dpinfo", dpinfo, err)
 	if err != nil {
 		return
 	}
 	err = create.SetupCacheService(dpinfo)
+	fmt.Println("setup err", err)
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
 		return

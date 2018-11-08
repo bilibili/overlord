@@ -16,3 +16,10 @@ type Config struct {
 
 	ExecutorURL string
 }
+
+// TaskData encdoing to byte and send by task.
+type TaskData struct {
+	IP         string
+	Port       int
+	DBEndPoint string
+}

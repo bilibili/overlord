@@ -32,7 +32,7 @@ func checkSafe(action ActionType) bool {
 
 // Run limited allowed command
 func Run(serviceName string, action ActionType) error {
-	if checkSafe(action) {
+	if !checkSafe(action) {
 		return ErrNotSupportAction
 	}
 	cmd := exec.Command("systemctl", string(action), serviceName)

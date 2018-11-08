@@ -40,7 +40,7 @@ type RedisClusterInfo struct {
 
 	Chunks []*chunk.Chunk
 
-	IDMap map[string]map[int]int
+	IDMap map[string]map[int]string
 }
 
 // RedisClusterTask description a task for create new cluster.
@@ -76,10 +76,14 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 			instanceDir := fmt.Sprintf(InstancePath, node.Name, node.Port)
 
 			err := c.e.Mkdir(ctx, instanceDir)
-			if err != nil {
-				return err
-			}
 
+			// if err != nil {
+			// 	return err
+			// }
+			c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), "redis_cluster")
+			// if err != nil {
+			// 	return err
+			// }
 			content := chunk.GenNodesConfFile(node.Name, node.Port, info.Chunks)
 			err = c.e.Set(ctx, fmt.Sprintf("%s/nodes.conf", instanceDir), content)
 			if err != nil {
@@ -153,7 +157,8 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 	for _, chunk := range info.Chunks {
 		for _, node := range chunk.Nodes {
 			id := info.IDMap[node.Name][node.Port]
-			node.RunID = fmt.Sprintf("%x", id)
+			node.RunID = id
+			fmt.Println(node)
 		}
 		chunk.Nodes[1].SlaveOf = chunk.Nodes[2].RunID
 		chunk.Nodes[3].SlaveOf = chunk.Nodes[0].RunID
@@ -163,7 +168,7 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
 	path := fmt.Sprintf(ClusterInstancesPath, info.ClusterName)
 	hostmap := chunk.GetHostCountInChunks(info.Chunks)
-	idMap := make(map[string]map[int]int)
+	idMap := make(map[string]map[int]string)
 	for node, ports := range hostmap {
 		for _, port := range ports {
 			addr := fmt.Sprintf("%s:%d", node, port)
@@ -175,11 +180,11 @@ func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
 			if maps, ok := idMap[node]; ok {
 				maps[port] = id
 			} else {
-				idMap[addr] = map[int]int{port: id}
+				idMap[node] = map[int]string{port: id}
 			}
 		}
 	}
 	info.IDMap = idMap
-
+	fmt.Println(info.IDMap)
 	return nil
 }
