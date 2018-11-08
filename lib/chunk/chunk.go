@@ -207,15 +207,28 @@ func (c *Chunk) String() string {
 	return sb.String()
 }
 
-func links2Chuks(links []link, portsMap map[string][]int) []*Chunk {
+func links2Chunks(links []link, portsMap map[string][]int) []*Chunk {
 	chunks := make([]*Chunk, len(links))
+	portsCountMap := make(map[string]int)
+	for name := range portsMap {
+		portsCountMap[name] = 0
+	}
+
 	for i, link := range links {
+		var (
+			baseCount   = portsCountMap[link.Base]
+			linkToCount = portsCountMap[link.LinkTo]
+		)
+
 		nodes := []*Node{
-			{Name: link.Base, Port: portsMap[link.Base][0], Role: RoleMaster, SlaveOf: "-"},
-			{Name: link.Base, Port: portsMap[link.Base][1], Role: RoleSlave},
-			{Name: link.LinkTo, Port: portsMap[link.LinkTo][0], Role: RoleMaster, SlaveOf: "-"},
-			{Name: link.LinkTo, Port: portsMap[link.LinkTo][1], Role: RoleSlave},
+			{Name: link.Base, Port: portsMap[link.Base][baseCount], Role: RoleMaster, SlaveOf: "-"},
+			{Name: link.Base, Port: portsMap[link.Base][baseCount+1], Role: RoleSlave},
+			{Name: link.LinkTo, Port: portsMap[link.LinkTo][linkToCount], Role: RoleMaster, SlaveOf: "-"},
+			{Name: link.LinkTo, Port: portsMap[link.LinkTo][linkToCount+1], Role: RoleSlave},
 		}
+		portsCountMap[link.Base] = baseCount + 2
+		portsCountMap[link.LinkTo] = linkToCount + 2
+
 		chunks[i] = &Chunk{nodes}
 	}
 	return chunks
@@ -303,7 +316,7 @@ func Chunks(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*C
 	}
 
 	portsMap := mapIntoPortsMap(offers)
-	chunks = links2Chuks(links, portsMap)
+	chunks = links2Chunks(links, portsMap)
 	return
 }
 
