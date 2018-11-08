@@ -141,13 +141,23 @@ func (c *RedisClusterTask) divideSlots(info *RedisClusterInfo) {
 
 	for _, cc := range info.Chunks {
 		for _, node := range cc.Nodes {
+			if node.Role == chunk.RoleSlave {
+				node.Slots = []chunk.Slot{}
+				continue
+			}
+
 			sc := per
-			if cursor <= left {
+			if cursor < left {
 				sc++
 			}
 
-			node.Slots = []chunk.Slot{{Begin: base, End: base + sc}}
-			base += sc
+			end := base + sc
+			if end >= ClusterSlotsCount {
+				end = ClusterSlotsCount - 1
+			}
+
+			node.Slots = []chunk.Slot{{Begin: base, End: end}}
+			base = end + 1
 			cursor++
 		}
 	}
