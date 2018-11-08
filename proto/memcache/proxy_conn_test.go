@@ -200,11 +200,20 @@ func TestEncodeErr(t *testing.T) {
 	p := NewProxyConn(conn)
 	err := p.Encode(msg)
 	assert.Error(t, err)
+
 	msg = proto.NewMessage()
 	msg.Type = proto.CacheTypeMemcache
 	msg.WithRequest(&mockReq{})
 	err = p.Encode(msg)
 	assert.NoError(t, err)
+
+	msg = proto.NewMessage()
+	msg.Type = proto.CacheTypeMemcache
+	msg.WithRequest(&mockReq{})
+	msg.WithRequest(&mockReq{}) // NOTE: batch
+	err = p.Encode(msg)
+	assert.NoError(t, err)
+
 	p.Flush()
 	c := conn.Conn.(*mockConn)
 	buf := make([]byte, 1024)

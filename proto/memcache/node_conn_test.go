@@ -149,6 +149,9 @@ func TestNodeConnWriteClosed(t *testing.T) {
 	_causeEqual(t, ErrClosed, err)
 	assert.NoError(t, nc.Close())
 	_causeEqual(t, ErrClosed, nc.Write(nil))
+	err = nc.Flush()
+	assert.Error(t, err)
+	_causeEqual(t, ErrClosed, err)
 }
 
 type mockReq struct {
@@ -241,6 +244,22 @@ func TestNodeConnReadHasErr(t *testing.T) {
 
 	err := nc.Read(msg)
 	assert.EqualError(t, errors.Cause(err), "read error")
+}
+
+func TestNodeConnFindLengthErr(t *testing.T) {
+	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn([]byte("VALUE mykey 0 a\r\nEND\r\n"))
+
+	err := nc.Read(msg)
+	_causeEqual(t, ErrBadLength, errors.Cause(err))
+}
+
+func TestNodeConnReadExtraErr(t *testing.T) {
+	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
+	nc := _createNodeConn([]byte("VALUE mykey 0 3\r\n"))
+
+	err := nc.Read(msg)
+	assert.EqualError(t, errors.Cause(err), "EOF")
 }
 
 func TestNodeConnReadBufFull(t *testing.T) {
