@@ -223,13 +223,51 @@ func TestNodeConnReadOk(t *testing.T) {
 	}
 }
 
-func TestNodeConnAssertError(t *testing.T) {
+func TestNodeConnError(t *testing.T) {
 	nc := _createNodeConn(nil)
 	msg := proto.NewMessage()
 	msg.WithRequest(&mockReq{})
 
 	err := nc.Read(msg)
 	_causeEqual(t, ErrAssertReq, err)
+
+	notLenBs := []byte{
+		0x80,       // magic
+		0x0c,       // cmd
+		0x00, 0x00, // key len
+		0x00,       // extra len
+		0x00,       // data type
+		0x00, 0x00, // vbucket
+		0x00, 0x00, 0x00, 0x00, // body len
+		0x00, 0x00, 0x00, 0x00, // opaque
+		// 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+		// 0x41, 0x42, 0x43, // key: ABC
+	}
+	msg = proto.NewMessage()
+	req := newReq()
+	msg.WithRequest(req)
+	nc = _createNodeConn(notLenBs)
+	err = nc.Read(msg)
+	assert.EqualError(t, err, "EOF")
+
+	notLenBs = []byte{
+		0x80,       // magic
+		0x0c,       // cmd
+		0x00, 0x03, // key len
+		0x00,       // extra len
+		0x00,       // data type
+		0x00, 0x00, // vbucket
+		0x00, 0x00, 0x00, 0x06, // body len
+		0x00, 0x00, 0x00, 0x00, // opaque
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // cas
+		0x41, 0x42, 0x43, // key: ABC
+	}
+	msg = proto.NewMessage()
+	req = newReq()
+	msg.WithRequest(req)
+	nc = _createNodeConn(notLenBs)
+	err = nc.Read(msg)
+	assert.EqualError(t, err, "EOF")
 }
 
 func TestNewNodeConnWithClosedBinder(t *testing.T) {
