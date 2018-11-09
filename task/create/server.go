@@ -64,7 +64,9 @@ func (c *RedisClusterTask) CreateCluster(info *RedisClusterInfo) error {
 	c.divideSlots(info)
 	c.setupSlaveOf(info)
 	// create new redis etcd tpl files
-	return c.buildTplTree(info)
+	err = c.buildTplTree(info)
+
+	return err
 }
 
 func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
@@ -75,7 +77,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 		for _, node := range cc.Nodes {
 			instanceDir := fmt.Sprintf(InstancePath, node.Name, node.Port)
 
-			err := c.e.Mkdir(ctx, instanceDir)
+			_ = c.e.Mkdir(ctx, instanceDir)
 
 			// if err != nil {
 			// 	return err
@@ -85,7 +87,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 			// 	return err
 			// }
 			content := chunk.GenNodesConfFile(node.Name, node.Port, info.Chunks)
-			err = c.e.Set(ctx, fmt.Sprintf("%s/nodes.conf", instanceDir), content)
+			err := c.e.Set(ctx, fmt.Sprintf("%s/nodes.conf", instanceDir), content)
 			if err != nil {
 				return err
 			}
@@ -118,6 +120,12 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 				return err
 			}
 
+			// write role info
+			err = c.e.Set(ctx, fmt.Sprintf("%s/role", instanceDir), node.Role)
+			if err != nil {
+				return err
+			}
+
 			err = c.e.Set(ctx, fmt.Sprintf("%s/taskid", instanceDir), info.TaskID)
 			if err != nil {
 				return err
@@ -127,6 +135,19 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func (c *RedisClusterTask) waitConsist(info *RedisClusterInfo) error {
+	for _, cc := range info.Chunks {
+		for _, node := range cc.Nodes {
+			if node.Role != chunk.RoleMaster {
+				continue
+			}
+
 		}
 	}
 

@@ -47,6 +47,11 @@ func (n *Node) String() string {
 	return fmt.Sprintf("Node<Name=%s, Port=%d, Role=%s>", n.Name, n.Port, n.Role)
 }
 
+// Addr get the node addr contians ip:port
+func (n *Node) Addr() string {
+	return fmt.Sprintf("%s:%d", n.Name, n.Port)
+}
+
 const epochSet = "vars currentEpoch 0 lastVoteEpoch 0"
 
 // GenNodesConfFile will gennerate nodes.conf file content

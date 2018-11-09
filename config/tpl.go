@@ -29,7 +29,6 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/data/lib/redis/{{.Version}}/bin/redis-server /data/%i/redis.conf
-ExecStop=/data/lib/redis/{{.Version}}/bin/redis-cli -p %i shutdown
 WorkingDirectory=/data/%i/
 
 [Install]
