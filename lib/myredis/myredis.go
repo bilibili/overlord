@@ -17,9 +17,14 @@ var (
 	ErrNoNode = errors.New("node not exists in cluster")
 )
 
-// New create new Client
-func New(chunks []*chunk.Chunk) *Client {
-	return nil
+// New create client with singleton node.
+func New() *Client {
+	return &Client{cluster: &cluster{make(map[string]*node)}}
+}
+
+// NewWithChunks create new Client
+func NewWithChunks(chunks []*chunk.Chunk) *Client {
+	return &Client{chunks: chunks, cluster: &cluster{make(map[string]*node)}}
 }
 
 // Client is the myredis manager client.
@@ -38,6 +43,26 @@ func (c *Client) Close() error {
 		}
 	}
 	return err
+}
+
+// Info get the info of client
+func (c *Client) Info(node string) (map[string]string, error) {
+	n := c.cluster.getNode(node)
+	cmd, err := n.execute("INFO ALL")
+	if err != nil {
+		return nil, err
+	}
+	info := make(map[string]string)
+	lines := strings.Split(string(cmd.reply.data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		lsp := strings.Split(line, ":")
+		info[lsp[0]] = lsp[1]
+	}
+
+	return info, nil
 }
 
 // Execute will trying to execute command to the given node.
@@ -236,6 +261,5 @@ func parseSlots(data []byte) ([]string, error) {
 			}
 		}
 	}
-
 	return slots, nil
 }
