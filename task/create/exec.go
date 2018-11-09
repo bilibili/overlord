@@ -284,11 +284,11 @@ func extractTarGz(baseDir string, gzipStream io.Reader) error {
 	return nil
 }
 
-func buildServiceName(cacheType proto.CacheType, port int) string {
+func buildServiceName(cacheType proto.CacheType, version string, port int) string {
 	if cacheType == proto.CacheTypeMemcache {
-		return fmt.Sprintf("memcache@%d.service", port)
+		return fmt.Sprintf("memcache-%s@%d.service", version, port)
 	}
-	return fmt.Sprintf("redis@%d.service", port)
+	return fmt.Sprintf("redis-%s@%d.service", version, port)
 }
 
 func setupSystemdServiceFile(info *DeployInfo) error {
@@ -356,6 +356,7 @@ func SetupCacheService(info *DeployInfo) error {
 		}
 	}
 	// 3. spawn a new redis cluster service
-	serviceName := buildServiceName(info.CacheType, info.Port)
+	serviceName := buildServiceName(info.CacheType, info.Version, info.Port)
+	log.Infof("setup service(%v)", serviceName)
 	return systemd.Start(serviceName)
 }

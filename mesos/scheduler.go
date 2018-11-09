@@ -3,6 +3,7 @@ package mesos
 import (
 	"container/list"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -123,8 +124,8 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 		ID:         &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
 		Checkpoint: &s.c.Checkpoint,
 	}
-	if s.c.FailVoer > 0 {
-		failOverTimeout := s.c.FailVoer.Seconds()
+	if s.c.FailOver > 0 {
+		failOverTimeout := time.Duration(s.c.FailOver).Seconds()
 		frameworkInfo.FailoverTimeout = &failOverTimeout
 	}
 	if s.c.Role != "" {
@@ -240,6 +241,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							Resources: makeResources(icpu, imem, uint64(node.Port)),
 							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
+						data := &TaskData{
+							IP:         node.Name,
+							Port:       node.Port,
+							DBEndPoint: s.c.DBEndPoint,
+						}
+						task.Data, _ = json.Marshal(data)
 						offerid[ofm[node.Name].ID] = struct{}{}
 						tasks[node.Name] = append(tasks[node.Name], task)
 					}

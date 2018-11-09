@@ -18,6 +18,7 @@ var runMode = RunModeTest
 func SetRunMode(mode RunModeType) {
 	if mode == RunModeProd || mode == RunModePreProd || mode == RunModeTest {
 		runMode = mode
+		return
 	}
 	panic("fail to setup unsupport run-mode")
 }

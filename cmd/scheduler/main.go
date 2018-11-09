@@ -14,10 +14,10 @@ var defConf = &mesos.Config{
 	User:        "root",
 	Name:        "test",
 	Master:      "127.0.0.1:5050",
-	ExecutorURL: "http://10.23.170.136:8000/executor",
+	ExecutorURL: "http://127.0.0.1:8000/executor",
 	DBEndPoint:  "http://127.0.0.1:2379",
 	Checkpoint:  true,
-	FailVoer:    time.Hour,
+	FailOver:    mesos.Duration(time.Hour),
 }
 
 func main() {
@@ -25,7 +25,10 @@ func main() {
 	flag.Parse()
 	conf := new(mesos.Config)
 	if confPath != "" {
-		toml.DecodeFile(confPath, &conf)
+		_, err := toml.DecodeFile(confPath, &conf)
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		conf = defConf
 	}

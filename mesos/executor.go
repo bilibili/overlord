@@ -1,11 +1,9 @@
 package mesos
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"encoding/json"
 	"net/url"
-	"strconv"
 
 	"time"
 
@@ -88,11 +86,20 @@ func New() *Executor {
 func (ec *Executor) handleEvent(e *executor.Event) {
 	switch e.GetType() {
 	case executor.Event_SUBSCRIBED:
-		fmt.Println("lanch")
 		ec.subcribe(e)
 	case executor.Event_LAUNCH:
-		fmt.Println("event")
-		ec.lanch(e)
+		err := ec.lanch(e)
+		task := e.Launch.Task
+		status := ec.newStatus(task.TaskID)
+		if err != nil {
+			status.State = ms.TASK_FAILED.Enum()
+		} else {
+			status.State = ms.TASK_RUNNING.Enum()
+		}
+		err = ec.update(status)
+		if err != nil {
+			log.Errorf("update lanch status fail %v ", err)
+		}
 	case executor.Event_SHUTDOWN:
 
 	}
@@ -104,36 +111,28 @@ func (ec *Executor) subcribe(e *executor.Event) {
 	ec.agent = e.Subscribed.AgentInfo
 }
 
-func (ec *Executor) lanch(e *executor.Event) {
+func (ec *Executor) lanch(e *executor.Event) (err error) {
 	data := e.GetLaunch().Task.GetData()
-	idx := bytes.IndexByte(data, ':')
-	if idx == -1 {
-		log.Error("err data")
+	tdata := new(TaskData)
+	if err = json.Unmarshal(data, tdata); err != nil {
+		log.Errorf("err task data %v", err)
 		return
 	}
-	port, err := strconv.ParseInt(string(data[idx+1:]), 10, 64)
+	ec.db, err = etcd.New(tdata.DBEndPoint)
 	if err != nil {
-		log.Error("err data")
+		log.Errorf("new db endpoint fail err %v", err)
 		return
 	}
-	dpinfo, err := create.GenDeployInfo(ec.db, string(data[:idx]), int(port))
-	fmt.Println("dpinfo", dpinfo, err)
+	dpinfo, err := create.GenDeployInfo(ec.db, tdata.IP, tdata.Port)
 	if err != nil {
+		log.Errorf("get deploy info err %v", err)
 		return
 	}
 	err = create.SetupCacheService(dpinfo)
-	fmt.Println("setup err", err)
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
-		return
 	}
-	task := e.Launch.Task
-	status := ec.newStatus(task.TaskID)
-	status.State = ms.TASK_RUNNING.Enum()
-	err = ec.update(status)
-	if err != nil {
-		log.Errorf("update lanch status fail %v ", err)
-	}
+	return
 }
 
 // Subscribe start executor subcribe.

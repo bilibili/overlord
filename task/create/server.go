@@ -81,9 +81,9 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 			// 	return err
 			// }
 			c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), "redis_cluster")
-			// if err != nil {
-			// 	return err
-			// }
+			if err != nil {
+				return err
+			}
 			content := chunk.GenNodesConfFile(node.Name, node.Port, info.Chunks)
 			err = c.e.Set(ctx, fmt.Sprintf("%s/nodes.conf", instanceDir), content)
 			if err != nil {
