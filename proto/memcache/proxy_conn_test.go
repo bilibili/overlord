@@ -218,12 +218,13 @@ func TestProxyConnEncodeOk(t *testing.T) {
 }
 
 func TestEncodeErr(t *testing.T) {
-	msg := proto.NewMessage()
-	msg.WithError(fmt.Errorf("SERVER_ERR"))
 	conn := _createConn(nil)
 	p := NewProxyConn(conn)
+
+	msg := proto.NewMessage()
+	msg.WithError(fmt.Errorf("SERVER_ERR"))
 	err := p.Encode(msg)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 
 	msg = proto.NewMessage()
 	msg.Type = proto.CacheTypeMemcache
