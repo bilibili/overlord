@@ -33,6 +33,11 @@ type Client struct {
 	cluster *cluster
 }
 
+// SetChunks set the chunks as given
+func (c *Client) SetChunks(chunks []*chunk.Chunk) {
+	c.chunks = chunks
+}
+
 // Close will close the whole client
 func (c *Client) Close() error {
 	var err error
