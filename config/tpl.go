@@ -27,8 +27,7 @@ Description=Cache Redis node.
 After=network.target
 
 [Service]
-Type=forking
-PIDFile=/data/%i/redis.pid
+Type=simple
 ExecStart=/data/lib/redis/{{.Version}}/bin/redis-server /data/%i/redis.conf
 ExecStop=/data/lib/redis/{{.Version}}/bin/redis-cli -p %i shutdown
 WorkingDirectory=/data/%i/
@@ -48,8 +47,8 @@ port {{.Port}}
 tcp-backlog 65535
 timeout 0
 tcp-keepalive 300
-daemonize yes
-supervised systemd
+daemonize no
+supervised no
 pidfile redis.pid
 loglevel notice
 logfile ""
