@@ -341,21 +341,21 @@ func revSpacIdx(bs []byte) int {
 // Encode encode response and write into writer.
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
 	if !m.IsBatch() {
-		if err = m.Err(); err != nil {
-			se := errors.Cause(err).Error()
+		if me := m.Err(); me != nil {
+			se := errors.Cause(me).Error()
 			_ = p.bw.Write(serverErrorBytes)
 			_ = p.bw.Write([]byte(se))
-			_ = p.bw.Write(crlfBytes)
+			err = p.bw.Write(crlfBytes)
 			return
 		}
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
 			_ = p.bw.Write(serverErrorBytes)
 			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-			_ = p.bw.Write(crlfBytes)
+			err = p.bw.Write(crlfBytes)
 			return
 		}
-		_ = p.bw.Write(mcr.data)
+		err = p.bw.Write(mcr.data)
 		return
 	}
 	for _, req := range m.Requests() {
@@ -363,7 +363,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		if !ok {
 			_ = p.bw.Write(serverErrorBytes)
 			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-			_ = p.bw.Write(crlfBytes)
+			err = p.bw.Write(crlfBytes)
 			return
 		}
 		var bs []byte
@@ -377,7 +377,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		}
 		_ = p.bw.Write(bs)
 	}
-	_ = p.bw.Write(endBytes)
+	err = p.bw.Write(endBytes)
 	return
 }
 

@@ -83,7 +83,7 @@ func main() {
 		panic(err)
 	}
 	defer p.Close()
-	go p.Serve(ccs)
+	p.Serve(ccs)
 	// pprof
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)
