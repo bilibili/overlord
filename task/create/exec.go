@@ -41,6 +41,7 @@ type DeployInfo struct {
 
 	Port    int
 	Version string
+	Role string
 
 	// TplTree is the Tree which contains a key as path of the file,
 	// and value as the content of the file.
@@ -65,6 +66,12 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	info.CacheType = proto.CacheType(val)
 
 	if info.CacheType == proto.CacheTypeRedisCluster {
+		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/role", instanceDir))
+		if err != nil {
+			return
+		}
+		info.Role = val
+
 		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
 
 		if err != nil {
@@ -77,6 +84,7 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
+
 	} else if info.CacheType == proto.CacheTypeRedis {
 		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
 		if err != nil {
