@@ -60,6 +60,7 @@ func (s *Scheduler) Set(fid string) (err error) {
 }
 
 // Run scheduler and watch at task dir for task info.
+// call run to start scheduler.
 func (s *Scheduler) Run() (err error) {
 	// watch task dir to get new task.
 	ch, err := s.db.Watch(context.Background(), etcd.TASKDIR)
@@ -104,6 +105,9 @@ func (s *Scheduler) taskEvent() {
 		// 	continue
 		// }
 		s.task.PushBack(t)
+		// revive offer when task comming.
+		revice := calls.Revive()
+		calls.CallNoData(context.Background(), s.cli, revice)
 	}
 }
 
@@ -194,7 +198,6 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
-		fmt.Println("resource offer", offers)
 		for taskEle := s.task.Front(); taskEle != nil; {
 			t := taskEle.Value.(task.Task)
 			imem := t.I.Memory
@@ -203,12 +206,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			switch {
 			case t.CacheType == proto.CacheTypeRedisCluster:
 				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
-				fmt.Println("chunk", chunks, err)
 				if err != nil {
 					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
 					taskEle = taskEle.Next()
 					continue
 				}
+				log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
 				var (
 					ofm     = make(map[string]ms.Offer)
 					tasks   = make(map[string][]ms.TaskInfo)
@@ -224,21 +227,21 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					MasterNum:   t.Num,
 				})
 				if err != nil {
-					fmt.Println(err)
+					log.Errorf("create cluster err %v", err)
 					return nil
 				}
-				fmt.Println(chunks)
 				for _, offer := range offers {
 					ofm[offer.GetHostname()] = offer
 				}
 				for _, ck := range chunks {
 					for _, node := range ck.Nodes {
 						task := ms.TaskInfo{
-							Name:      node.Name,
-							TaskID:    ms.TaskID{Value: node.RunID},
-							AgentID:   ofm[node.Name].AgentID,
-							Executor:  s.buildExcutor(node.Name, []ms.Resource{}),
-							Resources: makeResources(icpu, imem, uint64(node.Port)),
+							Name:     node.Name,
+							TaskID:   ms.TaskID{Value: node.RunID},
+							AgentID:  ofm[node.Name].AgentID,
+							Executor: s.buildExcutor(node.Name, []ms.Resource{}),
+							//  plus the port obtained by adding 10000 to the data port for redis cluster.
+							Resources: makeResources(icpu, imem, uint64(node.Port), uint64(node.Port+10000)),
 							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						data := &TaskData{
@@ -250,10 +253,6 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 						offerid[ofm[node.Name].ID] = struct{}{}
 						tasks[node.Name] = append(tasks[node.Name], task)
 					}
-				}
-				offerids := make([]ms.OfferID, 0, len(offerid))
-				for id := range offerid {
-					offerids = append(offerids, id)
 				}
 				for _, offer := range offers {
 					accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
@@ -272,83 +271,30 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			case t.CacheType == proto.CacheTypeMemcache:
 			}
 		}
+		// if there don't have any task,decline all offers and suppress offer envent.
+		// until task comming and call revive to schedule new workloads by taskevent.
 		ofid := make([]ms.OfferID, len(offers))
 		for _, offer := range offers {
 			ofid = append(ofid, offer.ID)
 		}
 		decli := calls.Decline(ofid...)
 		calls.CallNoData(ctx, s.cli, decli)
+		suppress := calls.Suppress()
+		calls.CallNoData(ctx, s.cli, suppress)
 		return nil
 	}
 }
 
-// func (s *Scheduler) resourceOffers() events.HandlerFunc {
-// 	return func(ctx context.Context, e *scheduler.Event) error {
-// 		var (
-// 			offers = e.GetOffers().GetOffers()
-// 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
-// 		)
-// 		for i, offer := range offers {
-// 			memRes := filterResource(offer.Resources, "mem")
-// 			mems := 0.0
-// 			for _, mem := range memRes {
-// 				mems += mem.GetScalar().GetValue()
-// 			}
-// 			log.Infof("Recived offer with MEM=%v", mems)
-// 			var tasks []ms.TaskInfo
-// 			for taskEle := s.task.Front(); taskEle != nil; {
-// 				task := taskEle.Value.(Task)
-// 				tkMem := float64(task.I.Memory)
-// 				if tkMem <= mems {
-// 					tskID := ms.TaskID{Value: strconv.FormatInt(rand.Int63(), 10)}
-// 					memsosTsk := ms.TaskInfo{
-// 						Name:     task.Name,
-// 						TaskID:   tskID,
-// 						AgentID:  offer.AgentID,
-// 						Executor: s.buildExcutor(task.Name, []ms.Resource{}),
-// 						// TODO:find suitable resource.
-// 						Resources: buildWantsExecutorResources(task.I.CPU, task.I.Memory),
-// 					}
-// 					cTask := taskEle
-// 					taskEle = taskEle.Next()
-// 					s.task.Remove(cTask)
-// 					tasks = append(tasks, memsosTsk)
-// 				} else {
-// 					taskEle = taskEle.Next()
-// 				}
-// 			}
-// 			if len(tasks) > 0 {
-// 				accept := calls.Accept(
-// 					calls.OfferOperations{calls.OpLaunch(tasks...)}.WithOffers(offers[i].ID),
-// 				) //.With(callOption)
-// 				err := calls.CallNoData(ctx, s.cli, accept)
-// 				if err != nil {
-// 					log.Errorf("failed to lanch task :%v", err)
-// 				}
-// 			} else {
-// 				decli := calls.Decline(offers[i].ID)
-// 				calls.CallNoData(ctx, s.cli, decli)
-// 			}
-// 		}
-// 		return nil
-// 	}
-// }
-
-func filterResource(rs []ms.Resource, filter string) (fs []ms.Resource) {
-	for _, r := range rs {
-		if r.GetName() == filter {
-			fs = append(fs, r)
-		}
-	}
-	return
-}
-
-func makeResources(cpu, mem float64, port uint64) (r ms.Resources) {
+func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	r.Add(
 		resources.NewCPUs(cpu).Resource,
 		resources.NewMemory(mem).Resource,
-		resources.Build().Ranges(ms.NewRanges(port)).Resource,
 	)
+	portRange := resources.BuildRanges()
+	for _, port := range ports {
+		portRange.Span(port, port+1)
+	}
+	r.Add(resources.Build().Name(resources.NamePorts).Ranges(portRange.Ranges).Resource)
 	return
 }
 
@@ -376,13 +322,13 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		if m := s.GetMessage(); m != "" {
 			msg += " with message '" + m + "'"
 		}
-		fmt.Println(msg)
+		log.Info(msg)
 
 		switch st := s.GetState(); st {
 		case ms.TASK_FINISHED:
-			fmt.Println("state finish")
+			log.Info("state finish")
 		case ms.TASK_LOST, ms.TASK_KILLED, ms.TASK_FAILED, ms.TASK_ERROR:
-			fmt.Println("Exiting because task " + s.GetTaskID().Value +
+			log.Info("Exiting because task " + s.GetTaskID().Value +
 				" is in an unexpected state " + st.String() +
 				" with reason " + s.GetReason().String() +
 				" from source " + s.GetSource().String() +

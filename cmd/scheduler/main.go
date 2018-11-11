@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"overlord/lib/etcd"
+	"overlord/lib/log"
 	"overlord/mesos"
 	"time"
 
@@ -21,6 +22,7 @@ var defConf = &mesos.Config{
 }
 
 func main() {
+	log.Init(log.NewStdHandler())
 	flag.StringVar(&confPath, "conf", "", "scheduler conf")
 	flag.Parse()
 	conf := new(mesos.Config)

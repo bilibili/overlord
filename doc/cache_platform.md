@@ -121,3 +121,8 @@ redis4-0-3.service
 systemctl start redis5-0-0@6379.service // 启动监听端口为6379的redis
 systemctl start redis5-0-0@16379.service // 启动监听端口为16379的redis
 ```
+
+## mesos 部署说明
+### mesos agent部署配置
+1.需要保证resources端口范围服务redis cluster端口要求。eg(--resources='ports:[21000-24000,31000-34000]')redis cluster默认监听 端口为port以及port+10000
+2.设置 --hostname_lookup=false ,使用ip作为agent hostname。缓存节点通过hostname ip加上分配的端口号进行访问
