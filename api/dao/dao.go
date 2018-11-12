@@ -5,8 +5,7 @@ import (
 	"overlord/api/model"
 	"overlord/config"
 	"overlord/lib/etcd"
-
-	"github.com/pkg/errors"
+	"overlord/lib/log"
 )
 
 // New create new dao layer
@@ -26,28 +25,32 @@ type Dao struct {
 }
 
 // CreateCluster will create new cluster
-func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (int64, error) {
+func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string, error) {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// check if master num is even
-	if p.MasterNum%2 == 0 {
-		return -1, ErrMasterNumMustBeEven
+	if p.MasterNum%2 != 0 {
+		log.Info("cluster master number is odd")
+		return "", ErrMasterNumMustBeEven
 	}
 
 	err := d.checkClusterName(p.Name)
 	if err != nil {
-		return -1, errors.WithStack(err)
+		log.Info("cluster name must be unique")
+		return "", err
 	}
 
 	err = d.checkVersion(p.Version)
 	if err != nil {
-		return -1, errors.WithStack(err)
+		log.Info("version must be exists")
+		return "", err
 	}
 
 	t, err := d.createCreateClusterTask(p)
 	if err != nil {
-		return -1, err
+		log.Infof("create fail due to %s", err)
+		return "", err
 	}
 
 	return d.saveTask(subctx, t)

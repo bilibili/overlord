@@ -1,11 +1,8 @@
 package server
 
 import (
-	"overlord/api/model"
 	"overlord/api/service"
 	"overlord/config"
-
-	"net/http"
 
 	"overlord/lib/log"
 
@@ -30,19 +27,8 @@ func Run(cfg *config.ServerConfig, s *service.Service) {
 func initRouter(e *gin.Engine) {
 	clusters := e.Group("/clusters")
 	clusters.POST("/", createCluster)
-}
+	clusters.GET("/", getCluster)
 
-func createCluster(c *gin.Context) {
-	p := new(model.ParamCluster)
-	if err := c.Bind(p); err != nil {
-		return
-	}
-
-	taskid, err := svc.CreateCluster(p)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, map[string]int{"task_id": int(taskid)})
+	tasks := e.Group("/tasks")
+	tasks.GET("/:task_id", getTask)
 }

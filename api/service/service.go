@@ -24,6 +24,11 @@ type Service struct {
 }
 
 // CreateCluster will create new cluster
-func (s *Service) CreateCluster(p *model.ParamCluster) (int64, error) {
+func (s *Service) CreateCluster(p *model.ParamCluster) (string, error) {
 	return s.d.CreateCluster(context.Background(), p)
+}
+
+// GetTask will get task by given taskID string
+func (s *Service) GetTask(taskID string) (*model.Task, error) {
+	return s.d.GetTask(context.Background(), taskID)
 }

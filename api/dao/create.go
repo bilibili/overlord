@@ -9,8 +9,6 @@ import (
 	"overlord/task"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 func (d *Dao) checkVersion(version string) error {
@@ -36,7 +34,7 @@ func (d *Dao) parseSpecification(spec string) (cpu float64, maxMem float64, err 
 	if err != nil {
 		return
 	}
-	maxMem, err = strconv.ParseFloat(strings.TrimRight(spec, "gmk"), 64)
+	maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
 	return
 }
 
@@ -50,13 +48,13 @@ func (d *Dao) createCreateClusterTask(p *model.ParamCluster) (*task.Task, error)
 
 	cacheType, err := d.mapCacheType(p.CacheType)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 	t.CacheType = cacheType
 
 	specCPU, specMaxMem, err := d.parseSpecification(p.Spec)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	t.MaxMem = specMaxMem
@@ -65,29 +63,23 @@ func (d *Dao) createCreateClusterTask(p *model.ParamCluster) (*task.Task, error)
 	return t, nil
 }
 
-func (d *Dao) saveTask(ctx context.Context, t *task.Task) (int64, error) {
+func (d *Dao) saveTask(ctx context.Context, t *task.Task) (string, error) {
 	var sb strings.Builder
 	encoder := json.NewEncoder(&sb)
 
 	err := encoder.Encode(t)
 	if err != nil {
-		return -1, errors.WithStack(err)
+		return "", err
 	}
 
-	taskIDStr, err := d.e.GenID(ctx, etcd.TASKDIR, sb.String())
+	taskID, err := d.e.GenID(ctx, etcd.TaskDir, sb.String())
 	if err != nil {
-		return -1, errors.WithStack(err)
-	}
-
-	taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
-	if err != nil {
-		// TODO: should we delete created task ?
-		return -1, errors.WithStack(err)
+		return "", err
 	}
 
 	err = d.e.SetTaskState(ctx, taskID, task.StatePending)
 	if err != nil {
-		return -1, err
+		return "", err
 	}
 
 	return taskID, nil

@@ -77,6 +77,12 @@
 			"versionExact": "v1.3.0"
 		},
 		{
+			"checksumSHA1": "6atR+t4aMVKculfOXtFQNq3l8BQ=",
+			"path": "github.com/go-xorm/builder",
+			"revision": "03eb88feccce3e477c318ce7f6f1b386544ab20b",
+			"revisionTime": "2018-10-26T05:37:58Z"
+		},
+		{
 			"checksumSHA1": "2XtrajUc7LktpQETiH+H2hbd200=",
 			"path": "github.com/gogo/protobuf/gogoproto",
 			"revision": "fcdc5011193ff531a548e9b0301828d5a5b97fd8",
@@ -147,6 +153,18 @@
 			"path": "github.com/grpc-ecosystem/go-grpc-middleware/util/backoffutils",
 			"revision": "498ae206fc3cfe81cd82e48c1d4354026fa5f9ec",
 			"revisionTime": "2018-08-30T09:29:08Z"
+		},
+		{
+			"checksumSHA1": "SVzanxaLYK43jeNWQqNs5P+uhow=",
+			"path": "github.com/jmoiron/sqlx",
+			"revision": "82935fac6c1a317907c8f43ed3f7f85ea844a78b",
+			"revisionTime": "2018-10-24T16:34:19Z"
+		},
+		{
+			"checksumSHA1": "i2O6Ji8ZL6q+EL+4cu/ftBytqZg=",
+			"path": "github.com/jmoiron/sqlx/reflectx",
+			"revision": "82935fac6c1a317907c8f43ed3f7f85ea844a78b",
+			"revisionTime": "2018-10-24T16:34:19Z"
 		},
 		{
 			"checksumSHA1": "W4cByvvu+jwClgwuAKbJn8vlDwI=",
