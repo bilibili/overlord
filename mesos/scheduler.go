@@ -241,7 +241,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							AgentID:  ofm[node.Name].AgentID,
 							Executor: s.buildExcutor(node.Name, []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
-							Resources: makeResources(icpu, imem, uint64(node.Port), uint64(node.Port+10000)),
+							Resources: makeResources(icpu, imem, uint64(node.Port)),
 							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						data := &TaskData{
@@ -292,7 +292,7 @@ func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	)
 	portRange := resources.BuildRanges()
 	for _, port := range ports {
-		portRange.Span(port, port+1)
+		portRange.Span(port, port)
 	}
 	r.Add(resources.Build().Name(resources.NamePorts).Ranges(portRange.Ranges).Resource)
 	return

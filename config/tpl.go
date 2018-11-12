@@ -46,7 +46,7 @@ port {{.Port}}
 tcp-backlog 65535
 timeout 0
 tcp-keepalive 300
-daemonize no
+daemonize yes
 supervised no
 pidfile redis.pid
 loglevel notice
