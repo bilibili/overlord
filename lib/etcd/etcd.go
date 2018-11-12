@@ -15,10 +15,10 @@ import (
 
 // etcd base dir
 const (
-	BASEDIR       = "/overlord"
-	CLUSTERDIR    = "/overlord/clusters"
-	CONFIGDIR     = "/overlord/config"
-	TASKDIR       = "/overlord/task"
+	BaseDir       = "/overlord"
+	ClusterDir    = "/overlord/clusters"
+	ConfigDir     = "/overlord/config"
+	TaskDir       = "/overlord/task"
 	TaskDetialDir = "overlord/task_detial"
 	FRAMEWORK     = "/overlord/framework"
 )
@@ -120,10 +120,10 @@ func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, er
 }
 
 // SetTaskState will change task state.
-func (e *Etcd) SetTaskState(ctx context.Context, taskID int64, state task.StateType) error {
+func (e *Etcd) SetTaskState(ctx context.Context, taskID string, state task.StateType) error {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%d/state", TaskDetialDir, taskID), state, &cli.SetOptions{})
+	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", TaskDetialDir, taskID), state, &cli.SetOptions{})
 	return err
 }
 
