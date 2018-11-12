@@ -41,6 +41,7 @@ type Task struct {
 	Version   string  // service version
 	Num       int     // num of instances ,if redis-cluster,mean master number.
 	MaxMem    float64 // max memory use of instance.
+	CPU       float64 // cpu count for each instance.
 	I         *Instance
 	// Scheduler is the name of scheduler and path of etcd
 	Scheduler string

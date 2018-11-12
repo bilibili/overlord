@@ -8,17 +8,19 @@ import (
 	"time"
 
 	"overlord/lib/log"
+	"overlord/task"
 
 	cli "go.etcd.io/etcd/client"
 )
 
 // etcd base dir
 const (
-	BASEDIR    = "/overlord"
-	CLUSTERDIR = "/overlord/clusters"
-	CONFIGDIR  = "/overlord/config"
-	TASKDIR    = "/overlord/task"
-	FRAMEWORK  = "/overlord/framework"
+	BASEDIR       = "/overlord"
+	CLUSTERDIR    = "/overlord/clusters"
+	CONFIGDIR     = "/overlord/config"
+	TASKDIR       = "/overlord/task"
+	TaskDetialDir = "overlord/task_detial"
+	FRAMEWORK     = "/overlord/framework"
 )
 
 // Node etcd kv info.
@@ -29,10 +31,9 @@ type Node struct {
 
 // Etcd etcd implement.
 type Etcd struct {
-	cli     cli.Client  //The client context
-	kapi    cli.KeysAPI //The api context for Get/Set/Delete/Update/Watcher etc.,
-	cfg     cli.Config  //Configuration details of the connection should be loaded from a configuration file
-	isSetup bool        //Has this been setup
+	cli  cli.Client  //The client context
+	kapi cli.KeysAPI //The api context for Get/Set/Delete/Update/Watcher etc.,
+	cfg  cli.Config  //Configuration details of the connection should be loaded from a configuration file
 }
 
 //New Function to create an etce object
@@ -116,6 +117,14 @@ func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, er
 		return resp.Node.Key, nil
 	}
 	return resp.Node.Key[idx+1:], nil
+}
+
+// SetTaskState will change task state.
+func (e *Etcd) SetTaskState(ctx context.Context, taskID int64, state task.StateType) error {
+	subctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%d/state", TaskDetialDir, taskID), state, &cli.SetOptions{})
+	return err
 }
 
 // WatchOnExpire watch expire action in this dir.

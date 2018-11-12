@@ -16,7 +16,9 @@ overlord
         /cluster1
     /task
         /$taskid # id was auto gen by etcd
-
+    /task_detial
+        /$taskid
+            /state #state of the global task
     /instances/$ip:$port/
         /type (cache type,eg:redis,memcached,redis-cluster)
         /info
