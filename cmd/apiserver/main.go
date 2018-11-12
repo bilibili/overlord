@@ -12,15 +12,17 @@ import (
 
 var (
 	confPath        string
-	defaultConfPath = "./conf.toml"
+	defaultConfPath = "conf.toml"
 )
 
 func main() {
+	config.SetRunMode(config.RunModeProd)
+
 	log.Init(log.NewStdHandler())
 	flag.StringVar(&confPath, "conf", "", "scheduler conf")
 	flag.Parse()
 	conf := new(config.ServerConfig)
-	if confPath != "" {
+	if confPath == "" {
 		confPath = defaultConfPath
 	}
 
