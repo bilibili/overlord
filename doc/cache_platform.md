@@ -106,7 +106,7 @@ After=syslog.target network.target
 Conflicts=sendmail.service exim.service
 
 [Service]
-Type=simple
+Type=forking
 PIDFile=/data/redis/%i/redis.pid
 ExecStart=/data/lib/redis/5.0.0/bin/redis-server /data/redis/%i/redis.conf
 

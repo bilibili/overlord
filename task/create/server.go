@@ -14,9 +14,7 @@ import (
 
 // maybe global defines
 const (
-	ClusterInstancesPath = "/clusters/%s/instances/"
-	InstancePath         = "/instances/%s:%d"
-	ClusterSlotsCount    = 16384
+	ClusterSlotsCount = 16384
 )
 
 // RedisClusterInfo is the arguments for create cluster task which was validated by apiserver.
@@ -69,20 +67,19 @@ func (c *RedisClusterTask) CreateCluster(info *RedisClusterInfo) error {
 	return err
 }
 
-func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
+func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	for _, cc := range info.Chunks {
 		for _, node := range cc.Nodes {
-			instanceDir := fmt.Sprintf(InstancePath, node.Name, node.Port)
+			instanceDir := fmt.Sprintf(etcd.InstanceDir, node.Name, node.Port)
 
-			_ = c.e.Mkdir(ctx, instanceDir)
-
-			// if err != nil {
-			// 	return err
-			// }
-			err := c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), "redis_cluster")
+			err = c.e.Mkdir(ctx, instanceDir)
+			if err != nil {
+				return err
+			}
+			err = c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), "redis_cluster")
 			if err != nil {
 				return err
 			}
@@ -91,7 +88,6 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) error {
 			if err != nil {
 				return err
 			}
-
 			tpl, err := template.New("redis.conf").Parse(config.RedisConfTpl)
 			if err != nil {
 				return err
@@ -197,7 +193,7 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 }
 
 func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
-	path := fmt.Sprintf(ClusterInstancesPath, info.ClusterName)
+	path := fmt.Sprintf(etcd.ClusterInstancesDir, info.ClusterName)
 	hostmap := chunk.GetHostCountInChunks(info.Chunks)
 	idMap := make(map[string]map[int]string)
 	for node, ports := range hostmap {
@@ -216,6 +212,5 @@ func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
 		}
 	}
 	info.IDMap = idMap
-	fmt.Println(info.IDMap)
 	return nil
 }

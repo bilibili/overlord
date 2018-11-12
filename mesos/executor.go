@@ -3,25 +3,31 @@ package mesos
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
-
 	"time"
-
-	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpexec"
-
-	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
 
 	"overlord/lib/etcd"
 	"overlord/lib/log"
+	"overlord/lib/myredis"
+	"overlord/proto"
 	"overlord/task/create"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
+	"github.com/mesos/mesos-go/api/v1/lib/backoff"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding/codecs"
 	"github.com/mesos/mesos-go/api/v1/lib/executor"
 	"github.com/mesos/mesos-go/api/v1/lib/executor/calls"
 	"github.com/mesos/mesos-go/api/v1/lib/executor/config"
+	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
+	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpexec"
 	"github.com/pborman/uuid"
+)
+
+const (
+	nodeTTL = time.Second * 5
+	maxErr  = 10
 )
 
 // Executor define overlord mesos executor.
@@ -78,7 +84,6 @@ func New() *Executor {
 			callOptions...,
 		),
 	}
-	ec.db, _ = etcd.New("http://172.22.33.167:2379")
 	return ec
 }
 
@@ -88,7 +93,7 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 	case executor.Event_SUBSCRIBED:
 		ec.subcribe(e)
 	case executor.Event_LAUNCH:
-		err := ec.lanch(e)
+		err := ec.launch(e)
 		task := e.Launch.Task
 		status := ec.newStatus(task.TaskID)
 		if err != nil {
@@ -101,7 +106,9 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 			log.Errorf("update lanch status fail %v ", err)
 		}
 	case executor.Event_SHUTDOWN:
-
+	case executor.Event_ACKNOWLEDGED:
+		delete(ec.unackedTasks, e.Acknowledged.TaskID)
+		delete(ec.unackedUpdates, string(e.Acknowledged.UUID))
 	}
 }
 
@@ -111,8 +118,10 @@ func (ec *Executor) subcribe(e *executor.Event) {
 	ec.agent = e.Subscribed.AgentInfo
 }
 
-func (ec *Executor) lanch(e *executor.Event) (err error) {
-	data := e.GetLaunch().Task.GetData()
+func (ec *Executor) launch(e *executor.Event) (err error) {
+	task := e.GetLaunch().Task
+	ec.unackedTasks[task.TaskID] = task
+	data := task.GetData()
 	tdata := new(TaskData)
 	if err = json.Unmarshal(data, tdata); err != nil {
 		log.Errorf("err task data %v", err)
@@ -132,31 +141,94 @@ func (ec *Executor) lanch(e *executor.Event) (err error) {
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
 	}
+	host := fmt.Sprintf("%s:%d", tdata.IP, tdata.Port)
+	ec.db.Set(context.Background(), fmt.Sprintf("%s/%s", etcd.HeartBeatDir, host), task.TaskID.String())
+	ec.monitor(dpinfo.CacheType, host)
 	return
 }
 
-// Subscribe start executor subcribe.
-func (ec *Executor) Subscribe(c context.Context) {
-	sub := calls.Subscribe(ec.unacknowledgedTasks(), ec.unacknowledgedUpdates())
-	resp, err := ec.subscriber.Send(c, calls.NonStreaming(sub))
-	if resp != nil {
-		defer resp.Close()
+func (ec *Executor) monitor(tp proto.CacheType, host string) {
+	switch tp {
+	case proto.CacheTypeRedis, proto.CacheTypeRedisCluster:
+		cli := myredis.New()
+		go func() {
+			var errCount int
+			for {
+				// close monitor when continuous fail ovef maxErr
+				if errCount > maxErr {
+					cli.Close()
+					return
+				}
+				err := cli.Ping(host)
+				// refresh ttl no sucess.
+				if err == nil {
+					errCount = 0
+					ec.db.Refresh(context.Background(), host, nodeTTL)
+				} else {
+					errCount++
+					log.Errorf("redis health check err %v", err)
+				}
+				time.Sleep(time.Second)
+			}
+		}()
 	}
-	if err == nil {
-		ec.eventLoop(resp)
+}
+
+// Run start executor.
+func (ec *Executor) Run(c context.Context) {
+	var (
+		shouldReconnect = maybeReconnect(ec.cfg)
+		disconnected    = time.Now()
+	)
+	for {
+		sub := calls.Subscribe(ec.unacknowledgedTasks(), ec.unacknowledgedUpdates())
+		resp, err := ec.subscriber.Send(c, calls.NonStreaming(sub))
+		if resp != nil {
+			defer resp.Close()
+		}
+		if err == nil {
+			ec.eventLoop(resp)
+			disconnected = time.Now()
+		}
+		if !ec.cfg.Checkpoint {
+			log.Infof("gracefully exiting because framework checkpointing is NOT enabled")
+			return
+		}
+		if time.Now().Sub(disconnected) > ec.cfg.RecoveryTimeout {
+			log.Infof("failed to re-establish subscription with agent within %v, aborting", ec.cfg.RecoveryTimeout)
+			return
+		}
+		<-shouldReconnect // wait for some amount of time before retrying subscription
 	}
-	return
+}
+
+func maybeReconnect(cfg config.Config) <-chan struct{} {
+	if cfg.Checkpoint {
+		return backoff.Notifier(1*time.Second, cfg.SubscriptionBackoffMax*3/4, nil)
+	}
+	return nil
 }
 
 func (ec *Executor) eventLoop(resp encoding.Decoder) {
 	var err error
 	for err == nil && !ec.shouldQuit {
+		ec.sendFailedTasks()
 		var e executor.Event
 		if err = resp.Decode(&e); err == nil {
 			ec.handleEvent(&e)
 		}
 	}
 
+}
+func (ec *Executor) sendFailedTasks() {
+	for taskID, status := range ec.failedTasks {
+		updateErr := ec.update(status)
+		if updateErr != nil {
+			log.Errorf("failed to send status update for task %s: %+v", taskID.Value, updateErr)
+		} else {
+			delete(ec.failedTasks, taskID)
+		}
+	}
 }
 
 func (ec *Executor) unacknowledgedTasks() (result []ms.TaskInfo) {
@@ -197,9 +269,13 @@ func (ec *Executor) update(status ms.TaskStatus) error {
 	}
 	if err != nil {
 		log.Infof("failed to send update: %+v", err)
-
+		status.State = ms.TASK_FAILED.Enum()
+		status.Message = protoString(err.Error())
+		ec.failedTasks[status.TaskID] = status
 	} else {
 		ec.unackedUpdates[string(status.UUID)] = *upd.Update
 	}
 	return err
 }
+
+func protoString(s string) *string { return &s }

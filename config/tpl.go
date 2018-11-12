@@ -13,7 +13,7 @@ Type=forking
 PIDFile=/data/%i/memcache.pid
 ExecStart=/data/lib/memcache/{{.Version}}/bin/memcached /data/%i/memcache.conf
 WorkingDirectory=/data/%i/
-
+Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 `
@@ -30,6 +30,7 @@ After=network.target
 Type=simple
 ExecStart=/data/lib/redis/{{.Version}}/bin/redis-server /data/%i/redis.conf
 WorkingDirectory=/data/%i/
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
@@ -46,7 +47,7 @@ port {{.Port}}
 tcp-backlog 65535
 timeout 0
 tcp-keepalive 300
-daemonize yes
+daemonize no
 supervised no
 pidfile redis.pid
 loglevel notice

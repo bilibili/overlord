@@ -15,12 +15,14 @@ import (
 
 // etcd base dir
 const (
-	BASEDIR       = "/overlord"
-	CLUSTERDIR    = "/overlord/clusters"
-	CONFIGDIR     = "/overlord/config"
-	TASKDIR       = "/overlord/task"
-	TaskDetialDir = "overlord/task_detial"
-	FRAMEWORK     = "/overlord/framework"
+	CLUSTERDIR          = "/overlord/clusters"
+	CONFIGDIR           = "/overlord/config"
+	TASKDIR             = "/overlord/task"
+	TaskDetialDir       = "/overlord/task_detial"
+	FRAMEWORK           = "/overlord/framework"
+	ClusterInstancesDir = "/overlord/clusters/%s/instances/"
+	InstanceDir         = "/overlord/instances/%s:%d"
+	HeartBeatDir        = "/overlord/heartbeat"
 )
 
 // Node etcd kv info.
@@ -63,6 +65,15 @@ func (e *Etcd) Mkdir(ctx context.Context, k string) (err error) {
 func (e *Etcd) Set(ctx context.Context, k, v string) (err error) {
 	_, err = e.kapi.Set(ctx, k, v, nil)
 	return err
+}
+
+// Refresh refresh key ttl.
+func (e *Etcd) Refresh(ctx context.Context, k string, ttl time.Duration) (err error) {
+	_, err = e.kapi.Set(ctx, k, "", &cli.SetOptions{
+		TTL:     ttl,
+		Refresh: true,
+	})
+	return
 }
 
 // Get value by key.

@@ -167,6 +167,12 @@ func (c *Client) TryBalance() error {
 	return nil
 }
 
+func (c *Client) Ping(node string) (err error) {
+	n := c.cluster.getNode(node)
+	_, err = n.execute("ping")
+	return
+}
+
 type cluster struct {
 	addrMap map[string]*node
 }
@@ -182,6 +188,7 @@ func (c *cluster) getNode(name string) *node {
 	return n
 }
 
+// TODO :reconnect on err
 func newNode(addr string) *node {
 	conn, err := net.Dial("tcp", addr)
 	n := &node{conn: conn, err: err}

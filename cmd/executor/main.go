@@ -11,6 +11,6 @@ func main() {
 	ec := mesos.New()
 	config.SetRunMode(config.RunModeProd)
 	log.Init(log.NewStdHandler())
-	ec.Subscribe(context.Background())
+	ec.Run(context.Background())
 
 }
