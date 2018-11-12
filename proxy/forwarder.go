@@ -68,7 +68,6 @@ type defaultForwarder struct {
 	alias    bool
 	aliasMap map[string]string
 	nodePipe map[string]*proto.NodeConnPipe
-	nodePing map[string]*pinger
 
 	state int32
 }
@@ -96,12 +95,12 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	// start nbc
 	f.nodePipe = make(map[string]*proto.NodeConnPipe)
 	for _, addr := range addrs {
-		f.nodePipe[addr] = proto.NewNodeConnPipe(cc.NodeConnections, func() proto.NodeConn {
-			return newNodeConn(cc, addr)
+		toAddr := addr // NOTE: avoid closure
+		f.nodePipe[toAddr] = proto.NewNodeConnPipe(cc.NodeConnections, func() proto.NodeConn {
+			return newNodeConn(cc, toAddr)
 		})
 	}
 	if cc.PingAutoEject {
-		f.nodePing = make(map[string]*pinger)
 		for idx, addr := range addrs {
 			w := ws[idx]
 			pc := newPingConn(cc, addr)

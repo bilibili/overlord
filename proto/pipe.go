@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -15,6 +16,8 @@ const (
 type NodeConnPipe struct {
 	input chan *Message
 	mps   []*msgPipe
+	l     sync.RWMutex
+
 	errCh chan error
 
 	state int32
@@ -35,10 +38,12 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 
 // Push push message into input chan.
 func (ncp *NodeConnPipe) Push(m *Message) {
-	if atomic.LoadInt32(&ncp.state) == opened {
+	ncp.l.RLock()
+	if ncp.state == opened {
 		m.Add()
 		ncp.input <- m
 	}
+	ncp.l.RUnlock()
 }
 
 // ErrorEvent return error chan.
@@ -48,13 +53,11 @@ func (ncp *NodeConnPipe) ErrorEvent() <-chan error {
 
 // Close close pipe.
 func (ncp *NodeConnPipe) Close() {
-	if atomic.CompareAndSwapInt32(&ncp.state, opened, closed) {
-		close(ncp.errCh)
-		close(ncp.input)
-		for _, mp := range ncp.mps {
-			mp.close()
-		}
-	}
+	close(ncp.errCh)
+	ncp.l.Lock()
+	ncp.state = closed
+	close(ncp.input)
+	ncp.l.Unlock()
 }
 
 // msgPipe message pipeline.
@@ -63,31 +66,25 @@ type msgPipe struct {
 	newNc func() NodeConn
 	input <-chan *Message
 
-	batch   [pipeMaxCount]*Message
-	count   int
-	forward chan *Message
+	batch [pipeMaxCount]*Message
+	count int
 
 	errCh chan<- error
-
-	closed chan struct{}
 }
 
 // newMsgPipe new msgPipe and return.
 func newMsgPipe(input <-chan *Message, newNc func() NodeConn, errCh chan<- error) (mp *msgPipe) {
 	mp = &msgPipe{
-		newNc:   newNc,
-		input:   input,
-		forward: make(chan *Message, pipeMaxCount*2),
-		errCh:   errCh,
-		closed:  make(chan struct{}, 1),
+		newNc: newNc,
+		input: input,
+		errCh: errCh,
 	}
 	mp.nc.Store(newNc())
-	go mp.pipeWrite()
-	go mp.pipeRead()
+	go mp.pipe()
 	return
 }
 
-func (mp *msgPipe) pipeWrite() {
+func (mp *msgPipe) pipe() {
 	var (
 		m  *Message
 		ok bool
@@ -99,7 +96,7 @@ func (mp *msgPipe) pipeWrite() {
 				select {
 				case m, ok = <-mp.input:
 					if !ok {
-						mp.closed <- struct{}{}
+						nc.Close()
 						return
 					}
 				default:
@@ -110,8 +107,8 @@ func (mp *msgPipe) pipeWrite() {
 			}
 			mp.batch[mp.count] = m
 			mp.count++
-			if err := nc.Write(m); err != nil {
-				m.WithError(err)
+			if werr := nc.Write(m); werr != nil {
+				m.WithError(werr)
 			}
 			m = nil
 			if mp.count >= pipeMaxCount {
@@ -119,62 +116,44 @@ func (mp *msgPipe) pipeWrite() {
 			}
 		}
 		if mp.count > 0 {
-			if err := nc.Flush(); err != nil {
+			if ferr := nc.Flush(); ferr != nil {
 				for i := 0; i < mp.count; i++ {
-					mp.batch[i].WithError(err)
+					mp.batch[i].WithError(ferr)
 					mp.batch[i].Done()
 				}
 				mp.count = 0
-				nc = mp.reNewNc()
-				select {
-				case mp.errCh <- err: // NOTE: action
-				default:
-				}
+				nc = mp.reNewNc(nc, ferr)
 				continue
 			}
+			var rerr error
 			for i := 0; i < mp.count; i++ {
-				mp.forward <- mp.batch[i]
+				if rerr = nc.Read(mp.batch[i]); rerr != nil {
+					mp.batch[i].WithError(rerr)
+				}
+				mp.batch[i].Done()
 			}
 			mp.count = 0
+			if rerr != nil {
+				nc = mp.reNewNc(nc, rerr)
+			}
 			continue
 		}
-		m = <-mp.input // NOTE: avoid infinite loop
-	}
-}
-
-func (mp *msgPipe) pipeRead() {
-	var nc = mp.nc.Load().(NodeConn)
-	for {
-		m, ok := <-mp.forward
+		m, ok = <-mp.input // NOTE: avoid infinite loop
 		if !ok {
-			mp.closed <- struct{}{}
+			nc.Close()
 			return
 		}
-		if m == nil {
-			nc.Close()
-			nc = mp.nc.Load().(NodeConn)
-			continue
-		}
-		if m.Err() != nil {
-			continue
-		}
-		if err := nc.Read(m); err != nil {
-			m.WithError(err)
-		}
-		m.Done()
 	}
 }
 
-func (mp *msgPipe) reNewNc() NodeConn {
-	mp.nc.Store(mp.newNc())
-	mp.forward <- nil
-	return mp.nc.Load().(NodeConn)
-}
-
-func (mp *msgPipe) close() {
-	<-mp.closed
-	close(mp.forward)
-	<-mp.closed
-	nc := mp.nc.Load().(NodeConn)
+func (mp *msgPipe) reNewNc(nc NodeConn, err error) NodeConn {
+	if err != nil {
+		select {
+		case mp.errCh <- err: // NOTE: action
+		default:
+		}
+	}
 	nc.Close()
+	mp.nc.Store(mp.newNc())
+	return mp.nc.Load().(NodeConn)
 }
