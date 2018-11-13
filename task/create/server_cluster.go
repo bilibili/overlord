@@ -53,8 +53,8 @@ func NewRedisClusterTask(e *etcd.Etcd) *RedisClusterTask {
 	}
 }
 
-// CreateCluster creates new cluster and wait for cluster done
-func (c *RedisClusterTask) CreateCluster(info *RedisClusterInfo) error {
+// Create creates new cluster and wait for cluster done
+func (c *RedisClusterTask) Create(info *RedisClusterInfo) error {
 	err := c.setupIDMap(info)
 	if err != nil {
 		return err
@@ -88,7 +88,8 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 			if err != nil {
 				return err
 			}
-			tpl, err := template.New("redis.conf").Parse(config.RedisConfTpl)
+
+			tpl, err := template.New("redis.conf").Parse(config.RedisClusterConfTpl)
 			if err != nil {
 				return err
 			}
@@ -96,7 +97,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 			var sb strings.Builder
 			err = tpl.Execute(&sb, map[string]interface{}{
 				"Port":             node.Port,
-				"MaxMemoryInBytes": info.MaxMemory * 1024 * 1024,
+				"MaxMemoryInBytes": int(info.MaxMemory * 1024 * 1024),
 			})
 			if err != nil {
 				return err
@@ -131,19 +132,6 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 			if err != nil {
 				return err
 			}
-		}
-	}
-
-	return nil
-}
-
-func (c *RedisClusterTask) waitConsist(info *RedisClusterInfo) error {
-	for _, cc := range info.Chunks {
-		for _, node := range cc.Nodes {
-			if node.Role != chunk.RoleMaster {
-				continue
-			}
-
 		}
 	}
 

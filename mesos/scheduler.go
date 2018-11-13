@@ -73,7 +73,7 @@ func (s *Scheduler) Run() (err error) {
 	s.cli = buildHTTPSched(s.c)
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
 
-	controller.Run(context.TODO(),
+	err = controller.Run(context.TODO(),
 		s.buildFrameworkInfo(),
 		s.cli,
 		controller.WithEventHandler(s.buildEventHandle()),
@@ -85,29 +85,18 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
-		fmt.Println(v)
-		t := task.Task{
-			Name:      v,
-			Version:   "4.0.11",
-			ID:        v,
-			CacheType: proto.CacheTypeRedisCluster,
-			Num:       6,
-			MaxMem:    1024,
-			I: &task.Instance{
-				Name:   v,
-				Memory: 1,
-				CPU:    0.01,
-			},
+		var t task.Task
+		if err := json.Unmarshal([]byte(v), &t); err != nil {
+			log.Errorf("err task info err %v", err)
+			continue
 		}
-		// var t task.Task
-		// if err := json.Unmarshal([]byte(v), &t); err != nil {
-		// 	log.Errorf("err task info err %v", err)
-		// 	continue
-		// }
 		s.task.PushBack(t)
 		// revive offer when task comming.
 		revice := calls.Revive()
-		calls.CallNoData(context.Background(), s.cli, revice)
+		if err := calls.CallNoData(context.Background(), s.cli, revice); err != nil {
+			log.Errorf("err call to revie %v", err)
+			continue
+		}
 	}
 }
 
@@ -200,11 +189,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 		)
 		for taskEle := s.task.Front(); taskEle != nil; {
 			t := taskEle.Value.(task.Task)
-			imem := t.I.Memory
-			icpu := t.I.CPU
+			imem := t.MaxMem
+			icpu := t.CPU
 			inum := t.Num
-			switch {
-			case t.CacheType == proto.CacheTypeRedisCluster:
+			switch t.CacheType {
+			case proto.CacheTypeRedisCluster:
 				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
 				if err != nil {
 					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
@@ -218,7 +207,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					offerid = make(map[ms.OfferID]struct{})
 				)
 				rtask := create.NewRedisClusterTask(s.db)
-				err = rtask.CreateCluster(&create.RedisClusterInfo{
+				err = rtask.Create(&create.RedisClusterInfo{
 					Chunks:      chunks,
 					MaxMemory:   t.MaxMem,
 					ClusterName: t.Name,
@@ -242,7 +231,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							Executor: s.buildExcutor(node.Name, []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
 							Resources: makeResources(icpu, imem, uint64(node.Port)),
-							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
+							// Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						data := &TaskData{
 							IP:         node.Name,
@@ -264,11 +253,74 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					}
 				}
 				ttask := taskEle
-				taskEle = taskEle.Next()
 				s.task.Remove(ttask)
 				return nil
-			case t.CacheType == proto.CacheTypeRedis:
-			case t.CacheType == proto.CacheTypeMemcache:
+			case proto.CacheTypeRedis, proto.CacheTypeMemcache:
+				dist, err := chunk.DistIt(t.Num, t.MaxMem, t.CPU, offers...)
+				if err != nil {
+					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
+					taskEle = taskEle.Next()
+					continue
+				}
+				ci := &create.CacheInfo{
+					TaskID:    t.ID,
+					CacheType: t.CacheType,
+					Number:    t.Num,
+					Thread:    int(t.CPU),
+					Version:   t.Version,
+					Dist:      dist,
+				}
+
+				ctask := create.NewCacheTask(s.db, ci)
+				err = ctask.Create()
+				if err != nil {
+					log.Errorf("create cluster err %v", err)
+					return nil
+				}
+
+				var (
+					ofm     = make(map[string]ms.Offer)
+					tasks   = make(map[string][]ms.TaskInfo)
+					offerid = make(map[ms.OfferID]struct{})
+				)
+
+				for _, offer := range offers {
+					ofm[offer.GetHostname()] = offer
+				}
+				for _, addr := range dist.Addrs {
+					task := ms.TaskInfo{
+						Name:     addr.IP,
+						TaskID:   ms.TaskID{Value: fmt.Sprintf("%s:%d", addr.IP, addr.Port)},
+						AgentID:  ofm[addr.IP].AgentID,
+						Executor: s.buildExcutor(addr.IP, []ms.Resource{}),
+						//  plus the port obtained by adding 10000 to the data port for redis cluster.
+						Resources: makeResources(t.CPU, t.MaxMem, uint64(addr.Port)),
+						Data:      []byte(fmt.Sprintf("%s:%d", addr.IP, addr.Port)),
+					}
+					data := &TaskData{
+						IP:         addr.IP,
+						Port:       addr.Port,
+						DBEndPoint: s.c.DBEndPoint,
+					}
+					task.Data, _ = json.Marshal(data)
+					offerid[ofm[addr.IP].ID] = struct{}{}
+					tasks[addr.IP] = append(tasks[addr.IP], task)
+				}
+
+				for _, offer := range offers {
+					accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+					err = calls.CallNoData(ctx, s.cli, accept)
+					if err != nil {
+						log.Errorf("fail to lanch task err %v", err)
+						taskEle = taskEle.Next()
+						continue
+					}
+				}
+				ttask := taskEle
+				s.task.Remove(ttask)
+
+			default:
+				panic("not support")
 			}
 		}
 		// if there don't have any task,decline all offers and suppress offer envent.
@@ -278,9 +330,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			ofid = append(ofid, offer.ID)
 		}
 		decli := calls.Decline(ofid...)
-		calls.CallNoData(ctx, s.cli, decli)
+		// TODO: deal with error
+		_ = calls.CallNoData(ctx, s.cli, decli)
 		suppress := calls.Suppress()
-		calls.CallNoData(ctx, s.cli, suppress)
+		// TODO: deal with error
+		_ = calls.CallNoData(ctx, s.cli, suppress)
 		return nil
 	}
 }

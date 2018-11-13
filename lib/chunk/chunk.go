@@ -43,7 +43,7 @@ func getHosts(offers ...ms.Offer) []string {
 	return hosts
 }
 
-// with MB
+// mem will with MB
 func getOfferScalar(offer ms.Offer, name string) (float64, bool) {
 	for _, res := range offer.GetResources() {
 		if res.GetName() == name {
@@ -139,11 +139,11 @@ func mapIntoPortsMap(offers []ms.Offer) map[string][]int {
 }
 
 // dp means dynamic dispatch
-func dpFillHostRes(hrs []*hostRes, count int) (hosts []*hostRes) {
+func dpFillHostRes(hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
 	left := count
 	hosts = make([]*hostRes, 0)
 	for _, hr := range hrs {
-		if hr.count < 2 {
+		if hr.count < scale {
 			break
 		}
 		hosts = append(hosts, &hostRes{name: hr.name, count: 0})
@@ -155,12 +155,12 @@ func dpFillHostRes(hrs []*hostRes, count int) (hosts []*hostRes) {
 				return
 			}
 
-			if hrs[i].count-hosts[i].count < 2 {
+			if hrs[i].count-hosts[i].count < scale {
 				continue
 			}
 
-			hosts[i].count += 2
-			left -= 2
+			hosts[i].count += scale
+			left -= scale
 		}
 	}
 }
@@ -278,7 +278,7 @@ func Chunks(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*C
 	}
 	sort.Sort(byCountDesc(hrs))
 
-	hrs = dpFillHostRes(hrs, masterNum*2) // NOTICE: each master is a half chunk
+	hrs = dpFillHostRes(hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
 
 	if !checkDist(hrs, masterNum*2) {
 		err = ErrBadDist
