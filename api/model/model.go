@@ -8,7 +8,7 @@ type ParamCluster struct {
 	Spec string `json:"spec" validate:"required"`
 	Version string `json:"version" validate:"required"`
 	CacheType string `json:"cache_type" validate:"required"`
-	MasterNum int `json:"master_num" validate:"required,gte=4"`
+	Number int `json:"number" validate:"required"`
 }
 
 

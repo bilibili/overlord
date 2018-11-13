@@ -36,7 +36,8 @@ var (
 // must be serialized and deserialized by json
 type DeployInfo struct {
 	// TaskID is the id of task
-	TaskID string
+	TaskID  string
+	Cluster string
 
 	CacheType proto.CacheType
 
@@ -57,57 +58,65 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		instanceDir = fmt.Sprintf(etcd.InstanceDir, ip, port)
 		workdir     = fmt.Sprintf(_workDir, port)
 	)
+
+	sub, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	info = new(DeployInfo)
 	info.Port = port
 	info.TplTree = make(map[string]string)
-	val, err = e.Get(context.TODO(), fmt.Sprintf("%s/type", instanceDir))
+
+	val, err = e.Get(sub, fmt.Sprintf("%s/type", instanceDir))
 	if err != nil {
 		return
 	}
 	info.CacheType = proto.CacheType(val)
 
 	if info.CacheType == proto.CacheTypeRedisCluster {
-		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/role", instanceDir))
+		val, err = e.Get(sub, fmt.Sprintf("%s/role", instanceDir))
 		if err != nil {
 			return
 		}
 		info.Role = val
 
-		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
+		val, err = e.Get(sub, fmt.Sprintf("%s/redis.conf", instanceDir))
 
 		if err != nil {
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
 
-		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/nodes.conf", instanceDir))
+		val, err = e.Get(sub, fmt.Sprintf("%s/nodes.conf", instanceDir))
 		if err != nil {
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/nodes.conf", workdir)] = val
 
 	} else if info.CacheType == proto.CacheTypeRedis {
-		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/redis.conf", instanceDir))
+		val, err = e.Get(sub, fmt.Sprintf("%s/redis.conf", instanceDir))
 		if err != nil {
 			return
 		}
 		info.TplTree[fmt.Sprintf("%s/redis.conf", workdir)] = val
 	} else if info.CacheType == proto.CacheTypeMemcache {
-		val, err = e.Get(context.TODO(), fmt.Sprintf("%s/memcached.conf", instanceDir))
+		val, err = e.Get(sub, fmt.Sprintf("%s/memcache.sh", instanceDir))
 		if err != nil {
 			return
 		}
-		info.TplTree[fmt.Sprintf("%s/memcached.conf", workdir)] = val
+		info.TplTree[fmt.Sprintf("%s/memcache.sh", workdir)] = val
 	} else {
 		log.Errorf("unsupported cachetype %s", info.CacheType)
 	}
 	// fileserver is not required,ignore fileserver err
-	info.FileServer, _ = e.Get(context.TODO(), "/fileserver")
-	info.TaskID, err = e.Get(context.TODO(), fmt.Sprintf("%s/taskid", instanceDir))
+	info.FileServer, _ = e.Get(sub, "/fileserver")
+	info.TaskID, err = e.Get(sub, fmt.Sprintf("%s/taskid", instanceDir))
 	if err != nil {
 		return
 	}
-	info.Version, err = e.Get(context.TODO(), fmt.Sprintf("%s/version", instanceDir))
+
+	info.Cluster, _ = e.Get(sub, fmt.Sprintf("%s/cluster", instanceDir))
+
+	info.Version, err = e.Get(sub, fmt.Sprintf("%s/version", instanceDir))
 	return
 }
 
@@ -194,10 +203,7 @@ func downloadFile(filepath string, url string) (err error) {
 
 	// Writer the body to file
 	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func downloadBinary(info *DeployInfo) error {

@@ -43,7 +43,7 @@ func (d *Dao) createCreateClusterTask(p *model.ParamCluster) (*task.Task, error)
 		OpType:  task.OpCreate,
 		Name:    p.Name,
 		Version: p.Version,
-		Num:     2 * p.MasterNum,
+		Num:     p.Number,
 	}
 
 	cacheType, err := d.mapCacheType(p.CacheType)
