@@ -208,12 +208,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				)
 				rtask := create.NewRedisClusterTask(s.db)
 				err = rtask.Create(&create.RedisClusterInfo{
-					Chunks:      chunks,
-					MaxMemory:   t.MaxMem,
-					ClusterName: t.Name,
-					TaskID:      t.ID,
-					Version:     t.Version,
-					MasterNum:   t.Num,
+					Chunks:    chunks,
+					MaxMemory: t.MaxMem,
+					Name:      t.Name,
+					TaskID:    t.ID,
+					Version:   t.Version,
+					MasterNum: t.Num,
 				})
 				if err != nil {
 					log.Errorf("create cluster err %v", err)
@@ -264,6 +264,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				}
 				ci := &create.CacheInfo{
 					TaskID:    t.ID,
+					Name:      t.Name,
 					CacheType: t.CacheType,
 					Number:    t.Num,
 					Thread:    int(t.CPU),

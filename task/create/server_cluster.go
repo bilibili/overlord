@@ -19,8 +19,8 @@ const (
 
 // RedisClusterInfo is the arguments for create cluster task which was validated by apiserver.
 type RedisClusterInfo struct {
-	TaskID      string
-	ClusterName string
+	TaskID string
+	Name   string
 	// MaxMemory in MB
 	MaxMemory float64
 
@@ -71,6 +71,16 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	var sb strings.Builder
+	err = json.NewEncoder(&sb).Encode(info)
+	if err != nil {
+		return err
+	}
+	err = c.e.Set(ctx, fmt.Sprintf("%s/%s/info", etcd.ClusterDir, info.Name), sb.String())
+	if err != nil {
+		return err
+	}
+
 	for _, cc := range info.Chunks {
 		for _, node := range cc.Nodes {
 			instanceDir := fmt.Sprintf(etcd.InstanceDir, node.Name, node.Port)
@@ -94,7 +104,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 				return err
 			}
 
-			var sb strings.Builder
+			sb.Reset()
 			err = tpl.Execute(&sb, map[string]interface{}{
 				"Port":             node.Port,
 				"MaxMemoryInBytes": int(info.MaxMemory * 1024 * 1024),
@@ -104,15 +114,6 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 			}
 
 			err = c.e.Set(ctx, fmt.Sprintf("%s/redis.conf", instanceDir), sb.String())
-			if err != nil {
-				return err
-			}
-			sb.Reset()
-			err = json.NewEncoder(&sb).Encode(info)
-			if err != nil {
-				return err
-			}
-			err = c.e.Set(ctx, fmt.Sprintf("%s/info", instanceDir), sb.String())
 			if err != nil {
 				return err
 			}
@@ -181,7 +182,7 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 }
 
 func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
-	path := fmt.Sprintf(etcd.ClusterInstancesDir, info.ClusterName)
+	path := fmt.Sprintf(etcd.ClusterInstancesDir, info.Name)
 	hostmap := chunk.GetHostCountInChunks(info.Chunks)
 	idMap := make(map[string]map[int]string)
 	for node, ports := range hostmap {
