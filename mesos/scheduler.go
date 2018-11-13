@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"overlord/lib/chunk"
@@ -32,19 +33,24 @@ import (
 
 // Scheduler mesos scheduler.
 type Scheduler struct {
-	c     *Config
-	Tchan chan string
-	task  *list.List
-	db    *etcd.Etcd
-	cli   calls.Caller
+	c         *Config
+	Tchan     chan string
+	task      *list.List // use task list.
+	db        *etcd.Etcd
+	cli       calls.Caller
+	rwlock    sync.RWMutex
+	taskInfos map[string]*ms.TaskInfo // mesos tasks
+	failTask  chan ms.TaskID
 }
 
 // NewScheduler new scheduler instance.
 func NewScheduler(c *Config, db *etcd.Etcd) *Scheduler {
 	return &Scheduler{
-		db:   db,
-		c:    c,
-		task: list.New(),
+		db:        db,
+		c:         c,
+		task:      list.New(),
+		taskInfos: make(map[string]*ms.TaskInfo),
+		failTask:  make(chan ms.TaskID, 100),
 	}
 }
 
@@ -198,6 +204,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
+		select {
+		case taskid := <-s.failTask:
+			s.tryRecovery(taskid, offers)
+		default:
+		}
 		for taskEle := s.task.Front(); taskEle != nil; {
 			t := taskEle.Value.(task.Task)
 			imem := t.I.Memory
@@ -226,10 +237,10 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					Version:     t.Version,
 					MasterNum:   t.Num,
 				})
-				if err != nil {
-					log.Errorf("create cluster err %v", err)
-					return nil
-				}
+				// if err != nil {
+				// 	log.Errorf("create cluster err %v", err)
+				// 	break
+				// }
 				for _, offer := range offers {
 					ofm[offer.GetHostname()] = offer
 				}
@@ -239,7 +250,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							Name:     node.Name,
 							TaskID:   ms.TaskID{Value: node.RunID},
 							AgentID:  ofm[node.Name].AgentID,
-							Executor: s.buildExcutor(node.Name, []ms.Resource{}),
+							Executor: s.buildExcutor(node, []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
 							Resources: makeResources(icpu, imem, uint64(node.Port)),
 							Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
@@ -250,6 +261,9 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							DBEndPoint: s.c.DBEndPoint,
 						}
 						task.Data, _ = json.Marshal(data)
+						s.rwlock.Lock()
+						s.taskInfos[task.TaskID.Value] = &task
+						s.rwlock.Unlock()
 						offerid[ofm[node.Name].ID] = struct{}{}
 						tasks[node.Name] = append(tasks[node.Name], task)
 					}
@@ -285,6 +299,27 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 	}
 }
 
+func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
+	s.rwlock.RLock()
+	defer s.rwlock.RUnlock()
+	task, ok := s.taskInfos[t.Value]
+	log.Info("try recover task", task, ok)
+	if !ok {
+		return
+	}
+	id := task.AgentID
+	// TODO:check mem cpu info
+	for _, offer := range offers {
+		if offer.GetAgentID() == id {
+			accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(*task)}.WithOffers(offer.ID))
+			err := calls.CallNoData(context.Background(), s.cli, accept)
+			if err != nil {
+				log.Errorf("try recover task from pre agent fail %v", err)
+			}
+		}
+	}
+}
+
 func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	r.Add(
 		resources.NewCPUs(cpu).Resource,
@@ -298,17 +333,16 @@ func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	return
 }
 
-func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo {
+func (s *Scheduler) buildExcutor(node *chunk.Node, rs []ms.Resource) *ms.ExecutorInfo {
 	executorUris := []ms.CommandInfo_URI{}
 	executorUris = append(executorUris, ms.CommandInfo_URI{Value: s.c.ExecutorURL, Executable: pb.Bool(true)})
 	exec := &ms.ExecutorInfo{
 		Type:       ms.ExecutorInfo_CUSTOM,
-		ExecutorID: ms.ExecutorID{Value: "default"},
-		Name:       &name,
+		ExecutorID: ms.ExecutorID{Value: node.RunID},
+		Name:       &node.Name,
 		Command: &ms.CommandInfo{
-			Value:     pb.String("./executor"),
-			Arguments: []string{"-debug -log-vl 5 -std"},
-			URIs:      executorUris,
+			Value: pb.String("./executor -debug -log-vl 5 -std"),
+			URIs:  executorUris,
 		},
 		Resources: rs,
 	}
@@ -317,22 +351,28 @@ func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo
 
 func (s *Scheduler) statusUpdate() events.HandlerFunc {
 	return func(ctx context.Context, e *scheduler.Event) error {
-		s := e.GetUpdate().GetStatus()
-		msg := "Task " + s.TaskID.Value + " is in state " + s.GetState().String()
-		if m := s.GetMessage(); m != "" {
+		status := e.GetUpdate().GetStatus()
+		msg := "Task " + status.TaskID.Value + " is in state " + status.GetState().String()
+		if m := status.GetMessage(); m != "" {
 			msg += " with message '" + m + "'"
 		}
 		log.Info(msg)
-
-		switch st := s.GetState(); st {
+		switch st := status.GetState(); st {
 		case ms.TASK_FINISHED:
 			log.Info("state finish")
 		case ms.TASK_LOST, ms.TASK_KILLED, ms.TASK_FAILED, ms.TASK_ERROR:
-			log.Info("Exiting because task " + s.GetTaskID().Value +
+			taskid := e.GetUpdate().GetStatus().TaskID
+			select {
+			case s.failTask <- taskid:
+				log.Infof("add fail task into failtask chan,task id %v", taskid)
+			default:
+				log.Error("failtask chan full")
+			}
+			log.Info("Exiting because task " + status.GetTaskID().Value +
 				" is in an unexpected state " + st.String() +
-				" with reason " + s.GetReason().String() +
-				" from source " + s.GetSource().String() +
-				" with message '" + s.GetMessage() + "'")
+				" with reason " + status.GetReason().String() +
+				" from source " + status.GetSource().String() +
+				" with message '" + status.GetMessage() + "'")
 		}
 		return nil
 	}

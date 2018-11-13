@@ -18,13 +18,19 @@ import (
 	"overlord/lib/dir"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"overlord/lib/systemd"
+	"overlord/lib/proc"
 	"overlord/proto"
 
 	"github.com/BurntSushi/toml"
 )
 
-var _workDir = "/data/%d"
+var (
+	_workDir  = "/data/%d"
+	mcpath    = "/data/lib/memcache/%s/bin/memcached"
+	mcarg     = "-p %d"
+	redispath = "/data/lib/redis/%s/bin/redis-server"
+	redisconf = "/data/%i/redis.conf"
+)
 
 // DeployInfo is the struct to communicate between etcd and executor
 // must be serialized and deserialized by json
@@ -355,7 +361,24 @@ func SetupCacheService(info *DeployInfo) error {
 		}
 	}
 	// 3. spawn a new redis cluster service
-	serviceName := buildServiceName(info.CacheType, info.Version, info.Port)
-	log.Infof("setup service(%v)", serviceName)
-	return systemd.Start(serviceName)
+	p := newproc(info.CacheType, info.Version, info.Port)
+	p.Start()
+	return nil
+}
+
+func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
+	var (
+		cmd string
+		arg string
+	)
+	switch tp {
+	case proto.CacheTypeMemcache:
+		cmd = fmt.Sprintf(mcpath, version, port)
+		arg = fmt.Sprintf(mcarg, port)
+	case proto.CacheTypeRedisCluster:
+		cmd = fmt.Sprintf(redispath, version, port)
+		arg = fmt.Sprintf(redisconf, version, port)
+	}
+	p = proc.NewProc(cmd, arg)
+	return
 }
