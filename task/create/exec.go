@@ -26,8 +26,7 @@ import (
 
 var (
 	_workDir  = "/data/%d"
-	mcpath    = "/data/lib/memcache/%s/bin/memcached"
-	mcarg     = "-p %d"
+	mcpath    = "/data/%d/memcache.sh"
 	redispath = "/data/lib/redis/%s/bin/redis-server"
 	redisconf = "/data/%i/redis.conf"
 )
@@ -368,8 +367,7 @@ func SetupCacheService(info *DeployInfo) error {
 	}
 	// 3. spawn a new redis cluster service
 	p := newproc(info.CacheType, info.Version, info.Port)
-	p.Start()
-	return nil
+	return p.Start()
 }
 
 func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
@@ -378,10 +376,9 @@ func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
 		arg string
 	)
 	switch tp {
-	case proto.CacheTypeMemcache:
-		cmd = fmt.Sprintf(mcpath, version, port)
-		arg = fmt.Sprintf(mcarg, port)
-	case proto.CacheTypeRedisCluster:
+	case proto.CacheTypeMemcache, proto.CacheTypeMemcacheBinary:
+		cmd = fmt.Sprintf(mcpath, port)
+	case proto.CacheTypeRedisCluster, proto.CacheTypeRedis:
 		cmd = fmt.Sprintf(redispath, version, port)
 		arg = fmt.Sprintf(redisconf, version, port)
 	}
