@@ -1,6 +1,10 @@
 package chunk
 
-import ms "github.com/mesos/mesos-go/api/v1/lib"
+import (
+	"fmt"
+
+	ms "github.com/mesos/mesos-go/api/v1/lib"
+)
 
 // Addr is a cache instance endpoint
 type Addr struct {
@@ -11,6 +15,10 @@ type Addr struct {
 // Dist is the distribution of mesos
 type Dist struct {
 	Addrs []*Addr
+}
+
+func (a *Addr) String() string {
+	return fmt.Sprintf("%s:%d", a.IP, a.Port)
 }
 
 func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {

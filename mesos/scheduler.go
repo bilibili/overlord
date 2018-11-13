@@ -239,10 +239,9 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 							Name:     node.Name,
 							TaskID:   ms.TaskID{Value: node.RunID},
 							AgentID:  ofm[node.Name].AgentID,
-							Executor: s.buildExcutor(node, []ms.Resource{}),
+							Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
 							Resources: makeResources(icpu, imem, uint64(node.Port)),
-							// Data:      []byte(fmt.Sprintf("%s:%d", node.Name, node.Port)),
 						}
 						data := &TaskData{
 							IP:         node.Name,
@@ -305,12 +304,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				for _, addr := range dist.Addrs {
 					task := ms.TaskInfo{
 						Name:     addr.IP,
-						TaskID:   ms.TaskID{Value: fmt.Sprintf("%s:%d", addr.IP, addr.Port)},
+						TaskID:   ms.TaskID{Value: addr.String()},
 						AgentID:  ofm[addr.IP].AgentID,
-						Executor: s.buildExcutor(addr.IP, []ms.Resource{}),
+						Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
 						//  plus the port obtained by adding 10000 to the data port for redis cluster.
 						Resources: makeResources(t.CPU, t.MaxMem, uint64(addr.Port)),
-						Data:      []byte(fmt.Sprintf("%s:%d", addr.IP, addr.Port)),
 					}
 					data := &TaskData{
 						IP:         addr.IP,
@@ -388,13 +386,13 @@ func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	return
 }
 
-func (s *Scheduler) buildExcutor(node *chunk.Node, rs []ms.Resource) *ms.ExecutorInfo {
+func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo {
 	executorUris := []ms.CommandInfo_URI{}
 	executorUris = append(executorUris, ms.CommandInfo_URI{Value: s.c.ExecutorURL, Executable: pb.Bool(true)})
 	exec := &ms.ExecutorInfo{
 		Type:       ms.ExecutorInfo_CUSTOM,
-		ExecutorID: ms.ExecutorID{Value: node.RunID},
-		Name:       &node.Name,
+		ExecutorID: ms.ExecutorID{Value: name},
+		Name:       &name,
 		Command: &ms.CommandInfo{
 			Value: pb.String("./executor -debug -log-vl 5 -std"),
 			URIs:  executorUris,
