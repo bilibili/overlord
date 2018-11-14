@@ -104,7 +104,6 @@ func (c *CacheTask) buildTplTree() error {
 			err = c.saveTplFile(ctx,
 				fmt.Sprintf("%s/memcache.sh", instanceDir),
 				config.MemcacheScriptTpl, "memcache.sh", data)
-
 			if err != nil {
 				return err
 			}

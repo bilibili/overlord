@@ -413,7 +413,7 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		switch st := status.GetState(); st {
 		case ms.TASK_FINISHED:
 			log.Info("state finish")
-		case ms.TASK_LOST, ms.TASK_KILLED, ms.TASK_FAILED, ms.TASK_ERROR:
+		case ms.TASK_LOST, ms.TASK_FAILED, ms.TASK_ERROR:
 			taskid := e.GetUpdate().GetStatus().TaskID
 			select {
 			case s.failTask <- taskid:
@@ -421,11 +421,12 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			default:
 				log.Error("failtask chan full")
 			}
-			log.Info("Exiting because task " + status.GetTaskID().Value +
-				" is in an unexpected state " + st.String() +
-				" with reason " + status.GetReason().String() +
-				" from source " + status.GetSource().String() +
-				" with message '" + status.GetMessage() + "'")
+			// revive offer for retry fail task.
+			revice := calls.Revive()
+			if err := calls.CallNoData(context.Background(), s.cli, revice); err != nil {
+				log.Errorf("err call to revie %v", err)
+			}
+		case ms.TASK_KILLED:
 		}
 		return nil
 	}

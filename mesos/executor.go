@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"overlord/lib/proc"
 	"time"
 
 	"overlord/lib/etcd"
@@ -43,6 +44,7 @@ type Executor struct {
 	unackedUpdates map[string]executor.Call_Update
 	failedTasks    map[ms.TaskID]ms.TaskStatus // send updates for these as we can
 	shouldQuit     bool
+	p              *proc.Proc
 }
 
 const (
@@ -137,7 +139,7 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 		log.Errorf("get deploy info err %v", err)
 		return
 	}
-	err = create.SetupCacheService(dpinfo)
+	ec.p, err = create.SetupCacheService(dpinfo)
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
 	}
@@ -154,9 +156,10 @@ func (ec *Executor) monitor(tp proto.CacheType, host string) {
 		go func() {
 			var errCount int
 			for {
-				// close monitor when continuous fail ovef maxErr
+				// close monitor when continuous fail over maxErr
 				if errCount > maxErr {
 					cli.Close()
+					ec.shouldQuit = true
 					return
 				}
 				err := cli.Ping(host)
@@ -176,6 +179,11 @@ func (ec *Executor) monitor(tp proto.CacheType, host string) {
 
 // Run start executor.
 func (ec *Executor) Run(c context.Context) {
+	defer func() {
+		if ec.p != nil {
+			ec.p.Stop()
+		}
+	}()
 	var (
 		shouldReconnect = maybeReconnect(ec.cfg)
 		disconnected    = time.Now()
@@ -189,6 +197,10 @@ func (ec *Executor) Run(c context.Context) {
 		if err == nil {
 			ec.eventLoop(resp)
 			disconnected = time.Now()
+		}
+		if ec.shouldQuit {
+			log.Error("executor quit")
+			return
 		}
 		if !ec.cfg.Checkpoint {
 			log.Infof("gracefully exiting because framework checkpointing is NOT enabled")

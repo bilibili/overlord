@@ -26,7 +26,7 @@ WantedBy=multi-user.target
 //   - Thread
 const MemcacheScriptTpl = `
 #!/bin/bash
-/data/lib/memcache/{{.Version}}/bin/memcached -p {{.Port}} -A -l 0.0.0.0 -m {{.MaxMemory}} -t {{.Thread}}
+/data/lib/memcache/{{.Version}}/bin/memcached -u root -p {{.Port}} -A -l 0.0.0.0 -m {{.MaxMemory}} -t {{.Thread}}
 `
 
 // RedisServiceTpl was used to render a unit file

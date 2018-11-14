@@ -26,10 +26,14 @@ import (
 
 var (
 	_workDir  = "/data/%d"
-	mcpath    = "/data/%d/memcache.sh"
 	redispath = "/data/lib/redis/%s/bin/redis-server"
 	redisconf = "/data/%i/redis.conf"
 )
+
+// SetWorkDir set custom work dir.
+func SetWorkDir(path string) {
+	_workDir = path
+}
 
 // DeployInfo is the struct to communicate between etcd and executor
 // must be serialized and deserialized by json
@@ -138,7 +142,6 @@ func renderTplTree(tplTree map[string]string) (err error) {
 		if err != nil {
 			return
 		}
-
 		err = ioutil.WriteFile(abs, []byte(content), 0755)
 		if err != nil {
 			return
@@ -327,16 +330,16 @@ func setupSystemdServiceFile(info *DeployInfo) error {
 }
 
 // SetupCacheService will create new cache service
-func SetupCacheService(info *DeployInfo) error {
+func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
 
 	// 1. render template tree into the path
 	//   1.1 foreach fpath, content in TplTree
 	//   1.2 mkdir for fpath's basedir.
 	//   1.3 write content into conf cile.
-	err := renderTplTree(info.TplTree)
+	err = renderTplTree(info.TplTree)
 	if err != nil {
 		log.Warnf("error when render template tree")
-		return err
+		return
 	}
 
 	// 2. execute given command
@@ -345,29 +348,30 @@ func SetupCacheService(info *DeployInfo) error {
 	err = dir.MkDirAll(workdir)
 	if err != nil {
 		log.Errorf("fail to create working dir")
-		return err
+		return
 	}
 	err = renderMetaIntoFile(workdir, info)
 	if err != nil {
 		log.Errorf("fail to create meta data file due to %s", err)
-		return err
+		return
 	}
 
 	// 2. setup systemd serivce
 	//   2.1 check if binary was exists
-	exists := checkBinaryVersion(info.CacheType, info.Version)
-	if !exists {
-		//   2.2 if not, pull it from scheduler and then setup systemd config
-		if err = downloadBinary(info); err != nil {
-			return err
-		}
-		if err = setupSystemdServiceFile(info); err != nil {
-			return err
-		}
-	}
+	// exists := checkBinaryVersion(info.CacheType, info.Version)
+	// if !exists {
+	// 	//   2.2 if not, pull it from scheduler and then setup systemd config
+	// 	if err = downloadBinary(info); err != nil {
+	// 		return err
+	// 	}
+	// 	if err = setupSystemdServiceFile(info); err != nil {
+	// 		return err
+	// 	}
+	// }
 	// 3. spawn a new redis cluster service
-	p := newproc(info.CacheType, info.Version, info.Port)
-	return p.Start()
+	p = newproc(info.CacheType, info.Version, info.Port)
+	err = p.Start()
+	return
 }
 
 func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
@@ -377,11 +381,13 @@ func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
 	)
 	switch tp {
 	case proto.CacheTypeMemcache, proto.CacheTypeMemcacheBinary:
-		cmd = fmt.Sprintf(mcpath, port)
+		cmd = fmt.Sprintf(_workDir+"/memcache.sh", port)
+		os.Chmod(cmd, 0755)
+		p = proc.NewProc("sh", "-c", cmd)
 	case proto.CacheTypeRedisCluster, proto.CacheTypeRedis:
 		cmd = fmt.Sprintf(redispath, version, port)
 		arg = fmt.Sprintf(redisconf, version, port)
+		p = proc.NewProc(cmd, arg)
 	}
-	p = proc.NewProc(cmd, arg)
 	return
 }

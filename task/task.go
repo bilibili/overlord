@@ -71,10 +71,3 @@ type Task struct {
 	// ArgsValid is the function which check need to check the tasks.
 	ArgsValid func(*Task, map[string]interface{}) (bool, map[string]string) `json:"-"`
 }
-
-// Instance  detail.
-type Instance struct {
-	Name   string
-	Memory float64 // capacity of memory of the instance in MB
-	CPU    float64 // num of cpu cors if the instance
-}
