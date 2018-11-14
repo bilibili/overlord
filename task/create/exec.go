@@ -38,7 +38,7 @@ func SetWorkDir(path string) {
 // DeployInfo is the struct to communicate between etcd and executor
 // must be serialized and deserialized by json
 type DeployInfo struct {
-	// TaskID is the id of task
+	// TaskID is the id of global task
 	TaskID  string
 	Cluster string
 

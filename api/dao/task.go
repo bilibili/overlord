@@ -11,7 +11,7 @@ import (
 func (d *Dao) GetTask(ctx context.Context, taskID string) (*model.Task, error) {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	state, err := d.e.Get(subctx, fmt.Sprintf("%s/%s/state", etcd.TaskDetialDir, taskID))
+	state, err := d.e.Get(subctx, fmt.Sprintf("%s/%s/state", etcd.TaskDetailDir, taskID))
 	if err != nil {
 		return nil, err
 	}

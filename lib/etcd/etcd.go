@@ -22,8 +22,22 @@ const (
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
 	TaskDir             = "/overlord/task"
-	TaskDetialDir       = "overlord/task_detial"
+	TaskDetailDir       = "overlord/task_detail"
 	FrameWork           = "/overlord/framework"
+)
+
+// define watch event
+// get, set, delete, update, create, compareAndSwap,
+// compareAndDelete and expire
+const (
+	// ActionGet              = "get"
+	ActionSet              = "set"
+	ActionDelete           = "delete"
+	ActionUpdate           = "update"
+	ActionCreate           = "create"
+	ActionCompareAndSwap   = "compareAndSwap"
+	ActionCompareAndDelete = "compareAndDelete"
+	ActionExpire           = "expire"
 )
 
 // Node etcd kv info.
@@ -135,7 +149,7 @@ func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, er
 func (e *Etcd) SetTaskState(ctx context.Context, taskID string, state task.StateType) error {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", TaskDetialDir, taskID), state, &cli.SetOptions{})
+	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", TaskDetailDir, taskID), state, &cli.SetOptions{})
 	return err
 }
 
@@ -155,4 +169,56 @@ func (e *Etcd) WatchOnExpire(ctx context.Context, dir string) (key chan string, 
 		}
 	}()
 	return
+}
+
+// WatchOn will watch the given path forever
+func (e *Etcd) WatchOn(ctx context.Context, path string, interestings ...string) (key chan *cli.Node, err error) {
+	evtMap := make(map[string]struct{})
+	for _, interest := range interestings {
+		evtMap[interest] = struct{}{}
+	}
+	var (
+		resp *cli.Response
+	)
+
+	watcher := e.kapi.Watcher(path, &cli.WatcherOptions{Recursive: true})
+	key = make(chan *cli.Node)
+	go func() {
+		for {
+			resp, err = watcher.Next(ctx)
+			if err != nil {
+				log.Errorf("watch etcd node %s err %v", path, err)
+			}
+			if _, ok := evtMap[resp.Action]; ok {
+				key <- resp.Node
+			}
+		}
+	}()
+	return
+}
+
+// WatchOneshot will watch the key until the context was reached Done.
+func (e *Etcd) WatchOneshot(ctx context.Context, path string, interestings ...string) (key string, val string, err error) {
+	evtMap := make(map[string]struct{})
+	for _, interest := range interestings {
+		evtMap[interest] = struct{}{}
+	}
+
+	var (
+		resp *cli.Response
+	)
+
+	watcher := e.kapi.Watcher(path, &cli.WatcherOptions{Recursive: true})
+	for {
+		resp, err = watcher.Next(ctx)
+		if err != nil {
+			log.Errorf("watch etcd node %s err %v", path, err)
+		}
+
+		if _, ok := evtMap[resp.Action]; ok {
+			key = resp.Node.Key
+			val = resp.Node.Value
+			return
+		}
+	}
 }

@@ -17,13 +17,9 @@ var (
 	StateFail StateType = "fail"
 )
 
-
 // define cluster deploying state enum
 var (
 	StateChunking StateType = "deploy_chunking"
-	StateSpawn StateType = "deploy_spawn"
-	// first wait consistent
-	StateWaiting StateType = "deploy_wait"
-	StateConsistent StateType = "deploy_wait_consistent"
-	StateBalancing  StateType = "deploy_balancing"
+	// StateNeedBalance is the state which all executer has ben succeed lunched the cache instance
+	StateNeedBalance StateType = "deploy_needbalance"
 )
