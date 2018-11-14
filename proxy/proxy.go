@@ -2,6 +2,7 @@ package proxy
 
 import (
 	errs "errors"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,7 +57,7 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
 		for _, cc := range ccs {
-			go p.serve(cc)
+			p.serve(cc)
 		}
 	})
 }
@@ -72,6 +73,10 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		panic(err)
 	}
 	log.Infof("overlord proxy cluster[%s] addr(%s) already listened", cc.Name, cc.ListenAddr)
+	go p.accept(cc, l, forwarder)
+}
+
+func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwarder) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
