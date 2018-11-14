@@ -23,7 +23,7 @@ const (
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
 	TaskDir             = "/overlord/task"
-	TaskDetailDir       = "overlord/task_detail"
+	TaskDetailDir       = "/overlord/task_detail"
 	FrameWork           = "/overlord/framework"
 )
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -237,7 +238,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					for _, node := range ck.Nodes {
 						task := ms.TaskInfo{
 							Name:     node.Name,
-							TaskID:   ms.TaskID{Value: node.RunID},
+							TaskID:   ms.TaskID{Value: node.Addr() + "-" + strconv.FormatInt(int64(time.Now().Second()), 10)},
 							AgentID:  ofm[node.Name].AgentID,
 							Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
@@ -304,7 +305,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				for _, addr := range dist.Addrs {
 					task := ms.TaskInfo{
 						Name:     addr.IP,
-						TaskID:   ms.TaskID{Value: addr.String()},
+						TaskID:   ms.TaskID{Value: addr.String() + "-" + strconv.FormatInt(int64(time.Now().Second()), 10)},
 						AgentID:  ofm[addr.IP].AgentID,
 						Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
 						//  plus the port obtained by adding 10000 to the data port for redis cluster.
@@ -428,6 +429,10 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			}
 		case ms.TASK_KILLED:
 		case ms.TASK_RUNNING:
+			taskid := status.TaskID.String()
+			idx := strings.IndexByte(taskid, '-')
+			addr := taskid[:idx]
+			s.db.Set(ctx, etcd.InstanceDirPrefix+addr, task.StateRunning)
 		}
 
 		return nil
