@@ -332,9 +332,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				}
 				ttask := taskEle
 				s.task.Remove(ttask)
-
+				return nil
 			default:
-				panic("not support")
+				ttask := taskEle
+				taskEle = taskEle.Next()
+				s.task.Remove(ttask)
+				log.Errorf("undefine job type,delete undefine task %v", ttask)
 			}
 		}
 		// if there don't have any task,decline all offers and suppress offer envent.
@@ -357,7 +360,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 	s.rwlock.RLock()
 	defer s.rwlock.RUnlock()
 	task, ok := s.taskInfos[t.Value]
-	log.Info("try recover task", task, ok)
+	log.Infof("try recover task(%v)", task)
 	if !ok {
 		return
 	}
