@@ -23,7 +23,7 @@ const (
 )
 
 // GenTryBalanceTask generate balanced task into task
-func GenTryBalanceTask(taskID string, clusterName string, e *etcd.Etcd) (*TryBalanceTask, error) {
+func GenTryBalanceTask(clusterName string, e *etcd.Etcd) (*TryBalanceTask, error) {
 	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -81,7 +81,6 @@ func GenTryBalanceTask(taskID string, clusterName string, e *etcd.Etcd) (*TryBal
 	}
 
 	tbi := &TryBalanceInfo{
-		TaskID:      taskID,
 		TraceTaskID: info.TaskID,
 		Cluster:     clusterName,
 		Chunks:      info.Chunks,
@@ -98,7 +97,6 @@ func GenTryBalanceTask(taskID string, clusterName string, e *etcd.Etcd) (*TryBal
 
 // TryBalanceInfo is the task to balance the whole cluster
 type TryBalanceInfo struct {
-	TaskID      string
 	TraceTaskID string
 	Cluster     string
 	Chunks      []*chunk.Chunk
@@ -170,7 +168,6 @@ func (b *TryBalanceTask) Balance() (err error) {
 	sub, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err = b.e.SetTaskState(sub, b.info.TaskID, task.StateRunning)
 	b.client.SetChunks(b.info.Chunks)
 
 	isTrace := b.info.TraceTaskID == ""
@@ -178,7 +175,7 @@ func (b *TryBalanceTask) Balance() (err error) {
 		// should not report status of task
 		log.Info("skip report task by unset TraceTaskID")
 	} else {
-		log.Infof("trying to balanced the cluster %s with trace task %s in task %s", b.info.Cluster, b.info.TraceTaskID, b.info.TaskID)
+		log.Infof("trying to balanced the cluster %s with trace task %s in balancer", b.info.Cluster, b.info.TraceTaskID)
 	}
 
 	if isTrace {
@@ -217,11 +214,6 @@ func (b *TryBalanceTask) Balance() (err error) {
 
 	if isTrace {
 		err = b.e.SetTaskState(sub, b.info.TraceTaskID, TraceTaskBalanced)
-		if err != nil {
-			return
-		}
 	}
-
-	err = b.e.SetTaskState(sub, b.info.TaskID, task.StateDone)
 	return
 }

@@ -77,7 +77,15 @@ func (c *Client) Execute(node, command string) (*cmd, error) {
 		return nil, ErrNoNode
 	}
 
-	return n.execute(command)
+	cmd, err := n.execute(command)
+	if err != nil {
+		oldN := c.cluster.removeNode(node)
+		if oldN != nil {
+			_ = oldN.Close()
+		}
+	}
+
+	return cmd, err
 }
 
 // IsConsistent will trying to to check if the cluster nodes info is consistent.
@@ -175,6 +183,12 @@ func (c *Client) Ping(node string) (err error) {
 
 type cluster struct {
 	addrMap map[string]*node
+}
+
+func (c *cluster) removeNode(name string) *node {
+	n := c.addrMap[name]
+	delete(c.addrMap, name)
+	return n
 }
 
 func (c *cluster) getNode(name string) *node {
