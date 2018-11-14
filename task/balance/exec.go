@@ -40,6 +40,35 @@ func GenTryBalanceTask(taskID string, clusterName string, e *etcd.Etcd) (*TryBal
 		return nil, err
 	}
 
+	nodes, err := e.LS(ctx, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, clusterName))
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		allIsRunning := true
+		for _, node := range nodes {
+			val, err := e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
+			if err != nil {
+				return nil, err
+			}
+			allIsRunning = allIsRunning && (val == create.SubStateRunning)
+			if !allIsRunning {
+				break
+			}
+		}
+
+		if allIsRunning {
+			break
+		}
+	}
+
 	for {
 		_, val, err := e.WatchOneshot(ctx, fmt.Sprintf("%s/%s/state", etcd.TaskDetailDir, info.TaskID), etcd.ActionSet)
 		if err != nil {

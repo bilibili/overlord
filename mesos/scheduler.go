@@ -427,7 +427,9 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 				log.Errorf("err call to revie %v", err)
 			}
 		case ms.TASK_KILLED:
+		case ms.TASK_RUNNING:
 		}
+
 		return nil
 	}
 }

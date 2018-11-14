@@ -143,8 +143,19 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
 	}
+
+	instanceDir := fmt.Sprintf(etcd.InstanceDir, tdata.IP, tdata.Port)
+	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/state", instanceDir), create.SubStateRunning)
+	if err != nil {
+		log.Errorf("set state to %s/state err due %v", instanceDir, err)
+	}
+
 	host := fmt.Sprintf("%s:%d", tdata.IP, tdata.Port)
-	ec.db.Set(context.Background(), fmt.Sprintf("%s/%s", etcd.HeartBeatDir, host), task.TaskID.String())
+	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/%s", etcd.HeartBeatDir, host), task.TaskID.String())
+	if err != nil {
+		log.Errorf("set heartbeat key err %v", err)
+	}
+
 	ec.monitor(dpinfo.CacheType, host)
 	return
 }

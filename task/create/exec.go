@@ -383,7 +383,7 @@ func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
 	case proto.CacheTypeMemcache, proto.CacheTypeMemcacheBinary:
 		cmd = fmt.Sprintf(_workDir+"/memcache.sh", port)
 		os.Chmod(cmd, 0755)
-		p = proc.NewProc("sh", "-c", cmd)
+		p = proc.NewProc("/bin/bash", "-c", cmd)
 	case proto.CacheTypeRedisCluster, proto.CacheTypeRedis:
 		cmd = fmt.Sprintf(redispath, version, port)
 		arg = fmt.Sprintf(redisconf, version, port)

@@ -18,6 +18,7 @@ const (
 	FRAMEWORK           = "/overlord/framework"
 	ClusterInstancesDir = "/overlord/clusters/%s/instances/"
 	InstanceDir         = "/overlord/instances/%s:%d"
+	InstanceDirPrefix   = "/ovelord/instances"
 	HeartBeatDir        = "/overlord/heartbeat"
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"

@@ -17,6 +17,12 @@ const (
 	ClusterSlotsCount = 16384
 )
 
+// define subtask state
+const (
+	SubStatePending = "pending"
+	SubStateRunning = "running"
+)
+
 // RedisClusterInfo is the arguments for create cluster task which was validated by apiserver.
 type RedisClusterInfo struct {
 	TaskID string
@@ -130,6 +136,11 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 			}
 
 			err = c.e.Set(ctx, fmt.Sprintf("%s/version", instanceDir), info.Version)
+			if err != nil {
+				return err
+			}
+
+			err = c.e.Set(ctx, fmt.Sprintf("%s/state", instanceDir), SubStatePending)
 			if err != nil {
 				return err
 			}
