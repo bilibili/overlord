@@ -227,10 +227,10 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					Version:   t.Version,
 					MasterNum: t.Num,
 				})
-				// if err != nil {
-				// 	log.Errorf("create cluster err %v", err)
-				// 	break
-				// }
+				if err != nil {
+					log.Errorf("create cluster err %v", err)
+					continue
+				}
 				for _, offer := range offers {
 					ofm[offer.GetHostname()] = offer
 				}
