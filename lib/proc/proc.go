@@ -25,9 +25,16 @@ func NewProc(name string, arg ...string) *Proc {
 }
 
 // Start start proc.
-func (p *Proc) Start() error {
+func (p *Proc) Start() (err error) {
 	log.Infof("start service %s %v", p.cmd.Path, p.cmd.Args)
-	return p.cmd.Start()
+	err = p.cmd.Start()
+	if err != nil {
+		return
+	}
+	go func() {
+		log.Infof("fork command exit with err %v", p.cmd.Wait())
+	}()
+	return
 }
 
 // Stop stop process by useing cancel.Stop

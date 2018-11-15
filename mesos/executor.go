@@ -156,7 +156,6 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 	if err != nil {
 		log.Errorf("set heartbeat key err %v", err)
 	}
-
 	ec.monitor(dpinfo.CacheType, host)
 	return
 }
@@ -253,6 +252,7 @@ func (ec *Executor) eventLoop(resp encoding.Decoder) {
 	}
 
 }
+
 func (ec *Executor) sendFailedTasks() {
 	for taskID, status := range ec.failedTasks {
 		updateErr := ec.update(status)

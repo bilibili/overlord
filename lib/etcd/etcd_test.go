@@ -3,8 +3,8 @@ package etcd
 import (
 	"context"
 	"encoding/json"
-	"overlord/proto"
 	"overlord/job"
+	"overlord/proto"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,16 +36,16 @@ func TestSet(t *testing.T) {
 	err = e.Set(ctx, "/overlord/jobs/job1", string(bs))
 	assert.NoError(t, err)
 
-	redisjob := &job.Job{
-		Name:      "test",
-		CacheType: proto.CacheTypeRedis,
-		Version:   "4.0.11",
-		Num:       6,
-		MaxMem:    10,
-		CPU:       0.1,
-	}
-	bs, err = json.Marshal(redisjob)
-	assert.NoError(t, err)
-	err = e.Set(ctx, "/overlord/jobs/job12", string(bs))
-	assert.NoError(t, err)
+	// redisjob := &job.Job{
+	// 	Name:      "test",
+	// 	CacheType: proto.CacheTypeRedis,
+	// 	Version:   "4.0.11",
+	// 	Num:       6,
+	// 	MaxMem:    10,
+	// 	CPU:       0.1,
+	// }
+	// bs, err = json.Marshal(redisjob)
+	// assert.NoError(t, err)
+	// err = e.Set(ctx, "/overlord/jobs/job12", string(bs))
+	// assert.NoError(t, err)
 }

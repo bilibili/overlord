@@ -238,7 +238,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					for _, node := range ck.Nodes {
 						task := ms.TaskInfo{
 							Name:     node.Name,
-							TaskID:   ms.TaskID{Value: node.Addr() + "-" + strconv.FormatInt(int64(time.Now().Second()), 10)},
+							TaskID:   ms.TaskID{Value: node.Addr() + "-" + strconv.FormatInt(int64(time.Now().Unix()), 10)},
 							AgentID:  ofm[node.Name].AgentID,
 							Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
 							//  plus the port obtained by adding 10000 to the data port for redis cluster.
@@ -306,7 +306,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				for _, addr := range dist.Addrs {
 					task := ms.TaskInfo{
 						Name:     addr.IP,
-						TaskID:   ms.TaskID{Value: addr.String() + "-" + strconv.FormatInt(int64(time.Now().Second()), 10)},
+						TaskID:   ms.TaskID{Value: addr.String() + "-" + strconv.FormatInt(int64(time.Now().Unix()), 10)},
 						AgentID:  ofm[addr.IP].AgentID,
 						Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
 						//  plus the port obtained by adding 10000 to the data port for redis cluster.
