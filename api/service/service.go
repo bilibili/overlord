@@ -27,8 +27,3 @@ type Service struct {
 func (s *Service) CreateCluster(p *model.ParamCluster) (string, error) {
 	return s.d.CreateCluster(context.Background(), p)
 }
-
-// GetJob will get job by given jobID string
-func (s *Service) GetJob(jobID string) (*model.Job, error) {
-	return s.d.GetJob(context.Background(), jobID)
-}

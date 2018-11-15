@@ -70,7 +70,7 @@ func (s *Scheduler) Set(fid string) (err error) {
 // call run to start scheduler.
 func (s *Scheduler) Run() (err error) {
 	// watch task dir to get new task.
-	ch, err := s.db.Watch(context.Background(), etcd.JobDir)
+	ch, err := s.db.Watch(context.Background(), etcd.JobsDir)
 	if err != nil {
 		log.Errorf("start watch task fail err %v", err)
 		return

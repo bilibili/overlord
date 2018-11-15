@@ -72,7 +72,7 @@ func (d *Dao) saveJob(ctx context.Context, t *job.Job) (string, error) {
 		return "", err
 	}
 
-	jobID, err := d.e.GenID(ctx, etcd.JobDir, sb.String())
+	jobID, err := d.e.GenID(ctx, etcd.JobsDir, sb.String())
 	if err != nil {
 		return "", err
 	}

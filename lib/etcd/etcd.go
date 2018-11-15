@@ -22,7 +22,7 @@ const (
 	HeartBeatDir        = "/overlord/heartbeat"
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
-	JobDir              = "/overlord/jobs"
+	JobsDir              = "/overlord/jobs"
 	JobDetailDir        = "/overlord/job_detail"
 	FrameWork           = "/overlord/framework"
 )
@@ -104,7 +104,7 @@ func (e *Etcd) Get(ctx context.Context, k string) (v string, err error) {
 
 // LS list kv in this dir.
 func (e *Etcd) LS(ctx context.Context, dir string) (nodes []*Node, err error) {
-	resp, err := e.kapi.Get(ctx, dir, &cli.GetOptions{Recursive: true})
+	resp, err := e.kapi.Get(ctx, dir, &cli.GetOptions{Recursive: true, Sort: true})
 	if err != nil {
 		return
 	}

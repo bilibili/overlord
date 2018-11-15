@@ -21,3 +21,37 @@ func getJob(c *gin.Context) {
 
 	c.JSON(http.StatusOK, t)
 }
+
+func getJobs(c *gin.Context) {
+	j, err := svc.GetJobs()
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	listJSON(c, j, len(j))
+}
+
+type list struct {
+	Count int         `json:"count"`
+	Items interface{} `json:"items"`
+}
+
+func empty() *list {
+	return &list{
+		Count: 0,
+		Items: []struct{}{},
+	}
+}
+
+func listJSON(c *gin.Context, vals interface{}, count int) {
+	if count == 0 {
+		c.JSON(http.StatusOK, empty())
+		return
+	}
+
+	c.JSON(http.StatusOK, &list{
+		Count: count,
+		Items: vals,
+	})
+}
