@@ -175,10 +175,23 @@ func (c *Client) TryBalance() error {
 	return nil
 }
 
-func (c *Client) Ping(node string) (err error) {
-	n := c.cluster.getNode(node)
-	_, err = n.execute("ping")
+type Conn struct {
+	conn *node
+}
+
+func NewConn(addr string) *Conn {
+	return &Conn{
+		conn: newNode(addr),
+	}
+}
+
+func (c *Conn) Ping() (err error) {
+	_, err = c.conn.execute("ping")
 	return
+}
+
+func (c *Conn) Close() {
+	c.conn.Close()
 }
 
 type cluster struct {

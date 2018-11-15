@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"overlord/lib/myredis"
 	"overlord/lib/proc"
 	"time"
 
 	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"overlord/lib/myredis"
+	"overlord/lib/memcache"
 	"overlord/proto"
 	"overlord/task/create"
 
@@ -161,31 +162,40 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 }
 
 func (ec *Executor) monitor(tp proto.CacheType, host string) {
+	var cli Pinger
 	switch tp {
 	case proto.CacheTypeRedis, proto.CacheTypeRedisCluster:
-		cli := myredis.New()
-		go func() {
-			var errCount int
-			for {
-				// close monitor when continuous fail over maxErr
-				if errCount > maxErr {
-					cli.Close()
-					ec.shouldQuit = true
-					return
-				}
-				err := cli.Ping(host)
-				// refresh ttl no sucess.
-				if err == nil {
-					errCount = 0
-					ec.db.Refresh(context.Background(), host, nodeTTL)
-				} else {
-					errCount++
-					log.Errorf("redis health check err %v", err)
-				}
-				time.Sleep(time.Second)
-			}
-		}()
+		cli = myredis.NewConn(host)
+	case proto.CacheTypeMemcache:
+		cli = memcache.New(host, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
 	}
+	go func() {
+		var errCount int
+		for {
+			// close monitor when continuous fail over maxErr
+			if errCount > maxErr {
+				cli.Close()
+				ec.shouldQuit = true
+				return
+			}
+			err := cli.Ping()
+			// refresh ttl no sucess.
+			if err == nil {
+				errCount = 0
+				ec.db.Refresh(context.Background(), host, nodeTTL)
+			} else {
+				errCount++
+				log.Errorf("redis health check err %v", err)
+			}
+			time.Sleep(time.Second)
+		}
+	}()
+}
+
+// Pinger service.
+type Pinger interface {
+	Ping() error
+	Close()
 }
 
 // Run start executor.

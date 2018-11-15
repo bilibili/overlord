@@ -318,6 +318,10 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 						DBEndPoint: s.c.DBEndPoint,
 					}
 					task.Data, _ = json.Marshal(data)
+					s.rwlock.Lock()
+					s.taskInfos[task.TaskID.Value] = &task
+					s.rwlock.Unlock()
+					fmt.Println(s.taskInfos)
 					offerid[ofm[addr.IP].ID] = struct{}{}
 					tasks[addr.IP] = append(tasks[addr.IP], task)
 				}

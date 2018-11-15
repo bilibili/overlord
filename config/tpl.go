@@ -92,7 +92,7 @@ auto-aof-rewrite-min-size 64mb
 aof-load-truncated yes
 aof-use-rdb-preamble no
 lua-time-limit 5000
-cluster-enabled false
+cluster-enabled no
 #cluster-config-file nodes.conf
 #cluster-node-timeout 15000
 slowlog-log-slower-than 10000
