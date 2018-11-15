@@ -5,33 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"overlord/config"
-	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 	"overlord/proto"
 	"strings"
 	"text/template"
 )
-
-// CacheInfo is the server side create cache info.
-type CacheInfo struct {
-	JobID string
-
-	Name string
-
-	CacheType proto.CacheType
-
-	MaxMemory float64
-
-	Number int
-
-	// for redis : it will be ignore becasue redis only run 1 cpu at all.
-	Thread int
-
-	Version string
-
-	Dist *chunk.Dist
-}
 
 // NewCacheJob will create deploy cache job.
 func NewCacheJob(e *etcd.Etcd, info *CacheInfo) *CacheJob {

@@ -218,15 +218,16 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					tasks   = make(map[string][]ms.TaskInfo)
 					offerid = make(map[ms.OfferID]struct{})
 				)
-				rtask := create.NewRedisClusterJob(s.db)
-				err = rtask.Create(&create.RedisClusterInfo{
+				rtask := create.NewRedisClusterJob(s.db, &create.CacheInfo{
 					Chunks:    chunks,
+					CacheType: t.CacheType,
 					MaxMemory: t.MaxMem,
 					Name:      t.Name,
 					JobID:     t.ID,
 					Version:   t.Version,
-					MasterNum: t.Num,
+					Number:    t.Num,
 				})
+				err = rtask.Create()
 				if err != nil {
 					log.Errorf("create cluster err %v", err)
 					continue
