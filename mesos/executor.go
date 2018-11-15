@@ -9,11 +9,11 @@ import (
 	"overlord/lib/proc"
 	"time"
 
+	"overlord/job/create"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 	"overlord/lib/memcache"
 	"overlord/proto"
-	"overlord/task/create"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 	"github.com/mesos/mesos-go/api/v1/lib/backoff"

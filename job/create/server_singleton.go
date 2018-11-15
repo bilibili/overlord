@@ -15,7 +15,7 @@ import (
 
 // CacheInfo is the server side create cache info.
 type CacheInfo struct {
-	TaskID string
+	JobID string
 
 	Name string
 
@@ -33,18 +33,18 @@ type CacheInfo struct {
 	Dist *chunk.Dist
 }
 
-// NewCacheTask will create deploy cache task.
-func NewCacheTask(e *etcd.Etcd, info *CacheInfo) *CacheTask {
-	return &CacheTask{e: e, info: info}
+// NewCacheJob will create deploy cache job.
+func NewCacheJob(e *etcd.Etcd, info *CacheInfo) *CacheJob {
+	return &CacheJob{e: e, info: info}
 }
 
-// CacheTask is the task for framework running
-type CacheTask struct {
+// CacheJob is the job for framework running
+type CacheJob struct {
 	e    *etcd.Etcd
 	info *CacheInfo
 }
 
-func (c *CacheTask) saveTplFile(ctx context.Context, path, conf, name string, data map[string]interface{}) error {
+func (c *CacheJob) saveTplFile(ctx context.Context, path, conf, name string, data map[string]interface{}) error {
 	tpl, err := template.New(name).Parse(conf)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (c *CacheTask) saveTplFile(ctx context.Context, path, conf, name string, da
 	return err
 }
 
-func (c *CacheTask) buildTplTree() error {
+func (c *CacheJob) buildTplTree() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -114,7 +114,7 @@ func (c *CacheTask) buildTplTree() error {
 			return err
 		}
 
-		err = c.e.Set(ctx, fmt.Sprintf("%s/taskid", instanceDir), c.info.TaskID)
+		err = c.e.Set(ctx, fmt.Sprintf("%s/jobid", instanceDir), c.info.JobID)
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (c *CacheTask) buildTplTree() error {
 	return nil
 }
 
-func (c *CacheTask) setupInstanceDir() error {
+func (c *CacheJob) setupInstanceDir() error {
 	sub, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
@@ -145,7 +145,7 @@ func (c *CacheTask) setupInstanceDir() error {
 }
 
 // Create Cache instance
-func (c *CacheTask) Create() error {
+func (c *CacheJob) Create() error {
 	err := c.setupInstanceDir()
 	if err != nil {
 		return err

@@ -1,6 +1,6 @@
-package task
+package job
 
-// StateType is the state enum for task
+// StateType is the state enum for job
 type StateType = string
 
 // define status enum

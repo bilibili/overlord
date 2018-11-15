@@ -19,7 +19,7 @@ func Run(cfg *config.ServerConfig, s *service.Service) {
 	engine := gin.Default()
 	initRouter(engine)
 	if err := engine.Run(cfg.Listen); err != nil {
-		log.Error("engine start fail due to %v", err)
+		log.Errorf("engine start fail due to %v", err)
 		panic(err)
 	}
 }
@@ -29,6 +29,7 @@ func initRouter(e *gin.Engine) {
 	clusters.POST("/", createCluster)
 	clusters.GET("/", getCluster)
 
-	tasks := e.Group("/tasks")
-	tasks.GET("/:task_id", getTask)
+	jobs := e.Group("/jobs")
+	jobs.GET("/", getJobs)
+	jobs.GET("/:job_id", getJob)
 }

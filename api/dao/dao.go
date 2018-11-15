@@ -50,11 +50,11 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 		return "", err
 	}
 
-	t, err := d.createCreateClusterTask(p)
+	t, err := d.createCreateClusterJob(p)
 	if err != nil {
 		log.Infof("create fail due to %s", err)
 		return "", err
 	}
 
-	return d.saveTask(subctx, t)
+	return d.saveJob(subctx, t)
 }

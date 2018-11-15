@@ -8,22 +8,22 @@ import (
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 	"overlord/lib/myredis"
-	"overlord/task"
-	"overlord/task/create"
+	"overlord/job"
+	"overlord/job/create"
 	"strings"
 	"time"
 )
 
 // define state
 const (
-	TraceTaskWaitConsistent = "cluster_wait_consistent"
-	TraceTaskTryBalancing   = "cluster_try_balancing"
-	TraceTaskBalanced       = "cluster_finally_balanced"
-	TraceTaskUnBalanced     = "cluster_finally_not_balanced"
+	TraceJobWaitConsistent = "cluster_wait_consistent"
+	TraceJobTryBalancing   = "cluster_try_balancing"
+	TraceJobBalanced       = "cluster_finally_balanced"
+	TraceJobUnBalanced     = "cluster_finally_not_balanced"
 )
 
-// GenTryBalanceTask generate balanced task into task
-func GenTryBalanceTask(clusterName string, e *etcd.Etcd) (*TryBalanceTask, error) {
+// GenTryBalanceJob generate balanced job into job
+func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) {
 	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,23 +70,23 @@ func GenTryBalanceTask(clusterName string, e *etcd.Etcd) (*TryBalanceTask, error
 	}
 
 	for {
-		_, val, err := e.WatchOneshot(ctx, fmt.Sprintf("%s/%s/state", etcd.TaskDetailDir, info.TaskID), etcd.ActionSet)
+		_, val, err := e.WatchOneshot(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID), etcd.ActionSet)
 		if err != nil {
 			return nil, err
 		}
 
-		if val == task.StateNeedBalance {
+		if val == job.StateNeedBalance {
 			break
 		}
 	}
 
 	tbi := &TryBalanceInfo{
-		TraceTaskID: info.TaskID,
+		TraceJobID:  info.JobID,
 		Cluster:     clusterName,
 		Chunks:      info.Chunks,
 	}
 
-	tbt := &TryBalanceTask{
+	tbt := &TryBalanceJob{
 		info:   tbi,
 		e:      e,
 		client: myredis.New(),
@@ -95,21 +95,21 @@ func GenTryBalanceTask(clusterName string, e *etcd.Etcd) (*TryBalanceTask, error
 	return tbt, nil
 }
 
-// TryBalanceInfo is the task to balance the whole cluster
+// TryBalanceInfo is the job to balance the whole cluster
 type TryBalanceInfo struct {
-	TraceTaskID string
+	TraceJobID string
 	Cluster     string
 	Chunks      []*chunk.Chunk
 }
 
-// TryBalanceTask is the struct descript balance task.
-type TryBalanceTask struct {
+// TryBalanceJob is the struct descript balance job.
+type TryBalanceJob struct {
 	info   *TryBalanceInfo
 	e      *etcd.Etcd
 	client *myredis.Client
 }
 
-func (b *TryBalanceTask) waitForConsistent(ctx context.Context) (err error) {
+func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 	var consistent = false
 	for {
 		select {
@@ -131,7 +131,7 @@ func (b *TryBalanceTask) waitForConsistent(ctx context.Context) (err error) {
 	}
 }
 
-func (b *TryBalanceTask) tryBalance(ctx context.Context) (err error) {
+func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 	var (
 		balanced = false
 	)
@@ -161,8 +161,8 @@ func (b *TryBalanceTask) tryBalance(ctx context.Context) (err error) {
 	}
 }
 
-// Balance will run balance task
-func (b *TryBalanceTask) Balance() (err error) {
+// Balance will run balance job
+func (b *TryBalanceJob) Balance() (err error) {
 	nodeNum := len(b.info.Chunks) * 4
 	timeout := time.Second*time.Duration(300) + time.Second*time.Duration(nodeNum*10)
 	sub, cancel := context.WithTimeout(context.Background(), timeout)
@@ -170,16 +170,16 @@ func (b *TryBalanceTask) Balance() (err error) {
 
 	b.client.SetChunks(b.info.Chunks)
 
-	isTrace := b.info.TraceTaskID == ""
+	isTrace := b.info.TraceJobID == ""
 	if isTrace {
-		// should not report status of task
-		log.Info("skip report task by unset TraceTaskID")
+		// should not report status of job
+		log.Info("skip report job by unset TraceJobID")
 	} else {
-		log.Infof("trying to balanced the cluster %s with trace task %s in balancer", b.info.Cluster, b.info.TraceTaskID)
+		log.Infof("trying to balanced the cluster %s with trace job %s in balancer", b.info.Cluster, b.info.TraceJobID)
 	}
 
 	if isTrace {
-		err = b.e.SetTaskState(sub, b.info.TraceTaskID, TraceTaskWaitConsistent)
+		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobWaitConsistent)
 		if err != nil {
 			return
 		}
@@ -190,7 +190,7 @@ func (b *TryBalanceTask) Balance() (err error) {
 	}
 
 	if isTrace {
-		err = b.e.SetTaskState(sub, b.info.TraceTaskID, TraceTaskTryBalancing)
+		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobTryBalancing)
 		if err != nil {
 			return
 		}
@@ -201,7 +201,7 @@ func (b *TryBalanceTask) Balance() (err error) {
 
 		if err == context.DeadlineExceeded {
 			if isTrace {
-				err = b.e.SetTaskState(sub, b.info.TraceTaskID, TraceTaskUnBalanced)
+				err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobUnBalanced)
 				if err != nil {
 					return
 				}
@@ -213,7 +213,7 @@ func (b *TryBalanceTask) Balance() (err error) {
 	}
 
 	if isTrace {
-		err = b.e.SetTaskState(sub, b.info.TraceTaskID, TraceTaskBalanced)
+		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobBalanced)
 	}
 	return
 }

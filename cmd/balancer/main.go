@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"overlord/config"
+	"overlord/job/balance"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
-	"overlord/task/balance"
 
 	"strings"
 )
@@ -36,13 +36,13 @@ func main() {
 		return
 	}
 
-	t, err := balance.GenTryBalanceTask(cluster, e)
+	job, err := balance.GenTryBalanceJob(cluster, e)
 	if err != nil {
-		log.Errorf("fail to init balance %s task due %v", cluster, err)
+		log.Errorf("fail to init balance %s job due %v", cluster, err)
 		return
 	}
 
-	err = t.Balance()
+	err = job.Balance()
 	if err != nil {
 		log.Errorf("balance cluster %s err due %v", cluster, err)
 	} else {

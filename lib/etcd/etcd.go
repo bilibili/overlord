@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"overlord/job"
 	"overlord/lib/log"
-	"overlord/task"
 
 	cli "go.etcd.io/etcd/client"
 )
@@ -22,8 +22,8 @@ const (
 	HeartBeatDir        = "/overlord/heartbeat"
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
-	TaskDir             = "/overlord/task"
-	TaskDetailDir       = "/overlord/task_detail"
+	JobsDir              = "/overlord/jobs"
+	JobDetailDir        = "/overlord/job_detail"
 	FrameWork           = "/overlord/framework"
 )
 
@@ -104,7 +104,7 @@ func (e *Etcd) Get(ctx context.Context, k string) (v string, err error) {
 
 // LS list kv in this dir.
 func (e *Etcd) LS(ctx context.Context, dir string) (nodes []*Node, err error) {
-	resp, err := e.kapi.Get(ctx, dir, &cli.GetOptions{Recursive: true})
+	resp, err := e.kapi.Get(ctx, dir, &cli.GetOptions{Recursive: true, Sort: true})
 	if err != nil {
 		return
 	}
@@ -146,11 +146,11 @@ func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, er
 	return resp.Node.Key[idx+1:], nil
 }
 
-// SetTaskState will change task state.
-func (e *Etcd) SetTaskState(ctx context.Context, taskID string, state task.StateType) error {
+// SetJobState will change job state.
+func (e *Etcd) SetJobState(ctx context.Context, jobID string, state job.StateType) error {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", TaskDetailDir, taskID), state, &cli.SetOptions{})
+	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", JobDetailDir, jobID), state, &cli.SetOptions{})
 	return err
 }
 

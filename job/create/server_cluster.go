@@ -17,15 +17,15 @@ const (
 	ClusterSlotsCount = 16384
 )
 
-// define subtask state
+// define subjob state
 const (
 	SubStatePending = "pending"
 	SubStateRunning = "running"
 )
 
-// RedisClusterInfo is the arguments for create cluster task which was validated by apiserver.
+// RedisClusterInfo is the arguments for create cluster job which was validated by apiserver.
 type RedisClusterInfo struct {
-	TaskID string
+	JobID string
 	Name   string
 	// MaxMemory in MB
 	MaxMemory float64
@@ -47,20 +47,20 @@ type RedisClusterInfo struct {
 	IDMap map[string]map[int]string
 }
 
-// RedisClusterTask description a task for create new cluster.
-type RedisClusterTask struct {
+// RedisClusterJob description a job for create new cluster.
+type RedisClusterJob struct {
 	e *etcd.Etcd
 }
 
-// NewRedisClusterTask will create new Redis cluster.
-func NewRedisClusterTask(e *etcd.Etcd) *RedisClusterTask {
-	return &RedisClusterTask{
+// NewRedisClusterJob will create new Redis cluster.
+func NewRedisClusterJob(e *etcd.Etcd) *RedisClusterJob {
+	return &RedisClusterJob{
 		e: e,
 	}
 }
 
 // Create creates new cluster and wait for cluster done
-func (c *RedisClusterTask) Create(info *RedisClusterInfo) error {
+func (c *RedisClusterJob) Create(info *RedisClusterInfo) error {
 	err := c.setupIDMap(info)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (c *RedisClusterTask) Create(info *RedisClusterInfo) error {
 	return err
 }
 
-func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
+func (c *RedisClusterJob) buildTplTree(info *RedisClusterInfo) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -130,7 +130,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 				return err
 			}
 
-			err = c.e.Set(ctx, fmt.Sprintf("%s/taskid", instanceDir), info.TaskID)
+			err = c.e.Set(ctx, fmt.Sprintf("%s/jobid", instanceDir), info.JobID)
 			if err != nil {
 				return err
 			}
@@ -150,7 +150,7 @@ func (c *RedisClusterTask) buildTplTree(info *RedisClusterInfo) (err error) {
 	return nil
 }
 
-func (c *RedisClusterTask) divideSlots(info *RedisClusterInfo) {
+func (c *RedisClusterJob) divideSlots(info *RedisClusterInfo) {
 	per := ClusterSlotsCount / info.MasterNum
 	left := ClusterSlotsCount % info.MasterNum
 	base := 0
@@ -180,7 +180,7 @@ func (c *RedisClusterTask) divideSlots(info *RedisClusterInfo) {
 	}
 }
 
-func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
+func (c *RedisClusterJob) setupSlaveOf(info *RedisClusterInfo) {
 	for _, chunk := range info.Chunks {
 		for _, node := range chunk.Nodes {
 			id := info.IDMap[node.Name][node.Port]
@@ -192,7 +192,7 @@ func (c *RedisClusterTask) setupSlaveOf(info *RedisClusterInfo) {
 	}
 }
 
-func (c *RedisClusterTask) setupIDMap(info *RedisClusterInfo) error {
+func (c *RedisClusterJob) setupIDMap(info *RedisClusterInfo) error {
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, info.Name)
 	hostmap := chunk.GetHostCountInChunks(info.Chunks)
 	idMap := make(map[string]map[int]string)

@@ -38,8 +38,8 @@ func SetWorkDir(path string) {
 // DeployInfo is the struct to communicate between etcd and executor
 // must be serialized and deserialized by json
 type DeployInfo struct {
-	// TaskID is the id of global task
-	TaskID  string
+	// JobID is the id of global job
+	JobID  string
 	Cluster string
 
 	CacheType proto.CacheType
@@ -112,7 +112,7 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	}
 	// fileserver is not required,ignore fileserver err
 	info.FileServer, _ = e.Get(sub, "/fileserver")
-	info.TaskID, err = e.Get(sub, fmt.Sprintf("%s/taskid", instanceDir))
+	info.JobID, err = e.Get(sub, fmt.Sprintf("%s/jobid", instanceDir))
 	if err != nil {
 		return
 	}

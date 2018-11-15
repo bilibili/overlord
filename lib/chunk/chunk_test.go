@@ -119,8 +119,8 @@ func TestNodeIntoConfLineOk(t *testing.T) {
 	}
 
 	line := node.IntoConfLine(true)
-	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 myself,master - 0 0 0 connected 1 12-20 700-800", line)
+	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 myself,master - 0 0 0 connected 1 12-20 700-800\n", line)
 
 	line = node.IntoConfLine(false)
-	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 master - 0 0 0 connected 1 12-20 700-800", line)
+	assert.Equal(t, "0000000000000000000000000000000000000001 127.0.0.1:7000@17000 master - 0 0 0 connected 1 12-20 700-800\n", line)
 }
