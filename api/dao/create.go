@@ -93,7 +93,8 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	defer cancel()
 
 	// check if master num is even
-	if ctype := proto.CacheType(p.CacheType); ctype == proto.CacheTypeRedisCluster {
+	ctype := proto.CacheType(p.CacheType)
+	if ctype == proto.CacheTypeRedisCluster {
 		if p.Number%2 != 0 {
 			log.Info("cluster master number is odd")
 			return "", ErrMasterNumMustBeEven
