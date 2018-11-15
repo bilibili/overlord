@@ -27,7 +27,7 @@ func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	info := &create.RedisClusterInfo{}
+	info := &create.CacheInfo{}
 
 	val, err := e.Get(ctx, path)
 	if err != nil {

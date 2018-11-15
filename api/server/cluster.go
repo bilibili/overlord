@@ -27,4 +27,13 @@ func createCluster(c *gin.Context) {
 }
 
 func getCluster(c *gin.Context) {
+	clusterID := c.Param("cluster_id")
+
+	cluster, err := svc.GetCluster(clusterID)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, cluster)
 }
