@@ -3,6 +3,7 @@ package proc
 import (
 	"context"
 	"os/exec"
+	"overlord/lib/log"
 )
 
 // Proc define process with cancel.
@@ -25,6 +26,7 @@ func NewProc(name string, arg ...string) *Proc {
 
 // Start start proc.
 func (p *Proc) Start() error {
+	log.Infof("start service %s %v", p.cmd.Path, p.cmd.Args)
 	return p.cmd.Start()
 }
 

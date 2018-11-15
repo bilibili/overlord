@@ -279,9 +279,10 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				ci := &create.CacheInfo{
 					TaskID:    t.ID,
 					Name:      t.Name,
+					MaxMemory: t.MaxMem,
 					CacheType: t.CacheType,
 					Number:    t.Num,
-					Thread:    int(t.CPU),
+					Thread:    int(t.CPU) + 1,
 					Version:   t.Version,
 					Dist:      dist,
 				}

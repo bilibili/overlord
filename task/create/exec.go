@@ -27,7 +27,7 @@ import (
 var (
 	_workDir  = "/data/%d"
 	redispath = "/data/lib/redis/%s/bin/redis-server"
-	redisconf = "/data/%i/redis.conf"
+	redisconf = "/data/%d/redis.conf"
 )
 
 // SetWorkDir set custom work dir.
@@ -385,8 +385,8 @@ func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
 		os.Chmod(cmd, 0755)
 		p = proc.NewProc("/bin/bash", "-c", cmd)
 	case proto.CacheTypeRedisCluster, proto.CacheTypeRedis:
-		cmd = fmt.Sprintf(redispath, version, port)
-		arg = fmt.Sprintf(redisconf, version, port)
+		cmd = fmt.Sprintf(redispath, version)
+		arg = fmt.Sprintf(redisconf, port)
 		p = proc.NewProc(cmd, arg)
 	}
 	return
