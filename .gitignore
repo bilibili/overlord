@@ -18,4 +18,5 @@ cmd/proxy/proxy
 cmd/executor/executor
 cmd/apiserver/apiserver
 cmd/scheduler/scheduler
+cmd/balancer/balancer
 coverage.txt
