@@ -19,7 +19,7 @@ func Run(cfg *config.ServerConfig, s *service.Service) {
 	engine := gin.Default()
 	initRouter(engine)
 	if err := engine.Run(cfg.Listen); err != nil {
-		log.Error("engine start fail due to %v", err)
+		log.Errorf("engine start fail due to %v", err)
 		panic(err)
 	}
 }
