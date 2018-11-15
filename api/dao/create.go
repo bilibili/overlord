@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"overlord/api/model"
+	"overlord/job"
 	"overlord/lib/etcd"
 	"overlord/proto"
-	"overlord/task"
 	"strconv"
 	"strings"
 )
@@ -38,9 +38,9 @@ func (d *Dao) parseSpecification(spec string) (cpu float64, maxMem float64, err 
 	return
 }
 
-func (d *Dao) createCreateClusterTask(p *model.ParamCluster) (*task.Task, error) {
-	t := &task.Task{
-		OpType:  task.OpCreate,
+func (d *Dao) createCreateClusterJob(p *model.ParamCluster) (*job.Job, error) {
+	t := &job.Job{
+		OpType:  job.OpCreate,
 		Name:    p.Name,
 		Version: p.Version,
 		Num:     p.Number,
@@ -63,7 +63,7 @@ func (d *Dao) createCreateClusterTask(p *model.ParamCluster) (*task.Task, error)
 	return t, nil
 }
 
-func (d *Dao) saveTask(ctx context.Context, t *task.Task) (string, error) {
+func (d *Dao) saveJob(ctx context.Context, t *job.Job) (string, error) {
 	var sb strings.Builder
 	encoder := json.NewEncoder(&sb)
 
@@ -72,15 +72,15 @@ func (d *Dao) saveTask(ctx context.Context, t *task.Task) (string, error) {
 		return "", err
 	}
 
-	taskID, err := d.e.GenID(ctx, etcd.TaskDir, sb.String())
+	jobID, err := d.e.GenID(ctx, etcd.JobDir, sb.String())
 	if err != nil {
 		return "", err
 	}
 
-	err = d.e.SetTaskState(ctx, taskID, task.StatePending)
+	err = d.e.SetJobState(ctx, jobID, job.StatePending)
 	if err != nil {
 		return "", err
 	}
 
-	return taskID, nil
+	return jobID, nil
 }

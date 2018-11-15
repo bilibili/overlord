@@ -28,7 +28,7 @@ func (s *Service) CreateCluster(p *model.ParamCluster) (string, error) {
 	return s.d.CreateCluster(context.Background(), p)
 }
 
-// GetTask will get task by given taskID string
-func (s *Service) GetTask(taskID string) (*model.Task, error) {
-	return s.d.GetTask(context.Background(), taskID)
+// GetJob will get job by given jobID string
+func (s *Service) GetJob(jobID string) (*model.Job, error) {
+	return s.d.GetJob(context.Background(), jobID)
 }

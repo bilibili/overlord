@@ -1,7 +1,7 @@
 package model
 
-// Task is the json-encodable struct
-type Task struct {
+// Job is the json-encodable struct
+type Job struct {
 	ID    string `json:"id"`
 	State string `json:"state"`
 }

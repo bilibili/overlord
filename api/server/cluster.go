@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 	"overlord/api/model"
+	"overlord/job"
 	"overlord/lib/log"
-	"overlord/task"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,13 +17,13 @@ func createCluster(c *gin.Context) {
 	}
 	log.Infof("create new cluster with param %v", *p)
 
-	taskid, err := svc.CreateCluster(p)
+	jobid, err := svc.CreateCluster(p)
 	if err != nil {
 		eJSON(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, &model.Task{ID: taskid, State: task.StatePending})
+	c.JSON(http.StatusOK, &model.Job{ID: jobid, State: job.StatePending})
 }
 
 func getCluster(c *gin.Context) {

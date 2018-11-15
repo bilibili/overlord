@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"overlord/job"
+	"overlord/job/create"
 	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 	"overlord/proto"
-	"overlord/task"
-	"overlord/task/create"
 
 	pb "github.com/golang/protobuf/proto"
 	ms "github.com/mesos/mesos-go/api/v1/lib"
@@ -70,7 +70,7 @@ func (s *Scheduler) Set(fid string) (err error) {
 // call run to start scheduler.
 func (s *Scheduler) Run() (err error) {
 	// watch task dir to get new task.
-	ch, err := s.db.Watch(context.Background(), etcd.TaskDir)
+	ch, err := s.db.Watch(context.Background(), etcd.JobDir)
 	if err != nil {
 		log.Errorf("start watch task fail err %v", err)
 		return
@@ -92,7 +92,7 @@ func (s *Scheduler) Run() (err error) {
 func (s *Scheduler) taskEvent() {
 	for {
 		v := <-s.Tchan
-		var t task.Task
+		var t job.Job
 		if err := json.Unmarshal([]byte(v), &t); err != nil {
 			log.Errorf("err task info err %v", err)
 			continue
@@ -200,7 +200,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 		default:
 		}
 		for taskEle := s.task.Front(); taskEle != nil; {
-			t := taskEle.Value.(task.Task)
+			t := taskEle.Value.(job.Job)
 			imem := t.MaxMem
 			icpu := t.CPU
 			inum := t.Num
@@ -218,12 +218,12 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					tasks   = make(map[string][]ms.TaskInfo)
 					offerid = make(map[ms.OfferID]struct{})
 				)
-				rtask := create.NewRedisClusterTask(s.db)
+				rtask := create.NewRedisClusterJob(s.db)
 				err = rtask.Create(&create.RedisClusterInfo{
 					Chunks:    chunks,
 					MaxMemory: t.MaxMem,
 					Name:      t.Name,
-					TaskID:    t.ID,
+					JobID:     t.ID,
 					Version:   t.Version,
 					MasterNum: t.Num,
 				})
@@ -277,7 +277,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					continue
 				}
 				ci := &create.CacheInfo{
-					TaskID:    t.ID,
+					JobID:     t.ID,
 					Name:      t.Name,
 					MaxMemory: t.MaxMem,
 					CacheType: t.CacheType,
@@ -287,7 +287,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					Dist:      dist,
 				}
 
-				ctask := create.NewCacheTask(s.db, ci)
+				ctask := create.NewCacheJob(s.db, ci)
 				err = ctask.Create()
 				if err != nil {
 					log.Errorf("create cluster err %v", err)
@@ -436,7 +436,7 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			taskid := status.TaskID.String()
 			idx := strings.IndexByte(taskid, '-')
 			addr := taskid[:idx]
-			s.db.Set(ctx, etcd.InstanceDirPrefix+addr, task.StateRunning)
+			s.db.Set(ctx, etcd.InstanceDirPrefix+addr, job.StateRunning)
 		}
 
 		return nil

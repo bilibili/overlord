@@ -27,10 +27,10 @@ func newEtcd(conf string) (e *etcd.Etcd, err error) {
 	return etcd.New(conf)
 }
 
-func TestCreateTask(t *testing.T) {
+func TestCreateJob(t *testing.T) {
 	SetWorkDir("/tmp/data/%d")
 	info := &CacheInfo{
-		TaskID:    "test",
+		JobID:    "test",
 		Name:      "test",
 		CacheType: proto.CacheTypeMemcache,
 		MaxMemory: 10,
@@ -41,13 +41,13 @@ func TestCreateTask(t *testing.T) {
 	info.Dist = mockDist(info.Number)
 	db, err := newEtcd("http://127.0.0.1:2379")
 	assert.NoError(t, err)
-	task := NewCacheTask(db, info)
-	task.Create()
+	job := NewCacheJob(db, info)
+	job.Create()
 	for _, inst := range info.Dist.Addrs {
 		dpinfo, err := GenDeployInfo(db, inst.IP, inst.Port)
 		assert.NoError(t, err)
 		assert.Equal(t, info.CacheType, dpinfo.CacheType, "assert cache type")
-		assert.Equal(t, info.TaskID, dpinfo.TaskID, "assert task id")
+		assert.Equal(t, info.JobID, dpinfo.JobID, "assert job id")
 		assert.NoError(t, err)
 		p, err := SetupCacheService(dpinfo)
 		assert.NoError(t, err, "setup cache service")

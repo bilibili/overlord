@@ -7,10 +7,10 @@ import (
 	"go.etcd.io/etcd/client"
 )
 
-// getTask get the task by given number
-func getTask(c *gin.Context) {
-	taskID := c.Param("task_id")
-	t, err := svc.GetTask(taskID)
+// getJob get the job by given number
+func getJob(c *gin.Context) {
+	jobID := c.Param("job_id")
+	t, err := svc.GetJob(jobID)
 	if client.IsKeyNotFound(err) {
 		c.JSON(http.StatusNotFound, err)
 		return

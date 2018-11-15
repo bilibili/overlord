@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"overlord/proto"
-	"overlord/task"
+	"overlord/job"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestSet(t *testing.T) {
 	e, err := New("http://127.0.0.1:2379")
 	ctx := context.TODO()
 	assert.NoError(t, err)
-	mctask := task.Task{
+	mcjob := job.Job{
 		Name:      "test",
 		CacheType: proto.CacheTypeMemcache,
 		Version:   "1.5.12",
@@ -31,12 +31,12 @@ func TestSet(t *testing.T) {
 		MaxMem:    10,
 		CPU:       0.1,
 	}
-	bs, err := json.Marshal(mctask)
+	bs, err := json.Marshal(mcjob)
 	assert.NoError(t, err)
-	err = e.Set(ctx, "/overlord/task/task1", string(bs))
+	err = e.Set(ctx, "/overlord/jobs/job1", string(bs))
 	assert.NoError(t, err)
 
-	redistask := task.Task{
+	redisjob := &job.Job{
 		Name:      "test",
 		CacheType: proto.CacheTypeRedis,
 		Version:   "4.0.11",
@@ -44,8 +44,8 @@ func TestSet(t *testing.T) {
 		MaxMem:    10,
 		CPU:       0.1,
 	}
-	bs, err = json.Marshal(redistask)
+	bs, err = json.Marshal(redisjob)
 	assert.NoError(t, err)
-	err = e.Set(ctx, "/overlord/task/task12", string(bs))
+	err = e.Set(ctx, "/overlord/jobs/job12", string(bs))
 	assert.NoError(t, err)
 }
