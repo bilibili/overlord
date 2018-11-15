@@ -30,5 +30,5 @@ func initRouter(e *gin.Engine) {
 	clusters.GET("/", getCluster)
 
 	tasks := e.Group("/jobs")
-	tasks.GET("/:task_id", getJob)
+	tasks.GET("/:job_id", getJob)
 }
