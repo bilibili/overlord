@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"overlord/job"
+	"overlord/job/create"
 	"overlord/lib/chunk"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 	"overlord/lib/myredis"
-	"overlord/job"
-	"overlord/job/create"
 	"strings"
 	"time"
 )
@@ -22,22 +22,44 @@ const (
 	TraceJobUnBalanced     = "cluster_finally_not_balanced"
 )
 
-// GenTryBalanceJob generate balanced job into job
-func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) {
-	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	info := &create.CacheInfo{}
-
-	val, err := e.Get(ctx, path)
+// Balance will balance the given clusterName
+func Balance(clusterName string, e *etcd.Etcd) error {
+	t, err := genTryBalanceJob(clusterName, e)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	rd := strings.NewReader(val)
-	decoder := json.NewDecoder(rd)
-	err = decoder.Decode(info)
-	if err != nil {
-		return nil, err
+	return t.Balance()
+}
+
+// genTryBalanceJob generate balanced job into job
+func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*180)
+	defer cancel()
+
+	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
+	info := &create.CacheInfo{}
+	ticker := time.NewTicker(time.Second * 3)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+
+		_, val, err := e.WatchOneshot(ctx, path, etcd.ActionSet)
+		if err != nil {
+			log.Warnf("fail to watch cluster due time")
+			continue
+		}
+
+		rd := strings.NewReader(val)
+		decoder := json.NewDecoder(rd)
+		err = decoder.Decode(info)
+		if err != nil {
+			return nil, err
+		}
+		break
 	}
 
 	nodes, err := e.LS(ctx, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, clusterName))
@@ -49,7 +71,7 @@ func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		default:
+		case <-ticker.C:
 		}
 
 		allIsRunning := true
@@ -81,9 +103,9 @@ func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 	}
 
 	tbi := &TryBalanceInfo{
-		TraceJobID:  info.JobID,
-		Cluster:     clusterName,
-		Chunks:      info.Chunks,
+		TraceJobID: info.JobID,
+		Cluster:    clusterName,
+		Chunks:     info.Chunks,
 	}
 
 	tbt := &TryBalanceJob{
@@ -98,8 +120,8 @@ func GenTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 // TryBalanceInfo is the job to balance the whole cluster
 type TryBalanceInfo struct {
 	TraceJobID string
-	Cluster     string
-	Chunks      []*chunk.Chunk
+	Cluster    string
+	Chunks     []*chunk.Chunk
 }
 
 // TryBalanceJob is the struct descript balance job.

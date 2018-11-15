@@ -2,10 +2,7 @@ package dao
 
 import (
 	"context"
-	"fmt"
 	"overlord/api/model"
-	"overlord/lib/etcd"
-	"overlord/job/create"
 )
 
 // GetCluster will search clusters by given cluster name
