@@ -3,6 +3,7 @@ package proto
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -38,5 +39,6 @@ func TestPipe(t *testing.T) {
 	}
 	wg.Wait()
 	ncp.Close()
+	time.Sleep(10 * time.Millisecond)
 	assert.True(t, nc.closed)
 }
