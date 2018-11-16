@@ -92,7 +92,7 @@ func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) 
 	sort.Sort(byCountAsc(oldDist))
 	for num > 0 {
 		for _, addr := range oldDist {
-			if _, ok := hrm[addr.name]; ok {
+			if _, ok := hrm[addr.name]; ok && num > 0 {
 				dhr[addr.name] = dhr[addr.name] + 1
 				num = num - 1
 			}
