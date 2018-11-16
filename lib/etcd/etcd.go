@@ -22,7 +22,7 @@ const (
 	HeartBeatDir        = "/overlord/heartbeat"
 	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
-	JobsDir              = "/overlord/jobs"
+	JobsDir             = "/overlord/jobs"
 	JobDetailDir        = "/overlord/job_detail"
 	FrameWork           = "/overlord/framework"
 )
@@ -222,4 +222,9 @@ func (e *Etcd) WatchOneshot(ctx context.Context, path string, interestings ...st
 			return
 		}
 	}
+}
+
+// ClusterInfo get cluster info .
+func (e *Etcd) ClusterInfo(ctx context.Context, cluster string) (info string, err error) {
+	return e.Get(ctx, fmt.Sprintf("%s/%s/info", ClusterDir, cluster))
 }

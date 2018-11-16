@@ -2,12 +2,14 @@ package chunk
 
 import (
 	"fmt"
+	"sort"
 
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 )
 
 // Addr is a cache instance endpoint
 type Addr struct {
+	ID   string
 	IP   string
 	Port int
 }
@@ -51,5 +53,55 @@ func DistIt(num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err erro
 
 // DistAppendIt will re-dist it by append new nodes.
 func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (err error) {
+	hrs := mapIntoHostRes(offers, memory, cpu)
+	hrm := make(map[string]*hostRes, len(hrs))
+	sort.Sort(byCountDesc(hrs))
+	for _, hr := range hrs {
+		hrm[hr.name] = hr
+	}
+	addrm := make(map[string]int)
+	for _, addr := range dist.Addrs {
+		addrm[addr.IP] = addrm[addr.IP] + 1
+	}
+	// try get resource never dist before
+	dhr := make(map[string]int)
+	for num > 0 {
+		allused := true
+		for _, hr := range hrs {
+			if _, ok := addrm[hr.name]; !ok && num > 0 {
+				allused = false
+				dhr[hr.name] = dhr[hr.name] + 1
+				addrm[hr.name] = addrm[hr.name] + 1
+				num = num - 1
+			}
+			if num <= 0 {
+				break
+			}
+		}
+		if allused {
+			break
+		}
+	}
+	oldDist := make([]*hostRes, len(addrm))
+	for addr, count := range addrm {
+		oldDist = append(oldDist, &hostRes{name: addr, count: count})
+
+	}
+	sort.Sort(byCountAsc(oldDist))
+	for num > 0 {
+		for _, addr := range oldDist {
+			if _, ok := hrm[addr.name]; ok {
+				dhr[addr.name] = dhr[addr.name] + 1
+				num = num - 1
+			}
+		}
+	}
+	newHrs := make([]*hostRes, 0)
+	for addr, count := range dhr {
+		newHrs = append(newHrs, &hostRes{name: addr, count: count})
+	}
+	portsMap := mapIntoPortsMap(offers)
+	newDist := mapHostResIntoDist(newHrs, portsMap)
+	dist.Addrs = append(dist.Addrs, newDist.Addrs...)
 	return
 }

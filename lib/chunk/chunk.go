@@ -82,6 +82,20 @@ func (hr byCountDesc) Less(i, j int) bool {
 	return hr[i].count < hr[j].count
 }
 
+type byCountAsc []*hostRes
+
+func (hr byCountAsc) Len() int {
+	return len(hr)
+}
+
+func (hr byCountAsc) Swap(i, j int) {
+	hr[i], hr[j] = hr[j], hr[i]
+}
+
+func (hr byCountAsc) Less(i, j int) bool {
+	return hr[i].count > hr[j].count
+}
+
 type hostRes struct {
 	name  string
 	count int
@@ -143,9 +157,6 @@ func dpFillHostRes(hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
 	left := count
 	hosts = make([]*hostRes, 0)
 	for _, hr := range hrs {
-		if hr.count < scale {
-			break
-		}
 		hosts = append(hosts, &hostRes{name: hr.name, count: 0})
 	}
 

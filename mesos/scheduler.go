@@ -281,6 +281,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					JobID:     t.ID,
 					Name:      t.Name,
 					MaxMemory: t.MaxMem,
+					CPU:       t.CPU,
 					CacheType: t.CacheType,
 					Number:    t.Num,
 					Thread:    int(t.CPU) + 1,
@@ -306,8 +307,8 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 				}
 				for _, addr := range dist.Addrs {
 					task := ms.TaskInfo{
-						Name:     addr.IP,
-						TaskID:   ms.TaskID{Value: addr.String() + "-" + strconv.FormatInt(int64(time.Now().Unix()), 10)},
+						Name:     addr.String(),
+						TaskID:   ms.TaskID{Value: addr.String() + "-" + ci.Name},
 						AgentID:  ofm[addr.IP].AgentID,
 						Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
 						//  plus the port obtained by adding 10000 to the data port for redis cluster.
@@ -322,7 +323,6 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					s.rwlock.Lock()
 					s.taskInfos[task.TaskID.Value] = &task
 					s.rwlock.Unlock()
-					fmt.Println(s.taskInfos)
 					offerid[ofm[addr.IP].ID] = struct{}{}
 					tasks[addr.IP] = append(tasks[addr.IP], task)
 				}
@@ -363,24 +363,58 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 }
 
 func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
-	s.rwlock.RLock()
-	defer s.rwlock.RUnlock()
-	task, ok := s.taskInfos[t.Value]
-	log.Infof("try recover task(%v)", task)
-	if !ok {
+
+	var (
+		err           error
+		cluster, port string
+		info          *create.CacheInfo
+		ip            string
+	)
+
+	cluster, ip, port = parseTaskID(t)
+	log.Infof("try recover task(%v)", t)
+	info, err = s.getInfoFromEtcd(context.Background(), cluster)
+	if err != nil {
 		return
 	}
-	id := task.AgentID
-	// TODO:check mem cpu info
+	uport, _ := strconv.ParseUint(port, 10, 64)
+	task := &ms.TaskInfo{
+		Name:      ip + port,
+		TaskID:    ms.TaskID{Value: t.GetValue()},
+		Executor:  s.buildExcutor(ip+port, []ms.Resource{}),
+		Resources: makeResources(info.CPU, info.MaxMemory, uport),
+	}
+
+	data := &TaskData{
+		IP:         ip,
+		Port:       int(uport),
+		DBEndPoint: s.c.DBEndPoint,
+	}
+	task.Data, _ = json.Marshal(data)
 	for _, offer := range offers {
-		if offer.GetAgentID() == id {
+		// try to recover from origin agent with the same info.
+		if offer.Hostname == ip {
+			task.AgentID = offer.GetAgentID()
 			accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(*task)}.WithOffers(offer.ID))
 			err := calls.CallNoData(context.Background(), s.cli, accept)
-			if err != nil {
-				log.Errorf("try recover task from pre agent fail %v", err)
+			if err == nil {
+				log.Info("recover task successfully")
+				return
 			}
+			log.Errorf("try recover task from pre agent fail %v", err)
 		}
 	}
+	// TODO:if can not recovery from origin host.dist increment
+}
+
+func (s *Scheduler) getInfoFromEtcd(ctx context.Context, cluster string) (t *create.CacheInfo, err error) {
+	i, err := s.db.ClusterInfo(ctx, cluster)
+	if err != nil {
+		return
+	}
+	t = new(create.CacheInfo)
+	err = json.Unmarshal([]byte(i), t)
+	return
 }
 
 func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
@@ -430,6 +464,8 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 				log.Infof("add fail task into failtask chan,task id %v", taskid)
 			default:
 				log.Error("failtask chan full")
+				time.Sleep(time.Second * 5)
+				return nil
 			}
 			// revive offer for retry fail task.
 			revice := calls.Revive()
@@ -443,7 +479,20 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			addr := taskid[:idx]
 			s.db.Set(ctx, etcd.InstanceDirPrefix+addr, job.StateRunning)
 		}
-
 		return nil
 	}
+}
+
+func parseTaskID(t ms.TaskID) (cluster, ip, port string) {
+	v := t.GetValue()
+	idx := strings.IndexByte(v, '-')
+	if idx == -1 {
+		return
+	}
+	cluster = v[:idx+1]
+	host := v[:idx]
+	idx = strings.IndexByte(host, ':')
+	ip = host[:idx]
+	port = host[idx+1:]
+	return
 }

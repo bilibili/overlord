@@ -14,8 +14,8 @@ type CacheInfo struct {
 	CacheType proto.CacheType
 
 	MaxMemory float64
-
-	Number int
+	CPU       float64
+	Number    int
 
 	// for redis : it will be ignore becasue redis only run 1 cpu at all.
 	Thread int

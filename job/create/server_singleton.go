@@ -113,12 +113,13 @@ func (c *CacheJob) setupInstanceDir() error {
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
 
 	for _, addr := range c.info.Dist.Addrs {
-		addr := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
-		_, err := c.e.GenID(sub, path, addr)
+		host := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
+		id, err := c.e.GenID(sub, path, host)
 		if err != nil {
 			log.Infof("fail to create etcd path due to %s", err)
 			return err
 		}
+		addr.ID = id
 	}
 	return nil
 }
