@@ -37,3 +37,13 @@ func getCluster(c *gin.Context) {
 
 	c.JSON(http.StatusOK, cluster)
 }
+
+func getClusters(c *gin.Context) {
+	clusters, err := svc.GetClusters()
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	listJSON(c, clusters, len(clusters))
+}

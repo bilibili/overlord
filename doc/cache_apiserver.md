@@ -3,7 +3,7 @@
 apiserver有以下约定：
 
 1. required 字段为加重字体。列表类型参数，加重表示至少有一个
-2. api 约定前缀为 `api/v1`
+2. api 约定前缀为 `api/v1`(可以后期通过nginx区分)
 3. api操作的对象或者返回的对象是名词代表的资源，或者名词代表资源的子资源，名词用复数，否则名词用单数。
 4. 复数资源GET请求均可进行分页，分页页码 `pn` ，分页大小 `pc`，均在 url query arguments 里。
 5. 所有资源能使用 name 直接定位的均使用 name
@@ -28,17 +28,16 @@ apiserver有以下约定：
 |**master_num**|integer|主节点数量为必选|
 |**version**|string|选择redis version|
 
+#### Response
+
+response `Job`
+
+|name|type|description|
+|----|----|-----------|
+|id| string | job id |
+|state|string| job state|
+
 ### GET /clusters
-
-#### response
-
-Reply with Cluster list. Each cluster was defined as:
-
-
-| name | type   | description              |
-|------|--------|--------------------------|
-| name | string | 全局不重复的唯一集群名字 |
-|      |        |                          |
 
 
 #### query arguments:
@@ -72,7 +71,17 @@ Reply with Cluster list. Each cluster was defined as:
 |**master_num**|integer|主节点数量为必选|
 |**version**|string|选择redis version|
 
-# Specs
+## Job
+
+### GET /jobs/:job_id
+
+get the job response by given id
+
+### GET /jobs
+
+get all jobs.
+
+## Specs
 
 规格列表
 

@@ -220,7 +220,6 @@ func (b *TryBalanceJob) Balance() (err error) {
 
 	err = b.tryBalance(sub)
 	if err != nil {
-
 		if err == context.DeadlineExceeded {
 			if isTrace {
 				err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobUnBalanced)
