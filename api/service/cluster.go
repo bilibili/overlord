@@ -12,10 +12,10 @@ func (s *Service) CreateCluster(p *model.ParamCluster) (string, error) {
 
 // GetCluster by given cluster name
 func (s *Service) GetCluster(cname string) (*model.Cluster, error) {
-	return s.d.GetCluster(cname)
+	return s.d.GetCluster(context.Background(), cname)
 }
 
 // GetClusters will get all clusters
 func (s *Service) GetClusters() ([]*model.Cluster, error) {
-	return s.d.GetClusters()
+	return s.d.GetClusters(context.Background())
 }
