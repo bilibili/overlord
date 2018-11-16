@@ -27,7 +27,8 @@ func Run(cfg *config.ServerConfig, s *service.Service) {
 func initRouter(e *gin.Engine) {
 	clusters := e.Group("/clusters")
 	clusters.POST("/", createCluster)
-	clusters.GET("/", getCluster)
+	clusters.GET("/", getClusters)
+	clusters.GET("/:cluster_id", getCluster)
 
 	jobs := e.Group("/jobs")
 	jobs.GET("/", getJobs)

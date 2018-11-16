@@ -12,10 +12,11 @@ type Cluster struct {
 	Appids []string `json:"appids"`
 	State  string   `json:"state"`
 
-	CacheType string `json:"cache_type"`
-	Spec      string `json:"spec" validate:"required"`
-	Version   string `json:"version" validate:"required"`
-	Number    int    `json:"number" validate:"required"`
+	CacheType string  `json:"cache_type"`
+	Thread    int     `json:"cpu" validate:"required"`
+	MaxMemory float64 `json:"max_memory"`
+	Version   string  `json:"version" validate:"required"`
+	Number    int     `json:"number" validate:"required"`
 
 	Instances []*Instance `json:"instances"`
 }
@@ -23,6 +24,6 @@ type Cluster struct {
 // Instance is the struct for each cache
 type Instance struct {
 	IP    string `json:"ip"`
-	Port  string `json:"port"`
+	Port  int    `json:"port"`
 	State string `json:"state"`
 }
