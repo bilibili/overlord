@@ -31,9 +31,11 @@ func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {
 	}
 
 	for _, hr := range hrs {
-		count := portsCountMap[hr.name]
-		addrs = append(addrs, &Addr{IP: hr.name, Port: portsMap[hr.name][count]})
-		portsCountMap[hr.name] = count + 1
+		for i := 0; i < hr.count; i++ {
+			count := portsCountMap[hr.name]
+			addrs = append(addrs, &Addr{IP: hr.name, Port: portsMap[hr.name][count]})
+			portsCountMap[hr.name] = count + 1
+		}
 	}
 
 	return &Dist{Addrs: addrs}
@@ -82,7 +84,7 @@ func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) 
 			break
 		}
 	}
-	oldDist := make([]*hostRes, len(addrm))
+	oldDist := make([]*hostRes, 0, len(addrm))
 	for addr, count := range addrm {
 		oldDist = append(oldDist, &hostRes{name: addr, count: count})
 
