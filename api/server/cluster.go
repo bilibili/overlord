@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// POST /clusters
 func createCluster(c *gin.Context) {
 	p := new(model.ParamCluster)
 	if err := c.BindJSON(p); err != nil {
@@ -26,10 +27,11 @@ func createCluster(c *gin.Context) {
 	c.JSON(http.StatusOK, &model.Job{ID: jobid, State: job.StatePending})
 }
 
+// GET /clusters/:cluster_id
 func getCluster(c *gin.Context) {
-	clusterID := c.Param("cluster_id")
+	clusterName := c.Param("cluster_name")
 
-	cluster, err := svc.GetCluster(clusterID)
+	cluster, err := svc.GetCluster(clusterName)
 	if err != nil {
 		eJSON(c, err)
 		return
@@ -38,6 +40,7 @@ func getCluster(c *gin.Context) {
 	c.JSON(http.StatusOK, cluster)
 }
 
+// GET /clusters
 func getClusters(c *gin.Context) {
 	clusters, err := svc.GetClusters()
 	if err != nil {
@@ -46,4 +49,14 @@ func getClusters(c *gin.Context) {
 	}
 
 	listJSON(c, clusters, len(clusters))
+}
+
+// DELETE /clusters/:cluster_name
+func removeCluster(c *gin.Context) {
+	cname := c.Param("cluster_name")
+
+}
+
+// PUT /clusters/:cluster_id
+func scaleCluster(c *gin.Context) {
 }
