@@ -263,7 +263,6 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					err = calls.CallNoData(ctx, s.cli, accept)
 					if err != nil {
 						log.Errorf("fail to lanch task err %v", err)
-						taskEle = taskEle.Next()
 						continue
 					}
 				}
@@ -288,53 +287,15 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 					Version:   t.Version,
 					Dist:      dist,
 				}
-
 				ctask := create.NewCacheJob(s.db, ci)
 				err = ctask.Create()
 				if err != nil {
 					log.Errorf("create cluster err %v", err)
 					return nil
 				}
-
-				var (
-					ofm     = make(map[string]ms.Offer)
-					tasks   = make(map[string][]ms.TaskInfo)
-					offerid = make(map[ms.OfferID]struct{})
-				)
-
-				for _, offer := range offers {
-					ofm[offer.GetHostname()] = offer
-				}
-				for _, addr := range dist.Addrs {
-					task := ms.TaskInfo{
-						Name:     addr.String(),
-						TaskID:   ms.TaskID{Value: addr.String() + "-" + ci.Name},
-						AgentID:  ofm[addr.IP].AgentID,
-						Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
-						//  plus the port obtained by adding 10000 to the data port for redis cluster.
-						Resources: makeResources(t.CPU, t.MaxMem, uint64(addr.Port)),
-					}
-					data := &TaskData{
-						IP:         addr.IP,
-						Port:       addr.Port,
-						DBEndPoint: s.c.DBEndPoint,
-					}
-					task.Data, _ = json.Marshal(data)
-					s.rwlock.Lock()
-					s.taskInfos[task.TaskID.Value] = &task
-					s.rwlock.Unlock()
-					offerid[ofm[addr.IP].ID] = struct{}{}
-					tasks[addr.IP] = append(tasks[addr.IP], task)
-				}
-
-				for _, offer := range offers {
-					accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
-					err = calls.CallNoData(ctx, s.cli, accept)
-					if err != nil {
-						log.Errorf("fail to lanch task err %v", err)
-						taskEle = taskEle.Next()
-						continue
-					}
+				if err = s.acceptOffer(ci, dist, offers); err != nil {
+					taskEle = taskEle.Next()
+					continue
 				}
 				ttask := taskEle
 				s.task.Remove(ttask)
@@ -404,7 +365,75 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 			log.Errorf("try recover task from pre agent fail %v", err)
 		}
 	}
+	// can not recovery from origin host,try to scale by append.
+	switch info.CacheType {
+	case proto.CacheTypeMemcache, proto.CacheTypeRedis:
+		// delete old host
+		for i, addr := range info.Dist.Addrs {
+			if addr.IP == ip {
+				info.Dist.Addrs = append(info.Dist.Addrs[:i], info.Dist.Addrs[i+1:]...)
+			}
+		}
+		newDist, err := chunk.DistAppendIt(info.Dist, 1, info.MaxMemory, info.CPU, offers...)
+		if err != nil {
+			log.Errorf("chunk,DistAppend err %v", err)
+			return
+		}
+		info.Dist.Addrs = append(info.Dist.Addrs, newDist.Addrs...)
+		s.acceptOffer(info, newDist, offers)
+		ctask := create.NewCacheJob(s.db, info)
+		err = ctask.Create()
+		if err != nil {
+			log.Errorf("recovery task create cache job err %v", err)
+			return
+		}
+
+		// TODO :update etcd cache info
+	case proto.CacheTypeRedisCluster:
+	default:
+		log.Errorf("recover from err cache type %v", err)
+	}
 	// TODO:if can not recovery from origin host.dist increment
+}
+
+func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers []ms.Offer) (err error) {
+	var (
+		ofm     = make(map[string]ms.Offer)
+		tasks   = make(map[string][]ms.TaskInfo)
+		offerid = make(map[ms.OfferID]struct{})
+	)
+
+	for _, offer := range offers {
+		ofm[offer.GetHostname()] = offer
+	}
+	for _, addr := range dist.Addrs {
+		task := ms.TaskInfo{
+			Name:     addr.String(),
+			TaskID:   ms.TaskID{Value: addr.String() + "-" + info.Name},
+			AgentID:  ofm[addr.IP].AgentID,
+			Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
+			//  plus the port obtained by adding 10000 to the data port for redis cluster.
+			Resources: makeResources(info.CPU, info.MaxMemory, uint64(addr.Port)),
+		}
+		data := &TaskData{
+			IP:         addr.IP,
+			Port:       addr.Port,
+			DBEndPoint: s.c.DBEndPoint,
+		}
+		task.Data, _ = json.Marshal(data)
+		offerid[ofm[addr.IP].ID] = struct{}{}
+		tasks[addr.IP] = append(tasks[addr.IP], task)
+	}
+
+	for _, offer := range offers {
+		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+		err = calls.CallNoData(context.Background(), s.cli, accept)
+		if err != nil {
+			log.Errorf("fail to lanch task err %v", err)
+			continue
+		}
+	}
+	return err
 }
 
 func (s *Scheduler) getInfoFromEtcd(ctx context.Context, cluster string) (t *create.CacheInfo, err error) {

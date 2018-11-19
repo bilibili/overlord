@@ -114,6 +114,11 @@ func (c *CacheJob) setupInstanceDir() error {
 
 	for _, addr := range c.info.Dist.Addrs {
 		host := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
+		// if addr already had id,update value.
+		if addr.ID != "" {
+			c.e.Set(sub, path+addr.ID, host)
+			continue
+		}
 		id, err := c.e.GenID(sub, path, host)
 		if err != nil {
 			log.Infof("fail to create etcd path due to %s", err)

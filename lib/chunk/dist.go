@@ -54,7 +54,7 @@ func DistIt(num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err erro
 }
 
 // DistAppendIt will re-dist it by append new nodes.
-func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (err error) {
+func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
 	hrs := mapIntoHostRes(offers, memory, cpu)
 	hrm := make(map[string]*hostRes, len(hrs))
 	sort.Sort(byCountDesc(hrs))
@@ -90,6 +90,7 @@ func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) 
 
 	}
 	sort.Sort(byCountAsc(oldDist))
+	// can distribution  with new host,try to use min deployed host.
 	for num > 0 {
 		for _, addr := range oldDist {
 			if _, ok := hrm[addr.name]; ok && num > 0 {
@@ -103,7 +104,6 @@ func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) 
 		newHrs = append(newHrs, &hostRes{name: addr, count: count})
 	}
 	portsMap := mapIntoPortsMap(offers)
-	newDist := mapHostResIntoDist(newHrs, portsMap)
-	dist.Addrs = append(dist.Addrs, newDist.Addrs...)
+	newDist = mapHostResIntoDist(newHrs, portsMap)
 	return
 }
