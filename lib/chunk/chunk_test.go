@@ -80,7 +80,7 @@ func TestChunksCalcByMemoryOk(t *testing.T) {
 	assert.Len(t, chunks, 3)
 }
 
-func TestChunkAppend(t *testing.T) {
+func TestChunksAppend(t *testing.T) {
 	offers := _createOffers(6, 128*1024, 32, 7000, 8000)
 	chunks, err := Chunks(6, 100.0, 1.0, offers...)
 	assert.NoError(t, err)
@@ -93,7 +93,14 @@ func TestChunkAppend(t *testing.T) {
 	newChunks, err = ChunksAppend(chunks, 2, 100.0, 1, offers...)
 	assert.NoError(t, err, "append by more offer host")
 	assert.Len(t, newChunks, 1)
-
+	offers = _createOffers(4, 128*1024, 32, 7000, 8000)
+	newChunks, err = ChunksAppend(chunks, 2, 100.0, 1, offers...)
+	assert.NoError(t, err, "append by less offer host")
+	assert.Len(t, newChunks, 1)
+	offers = _createOffers(10, 128*1024, 32, 7000, 8000)
+	newChunks, err = ChunksAppend(chunks, 2, 100.0, 1, offers[6:]...)
+	assert.NoError(t, err, "append by all new offer host")
+	assert.Len(t, newChunks, 1)
 }
 
 func TestChunksCalcByLowMemory(t *testing.T) {
