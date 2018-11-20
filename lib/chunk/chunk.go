@@ -97,6 +97,13 @@ func (hr byCountAsc) Less(i, j int) bool {
 	return hr[i].count > hr[j].count
 }
 
+func (hr byCountAsc) String() {
+	for _, h := range hr {
+		fmt.Printf("%v ", h)
+	}
+	fmt.Println()
+}
+
 type hostRes struct {
 	name  string
 	count int
@@ -330,7 +337,6 @@ func Chunks(masterNum int, memory, cpu float64, offers ...ms.Offer) (chunks []*C
 		hrs[m].count -= 2
 		hrs[llh].count -= 2
 	}
-	fmt.Println(links)
 	portsMap := mapIntoPortsMap(offers)
 	chunks = links2Chunks(links, portsMap)
 	return
@@ -379,7 +385,7 @@ func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ..
 	// recover chunks to linktable
 	for _, chunk := range chunks {
 		base := chunk.Nodes[0].Name
-		linkto := chunk.Nodes[3].Name
+		linkto := chunk.Nodes[2].Name
 		i, oki := hrmap[base]
 		if oki {
 			hrs[i].count -= 2
@@ -393,11 +399,7 @@ func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ..
 			linkTable[j][i]++
 		}
 	}
-	fmt.Println("delete old chunk")
-	for _, hr := range hrs {
-		fmt.Println(hr)
-	}
-	fmt.Println(linkTable)
+
 	for {
 		name, count := maxHost(hrs)
 		if count == 0 {
@@ -416,7 +418,6 @@ func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ..
 		hrs[m].count -= 2
 		hrs[llh].count -= 2
 	}
-	fmt.Println(links)
 	portsMap := mapIntoPortsMap(offers)
 	newChunks = links2Chunks(links, portsMap)
 	return
@@ -448,9 +449,82 @@ func checkChunk(chunk []*Chunk, masterNum int, memory, cpu float64, offers ...ms
 		hrmap[hr.name] = i
 	}
 	hrs = dpFillHostRes(chunk, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
-	fmt.Println("check chunk")
-	for _, hr := range hrs {
-		fmt.Println(hr)
+	return
+}
+
+// ChunksRecover recover chunk with disabled host by new offers.
+func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...ms.Offer) (newChunk []*Chunk, err error) {
+	var relateHost = make(map[string]struct{}, 0)
+	var dpCount int
+	var allCount = len(chunks) * 4
+	for i, chunk := range chunks {
+		if chunk.Nodes[0].Name == host {
+			relateHost[chunk.Nodes[2].Name] = struct{}{}
+			dpCount += 2
+			newChunk = append(chunks[:i], chunks[i+1:]...)
+		}
+		if chunk.Nodes[3].Name == host {
+			relateHost[chunk.Nodes[0].Name] = struct{}{}
+			dpCount += 2
+			newChunk = append(chunks[:i], chunks[i+1:]...)
+		}
 	}
+	hrs := mapIntoHostRes(offers, memory, cpu)
+	if !checkIfEnough(hrs, dpCount) {
+		err = ErrNotEnoughResource
+		return
+	}
+	sort.Sort(byCountDesc(hrs))
+	hrmap := make(map[string]int)
+	for i, hr := range hrs {
+		hrmap[hr.name] = i
+	}
+	hrs = dpFillHostRes(chunks, hrs, dpCount, 2)
+	if !checkDist(hrs, allCount) {
+		err = ErrBadDist
+		return
+	}
+	hcount := len(hrs)
+
+	linkTable := make([][]int, hcount)
+	for i := 0; i < hcount; i++ {
+		linkTable[i] = make([]int, hcount)
+		for j := 0; j < hcount; j++ {
+			linkTable[i][j] = 0
+		}
+	}
+	links := []link{}
+	// recover chunks to linktable
+	for _, chunk := range chunks {
+		base := chunk.Nodes[0].Name
+		linkto := chunk.Nodes[2].Name
+		i, oki := hrmap[base]
+		if oki {
+			hrs[i].count -= 2
+		}
+		j, okj := hrmap[linkto]
+		if okj {
+			hrs[j].count -= 2
+		}
+		if oki && okj {
+			linkTable[i][j]++
+			linkTable[j][i]++
+		}
+	}
+	for name := range relateHost {
+		m := hrmap[name]
+		llh := findMinLink(linkTable, m)
+		if hrs[llh].count < 2 {
+			linkTable[llh][m]++
+			linkTable[m][llh]++
+			continue
+		}
+		llHost := hrs[llh]
+		links = append(links, link{Base: name, LinkTo: llHost.name})
+		hrs[m].count -= 2
+		hrs[llh].count -= 2
+	}
+	portsMap := mapIntoPortsMap(offers)
+	newChunk = append(newChunk, links2Chunks(links, portsMap)...)
 	return
 }
