@@ -206,66 +206,13 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			inum := t.Num
 			switch t.CacheType {
 			case proto.CacheTypeRedisCluster:
-				chunks, err := chunk.Chunks(inum, imem, icpu, offers...)
+
+				err := s.dispatchCluster(t, inum, imem, icpu, offers)
 				if err != nil {
-					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
 					taskEle = taskEle.Next()
 					continue
 				}
-				log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
-				var (
-					ofm     = make(map[string]ms.Offer)
-					tasks   = make(map[string][]ms.TaskInfo)
-					offerid = make(map[ms.OfferID]struct{})
-				)
-				rtask := create.NewRedisClusterJob(s.db, &create.CacheInfo{
-					Chunks:    chunks,
-					CacheType: t.CacheType,
-					MaxMemory: t.MaxMem,
-					Name:      t.Name,
-					JobID:     t.ID,
-					Version:   t.Version,
-					Number:    t.Num,
-				})
-				err = rtask.Create()
-				if err != nil {
-					log.Errorf("create cluster err %v", err)
-					continue
-				}
-				for _, offer := range offers {
-					ofm[offer.GetHostname()] = offer
-				}
-				for _, ck := range chunks {
-					for _, node := range ck.Nodes {
-						task := ms.TaskInfo{
-							Name:     node.Name,
-							TaskID:   ms.TaskID{Value: node.Addr() + "-" + strconv.FormatInt(int64(time.Now().Unix()), 10)},
-							AgentID:  ofm[node.Name].AgentID,
-							Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
-							//  plus the port obtained by adding 10000 to the data port for redis cluster.
-							Resources: makeResources(icpu, imem, uint64(node.Port)),
-						}
-						data := &TaskData{
-							IP:         node.Name,
-							Port:       node.Port,
-							DBEndPoint: s.c.DBEndPoint,
-						}
-						task.Data, _ = json.Marshal(data)
-						s.rwlock.Lock()
-						s.taskInfos[task.TaskID.Value] = &task
-						s.rwlock.Unlock()
-						offerid[ofm[node.Name].ID] = struct{}{}
-						tasks[node.Name] = append(tasks[node.Name], task)
-					}
-				}
-				for _, offer := range offers {
-					accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
-					err = calls.CallNoData(ctx, s.cli, accept)
-					if err != nil {
-						log.Errorf("fail to lanch task err %v", err)
-						continue
-					}
-				}
+
 				ttask := taskEle
 				s.task.Remove(ttask)
 				return nil
@@ -388,12 +335,12 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 			return
 		}
 
-		// TODO :update etcd cache info
 	case proto.CacheTypeRedisCluster:
+		// if cluster cann't recovery from origin agent.
+		// set status as WaitApprove,and then should be recover by op with chunkrecover
 	default:
 		log.Errorf("recover from err cache type %v", err)
 	}
-	// TODO:if can not recovery from origin host.dist increment
 }
 
 func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers []ms.Offer) (err error) {
@@ -492,7 +439,7 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			case s.failTask <- taskid:
 				log.Infof("add fail task into failtask chan,task id %v", taskid)
 			default:
-				log.Error("failtask chan full")
+				log.Error("add fail task to chan fail, chan full")
 				time.Sleep(time.Second * 5)
 				return nil
 			}
@@ -518,10 +465,86 @@ func parseTaskID(t ms.TaskID) (cluster, ip, port string) {
 	if idx == -1 {
 		return
 	}
-	cluster = v[:idx+1]
+	cluster = v[idx+1:]
 	host := v[:idx]
 	idx = strings.IndexByte(host, ':')
 	ip = host[:idx]
 	port = host[idx+1:]
+	return
+}
+
+func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers []ms.Offer) (err error) {
+	var chunks []*chunk.Chunk
+	var jobChunks []*chunk.Chunk
+	switch t.OpType {
+	case job.OpCreate:
+		chunks, err = chunk.Chunks(num, mem, cpu, offers...)
+		if err != nil {
+			log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
+			return
+		}
+		jobChunks = chunks
+	case job.OpScale:
+		var newChunk []*chunk.Chunk
+		newChunk, err = chunk.ChunksAppend(chunks, num, mem, cpu, offers...)
+		if err != nil {
+			log.Errorf("chunk.ChunksAppend with job (%v) err %v", t, err)
+			return
+		}
+		jobChunks = newChunk
+		chunks = append(chunks, newChunk...)
+	}
+
+	log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
+	var (
+		ofm     = make(map[string]ms.Offer)
+		tasks   = make(map[string][]ms.TaskInfo)
+		offerid = make(map[ms.OfferID]struct{})
+	)
+	rtask := create.NewRedisClusterJob(s.db, &create.CacheInfo{
+		Chunks:    chunks,
+		CacheType: t.CacheType,
+		MaxMemory: t.MaxMem,
+		Name:      t.Name,
+		JobID:     t.ID,
+		Version:   t.Version,
+		Number:    t.Num,
+	})
+	err = rtask.Create()
+	if err != nil {
+		log.Errorf("create cluster err %v", err)
+		return
+	}
+	for _, offer := range offers {
+		ofm[offer.GetHostname()] = offer
+	}
+	for _, ck := range jobChunks {
+		for _, node := range ck.Nodes {
+			task := ms.TaskInfo{
+				Name:     node.Name,
+				TaskID:   ms.TaskID{Value: node.Addr() + "-" + t.Name},
+				AgentID:  ofm[node.Name].AgentID,
+				Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
+				//  plus the port obtained by adding 10000 to the data port for redis cluster.
+				Resources: makeResources(cpu, mem, uint64(node.Port)),
+			}
+			data := &TaskData{
+				IP:         node.Name,
+				Port:       node.Port,
+				DBEndPoint: s.c.DBEndPoint,
+			}
+			task.Data, _ = json.Marshal(data)
+			offerid[ofm[node.Name].ID] = struct{}{}
+			tasks[node.Name] = append(tasks[node.Name], task)
+		}
+	}
+	for _, offer := range offers {
+		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+		err = calls.CallNoData(context.Background(), s.cli, accept)
+		if err != nil {
+			log.Errorf("fail to lanch task err %v", err)
+			return
+		}
+	}
 	return
 }
