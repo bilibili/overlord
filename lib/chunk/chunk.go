@@ -489,7 +489,6 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 		return
 	}
 	sort.Sort(byCountDesc(hrs))
-	fmt.Println("before", hrs)
 	hrmap := make(map[string]int)
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
@@ -499,7 +498,6 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 		err = ErrBadDist
 		return
 	}
-	fmt.Println("after", hrs)
 	hcount := len(hrs)
 
 	linkTable := make([][]int, hcount)
@@ -529,20 +527,22 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 	}
 	for name := range relateHost {
 		m := hrmap[name]
-		llh := findMinLink(linkTable, m)
-		if hrs[llh].count < 2 {
-			linkTable[llh][m]++
-			linkTable[m][llh]++
-			continue
+		var llh int
+		for {
+			llh = findMinLink(linkTable, m)
+			if hrs[llh].count < 2 {
+				linkTable[llh][m]++
+				linkTable[m][llh]++
+				continue
+			}
+			break
 		}
 		llHost := hrs[llh]
 		links = append(links, link{Base: name, LinkTo: llHost.name})
-		hrs[m].count -= 2
 		hrs[llh].count -= 2
 	}
 	portsMap := mapIntoPortsMap(offers)
 	tmpChunk := links2Chunks(links, portsMap)
-	fmt.Println("tmp", tmpChunk)
 	newChunk = append(newChunk, tmpChunk...)
 	return
 }

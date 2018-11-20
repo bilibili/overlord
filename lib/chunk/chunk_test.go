@@ -115,7 +115,6 @@ func TestChunksRecover(t *testing.T) {
 	assert.Len(t, newChunk, 3)
 	t.Logf("after recover %v", newChunk)
 
-	offers = _createOffers(6, 128*1024, 32, 7000, 8000)
 	chunks, err = Chunks(10, 100, 1, offers...)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 5)
@@ -124,6 +123,16 @@ func TestChunksRecover(t *testing.T) {
 	newChunk, err = ChunksRecover(chunks, disabledHost, 100, 1, offers[:5]...)
 	assert.NoError(t, err)
 	assert.Len(t, newChunk, 5)
+	t.Logf("after recover %v", newChunk)
+
+	chunks, err = Chunks(12, 100, 1, offers...)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 6)
+	t.Logf("before recover %v", chunks)
+	disabledHost = offers[5].Hostname
+	newChunk, err = ChunksRecover(chunks, disabledHost, 100, 1, offers[:5]...)
+	assert.NoError(t, err)
+	assert.Len(t, newChunk, 6)
 	t.Logf("after recover %v", newChunk)
 }
 

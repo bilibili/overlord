@@ -18,9 +18,9 @@ func TestDistAppendItNewOffers(t *testing.T) {
 	dist, err := DistIt(10, 10, 1, offers[:5]...)
 	assert.NoError(t, err)
 	assert.Len(t, dist.Addrs, 10)
-	_, err = DistAppendIt(dist, 2, 2, 2, offers...)
+	newDist, err := DistAppendIt(dist, 2, 2, 2, offers...)
 	assert.NoError(t, err)
-	assert.Len(t, dist.Addrs, 12)
+	assert.Len(t, newDist.Addrs, 2)
 	t.Log(dist.Addrs)
 }
 
@@ -29,8 +29,8 @@ func TestDistAppendItNotOffers(t *testing.T) {
 	dist, err := DistIt(10, 10, 1, offers...)
 	assert.NoError(t, err)
 	assert.Len(t, dist.Addrs, 10)
-	_, err = DistAppendIt(dist, 2, 2, 2, offers...)
+	newDist, err := DistAppendIt(dist, 2, 2, 2, offers...)
 	assert.NoError(t, err)
-	assert.Len(t, dist.Addrs, 12)
+	assert.Len(t, newDist.Addrs, 2)
 	t.Log(dist.Addrs)
 }
