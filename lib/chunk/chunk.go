@@ -109,6 +109,10 @@ type hostRes struct {
 	count int
 }
 
+func (h *hostRes) String() string {
+	return fmt.Sprintf("%s %d", h.name, h.count)
+}
+
 func maxHost(hrs []*hostRes) (string, int) {
 	var name = hrs[0].name
 	var count = hrs[0].count
@@ -161,7 +165,8 @@ func mapIntoPortsMap(offers []ms.Offer) map[string][]int {
 }
 
 // dp means dynamic dispatch
-func dpFillHostRes(chunks []*Chunk, hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
+// if disableHost not nil ,cannot dispatch resouce on disable host.
+func dpFillHostRes(chunks []*Chunk, disableHost map[string]struct{}, hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
 	left := count
 	hosts = make([]*hostRes, 0)
 	hrmap := make(map[string]int)
@@ -184,7 +189,7 @@ func dpFillHostRes(chunks []*Chunk, hrs []*hostRes, count int, scale int) (hosts
 	}
 	var all = len(chunks)*2 + count
 	for {
-		i := findMinHrs(hrs, hosts, all, scale)
+		i := findMinHrs(hrs, hosts, disableHost, all, scale)
 		if left == 0 {
 			return
 		}
@@ -194,9 +199,14 @@ func dpFillHostRes(chunks []*Chunk, hrs []*hostRes, count int, scale int) (hosts
 	}
 }
 
-func findMinHrs(hrs, hosts []*hostRes, max, scale int) (i int) {
+func findMinHrs(hrs, hosts []*hostRes, disableHost map[string]struct{}, max, scale int) (i int) {
 	var min = max
 	for idx, hr := range hosts {
+		if disableHost != nil {
+			if _, ok := disableHost[hr.name]; ok {
+				continue
+			}
+		}
 		if hr.count < min && hrs[i].count-hr.count >= scale {
 			min = hr.count
 			i = idx
@@ -448,26 +458,30 @@ func checkChunk(chunk []*Chunk, masterNum int, memory, cpu float64, offers ...ms
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
 	}
-	hrs = dpFillHostRes(chunk, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
+	hrs = dpFillHostRes(chunk, nil, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
 	return
 }
 
 // ChunksRecover recover chunk with disabled host by new offers.
 func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...ms.Offer) (newChunk []*Chunk, err error) {
-	var relateHost = make(map[string]struct{}, 0)
-	var dpCount int
-	var allCount = len(chunks) * 4
-	for i, chunk := range chunks {
+	var (
+		relateHost = make(map[string]struct{}, 0)
+		dpCount    int
+		allCount   = len(chunks) * 4
+	)
+	newChunk = make([]*Chunk, 0, len(chunks))
+	for _, chunk := range chunks {
 		if chunk.Nodes[0].Name == host {
 			relateHost[chunk.Nodes[2].Name] = struct{}{}
 			dpCount += 2
-			newChunk = append(chunks[:i], chunks[i+1:]...)
+			continue
 		}
 		if chunk.Nodes[3].Name == host {
 			relateHost[chunk.Nodes[0].Name] = struct{}{}
 			dpCount += 2
-			newChunk = append(chunks[:i], chunks[i+1:]...)
+			continue
 		}
+		newChunk = append(newChunk, chunk)
 	}
 	hrs := mapIntoHostRes(offers, memory, cpu)
 	if !checkIfEnough(hrs, dpCount) {
@@ -475,15 +489,17 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 		return
 	}
 	sort.Sort(byCountDesc(hrs))
+	fmt.Println("before", hrs)
 	hrmap := make(map[string]int)
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
 	}
-	hrs = dpFillHostRes(chunks, hrs, dpCount, 2)
+	hrs = dpFillHostRes(chunks, relateHost, hrs, dpCount, 2)
 	if !checkDist(hrs, allCount) {
 		err = ErrBadDist
 		return
 	}
+	fmt.Println("after", hrs)
 	hcount := len(hrs)
 
 	linkTable := make([][]int, hcount)
@@ -525,6 +541,8 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 		hrs[llh].count -= 2
 	}
 	portsMap := mapIntoPortsMap(offers)
-	newChunk = append(newChunk, links2Chunks(links, portsMap)...)
+	tmpChunk := links2Chunks(links, portsMap)
+	fmt.Println("tmp", tmpChunk)
+	newChunk = append(newChunk, tmpChunk...)
 	return
 }
