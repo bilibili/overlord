@@ -25,9 +25,37 @@ var (
 	ErrClusterAssigned = errors.New("cluster has be assigned with some appids")
 )
 
+// ScaleCluster scale the given cluster
+func (d *Dao) ScaleCluster(ctx context.Context, p *model.ParamScale) (jobID string, err error) {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var (
+		val  string
+		info *create.CacheInfo
+	)
+
+	val, err = d.e.Get(sub, fmt.Sprintf("%s/%s/info", etcd.ClusterDir, p.Name))
+	if err != nil {
+		return
+	}
+
+	de := json.NewDecoder(strings.NewReader(val))
+	err = de.Decode(info)
+	if err != nil {
+		return
+	}
+
+	j := &job.Job{
+		Name:   p.Name,
+		Num:    p.Number,
+		OpType: job.OpScale,
+	}
+	return d.saveJob(sub, j)
+}
+
 // GetCluster will search clusters by given cluster name
 func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, error) {
-	istr, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/info", etcd.ClusterDir, cname))
+	istr, err := d.e.ClusterInfo(ctx, cname)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +194,6 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 }
 
 func (d *Dao) checkVersion(version string) error {
-
 
 	return nil
 }

@@ -32,6 +32,7 @@ func initRouter(e *gin.Engine) {
 	clusters.DELETE("/:cluster_name", removeCluster)
 
 	clusters.PATCH("/:cluster_name/instances", scaleCluster)
+	// TODO: impl it
 	clusters.GET("/:cluster_name/instances", getInstances)
 
 	// clusters.POST("/:cluster_name/appids", )

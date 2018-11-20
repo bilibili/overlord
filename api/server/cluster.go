@@ -7,6 +7,7 @@ import (
 	"overlord/lib/log"
 
 	"github.com/gin-gonic/gin"
+	"go.etcd.io/etcd/client"
 )
 
 // POST /clusters
@@ -54,9 +55,31 @@ func getClusters(c *gin.Context) {
 // DELETE /clusters/:cluster_name
 func removeCluster(c *gin.Context) {
 	cname := c.Param("cluster_name")
+	jobID, err := svc.RemoveCluster(cname)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
 
+	c.JSON(http.StatusOK, &model.Job{ID: jobID, State: job.StatePending})
 }
 
-// PUT /clusters/:cluster_id
+// PATCH /clusters/:cluster_name/instances
 func scaleCluster(c *gin.Context) {
+	p := new(model.ParamScale)
+	if err := c.BindJSON(p); err != nil {
+		c.JSON(http.StatusBadRequest, err)
+		return
+	}
+
+	jobID, err := svc.ScaleCluster(p)
+	if err != nil {
+		if client.IsKeyNotFound(err) {
+			c.JSON(http.StatusNotFound, err)
+			return
+		}
+		eJSON(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, &model.Job{ID: jobID, State: job.StatePending})
 }

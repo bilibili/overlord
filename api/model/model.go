@@ -11,6 +11,12 @@ type ParamCluster struct {
 	Number int `json:"number" validate:"required"`
 }
 
+// ParamScale parase from data to used to scale cluster
+type ParamScale struct {
+	Name string `json:"name" validate:"required"`
+	Number int `json:"number" validate:"required,ne=0"`
+}
+
 // QueryPage is the pagenation binder.
 type QueryPage struct {
 	PageNum int `form:"pn,default=1" validate:"gt=0"`

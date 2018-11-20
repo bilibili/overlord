@@ -58,7 +58,7 @@ func (c *Client) Info(node string) (map[string]string, error) {
 		return nil, err
 	}
 	info := make(map[string]string)
-	lines := strings.Split(string(cmd.reply.data), "\n")
+	lines := strings.Split(string(cmd.Reply.Data), "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "#") {
 			continue
@@ -71,7 +71,7 @@ func (c *Client) Info(node string) (map[string]string, error) {
 }
 
 // Execute will trying to execute command to the given node.
-func (c *Client) Execute(node, command string) (*cmd, error) {
+func (c *Client) Execute(node, command string) (*Command, error) {
 	n := c.cluster.getNode(node)
 	if n == nil {
 		return nil, ErrNoNode
@@ -100,10 +100,10 @@ func (c *Client) IsConsistent() (bool, error) {
 				return false, err
 			}
 
-			if command.reply.rtype != respBulk {
-				return false, fmt.Errorf("get wrong reply %v", *command.reply)
+			if command.Reply.RType != RespBulk {
+				return false, fmt.Errorf("get wrong Reply %v", *command.Reply)
 			}
-			slots, err := parseSlots(command.reply.data)
+			slots, err := parseSlots(command.Reply.Data)
 			if err != nil {
 				return false, err
 			}
@@ -138,7 +138,7 @@ func (c *Client) IsBalanced() (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			content := string(cmd.reply.data)
+			content := string(cmd.Reply.Data)
 			lsp := strings.Split(content, "\n")
 			for _, line := range lsp {
 				if strings.Contains(line, "role") {
@@ -164,34 +164,38 @@ func (c *Client) TryBalance() error {
 			if err != nil {
 				return err
 			}
-			if cmd.reply.rtype == respError {
-				if bytes.Contains(cmd.reply.data, []byte("You should send CLUSTER FAILOVER to a slave")) {
+			if cmd.Reply.RType == RespError {
+				if bytes.Contains(cmd.Reply.Data, []byte("You should send CLUSTER FAILOVER to a slave")) {
 					continue
 				}
-				return fmt.Errorf("fail with redis error %s", strconv.Quote(string(cmd.reply.data)))
+				return fmt.Errorf("fail with redis error %s", strconv.Quote(string(cmd.Reply.Data)))
 			}
 		}
 	}
 	return nil
 }
 
+// Conn is the singleton connection to backend
 type Conn struct {
 	conn *node
 }
 
+// NewConn create new connection by given addr
 func NewConn(addr string) *Conn {
 	return &Conn{
 		conn: newNode(addr),
 	}
 }
 
+// Ping will execute ping command
 func (c *Conn) Ping() (err error) {
 	_, err = c.conn.execute("ping")
 	return
 }
 
-func (c *Conn) Close() {
-	c.conn.Close()
+// Close will close the given connection
+func (c *Conn) Close() error {
+	return c.conn.Close()
 }
 
 type cluster struct {
@@ -236,18 +240,18 @@ func (n *node) Close() error {
 	return n.conn.Close()
 }
 
-func (n *node) execute(command string) (*cmd, error) {
+func (n *node) execute(command string) (*Command, error) {
 	if n.err == nil {
 		return nil, n.err
 	}
 
-	cmd := newCmd(command)
+	cmd := NewCmd(command)
 	n.err = cmd.execute(n)
 	return cmd, n.err
 }
 
-func parseSlots(data []byte) ([]string, error) {
-	dataStr := string(data)
+func parseSlots(Data []byte) ([]string, error) {
+	dataStr := string(Data)
 	lines := strings.Split(dataStr, "\n")
 	slots := make([]string, 16384)
 

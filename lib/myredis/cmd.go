@@ -6,51 +6,51 @@ import (
 	"strconv"
 )
 
-// resp type define
+// Resp type define
 const (
-	respUnknown respType = '0'
-	respString  respType = '+'
-	respError   respType = '-'
-	respInt     respType = ':'
-	respBulk    respType = '$'
-	respArray   respType = '*'
+	RespUnknown respType = '0'
+	RespString  respType = '+'
+	RespError   respType = '-'
+	RespInt     respType = ':'
+	RespBulk    respType = '$'
+	RespArray   respType = '*'
 )
 
-// respType is the type of redis resp
+// respType is the type of redis Resp
 type respType = byte
 
-type resp struct {
-	rtype respType
+type Resp struct {
+	RType respType
 
-	data  []byte
-	array []*resp
+	Data  []byte
+	Array []*Resp
 }
 
-func (r *resp) decode(br *bufio.ReadWriter) error {
+func (r *Resp) decode(br *bufio.ReadWriter) error {
 	line, err := br.ReadBytes(byte('\n'))
 	if err != nil && err != io.EOF {
 		return err
 	}
 
-	r.rtype = line[0]
+	r.RType = line[0]
 	switch line[0] {
-	case respString, respError, respInt:
+	case RespString, RespError, RespInt:
 		r.decodePlain(line[1 : len(line)-2])
 		return err
-	case respBulk:
+	case RespBulk:
 		return r.decodeBulk(br, line[1:len(line)-2])
-	case respArray:
+	case RespArray:
 		return r.decodeArray(br, line[1:len(line)-2])
 	default:
-		panic("not support resp")
+		panic("not support Resp")
 	}
 }
 
-func (r *resp) decodePlain(line []byte) {
-	r.data = line
+func (r *Resp) decodePlain(line []byte) {
+	r.Data = line
 }
 
-func (r *resp) decodeBulk(br *bufio.ReadWriter, line []byte) error {
+func (r *Resp) decodeBulk(br *bufio.ReadWriter, line []byte) error {
 	count, err := strconv.ParseInt(string(line), 10, 64)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func (r *resp) decodeBulk(br *bufio.ReadWriter, line []byte) error {
 	return err
 }
 
-func (r *resp) decodeArray(br *bufio.ReadWriter, line []byte) error {
+func (r *Resp) decodeArray(br *bufio.ReadWriter, line []byte) error {
 	count, err := strconv.ParseInt(string(line), 10, 64)
 	if err != nil {
 		return err
@@ -83,18 +83,20 @@ func (r *resp) decodeArray(br *bufio.ReadWriter, line []byte) error {
 	return nil
 }
 
-func newCmd(command string) *cmd {
-	return &cmd{command: command}
+// NewCmd parse command
+func NewCmd(command string) *Command {
+	return &Command{command: command}
 }
 
-type cmd struct {
+// Command is the exported command
+type Command struct {
 	command string
-	reply   *resp
+	Reply   *Resp
 }
 
-func (c *cmd) execute(n *node) error {
-	if c.reply == nil {
-		c.reply = &resp{}
+func (c *Command) execute(n *node) error {
+	if c.Reply == nil {
+		c.Reply = &Resp{}
 	}
 	n.wr.WriteString(c.command)
 	_, err := n.wr.WriteString("\r\n")
@@ -107,5 +109,5 @@ func (c *cmd) execute(n *node) error {
 		return err
 	}
 
-	return c.reply.decode(n.wr)
+	return c.Reply.decode(n.wr)
 }

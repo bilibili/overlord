@@ -5,9 +5,12 @@ type StateType = string
 
 // define status enum
 var (
-	StatePending StateType = "pending"
-	StateRunning StateType = "running"
-	StateRecover StateType = "recover"
+	StatePending     StateType = "pending"
+	StateRunning     StateType = "running"
+	StateRecover     StateType = "recover"
+
+	StateWaitApprove StateType = "wait_approve"
+	StateApproved    StateType = "approved"
 
 	// done status
 	StateDone StateType = "done"

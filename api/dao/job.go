@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"overlord/api/model"
+	"overlord/job"
 	"overlord/lib/etcd"
 	"path/filepath"
 )
@@ -40,4 +41,9 @@ func (d *Dao) GetJobs(ctx context.Context) ([]*model.Job, error) {
 func getID(etcdKey string) string {
 	_, file := filepath.Split(etcdKey)
 	return file
+}
+
+// ApproveJob will approve the given job
+func (d *Dao) ApproveJob(ctx context.Context, jobID string) error {
+	return d.e.Cas(ctx, fmt.Sprintf("%s/%s/state", etcd.JobsDir, jobID), job.StateWaitApprove, job.StateApproved)
 }

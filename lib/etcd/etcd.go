@@ -241,3 +241,10 @@ func (e *Etcd) WatchOneshot(ctx context.Context, path string, interestings ...st
 func (e *Etcd) ClusterInfo(ctx context.Context, cluster string) (info string, err error) {
 	return e.Get(ctx, fmt.Sprintf("%s/%s/info", ClusterDir, cluster))
 }
+
+
+// Cas will compareAndSwap with the given value
+func (e *Etcd) Cas(ctx context.Context, key, old, newer string) error {
+	_, err := e.kapi.Set(ctx, key, newer, &cli.SetOptions{PrevValue: old})
+	return err
+}
