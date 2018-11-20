@@ -11,7 +11,6 @@ type ParamCluster struct {
 	Number int `json:"number" validate:"required"`
 }
 
-
 // QueryPage is the pagenation binder.
 type QueryPage struct {
 	PageNum int `form:"pn,default=1" validate:"gt=0"`

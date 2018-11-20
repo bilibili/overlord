@@ -16,15 +16,16 @@ import (
 // etcd base dir
 const (
 	FRAMEWORK           = "/overlord/framework"
+	ClusterDir          = "/overlord/clusters"
 	ClusterInstancesDir = "/overlord/clusters/%s/instances/"
 	InstanceDir         = "/overlord/instances/%s:%d"
 	InstanceDirPrefix   = "/ovelord/instances"
 	HeartBeatDir        = "/overlord/heartbeat"
-	ClusterDir          = "/overlord/clusters"
 	ConfigDir           = "/overlord/config"
 	JobsDir             = "/overlord/jobs"
 	JobDetailDir        = "/overlord/job_detail"
 	FrameWork           = "/overlord/framework"
+	AppidsDir           = "/overlord/appids"
 )
 
 // define watch event
@@ -131,6 +132,18 @@ func (e *Etcd) Watch(ctx context.Context, k string) (ch chan string, err error) 
 		}
 	}()
 	return
+}
+
+// Delete will delete the given key
+func (e *Etcd) Delete(ctx context.Context, path string) error {
+	_, err := e.kapi.Delete(ctx, path, &cli.DeleteOptions{})
+	return err
+}
+
+// RMDir will delete the given path with recursive
+func (e *Etcd) RMDir(ctx context.Context, path string) error {
+	_, err := e.kapi.Delete(ctx, path, &cli.DeleteOptions{Dir: true, Recursive: true})
+	return err
 }
 
 // GenID will generate new id str with cas operation.

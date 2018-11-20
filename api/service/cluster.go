@@ -19,3 +19,9 @@ func (s *Service) GetCluster(cname string) (*model.Cluster, error) {
 func (s *Service) GetClusters() ([]*model.Cluster, error) {
 	return s.d.GetClusters(context.Background())
 }
+
+
+// RemoveCluster will remove the cluster if the cluster is not associated with other appids
+func (s *Service) RemoveCluster(cname string) (*model.Cluster, error) {
+	return nil, nil
+}
