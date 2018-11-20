@@ -23,6 +23,12 @@ type QueryPage struct {
 	PageCount int `form:"pc,default=1000" validate:"gt=0"`
 }
 
+// Appid is the struct conttains many cluster name
+type Appid struct {
+	Name string `json:"name"`
+	Clusters []string `json:"clusters"`
+}
+
 // ParamFilterCluster is the cluster filter.
 type ParamFilterCluster struct {
 	Name string `form:"name"`
