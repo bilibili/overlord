@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"overlord/lib/myredis"
 	"overlord/lib/proc"
 	"time"
@@ -92,6 +93,7 @@ func New() *Executor {
 
 // HandleEvent handle mesos executor event.
 func (ec *Executor) handleEvent(e *executor.Event) {
+	log.Infof("executor get event %+v", *e)
 	switch e.GetType() {
 	case executor.Event_SUBSCRIBED:
 		ec.subcribe(e)
@@ -184,7 +186,7 @@ func (ec *Executor) monitor(tp proto.CacheType, host string) {
 				ec.db.Refresh(context.Background(), host, nodeTTL)
 			} else {
 				errCount++
-				log.Errorf("redis health check err %v", err)
+				log.Errorf("%v health check err %v", tp, err)
 			}
 			time.Sleep(time.Second)
 		}
@@ -208,6 +210,7 @@ func (ec *Executor) Run(c context.Context) {
 		shouldReconnect = maybeReconnect(ec.cfg)
 		disconnected    = time.Now()
 	)
+	go ec.quitCheck()
 	for {
 		sub := calls.Subscribe(ec.unacknowledgedTasks(), ec.unacknowledgedUpdates())
 		resp, err := ec.subscriber.Send(c, calls.NonStreaming(sub))
@@ -231,6 +234,16 @@ func (ec *Executor) Run(c context.Context) {
 			return
 		}
 		<-shouldReconnect // wait for some amount of time before retrying subscription
+	}
+}
+
+func (ec *Executor) quitCheck() {
+	for {
+		if ec.shouldQuit {
+			log.Info("executor exit")
+			os.Exit(0)
+		}
+		time.Sleep(time.Second * 5)
 	}
 }
 

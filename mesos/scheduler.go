@@ -34,6 +34,10 @@ import (
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/events"
 )
 
+var (
+	errTaskID = errors.New("error taskid format")
+)
+
 // Scheduler mesos scheduler.
 type Scheduler struct {
 	c         *Config
@@ -196,9 +200,11 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			offers = e.GetOffers().GetOffers()
 			// callOption             = calls.RefuseSecondsWithJitter(rand.new, state.config.maxRefuseSeconds)
 		)
+
 		select {
 		case taskid := <-s.failTask:
 			s.tryRecovery(taskid, offers)
+			return nil
 		default:
 		}
 		for taskEle := s.task.Front(); taskEle != nil; {
@@ -256,9 +262,13 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		cluster, port string
 		info          *create.CacheInfo
 		ip            string
+		id            int64
 	)
 
-	cluster, ip, port = parseTaskID(t)
+	cluster, ip, port, id, err = parseTaskID(t)
+	if err != nil {
+		log.Errorf("cannot reovery task(%s) with err taskid ", t.String())
+	}
 	log.Infof("try recover task(%v)", t)
 	info, err = s.getInfoFromEtcd(context.Background(), cluster)
 	if err != nil {
@@ -266,8 +276,8 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 	}
 	uport, _ := strconv.ParseUint(port, 10, 64)
 	task := &ms.TaskInfo{
-		Name:      ip + port,
-		TaskID:    ms.TaskID{Value: t.GetValue()},
+		Name:      ip + ":" + port,
+		TaskID:    ms.TaskID{Value: fmt.Sprintf("%s:%s-%s-%d", ip, port, cluster, id+1)},
 		Executor:  s.buildExcutor(ip+port, []ms.Resource{}),
 		Resources: makeResources(info.CPU, info.MaxMemory, uport),
 	}
@@ -335,7 +345,7 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 	for _, addr := range dist.Addrs {
 		task := ms.TaskInfo{
 			Name:     addr.String(),
-			TaskID:   ms.TaskID{Value: addr.String() + "-" + info.Name},
+			TaskID:   ms.TaskID{Value: addr.String() + "-" + info.Name + "-" + "0"},
 			AgentID:  ofm[addr.IP].AgentID,
 			Executor: s.buildExcutor(addr.String(), []ms.Resource{}),
 			//  plus the port obtained by adding 10000 to the data port for redis cluster.
@@ -438,15 +448,18 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 	}
 }
 
-func parseTaskID(t ms.TaskID) (cluster, ip, port string) {
+func parseTaskID(t ms.TaskID) (cluster, ip, port string, id int64, err error) {
 	v := t.GetValue()
-	idx := strings.IndexByte(v, '-')
-	if idx == -1 {
+	ss := strings.Split(v, "-")
+	if len(ss) != 3 {
+		err = errTaskID
 		return
 	}
-	cluster = v[idx+1:]
-	host := v[:idx]
-	idx = strings.IndexByte(host, ':')
+	host := ss[0]
+	cluster = ss[1]
+	ids := ss[2]
+	id, _ = strconv.ParseInt(ids, 10, 64)
+	idx := strings.IndexByte(host, ':')
 	ip = host[:idx]
 	port = host[idx+1:]
 	return
@@ -510,7 +523,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		for _, node := range ck.Nodes {
 			task := ms.TaskInfo{
 				Name:     node.Name,
-				TaskID:   ms.TaskID{Value: node.Addr() + "-" + t.Name},
+				TaskID:   ms.TaskID{Value: node.Addr() + "-" + t.Name + "-" + "0"},
 				AgentID:  ofm[node.Name].AgentID,
 				Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),
 				//  plus the port obtained by adding 10000 to the data port for redis cluster.

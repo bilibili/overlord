@@ -20,11 +20,12 @@ func TestEtcd(t *testing.T) {
 	assert.NoError(t, err)
 }
 func TestSet(t *testing.T) {
-	e, err := New("http://127.0.0.1:2379")
+	e, err := New("http://172.22.33.167:2379")
 	ctx := context.TODO()
 	assert.NoError(t, err)
 	mcjob := job.Job{
 		Name:      "test",
+		OpType:    job.OpCreate,
 		CacheType: proto.CacheTypeMemcache,
 		Version:   "1.5.12",
 		Num:       6,
