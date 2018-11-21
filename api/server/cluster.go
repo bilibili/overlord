@@ -83,3 +83,33 @@ func scaleCluster(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, &model.Job{ID: jobID, State: job.StatePending})
 }
+
+func assignAppid(c *gin.Context) {
+	p := new(model.ParamAssign)
+	if err := c.BindJSON(p); err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	err := svc.AssignAppid(p.ClusterName, p.Appid)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]string{"message": "ok"})
+}
+
+func unassignAppid(c *gin.Context) {
+	p := new(model.ParamAssign)
+	if err := c.BindJSON(p); err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	err := svc.UnassignAppid(p.ClusterName, p.Appid)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]string{"message": "ok"})
+}

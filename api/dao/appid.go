@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"go.etcd.io/etcd/client"
 )
 
 // SearchAppids will search all the apps
@@ -31,13 +33,13 @@ func (d *Dao) SearchAppids(ctx context.Context, name string, page *model.QueryPa
 				cs[i] = c.Value
 			}
 			appids = append(appids, &model.Appid{Name: appid, Clusters: cs})
-			if len(appids) == page.PageNum {
+			if len(appids) == page.PageCount*page.PageNum {
 				break
 			}
 		}
 	}
 	sort.Sort(byName(appids))
-	return appids, nil
+	return appids[page.PageCount*(page.PageNum-1) : page.PageCount*page.PageNum], nil
 }
 
 type byName []*model.Appid
@@ -52,4 +54,38 @@ func (b byName) Swap(i, j int) {
 
 func (b byName) Len() int {
 	return len(b)
+}
+
+// AssignAppid will assign appid with cluster
+func (d *Dao) AssignAppid(ctx context.Context, cname, appid string) error {
+	_, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/info", etcd.ClusterDir, cname))
+	if err != nil {
+		if client.IsKeyNotFound(err) {
+			return model.ErrNotFound
+		}
+		return err
+	}
+	_, err = d.e.Get(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cname, appid))
+	if client.IsKeyNotFound(err) {
+		err := d.assignAppids(ctx, cname, appid)
+		return err
+	} else if err != nil {
+		return err
+	}
+
+	return model.ErrConflict
+}
+
+// UnassignAppid will assign appid with cluster
+func (d *Dao) UnassignAppid(ctx context.Context, cname, appid string) error {
+	_, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/info", etcd.ClusterDir, cname))
+	if err != nil {
+		return err
+	}
+
+	_, err = d.e.Get(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cname, appid))
+	if err != nil {
+		return err
+	}
+	return d.unassignAppids(ctx, cname, appid)
 }
