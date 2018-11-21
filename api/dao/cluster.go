@@ -268,7 +268,7 @@ func (d *Dao) saveJob(ctx context.Context, t *job.Job) (string, error) {
 	return jobID, nil
 }
 
-func (d *Dao) deassignAppids(ctx context.Context, cluster string, appids ...string) (err error) {
+func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...string) (err error) {
 	for _, appid := range appids {
 		err = d.e.Delete(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cluster, appid))
 		if err != nil {

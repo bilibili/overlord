@@ -28,7 +28,21 @@ func (s *Service) RemoveCluster(cname string) (string, error) {
 // ScaleCluster will scale the given cluster with params.
 // for redis cluster, number means scale chunk.
 // for redis/memcache, number means scale numbers.
-func (s *Service) ScaleCluster(p *model.ParamScale) (jobID string,err error) {
+func (s *Service) ScaleCluster(p *model.ParamScale) (jobID string, err error) {
 	jobID, err = s.d.ScaleCluster(context.Background(), p)
 	return
+}
+
+// AssignAppid will asign appid and cluster
+func (s *Service) AssignAppid(cname, appid string) error {
+	sub, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	return s.d.AssignAppid(sub, cname, appid)
+}
+
+// UnassignAppid will unasign appid and cluster
+func (s *Service) UnassignAppid(cname, appid string) error {
+	sub, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	return s.d.UnassignAppid(sub, cname, appid)
 }

@@ -31,6 +31,13 @@ type Appid struct {
 
 // ParamFilterCluster is the cluster filter.
 type ParamFilterCluster struct {
-	Name string `form:"name"`
-	Appid string `form:"appid"`
+	Name string `json:"name"`
+	Appid string `json:"appid"`
+}
+
+
+// ParamAssign is the model used for server.assgnAppid and server.unassignAppid
+type ParamAssign struct {
+	ClusterName string `json:"cluster_name" validate:"required"`
+	Appid string `json:"appid" validate:"required"`
 }

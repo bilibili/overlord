@@ -28,12 +28,16 @@ func initRouter(e *gin.Engine) {
 	clusters := e.Group("/clusters")
 	clusters.POST("/", createCluster)
 	clusters.GET("/", getClusters)
+
 	clusters.GET("/:cluster_name", getCluster)
 	clusters.DELETE("/:cluster_name", removeCluster)
-
 	clusters.PATCH("/:cluster_name/instances", scaleCluster)
 	// TODO: impl it
 	clusters.GET("/:cluster_name/instances", getInstances)
+
+	clusters.POST("/:cluster_name/appid", assignAppid)
+	clusters.DELETE("/:cluster_name/appid", unassignAppid)
+
 
 	// clusters.POST("/:cluster_name/appids", )
 
@@ -54,4 +58,6 @@ func initRouter(e *gin.Engine) {
 	appids := e.Group("/appids")
 	appids.GET("/", getAppids)
 	appids.DELETE("/:appid", removeAppid)
+
+	// e.POST("/link", )
 }
