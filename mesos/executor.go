@@ -194,7 +194,7 @@ func (ec *Executor) monitor(tp proto.CacheType, host string) {
 // Pinger service.
 type Pinger interface {
 	Ping() error
-	Close()
+	Close() error
 }
 
 // Run start executor.

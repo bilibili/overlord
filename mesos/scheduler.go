@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"overlord/job"
 	"overlord/job/create"
 	"overlord/lib/chunk"
@@ -206,41 +208,18 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 			inum := t.Num
 			switch t.CacheType {
 			case proto.CacheTypeRedisCluster:
-
 				err := s.dispatchCluster(t, inum, imem, icpu, offers)
 				if err != nil {
 					taskEle = taskEle.Next()
 					continue
 				}
-
 				ttask := taskEle
 				s.task.Remove(ttask)
 				return nil
 			case proto.CacheTypeRedis, proto.CacheTypeMemcache:
-				dist, err := chunk.DistIt(t.Num, t.MaxMem, t.CPU, offers...)
+				err := s.dispatchSingleton(t, offers)
 				if err != nil {
-					log.Errorf("task(%v) can not get offer by chunk, err %v", t, err)
-					taskEle = taskEle.Next()
-					continue
-				}
-				ci := &create.CacheInfo{
-					JobID:     t.ID,
-					Name:      t.Name,
-					MaxMemory: t.MaxMem,
-					CPU:       t.CPU,
-					CacheType: t.CacheType,
-					Number:    t.Num,
-					Thread:    int(t.CPU) + 1,
-					Version:   t.Version,
-					Dist:      dist,
-				}
-				ctask := create.NewCacheJob(s.db, ci)
-				err = ctask.Create()
-				if err != nil {
-					log.Errorf("create cluster err %v", err)
-					return nil
-				}
-				if err = s.acceptOffer(ci, dist, offers); err != nil {
+					log.Errorf("dispatchSingleton err %v", err)
 					taskEle = taskEle.Next()
 					continue
 				}
@@ -376,11 +355,11 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
 		err = calls.CallNoData(context.Background(), s.cli, accept)
 		if err != nil {
-			log.Errorf("fail to lanch task err %v", err)
-			continue
+			err = errors.WithStack(err)
+			return
 		}
 	}
-	return err
+	return nil
 }
 
 func (s *Scheduler) getInfoFromEtcd(ctx context.Context, cluster string) (t *create.CacheInfo, err error) {
@@ -485,7 +464,16 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		}
 		jobChunks = chunks
 	case job.OpScale:
-		var newChunk []*chunk.Chunk
+		var (
+			newChunk []*chunk.Chunk
+			ci       *create.CacheInfo
+		)
+		ci, err = s.getInfoFromEtcd(context.Background(), t.Name)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+		chunks = ci.Chunks
 		newChunk, err = chunk.ChunksAppend(chunks, num, mem, cpu, offers...)
 		if err != nil {
 			log.Errorf("chunk.ChunksAppend with job (%v) err %v", t, err)
@@ -542,9 +530,63 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
 		err = calls.CallNoData(context.Background(), s.cli, accept)
 		if err != nil {
-			log.Errorf("fail to lanch task err %v", err)
+			err = errors.WithStack(err)
 			return
 		}
+	}
+	return
+}
+
+func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) {
+	var dist *chunk.Dist
+	var jobDist *chunk.Dist
+	switch t.OpType {
+	case job.OpCreate:
+		dist, err = chunk.DistIt(t.Num, t.MaxMem, t.CPU, offers...)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+		jobDist = dist
+	case job.OpScale:
+		var (
+			newDist *chunk.Dist
+			ci      *create.CacheInfo
+		)
+		ci, err = s.getInfoFromEtcd(context.Background(), t.Name)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+		dist = ci.Dist
+		newDist, err = chunk.DistAppendIt(dist, t.Num, t.MaxMem, t.CPU, offers...)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+		jobDist = newDist
+		dist.Addrs = append(dist.Addrs, newDist.Addrs...)
+	}
+
+	ci := &create.CacheInfo{
+		JobID:     t.ID,
+		Name:      t.Name,
+		MaxMemory: t.MaxMem,
+		CPU:       t.CPU,
+		CacheType: t.CacheType,
+		Number:    t.Num,
+		Thread:    int(t.CPU) + 1,
+		Version:   t.Version,
+		Dist:      dist,
+	}
+	ctask := create.NewCacheJob(s.db, ci)
+	err = ctask.Create()
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	if err = s.acceptOffer(ci, jobDist, offers); err != nil {
+		err = errors.WithStack(err)
 	}
 	return
 }

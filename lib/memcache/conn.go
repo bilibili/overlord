@@ -57,6 +57,6 @@ func (c *Conn) Ping() (err error) {
 }
 
 // Close conn.
-func (c *Conn) Close() {
-	c.conn.Close()
+func (c *Conn) Close() error {
+	return c.conn.Close()
 }
