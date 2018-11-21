@@ -296,6 +296,13 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 			err := calls.CallNoData(context.Background(), s.cli, accept)
 			if err == nil {
 				log.Info("recover task successfully")
+				// decline other
+				for _, offer := range offers {
+					if offer.Hostname != ip {
+						decline := calls.Decline(offer.ID)
+						calls.CallNoData(context.Background(), s.cli, decline)
+					}
+				}
 				return
 			}
 			log.Errorf("try recover task from pre agent fail %v", err)
