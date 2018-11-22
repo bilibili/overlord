@@ -27,3 +27,9 @@ type Instance struct {
 	Port  int    `json:"port"`
 	State string `json:"state"`
 }
+
+// Appid is the struct conttains many cluster name
+type Appid struct {
+	Name     string   `json:"name"`
+	Clusters []string `json:"clusters"`
+}
