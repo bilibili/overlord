@@ -26,6 +26,7 @@ const (
 	JobDetailDir        = "/overlord/job_detail"
 	FrameWork           = "/overlord/framework"
 	AppidsDir           = "/overlord/appids"
+	SpecsDir            = "/overlord/specs"
 )
 
 // define watch event
@@ -242,6 +243,19 @@ func (e *Etcd) ClusterInfo(ctx context.Context, cluster string) (info string, er
 	return e.Get(ctx, fmt.Sprintf("%s/%s/info", ClusterDir, cluster))
 }
 
+// GetAllSpecs get all the specifications
+func (e *Etcd) GetAllSpecs(ctx context.Context) ([]string, error) {
+	nodes, err := e.LS(ctx, SpecsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	specs := make([]string, len(nodes))
+	for i, node := range nodes {
+		specs[i] = node.Value
+	}
+	return specs, nil
+}
 
 // Cas will compareAndSwap with the given value
 func (e *Etcd) Cas(ctx context.Context, key, old, newer string) error {

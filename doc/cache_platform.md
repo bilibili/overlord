@@ -5,6 +5,7 @@
 
 ```
 overlord
+    /specs/$spec
     /appids/
         /$appid/
             /${id} # value is cluster_name
