@@ -24,4 +24,19 @@ func getAppids(c *gin.Context) {
 }
 
 func removeAppid(c *gin.Context) {
+	appid := c.Param("appid")
+	err := svc.RemoveAppid(appid)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+	done(c)
+}
+
+func done(c *gin.Context) {
+	c.JSON(http.StatusOK, struct {
+		Message string
+	}{
+		Message : "done",
+	})
 }

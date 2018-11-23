@@ -89,3 +89,24 @@ func (d *Dao) UnassignAppid(ctx context.Context, cname, appid string) error {
 	}
 	return d.unassignAppids(ctx, cname, appid)
 }
+
+// RemoveAppid will remove appid with check the appid assign to others cluster
+func (d *Dao) RemoveAppid(ctx context.Context, appid string) error {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	nodes, err := d.e.LS(sub, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
+	if err != nil {
+		return err
+	}
+	if len(nodes) != 0 {
+		clusters := make([]string, len(nodes))
+		for idx, node := range nodes {
+			clusters[idx] = node.Value
+		}
+
+		return fmt.Errorf("appid %s has ben assigned to [%v]", appid, strings.Join(clusters, ", "))
+	}
+
+	return d.e.RMDir(sub, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
+}
