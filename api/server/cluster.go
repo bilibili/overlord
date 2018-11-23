@@ -18,7 +18,6 @@ func createCluster(c *gin.Context) {
 		return
 	}
 	log.Infof("create new cluster with param %v", *p)
-
 	jobid, err := svc.CreateCluster(p)
 	if err != nil {
 		eJSON(c, err)
