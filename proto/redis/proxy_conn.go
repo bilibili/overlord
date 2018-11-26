@@ -153,6 +153,7 @@ func nextReq(m *proto.Message) *Request {
 		return r
 	}
 	r := req.(*Request)
+	r.mType = mergeTypeNo
 	return r
 }
 
