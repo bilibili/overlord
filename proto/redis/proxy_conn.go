@@ -168,7 +168,14 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if !ok {
 		return ErrBadAssert
 	}
-	if !m.IsBatch() {
+	switch req.mType {
+	case mergeTypeOK:
+		err = pc.mergeOK(m)
+	case mergeTypeJoin:
+		err = pc.mergeJoin(m)
+	case mergeTypeCount:
+		err = pc.mergeCount(m)
+	default:
 		if !req.IsSupport() {
 			req.reply.rTp = respError
 			req.reply.data = req.reply.data[:0]
@@ -186,17 +193,6 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 			}
 		}
 		err = req.reply.encode(pc.bw)
-	} else {
-		switch req.mType {
-		case mergeTypeOK:
-			err = pc.mergeOK(m)
-		case mergeTypeJoin:
-			err = pc.mergeJoin(m)
-		case mergeTypeCount:
-			err = pc.mergeCount(m)
-		default:
-			panic("unreachable merge path")
-		}
 	}
 	if err != nil {
 		err = errors.WithStack(err)
