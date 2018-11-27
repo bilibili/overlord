@@ -36,7 +36,10 @@ func main() {
 	if log.Init(conf.Config) {
 		defer log.Close()
 	}
-	db, _ := etcd.New(conf.DBEndPoint)
+	db, err := etcd.New(conf.DBEndPoint)
+	if err != nil {
+		panic(err)
+	}
 	sched := mesos.NewScheduler(conf, db)
 	sched.Run()
 }

@@ -100,14 +100,14 @@ func (s *Scheduler) taskEvent() {
 		v := <-s.Tchan
 		var t job.Job
 		if err := json.Unmarshal([]byte(v), &t); err != nil {
-			log.Errorf("err task info err %v", err)
+			log.Errorf("get task info err %v", err)
 			continue
 		}
 		s.task.PushBack(t)
 		// revive offer when task comming.
 		revice := calls.Revive()
 		if err := calls.CallNoData(context.Background(), s.cli, revice); err != nil {
-			log.Errorf("err call to revie %v", err)
+			log.Errorf("revie offer fail  err(%v)", err)
 			continue
 		}
 	}
@@ -134,17 +134,21 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 		failOverTimeout := time.Duration(s.c.FailOver).Seconds()
 		frameworkInfo.FailoverTimeout = &failOverTimeout
 	}
-	if s.c.Role != "" {
-		frameworkInfo.Role = &s.c.Role
+	if len(s.c.Roles) != 0 {
+		frameworkInfo.Roles = s.c.Roles
+	}
+	if s.c.Hostname != "" {
+		frameworkInfo.Hostname = &s.c.Hostname
+	}
+	if s.c.Principal != "" {
+		frameworkInfo.Principal = &s.c.Principal
 	}
 	return frameworkInfo
 }
 
 func (s *Scheduler) buildEventHandle() events.Handler {
 	logger := controller.LogEvents(nil)
-	return eventrules.New(
-		logAllEvents(),
-	).Handle(events.Handlers{
+	return eventrules.New().Handle(events.Handlers{
 		scheduler.Event_FAILURE: logger.HandleF(failure),
 		scheduler.Event_OFFERS:  s.trackOffersReceived().HandleF(s.resourceOffers()),
 		scheduler.Event_UPDATE:  controller.AckStatusUpdates(s.cli).AndThen().HandleF(s.statusUpdate()),
@@ -153,14 +157,6 @@ func (s *Scheduler) buildEventHandle() events.Handler {
 			controller.TrackSubscription(s, time.Second*30),
 		),
 	}.Otherwise(logger.HandleEvent))
-}
-
-// logAllEvents logs every observed event; this is somewhat expensive to do
-func logAllEvents() eventrules.Rule {
-	return func(ctx context.Context, e *scheduler.Event, err error, ch eventrules.Chain) (context.Context, *scheduler.Event, error) {
-		log.Infof("%+v\n", *e)
-		return ch(ctx, e, err)
-	}
 }
 
 func (s *Scheduler) trackOffersReceived() eventrules.Rule {
@@ -264,10 +260,18 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		ip            string
 		id            int64
 	)
-
+	defer func() {
+		if err != nil {
+			for _, offer := range offers {
+				decline := calls.Decline(offer.ID)
+				calls.CallNoData(context.Background(), s.cli, decline)
+			}
+		}
+	}()
 	cluster, ip, port, id, err = parseTaskID(t)
 	if err != nil {
 		log.Errorf("cannot reovery task(%s) with err taskid ", t.String())
+		return
 	}
 	log.Infof("try recover task(%v)", t)
 	info, err = s.getInfoFromEtcd(context.Background(), cluster)
@@ -296,7 +300,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 			err := calls.CallNoData(context.Background(), s.cli, accept)
 			if err == nil {
 				log.Info("recover task successfully")
-				// decline other
+				// decline other offer
 				for _, offer := range offers {
 					if offer.Hostname != ip {
 						decline := calls.Decline(offer.ID)
@@ -305,7 +309,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 				}
 				return
 			}
-			log.Errorf("try recover task from pre agent fail %v", err)
+			log.Errorf("try recover task from origin agent fail %v", err)
 		}
 	}
 	// can not recovery from origin host,try to scale by append.
@@ -323,7 +327,11 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 			return
 		}
 		info.Dist.Addrs = append(info.Dist.Addrs, newDist.Addrs...)
-		s.acceptOffer(info, newDist, offers)
+		err = s.acceptOffer(info, newDist, offers)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
 		ctask := create.NewCacheJob(s.db, info)
 		err = ctask.Create()
 		if err != nil {
@@ -332,10 +340,11 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		}
 
 	case proto.CacheTypeRedisCluster:
+		log.Error("can not revoer redis-cluster from origin agent,need to be rescale by op")
 		// if cluster cann't recovery from origin agent.
 		// set status as WaitApprove,and then should be recover by op with chunkrecover
 	default:
-		log.Errorf("recover from err cache type %v", err)
+		log.Errorf("recover from err cache type")
 	}
 }
 
@@ -410,7 +419,7 @@ func (s *Scheduler) buildExcutor(name string, rs []ms.Resource) *ms.ExecutorInfo
 		ExecutorID: ms.ExecutorID{Value: name},
 		Name:       &name,
 		Command: &ms.CommandInfo{
-			Value: pb.String("./executor -debug -log-vl 5 -std"),
+			Value: pb.String("./executor"),
 			URIs:  executorUris,
 		},
 		Resources: rs,
@@ -455,6 +464,8 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 	}
 }
 
+// taskid should be ip:port-cluster-id
+// if id not equal zero mean task had fail before and been recover.
 func parseTaskID(t ms.TaskID) (cluster, ip, port string, id int64, err error) {
 	v := t.GetValue()
 	ss := strings.Split(v, "-")

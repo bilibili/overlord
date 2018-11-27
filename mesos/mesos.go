@@ -13,10 +13,11 @@ type Config struct {
 	Checkpoint bool     `toml:"checkpoint"`
 	Master     string   `toml:"master"` //MesosMaster's endpoint zk://mesos.master/2181 or 10.11.12.13:5050
 	FailOver   Duration `toml:"fail_voer"`
-	Role       string   `toml:"role"`
-
-	DBType     string `toml:"db_type"`      //Type of the database etcd/zk
-	DBEndPoint string `toml:"db_end_point"` //Endpoint of the database
+	Roles      []string `toml:"role"`
+	Hostname   string   `toml:"hostname"`
+	Principal  string   `toml:"principal"`
+	DBType     string   `toml:"db_type"`      //Type of the database etcd/zk
+	DBEndPoint string   `toml:"db_end_point"` //Endpoint of the database
 
 	ExecutorURL string `toml:"executor_url"`
 }
