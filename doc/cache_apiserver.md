@@ -109,3 +109,75 @@ appid 列表
 ### DELETE /appids/:appid_name
 
 *开源版独享*
+
+
+
+# V1 版本API整理
+
+## GET /search
+
+### query args
+|name|type|description|
+|----|----|-----------|
+|**q**|string|搜索集群名字和appid列表里的关键字|
+|cache_type|string|搜索的时候指定集群类型|
+
+examples: 
+
+1. /search?q=baka&cache_type=redis
+2. /search?q=chu
+
+### Response
+
+example response:
+
+```
+[
+    {
+        "appids": ["test.app1", "test.app2"], 
+        "name": "test-cluster", 
+        "max_memory": 2048, 
+        "cache_type": "redis",
+        "number": 20, "port": 1277
+    },
+    ...
+]
+```
+## DELETE /clusters/:cluster_name
+
+### path arguments
+
+|name|type|description|
+|----|----|-----------|
+|cluster_name|string| 唯一精确匹配的 cluster_name|
+
+### example response
+
+```
+{
+    "name": "test-cluster",
+    "max_memory": 2048,
+    "appids": ["abc", "def", "hij"],
+    "cpu": "1",
+    "state": "done",
+    "Number": "20",
+    "Instances": [{
+        "ip": "127.0.0.1",
+        "port": "12000",
+        "state": 123,
+        "weight": 1,
+    }],
+    "version": "0.1.1"
+}
+```
+
+## PATCH /:cluster_name/instances/:instance_id
+
+
+### body arguments
+
+```
+{
+    "weight": 12,
+}
+```

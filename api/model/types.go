@@ -25,6 +25,7 @@ type Cluster struct {
 type Instance struct {
 	IP    string `json:"ip"`
 	Port  int    `json:"port"`
+	Weight int   `json:"weight"`
 	State string `json:"state"`
 }
 

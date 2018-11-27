@@ -28,6 +28,7 @@ overlord
     /instances/$ip:$port/
         /type (cache type,eg:redis,memcached,redis-cluster)
         /cluster # cluster name
+        /weight  # instance weight number
         /nodes.conf
         /server.conf (服务配置文件 eg:redis.conf memcached.conf)
     /heartbeat
