@@ -3,6 +3,8 @@ package proto
 import (
 	"sync"
 	"sync/atomic"
+
+	"overlord/lib/hashkit"
 )
 
 const (
@@ -14,9 +16,10 @@ const (
 
 // NodeConnPipe multi MsgPipe for node conns.
 type NodeConnPipe struct {
-	input chan *Message
-	mps   []*msgPipe
-	l     sync.RWMutex
+	conns  int32
+	inputs []chan *Message
+	mps    []*msgPipe
+	l      sync.RWMutex
 
 	errCh chan error
 
@@ -25,13 +28,18 @@ type NodeConnPipe struct {
 
 // NewNodeConnPipe new NodeConnPipe.
 func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
-	ncp = &NodeConnPipe{
-		input: make(chan *Message, pipeMaxCount*128),
-		mps:   make([]*msgPipe, conns),
-		errCh: make(chan error, 1),
+	if conns <= 0 {
+		panic("the number of connections cannot be zero")
 	}
-	for i := 0; i < len(ncp.mps); i++ {
-		ncp.mps[i] = newMsgPipe(ncp.input, newNc, ncp.errCh)
+	ncp = &NodeConnPipe{
+		conns:  conns,
+		inputs: make([]chan *Message, conns),
+		mps:    make([]*msgPipe, conns),
+		errCh:  make(chan error, 1),
+	}
+	for i := int32(0); i < ncp.conns; i++ {
+		ncp.inputs[i] = make(chan *Message, pipeMaxCount*128)
+		ncp.mps[i] = newMsgPipe(ncp.inputs[i], newNc, ncp.errCh)
 	}
 	return
 }
@@ -40,8 +48,19 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 func (ncp *NodeConnPipe) Push(m *Message) {
 	ncp.l.RLock()
 	if ncp.state == opened {
-		m.Add()
-		ncp.input <- m
+		if ncp.conns == 1 {
+			m.Add()
+			ncp.inputs[0] <- m
+		} else {
+			req := m.Request()
+			if req != nil {
+				crc := int32(hashkit.Crc16(req.Key()))
+				m.Add()
+				ncp.inputs[crc%ncp.conns] <- m
+			} else {
+				// NOTE: impossible!!!
+			}
+		}
 	}
 	ncp.l.RUnlock()
 }
@@ -56,7 +75,9 @@ func (ncp *NodeConnPipe) Close() {
 	close(ncp.errCh)
 	ncp.l.Lock()
 	ncp.state = closed
-	close(ncp.input)
+	for _, input := range ncp.inputs {
+		close(input)
+	}
 	ncp.l.Unlock()
 }
 
