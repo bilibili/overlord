@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"overlord/api/server"
 	"overlord/api/service"
 	"overlord/config"
@@ -11,26 +12,20 @@ import (
 )
 
 var (
-	confPath        string
-	defaultConfPath = "conf.toml"
+	confPath string
 )
 
 func main() {
-	config.SetRunMode(config.RunModeProd)
-
-	log.Init(log.NewStdHandler())
-	flag.StringVar(&confPath, "conf", "", "scheduler conf")
+	flag.StringVar(&confPath, "conf", "conf.toml", "scheduler conf")
 	flag.Parse()
 	conf := new(config.ServerConfig)
-	if confPath == "" {
-		confPath = defaultConfPath
-	}
-
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil {
 		panic(err)
 	}
-
+	if log.Init(conf.Config) {
+		defer log.Close()
+	}
 	svc := service.New(conf)
 	server.Run(conf, svc)
 }

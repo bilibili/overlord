@@ -1,9 +1,13 @@
 package mesos
 
-import "time"
+import (
+	"overlord/lib/log"
+	"time"
+)
 
 // Config scheduler config.
 type Config struct {
+	*log.Config
 	User       string   `toml:"user"` // Supply a username
 	Name       string   `toml:"name"` // Supply a frameworkname
 	Checkpoint bool     `toml:"checkpoint"`

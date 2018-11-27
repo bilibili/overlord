@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"overlord/config"
 	"overlord/job/balance"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
@@ -16,13 +15,10 @@ var (
 )
 
 func main() {
-	config.SetRunMode(config.RunModeProd)
-
-	log.Init(log.NewStdHandler())
 	flag.StringVar(&cluster, "cluster", "", "cluster name")
 	flag.StringVar(&db, "db", "", "etcd dsn")
 	flag.Parse()
-
+	log.InitHandle(log.NewStdHandler())
 	var etcdURL string
 	if strings.HasPrefix(db, "http://") {
 		etcdURL = db
@@ -36,16 +32,9 @@ func main() {
 		return
 	}
 
-	job, err := balance.GenTryBalanceJob(cluster, e)
+	err = balance.Balance(cluster, e)
 	if err != nil {
 		log.Errorf("fail to init balance %s job due %v", cluster, err)
 		return
-	}
-
-	err = job.Balance()
-	if err != nil {
-		log.Errorf("balance cluster %s err due %v", cluster, err)
-	} else {
-		log.Infof("succeed balance %s", cluster)
 	}
 }

@@ -8,7 +8,6 @@ import (
 
 func main() {
 	ec := mesos.New()
-	log.Init(log.NewStdHandler())
+	log.InitHandle(log.NewStdHandler())
 	ec.Run(context.Background())
-
 }

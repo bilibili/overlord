@@ -51,5 +51,5 @@ stdout_logfile_backups = 3
 stderr_logfile = /data/log/zookeeper/stderr.log
 stderr_logfile_backups = 3
 logfile_maxbytes=20MB'>>$supervisor_path
-echo "environment=JAVA_HOME=\"${jdk}\",JRE_HOME=\"${jdk}\"/jre\"">>$supervisor_path
+echo "environment=JAVA_HOME=\"${jdk}\",JRE_HOME=\"${jdk}/jre\"">>$supervisor_path
 supervisorctl update

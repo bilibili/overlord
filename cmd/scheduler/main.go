@@ -22,7 +22,6 @@ var defConf = &mesos.Config{
 }
 
 func main() {
-	log.Init(log.NewStdHandler())
 	flag.StringVar(&confPath, "conf", "", "scheduler conf")
 	flag.Parse()
 	conf := new(mesos.Config)
@@ -33,6 +32,9 @@ func main() {
 		}
 	} else {
 		conf = defConf
+	}
+	if log.Init(conf.Config) {
+		defer log.Close()
 	}
 	db, _ := etcd.New(conf.DBEndPoint)
 	sched := mesos.NewScheduler(conf, db)
