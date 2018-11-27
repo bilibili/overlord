@@ -13,7 +13,8 @@ type ParamCluster struct {
 // ParamScale parase from data to used to scale cluster
 type ParamScale struct {
 	Name   string `json:"name" validate:"required"`
-	Number int    `json:"number" validate:"required,ne=0"`
+	Number int    `json:"number"`
+	Memory int    `json:"memory"`
 }
 
 // QueryPage is the pagenation binder.
@@ -32,4 +33,9 @@ type ParamFilterCluster struct {
 type ParamAssign struct {
 	ClusterName string `json:"cluster_name" validate:"required"`
 	Appid       string `json:"appid" validate:"required"`
+}
+
+// ParamScaleWeight change the weight of cluster
+type ParamScaleWeight struct {
+	Weight int `json:"weight" validate:"required,ne=0"`
 }

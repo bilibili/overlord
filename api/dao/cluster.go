@@ -79,12 +79,26 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 			val = -1
 		}
 
-		instances = append(instances, &model.Instance{
+		inst := &model.Instance{
 			IP:   vsp[0],
 			Port: int(val),
 			// TODO: change it as really state.
 			State: "RUNNING",
-		})
+			Weight: 1,
+		}
+
+		if info.CacheType != proto.CacheTypeRedisCluster {
+			weight, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/weight", etcd.InstanceDir, node.Value))
+			if err != nil {
+				continue
+			}
+			w, err := strconv.ParseInt(weight, 10, 64)
+			if err != nil {
+				continue
+			}
+			inst.Weight = int(w)
+		}
+		instances = append(instances, inst)
 	}
 
 	val, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))

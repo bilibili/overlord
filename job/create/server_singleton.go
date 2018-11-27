@@ -102,6 +102,10 @@ func (c *CacheJob) buildTplTree() error {
 		if err != nil {
 			return err
 		}
+		err = c.e.Set(ctx, fmt.Sprintf("%s/weight", instanceDir), fmt.Sprint(1))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
