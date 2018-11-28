@@ -407,34 +407,34 @@
 			"revisionTime": "2018-10-22T19:04:02Z"
 		},
 		{
-			"checksumSHA1": "VtM227FLn5y81r3dwSX9pSJKT9Y=",
+			"checksumSHA1": "ZMhpBxAZXOXQtBdO5UiQzdG8zeU=",
 			"path": "go.etcd.io/etcd/client",
-			"revision": "86b933311d239aeba576fac32077e41157d328eb",
-			"revisionTime": "2018-10-22T23:07:27Z"
+			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
+			"revisionTime": "2018-11-28T02:58:43Z"
 		},
 		{
 			"checksumSHA1": "Q4ZZnZeTbMHrXKZxTd6EQjSf4uY=",
 			"path": "go.etcd.io/etcd/pkg/pathutil",
-			"revision": "86b933311d239aeba576fac32077e41157d328eb",
-			"revisionTime": "2018-10-22T23:07:27Z"
+			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
+			"revisionTime": "2018-11-28T02:58:43Z"
 		},
 		{
-			"checksumSHA1": "jF9R5QbAMut5PvZMIy9+zDPf6NU=",
+			"checksumSHA1": "f0XHkJGhyhBIlx+AuLyv2lc519w=",
 			"path": "go.etcd.io/etcd/pkg/srv",
-			"revision": "86b933311d239aeba576fac32077e41157d328eb",
-			"revisionTime": "2018-10-22T23:07:27Z"
+			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
+			"revisionTime": "2018-11-28T02:58:43Z"
 		},
 		{
 			"checksumSHA1": "VL9HsNKbbCb1Ntj9VcFCfiTmjmM=",
 			"path": "go.etcd.io/etcd/pkg/types",
-			"revision": "86b933311d239aeba576fac32077e41157d328eb",
-			"revisionTime": "2018-10-22T23:07:27Z"
+			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
+			"revisionTime": "2018-11-28T02:58:43Z"
 		},
 		{
 			"checksumSHA1": "Vyt9fFWEV2/sagq9KmkVbPn+LFM=",
 			"path": "go.etcd.io/etcd/version",
-			"revision": "86b933311d239aeba576fac32077e41157d328eb",
-			"revisionTime": "2018-10-22T23:07:27Z"
+			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
+			"revisionTime": "2018-11-28T02:58:43Z"
 		},
 		{
 			"checksumSHA1": "b2oWuv1tpxlJBO7Dn8jh1iu8ZlA=",
