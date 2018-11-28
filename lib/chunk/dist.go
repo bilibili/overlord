@@ -55,6 +55,9 @@ func DistIt(num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err erro
 
 // DistAppendIt will re-dist it by append new nodes.
 func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
+	if num <= 0 {
+		return
+	}
 	hrs := mapIntoHostRes(offers, memory, cpu)
 	hrm := make(map[string]*hostRes, len(hrs))
 	sort.Sort(byCountDesc(hrs))

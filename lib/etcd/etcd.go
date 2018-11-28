@@ -243,6 +243,11 @@ func (e *Etcd) ClusterInfo(ctx context.Context, cluster string) (info string, er
 	return e.Get(ctx, fmt.Sprintf("%s/%s/info", ClusterDir, cluster))
 }
 
+// TaskID get cluster info .
+func (e *Etcd) TaskID(ctx context.Context, node string) (id string, err error) {
+	return e.Get(ctx, fmt.Sprintf("%s/%s/taskid", InstanceDirPrefix, node))
+}
+
 // GetAllSpecs get all the specifications
 func (e *Etcd) GetAllSpecs(ctx context.Context) ([]string, error) {
 	nodes, err := e.LS(ctx, SpecsDir)

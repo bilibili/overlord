@@ -22,8 +22,8 @@ const (
 	// OpStretch will scale the instance memory and may migrating slot.
 	OpStretch OpType = "stretch"
 
-	// OpDel means deal nodes from given cluster: with random given node or special name(id)
-	OpDel OpType = "delete"
+	// OpMigrate means delete specified node and restart in new agent.
+	OpMigrate OpType = "migrate"
 
 	// OpFix will trying to run `rustkit fix` to the given cluster(redis cluster only)
 	OpFix OpType = "fix"
@@ -49,6 +49,7 @@ type Job struct {
 
 	OpType OpType
 
+	Nodes []string `json:"nodes"`
 	// Users to apply that
 	// the first is the job commiter
 	Users []string

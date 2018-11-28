@@ -590,13 +590,36 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 			return
 		}
 		dist = ci.Dist
-		newDist, err = chunk.DistAppendIt(dist, t.Num, t.MaxMem, t.CPU, offers...)
-		if err != nil {
-			err = errors.WithStack(err)
+		delta := t.Num - len(dist.Addrs)
+		if delta >= 0 {
+			newDist, err = chunk.DistAppendIt(dist, t.Num, t.MaxMem, t.CPU, offers...)
+			if err != nil {
+				err = errors.WithStack(err)
+				return
+			}
+			jobDist = newDist
+			dist.Addrs = append(dist.Addrs, newDist.Addrs...)
+		} else {
+			// TODO:scale down
 			return
 		}
-		jobDist = newDist
-		dist.Addrs = append(dist.Addrs, newDist.Addrs...)
+	case job.OpMigrate:
+		if len(t.Nodes) != 0 {
+			for _, node := range t.Nodes {
+				var id string
+				id, err = s.db.TaskID(context.Background(), node)
+				if err == nil {
+					ids := strings.Split(id, ",")
+					if len(ids) != 2 {
+						return
+					}
+					kill := calls.Kill(ids[0], ids[1])
+					calls.CallNoData(context.Background(), s.cli, kill)
+				}
+			}
+		}
+		// TODO: dist new node.
+
 	}
 
 	ci := &create.CacheInfo{

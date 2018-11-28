@@ -110,6 +110,8 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 		if err != nil {
 			log.Errorf("update lanch status fail %v ", err)
 		}
+	case executor.Event_KILL:
+		ec.kill(e.Kill.TaskID)
 	case executor.Event_SHUTDOWN:
 	case executor.Event_ACKNOWLEDGED:
 		delete(ec.unackedTasks, e.Acknowledged.TaskID)
@@ -325,3 +327,12 @@ func (ec *Executor) update(status ms.TaskStatus) error {
 }
 
 func protoString(s string) *string { return &s }
+
+func (ec *Executor) kill(id ms.TaskID) {
+	status := ec.newStatus(id)
+	status.State = ms.TASK_KILLED.Enum()
+	err := ec.update(status)
+	if err != nil {
+		log.Errorf("kill task err %v", err)
+	}
+}
