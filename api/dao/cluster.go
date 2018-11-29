@@ -83,11 +83,17 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 			IP:   vsp[0],
 			Port: int(val),
 			// TODO: change it as really state.
-			State: "RUNNING",
-			Weight: 1,
+			State:  "RUNNING",
+			Weight: -1,
 		}
 
 		if info.CacheType != proto.CacheTypeRedisCluster {
+			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDir, node.Value))
+			if err != nil {
+				continue
+			}
+			inst.Alias = alias
+
 			weight, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/weight", etcd.InstanceDir, node.Value))
 			if err != nil {
 				continue
