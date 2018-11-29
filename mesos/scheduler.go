@@ -76,16 +76,18 @@ func (s *Scheduler) Set(fid string) (err error) {
 // call run to start scheduler.
 func (s *Scheduler) Run() (err error) {
 	// watch task dir to get new task.
-	ch, err := s.db.Watch(context.Background(), etcd.JobsDir)
-	if err != nil {
-		log.Errorf("start watch task fail err %v", err)
-		return
+	for _, role := range s.c.Roles {
+		var ch chan string
+		ch, err = s.db.Watch(context.Background(), etcd.JobsDir+role)
+		if err != nil {
+			log.Errorf("start watch task fail err %v", err)
+			return
+		}
+		go s.taskEvent(ch)
 	}
-	s.Tchan = ch
-	go s.taskEvent()
+
 	s.cli = buildHTTPSched(s.c)
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
-
 	err = controller.Run(context.TODO(),
 		s.buildFrameworkInfo(),
 		s.cli,
@@ -95,9 +97,9 @@ func (s *Scheduler) Run() (err error) {
 	return
 }
 
-func (s *Scheduler) taskEvent() {
+func (s *Scheduler) taskEvent(ch chan string) {
 	for {
-		v := <-s.Tchan
+		v := <-ch
 		var t job.Job
 		if err := json.Unmarshal([]byte(v), &t); err != nil {
 			log.Errorf("get task info err %v", err)
@@ -547,6 +549,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 				//  plus the port obtained by adding 10000 to the data port for redis cluster.
 				Resources: makeResources(cpu, mem, uint64(node.Port)),
 			}
+			//	s.db.Set(ctx context.Context, k string, v string)
 			data := &TaskData{
 				IP:         node.Name,
 				Port:       node.Port,

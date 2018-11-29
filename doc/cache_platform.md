@@ -21,7 +21,8 @@ overlord
     /config
         /cluster1
     /jobs
-        /$jobid # id was auto gen by etcd
+        /$role # 分组，基于role实现资源和任务的隔离
+            /$jobid # id was auto gen by etcd
     /job_detial
         /$jobid
             /state #state of the global job
@@ -29,6 +30,7 @@ overlord
         /type (cache type,eg:redis,memcached,redis-cluster)
         /cluster # cluster name
         /taskid # mesos taskid
+        /alias # alias of node
         /weight  # instance weight number
         /nodes.conf
         /server.conf (服务配置文件 eg:redis.conf memcached.conf)
