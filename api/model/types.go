@@ -23,10 +23,11 @@ type Cluster struct {
 
 // Instance is the struct for each cache
 type Instance struct {
-	IP    string `json:"ip"`
-	Port  int    `json:"port"`
-	Weight int   `json:"weight"`
-	State string `json:"state"`
+	IP     string `json:"ip"`
+	Port   int    `json:"port"`
+	Weight int    `json:"weight"`
+	Alias  string `json:"alias"`
+	State  string `json:"state"`
 }
 
 // Appid is the struct conttains many cluster name
