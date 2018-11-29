@@ -53,7 +53,7 @@ func (c *CacheJob) buildTplTree() error {
 		return err
 	}
 
-	for i, addr := range c.info.Dist.Addrs {
+	for _, addr := range c.info.Dist.Addrs {
 		instanceDir := fmt.Sprintf(etcd.InstanceDir, addr.IP, addr.Port)
 
 		err = c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), string(c.info.CacheType))
@@ -88,7 +88,7 @@ func (c *CacheJob) buildTplTree() error {
 			}
 		}
 
-		err = c.e.Set(ctx, fmt.Sprintf("%s/alias", instanceDir), fmt.Sprintf("%s-%40d", string(c.info.CacheType), i+1))
+		err = c.e.Set(ctx, fmt.Sprintf("%s/alias", instanceDir), addr.ID)
 		if err != nil {
 			return err
 		}

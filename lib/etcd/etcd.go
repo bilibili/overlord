@@ -248,6 +248,16 @@ func (e *Etcd) TaskID(ctx context.Context, node string) (id string, err error) {
 	return e.Get(ctx, fmt.Sprintf("%s/%s/taskid", InstanceDirPrefix, node))
 }
 
+// Alias get node alias.
+func (e *Etcd) Alias(ctx context.Context, node string) (id string, err error) {
+	return e.Get(ctx, fmt.Sprintf("%s/%s/alias", InstanceDirPrefix, node))
+}
+
+// SetTaskID set node taskid
+func (e *Etcd) SetTaskID(ctx context.Context, node string, id string) (err error) {
+	return e.Set(ctx, fmt.Sprintf("%s/%s/taskid", InstanceDirPrefix, node), id)
+}
+
 // GetAllSpecs get all the specifications
 func (e *Etcd) GetAllSpecs(ctx context.Context) ([]string, error) {
 	nodes, err := e.LS(ctx, SpecsDir)

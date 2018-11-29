@@ -287,7 +287,6 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		Executor:  s.buildExcutor(ip+port, []ms.Resource{}),
 		Resources: makeResources(info.CPU, info.MaxMemory, uport),
 	}
-
 	data := &TaskData{
 		IP:         ip,
 		Port:       int(uport),
@@ -298,6 +297,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		// try to recover from origin agent with the same info.
 		if offer.Hostname == ip {
 			task.AgentID = offer.GetAgentID()
+			s.db.SetTaskID(context.Background(), task.Name, task.TaskID.String()+task.AgentID.String())
 			accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(*task)}.WithOffers(offer.ID))
 			err := calls.CallNoData(context.Background(), s.cli, accept)
 			if err == nil {
@@ -318,16 +318,19 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 	switch info.CacheType {
 	case proto.CacheTypeMemcache, proto.CacheTypeRedis:
 		// delete old host
+		var alias string
 		for i, addr := range info.Dist.Addrs {
-			if addr.IP == ip {
+			if addr.String() == ip+port {
 				info.Dist.Addrs = append(info.Dist.Addrs[:i], info.Dist.Addrs[i+1:]...)
+				alias = addr.ID
 			}
 		}
-		newDist, err := chunk.DistAppendIt(info.Dist, 1, info.MaxMemory, info.CPU, offers...)
+		newDist, err := chunk.DistAppendIt(string(info.CacheType), info.Dist, 1, info.MaxMemory, info.CPU, offers...)
 		if err != nil {
 			log.Errorf("chunk,DistAppend err %v", err)
 			return
 		}
+		newDist.Addrs[0].ID = alias
 		info.Dist.Addrs = append(info.Dist.Addrs, newDist.Addrs...)
 		err = s.acceptOffer(info, newDist, offers)
 		if err != nil {
@@ -369,6 +372,7 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 			//  plus the port obtained by adding 10000 to the data port for redis cluster.
 			Resources: makeResources(info.CPU, info.MaxMemory, uint64(addr.Port)),
 		}
+		s.db.SetTaskID(context.Background(), addr.String(), task.TaskID.String()+","+task.AgentID.String())
 		data := &TaskData{
 			IP:         addr.IP,
 			Port:       addr.Port,
@@ -576,7 +580,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 	var jobDist *chunk.Dist
 	switch t.OpType {
 	case job.OpCreate:
-		dist, err = chunk.DistIt(t.Num, t.MaxMem, t.CPU, offers...)
+		dist, err = chunk.DistIt(string(t.CacheType), t.Num, t.MaxMem, t.CPU, offers...)
 		if err != nil {
 			err = errors.WithStack(err)
 			return
@@ -595,7 +599,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		dist = ci.Dist
 		delta := t.Num - len(dist.Addrs)
 		if delta >= 0 {
-			newDist, err = chunk.DistAppendIt(dist, t.Num, t.MaxMem, t.CPU, offers...)
+			newDist, err = chunk.DistAppendIt(string(t.CacheType), dist, t.Num, t.MaxMem, t.CPU, offers...)
 			if err != nil {
 				err = errors.WithStack(err)
 				return
@@ -607,22 +611,50 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 			return
 		}
 	case job.OpMigrate:
-		if len(t.Nodes) != 0 {
-			for _, node := range t.Nodes {
-				var id string
-				id, err = s.db.TaskID(context.Background(), node)
-				if err == nil {
-					ids := strings.Split(id, ",")
-					if len(ids) != 2 {
-						return
-					}
-					kill := calls.Kill(ids[0], ids[1])
-					calls.CallNoData(context.Background(), s.cli, kill)
-				}
-			}
+		var (
+			ci      *create.CacheInfo
+			ctx     = context.Background()
+			newDist *chunk.Dist
+		)
+		ci, err = s.getInfoFromEtcd(context.Background(), t.Name)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
 		}
-		// TODO: dist new node.
+		var alias = make([]string, 0)
 
+		for _, node := range t.Nodes {
+			var (
+				al, id string
+			)
+			id, err = s.db.TaskID(context.Background(), node)
+			if err == nil {
+				ids := strings.Split(id, ",")
+				if len(ids) != 2 {
+					return
+				}
+				kill := calls.Kill(ids[0], ids[1])
+				calls.CallNoData(context.Background(), s.cli, kill)
+			}
+			al, err = s.db.Alias(ctx, node)
+			if err != nil {
+				return
+			}
+			alias = append(alias, al)
+		}
+
+		num := len(alias)
+		newDist, err = chunk.DistAppendIt(string(t.CacheType), ci.Dist, num, ci.MaxMemory, ci.CPU, offers...)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+
+		for i, dis := range newDist.Addrs {
+			dis.ID = alias[i]
+		}
+		jobDist = newDist
+		dist.Addrs = append(dist.Addrs, jobDist.Addrs...)
 	}
 
 	ci := &create.CacheInfo{

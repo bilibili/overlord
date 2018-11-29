@@ -88,7 +88,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 
 		if info.CacheType != proto.CacheTypeRedisCluster {
-			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDir, node.Value))
+			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDir, node.Key))
 			if err != nil {
 				continue
 			}

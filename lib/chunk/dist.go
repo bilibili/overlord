@@ -9,7 +9,7 @@ import (
 
 // Addr is a cache instance endpoint
 type Addr struct {
-	ID   string
+	ID   string // genid ,also be used as alias in singleton.
 	IP   string
 	Port int
 }
@@ -23,7 +23,7 @@ func (a *Addr) String() string {
 	return fmt.Sprintf("%s:%d", a.IP, a.Port)
 }
 
-func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {
+func mapHostResIntoDist(name string, idx int, hrs []*hostRes, portsMap map[string][]int) *Dist {
 	addrs := make([]*Addr, 0)
 	portsCountMap := make(map[string]int)
 	for name := range portsMap {
@@ -33,6 +33,7 @@ func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {
 	for _, hr := range hrs {
 		for i := 0; i < hr.count; i++ {
 			count := portsCountMap[hr.name]
+			idx++
 			addrs = append(addrs, &Addr{IP: hr.name, Port: portsMap[hr.name][count]})
 			portsCountMap[hr.name] = count + 1
 		}
@@ -42,19 +43,19 @@ func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {
 }
 
 // DistIt will cacluate Dist by the given offer.
-func DistIt(num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err error) {
+func DistIt(name string, num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err error) {
 	hrs := dpFillHostRes(nil, nil, mapIntoHostRes(offers, mem, cpu), num, 1)
 	if !checkDist(hrs, num) {
 		err = ErrBadDist
 		return
 	}
 	portsMap := mapIntoPortsMap(offers)
-	dist = mapHostResIntoDist(hrs, portsMap)
+	dist = mapHostResIntoDist(name, 0, hrs, portsMap)
 	return
 }
 
 // DistAppendIt will re-dist it by append new nodes.
-func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
+func DistAppendIt(name string, dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
 	if num <= 0 {
 		return
 	}
@@ -107,6 +108,6 @@ func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) 
 		newHrs = append(newHrs, &hostRes{name: addr, count: count})
 	}
 	portsMap := mapIntoPortsMap(offers)
-	newDist = mapHostResIntoDist(newHrs, portsMap)
+	newDist = mapHostResIntoDist(name, len(dist.Addrs), newHrs, portsMap)
 	return
 }
