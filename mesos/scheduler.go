@@ -460,6 +460,7 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 				log.Errorf("err call to revie %v", err)
 			}
 		case ms.TASK_KILLED:
+			log.Infof("task(%v) killed", status.TaskID)
 		case ms.TASK_RUNNING:
 			taskid := status.TaskID.String()
 			idx := strings.IndexByte(taskid, '-')
@@ -576,8 +577,12 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 }
 
 func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) {
-	var dist *chunk.Dist
-	var jobDist *chunk.Dist
+	var (
+		dist    *chunk.Dist
+		jobDist *chunk.Dist
+		ctx     = context.Background()
+		ci      *create.CacheInfo
+	)
 	switch t.OpType {
 	case job.OpCreate:
 		dist, err = chunk.DistIt(string(t.CacheType), t.Num, t.MaxMem, t.CPU, offers...)
@@ -586,10 +591,33 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 			return
 		}
 		jobDist = dist
+	case job.OpDestroy:
+		ci, err = s.getInfoFromEtcd(ctx, t.Name)
+		if err != nil {
+			return
+		}
+		for _, d := range ci.Dist.Addrs {
+			var id string
+			id, err = s.db.TaskID(ctx, d.String())
+			if err != nil {
+				return
+			}
+			s.kill(id)
+		}
+		// clear etcd info
+		var nodes []*etcd.Node
+		nodes, err = s.db.LS(ctx, fmt.Sprintf(etcd.ClusterInstancesDir, ci.Name))
+		if err != nil {
+			log.Errorf("get cluster etcd info err %v", err)
+			return
+		}
+		s.db.RMDir(ctx, fmt.Sprintf(etcd.ClusterInstancesDir, ci.Name))
+		for _, node := range nodes {
+			s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
+		}
 	case job.OpScale:
 		var (
 			newDist *chunk.Dist
-			ci      *create.CacheInfo
 		)
 		ci, err = s.getInfoFromEtcd(context.Background(), t.Name)
 		if err != nil {
@@ -612,8 +640,6 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		}
 	case job.OpMigrate:
 		var (
-			ci      *create.CacheInfo
-			ctx     = context.Background()
 			newDist *chunk.Dist
 		)
 		ci, err = s.getInfoFromEtcd(context.Background(), t.Name)
@@ -657,7 +683,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		dist.Addrs = append(dist.Addrs, jobDist.Addrs...)
 	}
 
-	ci := &create.CacheInfo{
+	ci = &create.CacheInfo{
 		JobID:     t.ID,
 		Name:      t.Name,
 		MaxMemory: t.MaxMem,
@@ -678,4 +704,13 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		err = errors.WithStack(err)
 	}
 	return
+}
+func (s *Scheduler) kill(id string) {
+	ids := strings.Split(id, ",")
+	if len(ids) != 2 {
+		return
+	}
+	kill := calls.Kill(ids[0], ids[1])
+	calls.CallNoData(context.Background(), s.cli, kill)
+
 }

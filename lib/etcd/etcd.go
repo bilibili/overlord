@@ -248,6 +248,7 @@ func (e *Etcd) TaskID(ctx context.Context, node string) (id string, err error) {
 	return e.Get(ctx, fmt.Sprintf("%s/%s/taskid", InstanceDirPrefix, node))
 }
 
+
 // Alias get node alias.
 func (e *Etcd) Alias(ctx context.Context, node string) (id string, err error) {
 	return e.Get(ctx, fmt.Sprintf("%s/%s/alias", InstanceDirPrefix, node))
