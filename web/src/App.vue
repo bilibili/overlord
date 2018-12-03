@@ -1,29 +1,51 @@
 <template>
   <div id="app">
-    <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
+    <SideBar/>
+    <div class="layout">
+      <Header/>
+      <transition name="slide-fade" mode="out-in" appear>
+        <router-view/>
+      </transition>
     </div>
-    <router-view/>
   </div>
 </template>
 
-<style lang="scss">
-#app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
+<script>
+import Header from '@/layout/Header.vue'
+import SideBar from '@/layout/SideBar.vue'
+
+export default {
+  components: {
+    Header,
+    SideBar
+  }
 }
-#nav {
-  padding: 30px;
-  a {
-    font-weight: bold;
-    color: #2c3e50;
-    &.router-link-exact-active {
-      color: #42b983;
-    }
+</script>
+
+<style lang="scss">
+@import './style/reset.scss';
+$backgroud-color: #F8F9FD;
+
+#app {
+ background: $backgroud-color;
+ min-height: 100vh;
+}
+.layout {
+  margin-left: 240px;
+  display: flex;
+  flex-direction: column;
+  .slide-fade-enter-active {
+    transition: all .15s ease;
+  }
+
+  .slide-fade-leave-active {
+    transition: all .15s cubic-bezier(1.0, 0.5, 0.8, 1.0);
+  }
+
+  .slide-fade-enter,
+  .slide-fade-leave-to {
+    transform: translateY(10px);
+    opacity: 0;
   }
 }
 </style>
