@@ -43,7 +43,7 @@ response `Job`
 
 ```json
 {
-  "id": "0000000001",
+  "id": "sh002.0000000001",
   "state": "pending",
 }
 ```
@@ -105,7 +105,7 @@ response `Job`
 
 ```json
 {
-  "id": "0000002",
+  "id": "sh001.12213345453450",
   "state": "pending",
 }
 ```
@@ -125,7 +125,7 @@ get the job response by given id
 
 ```json
 {
-  "id": "12213345453450",
+  "id": "sh001.12213345453450",
   "state": "pending"
 }
 ```
@@ -244,10 +244,11 @@ appid 列表
 {
    "name": "main.platform.overlord",
    "grouped_clusters": [{
-     "group": "嘉定机房",
+     "group": "sh001",
      "clusters": [{
       "name": "test-cluster1",
       "appids": ["main.pikachu", "main.zelda"],
+      "group": "sh001",
       "state": "done",
       "cache_type": "redis_Cluster",
       "cpu": 1,

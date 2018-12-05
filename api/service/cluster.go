@@ -16,8 +16,8 @@ func (s *Service) GetCluster(cname string) (*model.Cluster, error) {
 }
 
 // GetClusters will get all clusters
-func (s *Service) GetClusters() ([]*model.Cluster, error) {
-	return s.d.GetClusters(context.Background())
+func (s *Service) GetClusters(name string) ([]*model.Cluster, error) {
+	return s.d.GetClusters(context.Background(), name)
 }
 
 // RemoveCluster will remove the cluster if the cluster is not associated with other appids

@@ -121,22 +121,28 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		Number:    info.Number,
 		State:     val,
 		Instances: instances,
+		Group:     info.Group,
 	}
 
 	return c, nil
 }
 
 // GetClusters will get all clusters
-func (d *Dao) GetClusters(ctx context.Context) (clusters []*model.Cluster, err error) {
+func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.Cluster, err error) {
 	var nodes []*etcd.Node
 	nodes, err = d.e.LS(ctx, etcd.ClusterDir)
-	clusters = make([]*model.Cluster, len(nodes))
-	for i, node := range nodes {
+	clusters = make([]*model.Cluster, 0)
+	var cluster *model.Cluster
+	for _, node := range nodes {
 		_, cname := filepath.Split(node.Key)
-		clusters[i], err = d.GetCluster(ctx, cname)
+		if !strings.Contains(cname, name) {
+			continue
+		}
+		cluster, err = d.GetCluster(ctx, cname)
 		if err != nil {
 			return
 		}
+		clusters = append(clusters, cluster)
 	}
 	return
 }
@@ -147,7 +153,7 @@ func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, er
 	sub, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var nodes []*etcd.Node
-	nodes, err = d.e.LS(sub, cname)
+	nodes, err = d.e.LS(sub, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, cname))
 	if err != nil && !client.IsKeyNotFound(err) {
 		return
 	}
@@ -156,7 +162,6 @@ func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, er
 		err = ErrClusterAssigned
 		return
 	}
-
 	j := d.createDestroyClusterJob(ctx, cname)
 	jobid, err = d.saveJob(ctx, j)
 	return
@@ -214,7 +219,6 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 }
 
 func (d *Dao) checkVersion(version string) error {
-
 	return nil
 }
 
@@ -247,6 +251,7 @@ func (d *Dao) createCreateClusterJob(p *model.ParamCluster) (*job.Job, error) {
 		Name:    p.Name,
 		Version: p.Version,
 		Num:     p.Number,
+		Group:   p.Group,
 	}
 
 	cacheType, err := d.mapCacheType(p.CacheType)
@@ -275,17 +280,17 @@ func (d *Dao) saveJob(ctx context.Context, t *job.Job) (string, error) {
 		return "", err
 	}
 
-	jobID, err := d.e.GenID(ctx, etcd.JobsDir, sb.String())
+	jobID, err := d.e.GenID(ctx, fmt.Sprintf("%s/%s/", etcd.JobsDir, t.Group), sb.String())
 	if err != nil {
 		return "", err
 	}
 
-	err = d.e.SetJobState(ctx, jobID, job.StatePending)
+	err = d.e.SetJobState(ctx, t.Group, jobID, job.StatePending)
 	if err != nil {
 		return "", err
 	}
 
-	return jobID, nil
+	return fmt.Sprintf("%s.%s", t.Group, jobID), nil
 }
 
 func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...string) (err error) {
@@ -304,9 +309,7 @@ func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...stri
 				}
 			}
 		}
-
 	}
-
 	return
 }
 

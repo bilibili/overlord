@@ -6,55 +6,51 @@ import (
 	"overlord/api/model"
 	"overlord/lib/etcd"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"go.etcd.io/etcd/client"
 )
 
-// SearchAppids will search all the apps
-func (d *Dao) SearchAppids(ctx context.Context, name string, page *model.QueryPage) ([]*model.Appid, error) {
-	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/", etcd.AppidsDir))
+// GetTreeAppid get the grouped all result
+func (d *Dao) GetTreeAppid(ctx context.Context) ([]*model.TreeAppid, error) {
+	nodes, err := d.e.LS(ctx, etcd.AppidsDir)
 	if err != nil {
 		return nil, err
 	}
-	appids := []*model.Appid{}
-
-	for _, node := range nodes {
+	appids := make([]string, len(nodes))
+	for i, node := range nodes {
 		_, appid := filepath.Split(node.Key)
-		if strings.Contains(appid, name) {
-			clusters, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/", etcd.AppidsDir, appid))
-			if err != nil {
-				continue
-			}
+		appids[i] = appid
+	}
 
-			cs := make([]string, len(clusters))
-			for i, c := range clusters {
-				cs[i] = c.Value
-			}
-			appids = append(appids, &model.Appid{Name: appid, Clusters: cs})
-			if len(appids) == page.PageCount*page.PageNum {
-				break
-			}
+	return model.BuildTreeAppids(appids), nil
+}
+
+// GetGroupedAppid will query the grouped cluster by appid
+func (d *Dao) GetGroupedAppid(ctx context.Context, appid string) (*model.GroupedAppid, error) {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+	nodes, err := d.e.LS(sub, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
+	if err != nil {
+		return nil, err
+	}
+
+	groups := map[string][]*model.Cluster{}
+	for _, node := range nodes {
+		cluster, err := d.GetCluster(sub, node.Value)
+		if err != nil {
+			return nil, err
+		}
+		if cluster != nil {
+			groups[cluster.Group] = append(groups[cluster.Group], cluster)
 		}
 	}
-	sort.Sort(byName(appids))
-	lower, upper := page.Bounds()
-	return appids[lower:upper], nil
-}
 
-type byName []*model.Appid
-
-func (b byName) Less(i, j int) bool {
-	return strings.Compare(b[i].Name, b[j].Name) > 0
-}
-
-func (b byName) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
-}
-
-func (b byName) Len() int {
-	return len(b)
+	gcs := []*model.GroupedClusters{}
+	for group, clusters := range groups {
+		gcs = append(gcs, &model.GroupedClusters{Group: group, Clusters: clusters})
+	}
+	return &model.GroupedAppid{Name: appid, GroupedClusters: gcs}, nil
 }
 
 // AssignAppid will assign appid with cluster

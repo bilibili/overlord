@@ -104,6 +104,7 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 
 	tbi := &TryBalanceInfo{
 		TraceJobID: info.JobID,
+		Group:      info.Group,
 		Cluster:    clusterName,
 		Chunks:     info.Chunks,
 	}
@@ -120,6 +121,7 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 // TryBalanceInfo is the job to balance the whole cluster
 type TryBalanceInfo struct {
 	TraceJobID string
+	Group      string
 	Cluster    string
 	Chunks     []*chunk.Chunk
 }
@@ -201,7 +203,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 	}
 
 	if isTrace {
-		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobWaitConsistent)
+		err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobWaitConsistent)
 		if err != nil {
 			return
 		}
@@ -212,7 +214,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 	}
 
 	if isTrace {
-		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobTryBalancing)
+		err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobTryBalancing)
 		if err != nil {
 			return
 		}
@@ -222,7 +224,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			if isTrace {
-				err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobUnBalanced)
+				err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobUnBalanced)
 				if err != nil {
 					return
 				}
@@ -234,7 +236,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 	}
 
 	if isTrace {
-		err = b.e.SetJobState(sub, b.info.TraceJobID, TraceJobBalanced)
+		err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobBalanced)
 	}
 	return
 }

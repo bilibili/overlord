@@ -161,10 +161,10 @@ func (e *Etcd) GenID(ctx context.Context, path string, value string) (string, er
 }
 
 // SetJobState will change job state.
-func (e *Etcd) SetJobState(ctx context.Context, jobID string, state job.StateType) error {
+func (e *Etcd) SetJobState(ctx context.Context, group, jobID string, state job.StateType) error {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/state", JobDetailDir, jobID), state, &cli.SetOptions{})
+	_, err := e.kapi.Set(subctx, fmt.Sprintf("%s/%s/%s/state", JobDetailDir, group, jobID), state, &cli.SetOptions{})
 	return err
 }
 
@@ -247,7 +247,6 @@ func (e *Etcd) ClusterInfo(ctx context.Context, cluster string) (info string, er
 func (e *Etcd) TaskID(ctx context.Context, node string) (id string, err error) {
 	return e.Get(ctx, fmt.Sprintf("%s/%s/taskid", InstanceDirPrefix, node))
 }
-
 
 // Alias get node alias.
 func (e *Etcd) Alias(ctx context.Context, node string) (id string, err error) {

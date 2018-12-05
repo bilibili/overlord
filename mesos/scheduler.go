@@ -535,6 +535,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		JobID:     t.ID,
 		Version:   t.Version,
 		Number:    t.Num,
+		Group:     t.Group,
 	})
 	err = rtask.Create()
 	if err != nil {
@@ -693,6 +694,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		Thread:    int(t.CPU) + 1,
 		Version:   t.Version,
 		Dist:      dist,
+		Group:     t.Group,
 	}
 	ctask := create.NewCacheJob(s.db, ci)
 	err = ctask.Create()

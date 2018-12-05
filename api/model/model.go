@@ -8,6 +8,7 @@ type ParamCluster struct {
 	Version   string   `json:"version" validate:"required"`
 	CacheType string   `json:"cache_type" validate:"required"`
 	Number    int      `json:"number" validate:"required"`
+	Group     string   `json:"group" validate:"required"`
 }
 
 // ParamScale parase from data to used to scale cluster
