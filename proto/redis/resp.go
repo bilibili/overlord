@@ -3,6 +3,7 @@ package redis
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 
 	"overlord/lib/bufio"
 	"overlord/lib/conv"
@@ -72,14 +73,14 @@ type resp struct {
 
 func (r *resp) reset() {
 	r.rTp = respUnknown
-	r.data = nil
+	r.data = r.data[:0]
 	r.arrayn = 0
 }
 
 func (r *resp) copy(re *resp) {
 	r.reset()
 	r.rTp = re.rTp
-	r.data = re.data
+	r.data = append(r.data, re.data...)
 	for i := 0; i < re.arrayn; i++ {
 		nre := r.next()
 		nre.copy(re.array[i])
@@ -111,7 +112,7 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	r.rTp = rTp
 	switch rTp {
 	case respString, respInt, respError:
-		r.data = line[1 : len(line)-2]
+		r.data = append(r.data, line[1:len(line)-2]...)
 	case respBulk:
 		err = r.decodeBulk(line, br)
 	case respArray:
@@ -129,12 +130,10 @@ func (r *resp) decodeInline(line []byte) (err error) {
 		err = ErrBadRequest
 		return
 	}
-
 	r.arrayn = flen
-	r.data = []byte(fmt.Sprintf("%d", flen))
+	r.data = []byte(strconv.Itoa(flen))
 	r.array = make([]*resp, flen)
 	r.rTp = respArray
-
 	for i, field := range fields {
 		r.array[i] = &resp{
 			rTp:    respBulk,
@@ -154,7 +153,7 @@ func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 		return
 	}
 	if size == -1 {
-		r.data = nil
+		r.data = r.data[:0]
 		return
 	}
 	br.Advance(-(ls - 1))
@@ -166,7 +165,7 @@ func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 	} else if err != nil {
 		return
 	}
-	r.data = data[:len(data)-2]
+	r.data = append(r.data, data[:len(data)-2]...)
 	return
 }
 
@@ -178,10 +177,10 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 		return
 	}
 	if size == -1 {
-		r.data = nil
+		r.data = r.data[:0]
 		return
 	}
-	r.data = sBs
+	r.data = append(r.data, sBs...)
 	mark := br.Mark()
 	for i := 0; i < int(size); i++ {
 		nre := r.next()
@@ -248,3 +247,26 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	}
 	return
 }
+
+// // String for debug!!!
+// func (r *resp) String() string {
+// 	var sb strings.Builder
+// 	sb.Write([]byte{r.rTp})
+// 	switch r.rTp {
+// 	case respString, respInt, respError:
+// 		sb.Write(r.data)
+// 		sb.Write(crlfBytes)
+// 	case respBulk:
+// 		sb.Write(r.data)
+// 		sb.Write(crlfBytes)
+// 	case respArray:
+// 		sb.Write([]byte(strconv.Itoa(r.arrayn)))
+// 		sb.Write(crlfBytes)
+// 		for i := 0; i < r.arrayn; i++ {
+// 			sb.WriteString(r.array[i].String())
+// 		}
+// 	default:
+// 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
+// 	}
+// 	return sb.String()
+// }

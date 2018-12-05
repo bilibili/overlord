@@ -302,7 +302,7 @@ func testCmdNotAvaliabeNode(t testing.TB, cmds ...[]byte) {
 	}
 }
 
-func _createTcpProxy(t *testing.T, dist, origin int64) (cancel context.CancelFunc) {
+func _createTCPProxy(t *testing.T, dist, origin int64) (cancel context.CancelFunc) {
 	ctx := context.Background()
 	var sub context.Context
 	sub, cancel = context.WithCancel(ctx)
@@ -366,7 +366,7 @@ func _execute(t *testing.T) (bs []byte) {
 }
 
 func TestReconnFeature(t *testing.T) {
-	cancel := _createTcpProxy(t, 11211, 21220)
+	cancel := _createTCPProxy(t, 11211, 21220)
 	defer cancel()
 	// 1. try to execute with error, but click reconn process
 	bs := _execute(t)
@@ -548,7 +548,7 @@ func TestEject(t *testing.T) {
 		Except []string
 	}{
 
-		{Name: "SetLowerOneOk", Line: 1, Cmd: "set a_11 0 1024 1\r\n2\r\n", eject: true, Except: []string{"SERVER_ERROR executor hash no hit node\r\n"}},
+		{Name: "SetLowerOneOk", Line: 1, Cmd: "set a_11 0 1024 1\r\n2\r\n", eject: true, Except: []string{"SERVER_ERROR forwarder hash no hit node\r\n"}},
 		{Name: "SetLowerTwoOk", Line: 1, Cmd: "set a_22 0 1024 4\r\nhalo\r\n", Except: []string{"STORED\r\n"}},
 		{Name: "SetUpperOk", Line: 1, Cmd: "SET a_11 0 1024 1\r\n1\r\n", Except: []string{"STORED\r\n"}},
 
@@ -558,10 +558,10 @@ func TestEject(t *testing.T) {
 		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
 	eject := ccs[0]
-	exec := p.executors["eject-cluster"].(*defaultExecutor)
+	fer := p.forwarders["eject-cluster"].(*defaultForwarder)
 	mp := &mockPing{}
 	ping := &pinger{ping: mp, cc: eject, weight: 10, alias: "mc1"}
-	go exec.processPing(ping)
+	go fer.processPing(ping)
 
 	for _, tt := range ts {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:22211", time.Second)

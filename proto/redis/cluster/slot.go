@@ -1,10 +1,7 @@
 package cluster
 
 import (
-	"bufio"
-	"bytes"
 	errs "errors"
-	"io"
 	"strconv"
 	"strings"
 )
@@ -18,6 +15,7 @@ var (
 )
 
 var (
+	roleMyself = "myself"
 	roleMaster = "master"
 	roleSlave  = "slave"
 )
@@ -32,20 +30,11 @@ var (
 // 828c400ea2b55c43e5af67af94bec4943b7b3d93 172.17.0.2:7002@17002 master - 0 1532770704000 3 connected 10923-16383
 // 8f02f3135c65482ac00f217df0edb6b9702691f8 172.17.0.2:7001@17001 myself,master - 0 1532770703000 2 connected 5461-10922
 func parseSlots(data []byte) (*nodeSlots, error) {
-	br := bufio.NewReader(bytes.NewBuffer(data))
-	lines := []string{}
-	for {
-		// NOTICE: we assume that each line is not longer
-		// than 65535.
-		token, _, err := br.ReadLine()
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		if len(token) != 0 {
-			lines = append(lines, string(token))
-		}
-		if err == io.EOF {
-			break
+	tmpLines := strings.Split(string(data), "\n")
+	lines := make([]string, 0)
+	for _, tl := range tmpLines {
+		if len(strings.TrimSpace(tl)) != 0 {
+			lines = append(lines, tl)
 		}
 	}
 	nodes := make(map[string]*node)
@@ -59,10 +48,10 @@ func parseSlots(data []byte) (*nodeSlots, error) {
 			return nil, err
 		}
 		nodes[node.addr] = node
-		subSlots := node.slots
 		if node.role != roleMaster {
 			continue
 		}
+		subSlots := node.slots
 		masterIDMap[node.ID] = node
 		for _, slot := range subSlots {
 			slots[slot] = node.addr
@@ -96,7 +85,7 @@ type nodeSlots struct {
 func (ns *nodeSlots) getMasters() []string {
 	masters := make([]string, 0)
 	for _, node := range ns.nodes {
-		if node.role == roleMaster {
+		if node.role == roleMaster && node.isNormal() {
 			masters = append(masters, node.addr)
 		}
 	}
@@ -209,6 +198,18 @@ func (n *node) setSlots(vals ...string) {
 	}
 	//sort.IntSlice(slots).Sort()
 	n.slots = slots
+}
+
+func (n *node) isNormal() bool {
+	for _, f := range n.flags {
+		if f != roleMaster && f != roleSlave && f != roleMyself {
+			return false
+		}
+	}
+	if n.linkState != "connected" {
+		return false
+	}
+	return true
 }
 
 func parseSlotField(val string) ([]int, bool) {

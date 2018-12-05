@@ -37,6 +37,7 @@ func (m *mockConn) Read(b []byte) (n int, err error) {
 	}
 	return m.rbuf.Read(b)
 }
+
 func (m *mockConn) Write(b []byte) (n int, err error) {
 	if m.err != nil {
 		err = m.err

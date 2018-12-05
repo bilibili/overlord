@@ -8,6 +8,8 @@ import (
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
 	"overlord/proto"
+
+	"github.com/pkg/errors"
 )
 
 // errors
@@ -42,20 +44,22 @@ func NewPinger(conn *libnet.Conn) proto.Pinger {
 
 func (p *pinger) Ping() (err error) {
 	if atomic.LoadInt32(&p.state) == closed {
-		err = ErrPingClosed
+		err = errors.WithStack(ErrPingClosed)
 		return
 	}
 	_ = p.bw.Write(pingBytes)
 	if err = p.bw.Flush(); err != nil {
-		return err
+		err = errors.WithStack(err)
+		return
 	}
 	_ = p.br.Read()
 	data, err := p.br.ReadLine()
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 	if !bytes.Equal(data, pongBytes) {
-		err = ErrBadPong
+		err = errors.WithStack(ErrBadPong)
 	}
 	return
 }

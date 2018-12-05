@@ -17,7 +17,7 @@ import (
 
 const (
 	// VERSION version
-	VERSION = "1.4.0"
+	VERSION = "1.5.0"
 )
 
 var (
@@ -77,6 +77,13 @@ func main() {
 	if initLog(c) {
 		defer log.Close()
 	}
+	// new proxy
+	p, err := proxy.New(c)
+	if err != nil {
+		panic(err)
+	}
+	defer p.Close()
+	p.Serve(ccs)
 	// pprof
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)
@@ -86,13 +93,6 @@ func main() {
 			prom.On = false
 		}
 	}
-	// new proxy
-	p, err := proxy.New(c)
-	if err != nil {
-		panic(err)
-	}
-	defer p.Close()
-	go p.Serve(ccs)
 	// hanlde signal
 	signalHandler()
 }

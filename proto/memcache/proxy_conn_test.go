@@ -28,6 +28,30 @@ func TestFindLengthParseLengthError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
+
+	i, err = findLength([]byte("VALUE\r\n"), true)
+	assert.Error(t, err)
+	assert.Equal(t, ErrBadLength, err)
+	assert.Equal(t, -1, i)
+
+	i, err = findLength([]byte("VALUE 0\r\n"), true)
+	assert.Error(t, err)
+	assert.Equal(t, ErrBadLength, err)
+	assert.Equal(t, -1, i)
+}
+
+func TestNextFeild(t *testing.T) {
+	b, e := nextField([]byte(" "))
+	assert.Equal(t, 1, b)
+	assert.Equal(t, 1, e)
+
+	b, e = nextField([]byte("get\r\n"))
+	assert.Equal(t, 0, b)
+	assert.Equal(t, 3, e)
+
+	b, e = nextField([]byte("get a\r\n"))
+	assert.Equal(t, 0, b)
+	assert.Equal(t, 3, e)
 }
 
 func TestLegalKeyOk(t *testing.T) {
@@ -139,17 +163,13 @@ func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
 
 	if !m.IsBatch() {
 		nc := _createNodeConn(resps[0])
-		batch := proto.NewMsgBatch()
-		batch.AddMsg(m)
-		err := nc.ReadBatch(batch)
+		err := nc.Read(m)
 		assert.NoError(t, err)
 	} else {
 		subs := m.Batch()
 		for idx, resp := range resps {
 			nc := _createNodeConn(resp)
-			batch := proto.NewMsgBatch()
-			batch.AddMsg(subs[idx])
-			err := nc.ReadBatch(batch)
+			err := nc.Read(subs[idx])
 			assert.NoError(t, err)
 		}
 	}
@@ -198,17 +218,27 @@ func TestProxyConnEncodeOk(t *testing.T) {
 }
 
 func TestEncodeErr(t *testing.T) {
-	msg := proto.NewMessage()
-	msg.WithError(fmt.Errorf("SERVER_ERR"))
 	conn := _createConn(nil)
 	p := NewProxyConn(conn)
+
+	msg := proto.NewMessage()
+	msg.WithError(fmt.Errorf("SERVER_ERR"))
 	err := p.Encode(msg)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+
 	msg = proto.NewMessage()
 	msg.Type = proto.CacheTypeMemcache
 	msg.WithRequest(&mockReq{})
 	err = p.Encode(msg)
 	assert.NoError(t, err)
+
+	msg = proto.NewMessage()
+	msg.Type = proto.CacheTypeMemcache
+	msg.WithRequest(&mockReq{})
+	msg.WithRequest(&mockReq{}) // NOTE: batch
+	err = p.Encode(msg)
+	assert.NoError(t, err)
+
 	p.Flush()
 	c := conn.Conn.(*mockConn)
 	buf := make([]byte, 1024)

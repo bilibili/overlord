@@ -91,33 +91,6 @@ func TestReaderReadExact(t *testing.T) {
 	assert.Equal(t, ErrBufferFull, err)
 }
 
-func TestReaderResetBuffer(t *testing.T) {
-	bts := _genData()
-	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-
-	err := b.Read()
-	assert.NoError(t, err)
-
-	_, err = b.ReadExact(512)
-	assert.NoError(t, err)
-
-	b.ResetBuffer(Get(defaultBufferSize))
-	err = b.Read()
-	assert.NoError(t, err)
-
-	data, err := b.ReadExact(300)
-	assert.NoError(t, err)
-	assert.Len(t, data, 300)
-
-	_, err = b.ReadExact(300)
-	assert.Error(t, err)
-	assert.Equal(t, ErrBufferFull, err)
-
-	b.ResetBuffer(nil)
-	buf := b.Buffer()
-	assert.Nil(t, buf)
-}
-
 type mockAddr string
 
 func (m mockAddr) Network() string {

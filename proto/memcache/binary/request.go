@@ -279,7 +279,7 @@ type MCRequest struct {
 
 var msgPool = &sync.Pool{
 	New: func() interface{} {
-		return NewReq()
+		return newReq()
 	},
 }
 
@@ -288,22 +288,23 @@ func GetReq() *MCRequest {
 	return msgPool.Get().(*MCRequest)
 }
 
-// NewReq return new mc req.
-func NewReq() *MCRequest {
-	return &MCRequest{}
+// newReq return new mc req.
+func newReq() *MCRequest {
+	return &MCRequest{
+		keyLen:   []byte{0x00, 0x00},
+		extraLen: []byte{0x00},
+		status:   []byte{0x00, 0x00},
+		bodyLen:  []byte{0x00, 0x00, 0x00, 0x00},
+		opaque:   []byte{0x00, 0x00, 0x00, 0x00},
+		cas:      []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	}
 }
 
 // Put put req back to pool.
 func (r *MCRequest) Put() {
 	r.rTp = RequestTypeUnknown
-	r.keyLen = nil
-	r.extraLen = nil
-	r.status = nil
-	r.bodyLen = nil
-	r.opaque = nil
-	r.cas = nil
-	r.key = nil
-	r.data = nil
+	r.key = r.key[:0]
+	r.data = r.data[:0]
 	msgPool.Put(r)
 }
 
