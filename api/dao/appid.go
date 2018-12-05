@@ -39,7 +39,8 @@ func (d *Dao) SearchAppids(ctx context.Context, name string, page *model.QueryPa
 		}
 	}
 	sort.Sort(byName(appids))
-	return appids[page.PageCount*(page.PageNum-1) : page.PageCount*page.PageNum], nil
+	lower, upper := page.Bounds()
+	return appids[lower:upper], nil
 }
 
 type byName []*model.Appid

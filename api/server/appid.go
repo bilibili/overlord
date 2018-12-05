@@ -35,7 +35,7 @@ func removeAppid(c *gin.Context) {
 
 func done(c *gin.Context) {
 	c.JSON(http.StatusOK, struct {
-		Message string
+		Message string `json:"message"`
 	}{
 		Message : "done",
 	})
