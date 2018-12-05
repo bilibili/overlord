@@ -1,5 +1,7 @@
 <template>
-  <div class="header"></div>
+  <div class="header">
+    <p class="header__user">zhongbingqing</p>
+  </div>
 </template>
 
 <script>
@@ -11,5 +13,13 @@ export default {
 <style lang="scss" scoped>
 .header {
   height: 60px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  flex-direction: row-reverse;
+  flex-shrink: 0;
+  &__user {
+    font-size: 15px;
+  }
 }
 </style>

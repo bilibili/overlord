@@ -32,11 +32,15 @@ $backgroud-color: #F8FAFC;
 #app {
  background: $backgroud-color;
  min-height: 100vh;
+ height: 100%;
  @include slide-transition;
 }
+
 .layout {
-  margin-left: 240px;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  height: 100vh;
+  overflow-x: hidden;
 }
 </style>
