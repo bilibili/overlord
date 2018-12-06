@@ -36,10 +36,12 @@ func main() {
 	if log.Init(conf.Config) {
 		defer log.Close()
 	}
+	log.Infof("start framework with conf %v", conf)
 	db, err := etcd.New(conf.DBEndPoint)
 	if err != nil {
 		panic(err)
 	}
+	log.Info("init etcd successful")
 	sched := mesos.NewScheduler(conf, db)
 	sched.Run()
 }

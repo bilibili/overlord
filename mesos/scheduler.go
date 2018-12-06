@@ -75,6 +75,7 @@ func (s *Scheduler) Set(fid string) (err error) {
 // Run scheduler and watch at task dir for task info.
 // call run to start scheduler.
 func (s *Scheduler) Run() (err error) {
+	log.Infof("start scheduler with conf %v", s.c)
 	// watch task dir to get new task.
 	for _, role := range s.c.Roles {
 		var ch chan string
@@ -84,7 +85,7 @@ func (s *Scheduler) Run() (err error) {
 			return
 		}
 		go s.taskEvent(ch)
-	}
+}
 
 	s.cli = buildHTTPSched(s.c)
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
