@@ -15,6 +15,12 @@
 			"revisionTime": "2016-08-04T10:47:26Z"
 		},
 		{
+			"checksumSHA1": "wZoIarmzIWVWJcDLZ9CEzyvnCOs=",
+			"path": "github.com/cloudfoundry-community/go-cfenv",
+			"revision": "dd6b21aad7ac4c201b643e4e5e5b1a97a6e638a1",
+			"revisionTime": "2018-07-05T20:47:39Z"
+		},
+		{
 			"checksumSHA1": "97BsbXOiZ8+Kr+LIuZkQFtSj7H4=",
 			"path": "github.com/coreos/go-semver/semver",
 			"revision": "e214231b295a8ea9479f11b70b35d5acf3556d9b",
@@ -95,6 +101,12 @@
 			"revisionTime": "2018-10-30T15:47:21Z"
 		},
 		{
+			"checksumSHA1": "cyejI0bcXBrdCmmbBNVzMNx7I80=",
+			"path": "github.com/gomodule/redigo/redis",
+			"revision": "e8fc0692a7e26a05b06517348ed466349062eb47",
+			"revisionTime": "2018-10-26T00:15:55Z"
+		},
+		{
 			"checksumSHA1": "yNyE9MrpDJQAxOxSipSIBgBhuNQ=",
 			"path": "github.com/google/uuid",
 			"revision": "9b3b1e0f5f99ae461456d768e7d301a7acdaa2d8",
@@ -105,6 +117,10 @@
 			"path": "github.com/json-iterator/go",
 			"revision": "05d041de1043ba04b678fb046bd35455a9b1b33b",
 			"revisionTime": "2018-10-24T15:28:41Z"
+		},
+		{
+			"path": "github.com/konsorten/go-windows-terminal-sequences",
+			"revision": ""
 		},
 		{
 			"checksumSHA1": "GiVgQkx5acnq+JZtYiuHPlhHoso=",
@@ -293,6 +309,12 @@
 			"revisionTime": "2018-10-03T15:22:44Z"
 		},
 		{
+			"checksumSHA1": "J+g0oZePWp2zSIISD2dZZKTxmgg=",
+			"path": "github.com/mitchellh/mapstructure",
+			"revision": "3536a929edddb9a5b34bd6861dc4a9647cb459fe",
+			"revisionTime": "2018-10-05T04:51:35Z"
+		},
+		{
 			"checksumSHA1": "ZTcgWKWHsrX0RXYVXn5Xeb8Q0go=",
 			"path": "github.com/modern-go/concurrent",
 			"revision": "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94",
@@ -395,6 +417,18 @@
 			"revisionTime": "2018-02-28T15:07:32Z"
 		},
 		{
+			"checksumSHA1": "1Z1LToD/EEb1r+sWog8vtwfaGBk=",
+			"path": "github.com/prometheus/prometheus/util/strutil",
+			"revision": "40f0b4a9f649e7de3505b0c4c19e402ee7c191d0",
+			"revisionTime": "2018-12-05T16:12:34Z"
+		},
+		{
+			"checksumSHA1": "//pb4co1t6JuiPSorAZiLrDh+00=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "29d7eb25e8ffa54207ff5a9a5c3d63e95be2cc39",
+			"revisionTime": "2018-11-22T06:14:47Z"
+		},
+		{
 			"checksumSHA1": "c6pbpF7eowwO59phRTpF8cQ80Z0=",
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
@@ -435,6 +469,10 @@
 			"path": "go.etcd.io/etcd/version",
 			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
 			"revisionTime": "2018-11-28T02:58:43Z"
+		},
+		{
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": ""
 		},
 		{
 			"checksumSHA1": "b2oWuv1tpxlJBO7Dn8jh1iu8ZlA=",
