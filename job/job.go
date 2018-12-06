@@ -49,6 +49,8 @@ type Job struct {
 
 	OpType OpType
 
+	Group string `json:"group"`
+
 	Nodes []string `json:"nodes"`
 	// Users to apply that
 	// the first is the job commiter

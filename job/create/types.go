@@ -23,6 +23,7 @@ type CacheInfo struct {
 	Version string
 
 	Dist *chunk.Dist
+	Group string
 
 	Chunks []*chunk.Chunk
 	IDMap  map[string]map[int]string

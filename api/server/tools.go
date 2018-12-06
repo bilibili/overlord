@@ -35,3 +35,11 @@ func listJSON(c *gin.Context, vals interface{}, count int) {
 		Items: vals,
 	})
 }
+
+func done(c *gin.Context) {
+	c.JSON(http.StatusOK, struct {
+		Message string `json:"message"`
+	}{
+		Message: "done",
+	})
+}

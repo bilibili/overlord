@@ -118,7 +118,7 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 				return err
 			}
 
-			err = c.e.Set(ctx, fmt.Sprintf("%s/state", instanceDir), SubStatePending)
+			err = c.e.Set(ctx, fmt.Sprintf("%s/group", instanceDir), c.info.Group)
 			if err != nil {
 				return err
 			}

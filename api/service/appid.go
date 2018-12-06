@@ -5,11 +5,15 @@ import (
 	"overlord/api/model"
 )
 
-// SearchAppids will search the given name
-func (s *Service) SearchAppids(name string, page *model.QueryPage) ([]*model.Appid, error) {
-	return s.d.SearchAppids(context.Background(), name, page)
+// GetTreeAppid get the grouped all result
+func (s *Service) GetTreeAppid() ([]*model.TreeAppid, error) {
+	return s.d.GetTreeAppid(context.Background())
 }
 
+// GetGroupedAppid will query the grouped cluster by appid
+func (s *Service) GetGroupedAppid(appid string) (*model.GroupedAppid, error) {
+	return s.d.GetGroupedAppid(context.Background(), appid)
+}
 
 // RemoveAppid the given appid
 func (s *Service) RemoveAppid(appid string) error {

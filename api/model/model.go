@@ -8,6 +8,7 @@ type ParamCluster struct {
 	Version   string   `json:"version" validate:"required"`
 	CacheType string   `json:"cache_type" validate:"required"`
 	Number    int      `json:"number" validate:"required"`
+	Group     string   `json:"group" validate:"required"`
 }
 
 // ParamScale parase from data to used to scale cluster
@@ -21,6 +22,11 @@ type ParamScale struct {
 type QueryPage struct {
 	PageNum   int `form:"pn,default=1" validate:"gt=0"`
 	PageCount int `form:"pc,default=1000" validate:"gt=0"`
+}
+
+// Bounds returns the upper and lower bounds begins with 0 for this query path.
+func (p *QueryPage) Bounds() (int, int) {
+	return p.PageCount * (p.PageNum - 1), p.PageCount * p.PageNum
 }
 
 // ParamFilterCluster is the cluster filter.

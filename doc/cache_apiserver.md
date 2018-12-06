@@ -16,7 +16,8 @@ apiserver有以下约定：
 
 ### POST /clusters
 
-创建一个新的集群
+<details>
+<summary> 创建一个新的集群 </summary>
 
 #### body args
 |name|type|description|
@@ -27,6 +28,7 @@ apiserver有以下约定：
 |**spec**|string|容量规格表达式例如："0.5c2g"、"1c2g"|
 |**master_num**|integer|主节点数量为必选|
 |**version**|string|选择redis version|
+|**group**|string|精确选取机房|
 
 #### Response
 
@@ -37,49 +39,120 @@ response `Job`
 |id| string | job id |
 |state|string| job state|
 
+#### example Response
+
+```json
+{
+  "id": "sh002.0000000001",
+  "state": "pending",
+}
+```
+
+</details>
+
 ### GET /clusters
 
+<details>
+<summary> 通过cluster name 拿到集群名列表 </summary>
 
 #### query arguments:
 
 |name|type|description|
 |----|----|-----------|
-|appid|string| appid模糊匹配 |
 |name|stirng| 通过 name 模糊匹配|
 
+#### example response
+
+```json
+{
+  "count": 2,
+  "items": [
+    {
+      "name": "test-cluster1",
+      "appids": ["main.pikachu", "main.zelda"],
+      "state": "done",
+      "cache_type": "redis_Cluster",
+      "group": "sh001",
+      "cpu": 1,
+      "max_memory": 1024.0,
+      "version": "4.0.11",
+      "number": 4,
+      "instances": [{
+        "ip": "127.0.0.1",
+        "port": 7777,
+        "weight": 0,
+        "alias": "",
+        "state": "running"
+      }, ... ]
+    },
+    {...}
+  ]
+}
+```
+
+</details>
+
 ### DELETE /clusters/:cluster_name
+<details>
+<summary>创建删除集群任务</summary>
 
 #### path arguments
 |name|type|description|
 |----|----|-----------|
 |cluster_name|string| 唯一精确匹配的 cluster_name|
 
-### PUT /clusters/:clusters_name
+#### example response
 
-#### path arguments
-|name|type|description|
-|----|----|-----------|
-|cluster_name|string| 唯一精确匹配的 cluster_name|
+```json
+{
+  "id": "sh001.12213345453450",
+  "state": "pending",
+}
+```
 
-#### body args
-|name|type|description|
-|----|----|-----------|
-|**name**|string|全局唯一不重复的集群名字|
-|appids|[]string|appid list 用于创建时关联appid|
-|**cache_type**|string|cache_type name(only support "memcache", "redis", "redis_cluster")|
-|**spec**|string|容量规格表达式例如："0.5c2g"、"1c2g"|
-|**master_num**|integer|主节点数量为必选|
-|**version**|string|选择redis version|
+</details>
+
 
 ## Job
 
 ### GET /jobs/:job_id
 
+<details>
+<summary>按照job id 获取job状态(可用于轮询)</summary>
 get the job response by given id
+
+#### example response
+
+```json
+{
+  "id": "sh001.12213345453450",
+  "state": "pending"
+}
+```
+
+</details>
 
 ### GET /jobs
 
-get all jobs.
+<details>
+<summary>get all jobs</summary>
+
+#### example responses
+
+```json
+{
+  "count": 2,
+  "items": [{
+    "id": "12313124143234",
+    "state": "running"
+  },{
+    "id": "12213345453450",
+    "state": "pending"
+  }]
+}
+```
+</details>
+
 
 ## Specs
 
@@ -87,14 +160,37 @@ get all jobs.
 
 ### GET /specs/
 
-获得所有的资源选型列表
+<details>
+<summary> 获得所有的资源选型列表 </summary>
 
-### POST /specs/
+#### example response
 
-创建新的资源列表
+```json
+{
+   "count": 2,
+   "items": ["1c2g", "2c4g"]
+}
+```
+
+</details>
+
+<!-- ### POST /specs/ -->
+<!-- <details> -->
+<!-- <summary>创建新的资源列表</summary> -->
+<!-- </details> -->
 
 ### DELETE /specs/:spec_name
 
+<details>
+<summary>删除对应的spec</summary>
+
+#### example response
+```
+{
+  "message": "done"
+}
+```
+</details>
 
 # Appids
 
@@ -102,76 +198,111 @@ appid 列表
 
 ### Get /appids/
 
-### POST /appids/
+<details>
+<summary>取得所有的appid</summary>
 
-*开源版独享*
+#### example respones
+```
+{
+  "count": 2,
+  "items": [{
+     "name": "main.platform",
+     "label": "main.platform"
+     "children": [{
+       "name": "main.platform.overlord",
+       "label": "overlord"
+     },{
+       "name": "main.platform.overlord",
+       "label": "discorvery"
+     }]
+  },{
+    "name": "live.live",
+    "label": "live.live",
+    "children": [{
+      "name": "live.live.xreward-service",
+      "label": "xreward-service"
+    }]
+  }]
+}
+```
+</details>
+
+### GET /appids/:appid
+
+<details>
+<summary>获取指定的appid的详细内容（主要是集群信息）</summary>
+
+#### path arguments
+
+|name|type|description|
+|----|----|-----------|
+|appid|string| 唯一精确匹配的 appid|
+
+#### example response
+
+```
+{
+   "name": "main.platform.overlord",
+   "grouped_clusters": [{
+     "group": "sh001",
+     "clusters": [{
+      "name": "test-cluster1",
+      "appids": ["main.pikachu", "main.zelda"],
+      "group": "sh001",
+      "state": "done",
+      "cache_type": "redis_Cluster",
+      "cpu": 1,
+      "max_memory": 1024.0,
+      "version": "4.0.11",
+      "number": 1,
+      "instances": [{
+        "ip": "127.0.0.1",
+        "port": 7777,
+        "weight": 0,
+        "alias": "",
+        "state": "running"
+      }]
+     },{
+       "group": "村头机房",
+       "clusters": [{...}]
+     }]
+   }]
+}
+```
+
+</details>
 
 ### DELETE /appids/:appid_name
 
 *开源版独享*
 
+<details>
+<summary>删除对应的appid</summary>
+
+#### path arguments
+
+|name|type|description|
+|----|----|-----------|
+|appid|string| 唯一精确匹配的 appid|
+
+#### example response
+
+```
+{
+  "message": "done"
+}
+```
+</details>
+
 
 
 # V1 版本API整理
 
-## GET /search
-
-### query args
-|name|type|description|
-|----|----|-----------|
-|**q**|string|搜索集群名字和appid列表里的关键字|
-|cache_type|string|搜索的时候指定集群类型|
-
-examples: 
-
-1. /search?q=baka&cache_type=redis
-2. /search?q=chu
-
-### Response
-
-example response:
-
-```
-[
-    {
-        "appids": ["test.app1", "test.app2"], 
-        "name": "test-cluster", 
-        "max_memory": 2048, 
-        "cache_type": "redis",
-        "number": 20, "port": 1277
-    },
-    ...
-]
-```
-## DELETE /clusters/:cluster_name
-
-### path arguments
-
-|name|type|description|
-|----|----|-----------|
-|cluster_name|string| 唯一精确匹配的 cluster_name|
-
-### example response
-
-```
-{
-    "name": "test-cluster",
-    "max_memory": 2048,
-    "appids": ["abc", "def", "hij"],
-    "cpu": "1",
-    "state": "done",
-    "Number": "20",
-    "Instances": [{
-        "ip": "127.0.0.1",
-        "port": "12000",
-        "state": 123,
-        "weight": 1,
-    }],
-    "version": "0.1.1"
-}
-```
-
 ## PATCH /:cluster_name/instances/:instance_id
+
+
+<details>
+<summary>修改权重</summary>
 
 
 ### body arguments
@@ -181,3 +312,12 @@ example response:
     "weight": 12,
 }
 ```
+
+#### example response
+
+```
+{
+  "message": "done",
+}
+```
+</details>

@@ -111,6 +111,11 @@ func (c *CacheJob) buildTplTree() error {
 		if err != nil {
 			return err
 		}
+
+		err = c.e.Set(ctx, fmt.Sprintf("%s/group", instanceDir), c.info.Group)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

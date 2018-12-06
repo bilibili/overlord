@@ -42,7 +42,9 @@ func getCluster(c *gin.Context) {
 
 // GET /clusters
 func getClusters(c *gin.Context) {
-	clusters, err := svc.GetClusters()
+	name := c.DefaultQuery("name", "")
+
+	clusters, err := svc.GetClusters(name)
 	if err != nil {
 		eJSON(c, err)
 		return
