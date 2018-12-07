@@ -42,5 +42,8 @@ $backgroud-color: #F8FAFC;
   flex: 1 1 auto;
   height: 100vh;
   overflow-x: hidden;
+  & > div:last-child {
+    padding: 12px 24px;
+  }
 }
 </style>

@@ -30,12 +30,20 @@ export default new Router({
       component: () => import(/* webpackChunkName: "about" */ './views/Cluster.vue')
     },
     {
-      path: '/task',
-      name: 'task',
+      path: '/job',
+      name: 'job',
       // route level code-splitting
       // this generates a separate chunk (about.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
-      component: () => import(/* webpackChunkName: "about" */ './views/Task.vue')
+      component: () => import(/* webpackChunkName: "about" */ './views/Job.vue')
+    },
+    {
+      path: '/create',
+      name: 'create',
+      // route level code-splitting
+      // this generates a separate chunk (about.[hash].js) for this route
+      // which is lazy-loaded when the route is visited.
+      component: () => import(/* webpackChunkName: "about" */ './views/Create.vue')
     }
   ]
 })

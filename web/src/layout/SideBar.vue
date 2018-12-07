@@ -17,13 +17,9 @@
         <i class="el-icon-document"></i>
         <span slot="title">Appid</span>
       </el-menu-item>
-      <el-menu-item index="/task">
+      <el-menu-item index="/job">
         <i class="el-icon-time"></i>
-        <span slot="title">Task</span>
-      </el-menu-item>
-      <el-menu-item index="/cluster">
-        <i class="el-icon-goods"></i>
-        <span slot="title">Cluster</span>
+        <span slot="title">Job</span>
       </el-menu-item>
       <el-menu-item index="/create">
         <i class="el-icon-circle-plus-outline"></i>

@@ -1,9 +1,9 @@
-// table
+// el-table
 .el-table .el-table__header-wrapper th {
   background: #F5F7FA;
 }
 
-// menu
+// el-menu
 .el-menu {
   height: 100%;
   text-align: left;
@@ -39,4 +39,14 @@
       color: #fff !important;
     }
   }
+}
+
+// el-step
+.el-step__title.is-success {
+  color: #f8878c !important;
+}
+
+.el-step__head.is-success {
+  color: #fa878c !important;
+  border-color: #fc888b !important;
 }

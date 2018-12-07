@@ -1,6 +1,6 @@
 <template>
   <div class="header">
-    <p class="header__user">zhongbingqing</p>
+    <p class="header__user">Hello, 2233</p>
   </div>
 </template>
 

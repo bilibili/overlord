@@ -1,5 +1,5 @@
 <template>
-  <div class="appid-page">
+  <div>
     <div class="appid-container">
       <div class="appid-tree">
         <el-input
@@ -137,42 +137,39 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.appid-page {
-  padding: 5px 24px;
-  .appid-container {
-    display: flex;
-  }
-  .appid-tree {
-    width: 300px;
-    min-height: 500px;
-    background: #fff;
-    padding: 10px;
-    margin-right: 10px;
-  }
-  .appid-info {
-    width: 100%;
-    min-height: 500px;
-  }
-  .appid-header {
-    height: 40px;
-    width: 100%;
-    background: #fff;
-    font-size: 16px;
+.appid-container {
+  display: flex;
+}
+.appid-tree {
+  width: 300px;
+  min-height: 500px;
+  background: #fff;
+  padding: 10px;
+  margin-right: 10px;
+}
+.appid-info {
+  width: 100%;
+  min-height: 500px;
+}
+.appid-header {
+  height: 40px;
+  width: 100%;
+  background: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+.appid-group {
+  padding: 10px;
+  margin: 10px 0;
+  background: #fff;
+  &__title {
+    font-size: 15px;
     font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 10px;
-  }
-  .appid-group {
-    padding: 10px;
-    margin: 10px 0;
-    background: #fff;
-    &__title {
-      font-size: 15px;
-      font-weight: bold;
-      margin: 10px 0 5px 2px;
-    }
+    margin: 10px 0 5px 2px;
   }
 }
 </style>

@@ -32,3 +32,12 @@
   justify-items: center;
   align-content: center;
 }
+
+@mixin page-title-font {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@mixin box-shadow($opacity) {
+	box-shadow: 0 2px 5px 0 rgba(101, 121, 162 ,$opacity);
+}

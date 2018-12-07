@@ -6,10 +6,9 @@
         Cluster Search
       </div>
       <div class="search-panel__input">
-        <el-input v-model="cluster" placeholder="集群名关键字" size="large">
+        <el-input v-model="cluster" placeholder="集群名关键字" size="large" @keyup.native="searchCluster">
           <i slot="prefix" class="el-input__icon el-icon-search"></i>
         </el-input>
-        <el-button type="primary" size="large" @click="searchCluster">搜索</el-button>
       </div>
     </div>
     <transition name="slide-fade" mode="out-in" appear>
@@ -30,10 +29,10 @@
           </el-table-column>
           <el-table-column prop="number" label="节点数">
           </el-table-column>
-          <el-table-column label="详情">
+          <el-table-column label="详情" width="150">>
             <template slot-scope="{ row }">
-              <el-button type="text" @click="linkToSetting(row)">设置</el-button>
               <el-button type="text" @click="linkToSetting(row)">监控</el-button>
+              <el-button type="text" @click="linkToClusterDetail(row)">集群详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -53,6 +52,9 @@ export default {
     }
   },
   methods: {
+    // searchCluster: throttle(function queryKeyUpHandler () {
+    //   this.applyFilters();
+    // }, 1000),
     searchCluster () {
       this.clusterList = [{
         'appids': ['test.app1', 'test.app2'],
@@ -70,6 +72,9 @@ export default {
         'port': 1277
       }]
     },
+    linkToClusterDetail ({ name }) {
+      this.$router.push({ name: 'cluster', params: { name } })
+    },
     linkToSetting () {
 
     }
@@ -81,7 +86,6 @@ export default {
 @import '@/style/mixin.scss';
 
 .home-page {
-  padding: 20px;
   width: 100%;
   height: calc(100vh - 200px);
   display: flex;
