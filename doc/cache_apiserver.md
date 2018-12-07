@@ -306,7 +306,7 @@ appid 列表
 ```json
 {
   "count": 2,
-  items: [{
+  "items": [{
     "cache_type": "redis",
     "versions": ["4.0.11", "3.2.8"]
   },{
