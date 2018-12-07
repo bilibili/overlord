@@ -20,15 +20,15 @@ apiserver有以下约定：
 <summary> 创建一个新的集群 </summary>
 
 #### body args
-|name|type|description|
-|----|----|-----------|
-|**name**|string|全局唯一不重复的集群名字|
-|appids|[]string|appid list 用于创建时关联appid|
-|**cache_type**|string|cache_type name(only support "memcache", "redis", "redis_cluster")|
-|**spec**|string|容量规格表达式例如："0.5c2g"、"1c2g"|
-|**master_num**|integer|主节点数量为必选|
-|**version**|string|选择redis version|
-|**group**|string|精确选取机房|
+| name             | type     | description                                                        |
+|------------------|----------|--------------------------------------------------------------------|
+| **name**         | string   | 全局唯一不重复的集群名字                                           |
+| appids           | []string | appid list 用于创建时关联appid                                     |
+| **cache_type**   | string   | cache_type name(only support "memcache", "redis", "redis_cluster") |
+| **spec**         | string   | 容量规格表达式例如："0.5c2g"、"1c2g"                               |
+| **total_memory** | integer  | 总容量，MB单位                                                     |
+| **version**      | string   | 选择redis/memcache的版本                                           |
+| **group**        | string   | 精确选取机房                                                       |
 
 #### Response
 
@@ -143,11 +143,13 @@ get the job response by given id
 {
   "count": 2,
   "items": [{
-    "id": "12313124143234",
+    "id": "sh001.12313124143234",
     "state": "running"
+    "param": "{..}"
   },{
-    "id": "12213345453450",
+    "id": "sh001.12213345453450",
     "state": "pending"
+    "param": "{}"
   }]
 }
 ```
@@ -293,6 +295,29 @@ appid 列表
 }
 ```
 </details>
+
+
+### GET /versions
+
+<details>
+<summary>提供所有的版本信息</sumary>
+#### example response
+
+```json
+{
+  "count": 2,
+  items: [{
+    "cache_type": "redis",
+    "versions": ["4.0.11", "3.2.8"]
+  },{
+    "cache_type": "memcache",
+    "versions": ["1.5.0"]
+  }]
+}
+```
+
+</details>
+
 
 
 
