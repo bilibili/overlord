@@ -5,6 +5,11 @@ import (
 	"overlord/api/model"
 )
 
+// GetPlainAppid will get appid by plain format
+func (s *Service) GetPlainAppid() ([]string, error) {
+	return s.d.GetPlainAppid(context.Background())
+}
+
 // GetTreeAppid get the grouped all result
 func (s *Service) GetTreeAppid() ([]*model.TreeAppid, error) {
 	return s.d.GetTreeAppid(context.Background())

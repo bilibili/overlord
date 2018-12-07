@@ -187,7 +187,7 @@ get the job response by given id
 <summary>删除对应的spec</summary>
 
 #### example response
-```
+```json
 {
   "message": "done"
 }
@@ -203,8 +203,18 @@ appid 列表
 <details>
 <summary>取得所有的appid</summary>
 
+#### query param 
+
+| name   | type   | description                                         |
+|--------|--------|-----------------------------------------------------|
+| format | string | 输出格式，不写则为 `tree`，可选项有 `tree`、`plain` |
+
+
 #### example respones
-```
+
+output in `tree ` format:
+
+```json
 {
   "count": 2,
   "items": [{
@@ -227,6 +237,20 @@ appid 列表
   }]
 }
 ```
+
+output in `plain` format:
+
+```json
+{
+  "count": 3,
+  "items": [
+    "main.community.account",
+    "main.infra.discovery",
+    "main.infra.overlord"
+  ]
+}
+```
+
 </details>
 
 ### GET /appids/:appid
@@ -242,7 +266,7 @@ appid 列表
 
 #### example response
 
-```
+```json
 {
    "name": "main.platform.overlord",
    "grouped_clusters": [{
@@ -289,7 +313,7 @@ appid 列表
 
 #### example response
 
-```
+```json
 {
   "message": "done"
 }
@@ -331,7 +355,7 @@ appid 列表
 
 ### body arguments
 
-```
+```json
 {
     "weight": 12,
 }
@@ -339,7 +363,7 @@ appid 列表
 
 #### example response
 
-```
+```json
 {
   "message": "done",
 }

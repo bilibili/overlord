@@ -7,12 +7,26 @@ import (
 )
 
 func getAppids(c *gin.Context) {
-	appids, err := svc.GetTreeAppid()
-	if err != nil {
-		eJSON(c, err)
+	format := c.DefaultQuery("format", "plain")
+	if format == "tree" {
+		appids, err := svc.GetTreeAppid()
+		if err != nil {
+			eJSON(c, err)
+			return
+		}
+		listJSON(c, appids, len(appids))
+		return
+	} else if format == "plain" {
+		appids, err := svc.GetPlainAppid()
+		if err != nil {
+			eJSON(c, err)
+			return
+		}
+		listJSON(c, appids, len(appids))
 		return
 	}
-	listJSON(c, appids, len(appids))
+
+	c.JSON(http.StatusBadRequest, map[string]string{"error": "output format must be one of plain|tree"})
 }
 
 func getAppid(c *gin.Context) {

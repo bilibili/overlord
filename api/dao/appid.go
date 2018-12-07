@@ -11,6 +11,20 @@ import (
 	"go.etcd.io/etcd/client"
 )
 
+// GetPlainAppid will get all plain text appid list
+func (d *Dao) GetPlainAppid(ctx context.Context) ([]string, error) {
+	nodes, err := d.e.LS(ctx, etcd.AppidsDir)
+	if err != nil {
+		return nil, err
+	}
+	appids := make([]string, len(nodes))
+	for i, node := range nodes {
+		_, appid := filepath.Split(node.Key)
+		appids[i] = appid
+	}
+	return appids, nil
+}
+
 // GetTreeAppid get the grouped all result
 func (d *Dao) GetTreeAppid(ctx context.Context) ([]*model.TreeAppid, error) {
 	nodes, err := d.e.LS(ctx, etcd.AppidsDir)
