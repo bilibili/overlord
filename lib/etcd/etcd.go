@@ -188,6 +188,7 @@ func (e *Etcd) WatchOnExpire(ctx context.Context, dir string) (key chan string, 
 
 // WatchOn will watch the given path forever
 func (e *Etcd) WatchOn(ctx context.Context, path string, interestings ...string) (key chan *cli.Node, err error) {
+	fmt.Printf("watch on %v", path)
 	evtMap := make(map[string]struct{})
 	for _, interest := range interestings {
 		evtMap[interest] = struct{}{}

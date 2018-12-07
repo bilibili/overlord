@@ -79,7 +79,7 @@ func (s *Scheduler) Run() (err error) {
 	log.Infof("start scheduler with conf %v", s.c)
 	// watch task dir to get new task.
 	for _, role := range s.c.Roles {
-		ch, err := s.db.WatchOn(context.Background(), etcd.JobsDir+role, "")
+		ch, err := s.db.WatchOn(context.Background(), etcd.JobsDir+"/"+role)
 		if err != nil {
 			log.Errorf("start watch task fail err %v", err)
 			return err
@@ -129,10 +129,11 @@ func buildHTTPSched(cfg *Config) calls.Caller {
 
 func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	frameworkInfo := &ms.FrameworkInfo{
-		User:       s.c.User,
-		Name:       s.c.Name,
-		ID:         &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
-		Checkpoint: &s.c.Checkpoint,
+		User:         s.c.User,
+		Name:         s.c.Name,
+		ID:           &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
+		Checkpoint:   &s.c.Checkpoint,
+		Capabilities: []ms.FrameworkInfo_Capability{ms.FrameworkInfo_Capability{Type: ms.FrameworkInfo_Capability_MULTI_ROLE}},
 	}
 	if s.c.FailOver > 0 {
 		failOverTimeout := time.Duration(s.c.FailOver).Seconds()
