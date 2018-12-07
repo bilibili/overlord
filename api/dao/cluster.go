@@ -172,16 +172,23 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	specCPU, specMaxMem, err := d.parseSpecification(p.Spec)
+	if err != nil {
+		return "", err
+	}
+	p.SpecCPU = specCPU
+	p.SpecMemory = specMaxMem
+
+	number := p.TotalMemory / int(p.SpecMemory)
+
 	// check if master num is even
 	ctype := proto.CacheType(p.CacheType)
-	if ctype == proto.CacheTypeRedisCluster {
-		if p.Number%2 != 0 {
-			log.Info("cluster master number is odd")
-			return "", ErrMasterNumMustBeEven
-		}
+	if ctype == proto.CacheTypeRedisCluster && number%2 != 0 {
+		number++
 	}
+	p.Number = number
 
-	err := d.checkClusterName(p.Name)
+	err = d.checkClusterName(p.Name)
 	if err != nil {
 		log.Info("cluster name must be unique")
 		return "", err
@@ -241,7 +248,12 @@ func (d *Dao) parseSpecification(spec string) (cpu float64, maxMem float64, err 
 	if err != nil {
 		return
 	}
-	maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
+	if strings.HasSuffix(ssp[1], "m") {
+		maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
+	} else if strings.HasSuffix(ssp[1], "g") {
+		maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
+		maxMem = maxMem * 1024.0
+	}
 	return
 }
 
@@ -260,13 +272,8 @@ func (d *Dao) createCreateClusterJob(p *model.ParamCluster) (*job.Job, error) {
 	}
 	t.CacheType = cacheType
 
-	specCPU, specMaxMem, err := d.parseSpecification(p.Spec)
-	if err != nil {
-		return nil, err
-	}
-
-	t.MaxMem = specMaxMem
-	t.CPU = specCPU
+	t.MaxMem = p.SpecMemory
+	t.CPU = p.SpecCPU
 
 	return t, nil
 }

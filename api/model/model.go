@@ -2,13 +2,17 @@ package model
 
 // ParamCluster is be used to create new or modify cluster
 type ParamCluster struct {
-	Name      string   `json:"name" validate:"required"`
-	Appids    []string `json:"appids,split" validate:"gte=0,dive,gte=0"`
-	Spec      string   `json:"spec" validate:"required"`
-	Version   string   `json:"version" validate:"required"`
-	CacheType string   `json:"cache_type" validate:"required"`
-	Number    int      `json:"number" validate:"required"`
-	Group     string   `json:"group" validate:"required"`
+	Name        string   `json:"name" validate:"required"`
+	Appids      []string `json:"appids,split" validate:"gte=0,dive,gte=0"`
+	Spec        string   `json:"spec" validate:"required"`
+	Version     string   `json:"version" validate:"required"`
+	CacheType   string   `json:"cache_type" validate:"required"`
+	TotalMemory int      `json:"total_memory" validate:"required"`
+	Group       string   `json:"group" validate:"required"`
+
+	Number     int     `json:"-"`
+	SpecCPU    float64 `json:"-"`
+	SpecMemory float64 `json:"-"`
 }
 
 // ParamScale parase from data to used to scale cluster

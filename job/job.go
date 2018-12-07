@@ -49,15 +49,15 @@ type Job struct {
 
 	OpType OpType
 
-	Group string `json:"group"`
+	Group string
 
-	Nodes []string `json:"nodes"`
+	Nodes []string
 	// Users to apply that
 	// the first is the job commiter
 	Users []string
 
 	// cluster must never be absent unless create.
-	Cluster string `json:"omitempty"`
+	Cluster string
 
 	// Params is the given parameters by the frontend interface.
 	Params map[string]string

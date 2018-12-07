@@ -54,7 +54,7 @@ func initRouter(e *gin.Engine) {
 
 	specs := e.Group("/specs")
 	specs.GET("/", getSpecs)
-	specs.DELETE("/", removeSpecs)
+	specs.DELETE("/:spec", removeSpecs)
 
 	appids := e.Group("/appids")
 	appids.GET("/", getAppids)

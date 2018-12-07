@@ -1,7 +1,6 @@
-
 #!/bin/bash
 #mesos agent 使用supvisor启动配置脚本
-apt-get install -y supervisor 
+apt-get install -y supervisor
 # 写入mesos启动配置
 zk_addr=127.0.0.1:2181
 echo -e "[program:mesos]">/etc/supervisor/conf.d/mesos-agent.conf

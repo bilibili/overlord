@@ -88,7 +88,7 @@ func BuildTreeAppids(appids []string) []*TreeAppid {
 	tas := make([]*TreeAppid, len(nameMapper))
 	count := 0
 	for prefix, suffixs := range nameMapper {
-		children := make([]*NameLabel, len(appids))
+		children := make([]*NameLabel, len(suffixs))
 		for idx, suffix := range suffixs {
 			children[idx] = &NameLabel{Name: fmt.Sprintf("%s.%s", prefix, suffix), Label: suffix}
 		}

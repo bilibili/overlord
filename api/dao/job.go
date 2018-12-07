@@ -36,29 +36,29 @@ func (d *Dao) GetJobs(ctx context.Context) ([]*model.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	jobs := make([]*model.Job, 0)
 
 	for _, node := range nodes {
-		group := getID(node.Key)
-		subs, err := d.e.LS(sub, fmt.Sprintf("%s/%s", etcd.JobDetailDir, group))
+		group := getLastField(node.Key)
+		subnodes, err := d.e.LS(sub, node.Key)
 		if err != nil {
-			return nil, err
+			continue
 		}
-
-		for _, subn := range subs {
-			subid := getID(subn.Key)
-			mjob, err := d.GetJob(sub, fmt.Sprintf("%s/%s", group, subid))
+		for _, subnode := range subnodes {
+			innerID := getLastField(subnode.Key)
+			job := &model.Job{ID: group + "." + innerID, Param: subnode.Value}
+			state, err := d.e.Get(sub, fmt.Sprintf("%s/%s/%s/state", etcd.JobDetailDir, group, innerID))
 			if err != nil {
-				return nil, err
+				continue
 			}
-			jobs = append(jobs, mjob)
+			job.State = state
+			jobs = append(jobs, job)
 		}
 	}
 	return jobs, nil
 }
 
-func getID(etcdKey string) string {
+func getLastField(etcdKey string) string {
 	_, file := filepath.Split(etcdKey)
 	return file
 }
