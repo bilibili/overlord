@@ -32,6 +32,7 @@ import (
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/calls"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/events"
+	cli "go.etcd.io/etcd/client"
 )
 
 var (
@@ -78,14 +79,13 @@ func (s *Scheduler) Run() (err error) {
 	log.Infof("start scheduler with conf %v", s.c)
 	// watch task dir to get new task.
 	for _, role := range s.c.Roles {
-		var ch chan string
-		ch, err = s.db.Watch(context.Background(), etcd.JobsDir+role)
+		ch, err := s.db.WatchOn(context.Background(), etcd.JobsDir+role, "")
 		if err != nil {
 			log.Errorf("start watch task fail err %v", err)
-			return
+			return err
 		}
 		go s.taskEvent(ch)
-}
+	}
 
 	s.cli = buildHTTPSched(s.c)
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
@@ -98,14 +98,15 @@ func (s *Scheduler) Run() (err error) {
 	return
 }
 
-func (s *Scheduler) taskEvent(ch chan string) {
+func (s *Scheduler) taskEvent(ch chan *cli.Node) {
 	for {
-		v := <-ch
+		n := <-ch
 		var t job.Job
-		if err := json.Unmarshal([]byte(v), &t); err != nil {
+		if err := json.Unmarshal([]byte(n.Value), &t); err != nil {
 			log.Errorf("get task info err %v", err)
 			continue
 		}
+		t.ID = splitJobID(n.Key)
 		s.task.PushBack(t)
 		// revive offer when task comming.
 		revice := calls.Revive()

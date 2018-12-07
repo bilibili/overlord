@@ -1,2 +1,15 @@
 listen = "0.0.0.0:8880"
 etcd = "http://127.0.0.1:2379"
+
+[[versions]]
+  cache_type = "redis"
+  versions = ["4.0.11", "3.2.8"]
+
+[[versions]]
+  cache_type = "redis_cluster"
+  versions = ["4.0.11", "3.2.8", "5.0"]
+
+
+[[versions]]
+  cache_type = "memcache"
+  versions = ["1.5.0"]

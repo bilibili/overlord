@@ -61,5 +61,5 @@ func initRouter(e *gin.Engine) {
 	appids.GET("/:appid", getAppid)
 	appids.DELETE("/:appid", removeAppid)
 
-	// e.POST("/link", )
+	e.GET("/versions", getAllVersions)
 }

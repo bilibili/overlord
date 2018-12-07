@@ -5,10 +5,17 @@ import (
 	"strings"
 )
 
+// Version is the info or version dir
+type Version struct {
+	CacheType string `json:"cache_type"`
+	Versions []string `json:"versions"`
+}
+
 // Job is the json-encodable struct
 type Job struct {
 	ID    string `json:"id"`
 	State string `json:"state"`
+	Param string `json:"param"`
 }
 
 // Cluster is the special struct in model
@@ -57,7 +64,7 @@ type GroupedClusters struct {
 // TreeAppid is the struct used for tree
 type TreeAppid struct {
 	NameLabel
-	Children []*NameLabel
+	Children []*NameLabel `json:"children"`
 }
 
 // NameLabel contains the name and label

@@ -7,6 +7,7 @@ import (
 	"overlord/job"
 	"overlord/lib/etcd"
 	"path/filepath"
+	"strings"
 )
 
 // GetJob will get job info from redis or etcd
@@ -17,7 +18,12 @@ func (d *Dao) GetJob(ctx context.Context, jobID string) (*model.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &model.Job{ID: jobID, State: state}
+	param, err := d.e.Get(subctx, fmt.Sprintf("%s/%s", etcd.JobsDir, jobID))
+	if err != nil {
+		return nil, err
+	}
+
+	t := &model.Job{ID: strings.Replace(jobID, "/", ".", -1), State: state, Param: param}
 	return t, nil
 }
 
@@ -30,10 +36,24 @@ func (d *Dao) GetJobs(ctx context.Context) ([]*model.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	jobs := make([]*model.Job, len(nodes))
 
-	for idx, node := range nodes {
-		jobs[idx] = &model.Job{ID: getID(node.Key), State: node.Value}
+	jobs := make([]*model.Job, 0)
+
+	for _, node := range nodes {
+		group := getID(node.Key)
+		subs, err := d.e.LS(sub, fmt.Sprintf("%s/%s", etcd.JobDetailDir, group))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, subn := range subs {
+			subid := getID(subn.Key)
+			mjob, err := d.GetJob(sub, fmt.Sprintf("%s/%s", group, subid))
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, mjob)
+		}
 	}
 	return jobs, nil
 }

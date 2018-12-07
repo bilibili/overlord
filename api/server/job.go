@@ -5,11 +5,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.etcd.io/etcd/client"
+	"strings"
 )
 
 // getJob get the job by given number
 func getJob(c *gin.Context) {
 	jobID := c.Param("job_id")
+	jobID = strings.Replace(jobID, ".", "/", -1)
 	t, err := svc.GetJob(jobID)
 	if client.IsKeyNotFound(err) {
 		c.JSON(http.StatusNotFound, err)

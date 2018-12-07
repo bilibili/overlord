@@ -204,6 +204,10 @@ func (e *Etcd) WatchOn(ctx context.Context, path string, interestings ...string)
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", path, err)
 			}
+			if len(evtMap) == 0 {
+				key <- resp.Node
+			}
+
 			if _, ok := evtMap[resp.Action]; ok {
 				key <- resp.Node
 			}
