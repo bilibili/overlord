@@ -300,9 +300,9 @@ appid 列表
 ### GET /versions
 
 <details>
-<summary>提供所有的版本信息</sumary>
-#### example response
+<summary>提供所有的版本信息</summary>
 
+#### example response
 ```json
 {
   "count": 2,
@@ -317,7 +317,6 @@ appid 列表
 ```
 
 </details>
-
 
 
 
