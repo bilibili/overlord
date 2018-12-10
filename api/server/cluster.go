@@ -86,13 +86,14 @@ func scaleCluster(c *gin.Context) {
 }
 
 func assignAppid(c *gin.Context) {
+	cname := c.Param("cluster_name")
 	p := new(model.ParamAssign)
 	if err := c.BindJSON(p); err != nil {
 		eJSON(c, err)
 		return
 	}
 
-	err := svc.AssignAppid(p.ClusterName, p.Appid)
+	err := svc.AssignAppid(cname, p.Appid)
 	if err != nil {
 		eJSON(c, err)
 		return
@@ -101,13 +102,14 @@ func assignAppid(c *gin.Context) {
 }
 
 func unassignAppid(c *gin.Context) {
+	cname := c.Param("cluster_name")
 	p := new(model.ParamAssign)
 	if err := c.BindJSON(p); err != nil {
 		eJSON(c, err)
 		return
 	}
 
-	err := svc.UnassignAppid(p.ClusterName, p.Appid)
+	err := svc.UnassignAppid(cname, p.Appid)
 	if err != nil {
 		eJSON(c, err)
 		return

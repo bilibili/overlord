@@ -112,6 +112,59 @@ response `Job`
 
 </details>
 
+### DELETE /clusters/:cluster_name/appid
+
+<details>
+<summary>解除集群关联关系</summary>
+
+#### path arguments
+|name|type|description|
+|----|----|-----------|
+|cluster_name|string| 唯一精确匹配的 cluster_name|
+
+#### body arguments
+
+|name|type|description|
+|----|----|-----------|
+|appid|string| 唯一精确匹配的 appid|
+
+#### example response
+
+```
+{
+  "message": "done",
+}
+```
+
+</details>
+
+### POST /clusters/:cluster_name/appid
+
+
+<details>
+<summary>绑定集群关联关系</summary>
+
+#### path arguments
+|name|type|description|
+|----|----|-----------|
+|cluster_name|string| 唯一精确匹配的 cluster_name|
+
+#### body arguments
+
+|name|type|description|
+|----|----|-----------|
+|appid|string| 唯一精确匹配的 appid|
+
+#### example response
+
+```
+{
+  "message": "done",
+}
+```
+
+</details>
+
 
 ## Job
 
