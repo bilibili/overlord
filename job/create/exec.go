@@ -12,9 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"text/template"
 
-	"overlord/config"
 	"overlord/lib/dir"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
@@ -22,7 +20,10 @@ import (
 	"overlord/proto"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gofrs/flock"
 )
+
+const binaryLock = "./binary.lock"
 
 var (
 	_workDir  = "/data/%d"
@@ -304,30 +305,30 @@ func buildServiceName(cacheType proto.CacheType, version string, port int) strin
 	return fmt.Sprintf("redis-%s@%d.service", version, port)
 }
 
-func setupSystemdServiceFile(info *DeployInfo) error {
-	var (
-		fname   string
-		tplBody string
-	)
+// func setupSystemdServiceFile(info *DeployInfo) error {
+// 	var (
+// 		fname   string
+// 		tplBody string
+// 	)
 
-	if info.CacheType == proto.CacheTypeRedis || info.CacheType == proto.CacheTypeRedisCluster {
-		fname = fmt.Sprintf("/etc/systemd/system/redis-%s@.service", info.Version)
-		tplBody = config.RedisServiceTpl
-	} else if info.CacheType == proto.CacheTypeMemcache {
-		fname = fmt.Sprintf("/etc/systemd/system/memcache-%s@.service", info.Version)
-		tplBody = config.MemcacheServiceTpl
-	}
+// 	if info.CacheType == proto.CacheTypeRedis || info.CacheType == proto.CacheTypeRedisCluster {
+// 		fname = fmt.Sprintf("/etc/systemd/system/redis-%s@.service", info.Version)
+// 		tplBody = config.RedisServiceTpl
+// 	} else if info.CacheType == proto.CacheTypeMemcache {
+// 		fname = fmt.Sprintf("/etc/systemd/system/memcache-%s@.service", info.Version)
+// 		tplBody = config.MemcacheServiceTpl
+// 	}
 
-	fd, err := os.Create(fname)
-	if err != nil {
-		return err
-	}
-	tpl, err := template.New("service").Parse(tplBody)
-	if err != nil {
-		return err
-	}
-	return tpl.Execute(fd, map[string]string{"Version": info.Version})
-}
+// 	fd, err := os.Create(fname)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	tpl, err := template.New("service").Parse(tplBody)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return tpl.Execute(fd, map[string]string{"Version": info.Version})
+// }
 
 // SetupCacheService will create new cache service
 func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
@@ -358,20 +359,44 @@ func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
 
 	// 2. setup systemd serivce
 	//   2.1 check if binary was exists
-	// exists := checkBinaryVersion(info.CacheType, info.Version)
-	// if !exists {
-	// 	//   2.2 if not, pull it from scheduler and then setup systemd config
-	// 	if err = downloadBinary(info); err != nil {
-	// 		return err
-	// 	}
-	// 	if err = setupSystemdServiceFile(info); err != nil {
-	// 		return err
-	// 	}
-	// }
 	// 3. spawn a new redis cluster service
+	err = setupBinary(info)
+	if err != nil {
+		return nil, err
+	}
+
 	p = newproc(info.CacheType, info.Version, info.Port)
 	err = p.Start()
 	return
+}
+
+func setupBinary(info *DeployInfo) error {
+	exists := checkBinaryVersion(info.CacheType, info.Version)
+	if !exists {
+		locker := flock.New(binaryLock)
+		err := locker.Lock()
+		defer func() {
+			suberr := locker.Unlock()
+			if suberr != nil {
+				log.Errorf("error to unlock %s", err)
+			}
+		}()
+
+		// 如果存在则直接退出
+		if checkBinaryVersion(info.CacheType, info.Version) {
+			return nil
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if err = downloadBinary(info); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func newproc(tp proto.CacheType, version string, port int) (p *proc.Proc) {
