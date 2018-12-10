@@ -71,6 +71,12 @@
 			"versionExact": "v1.3.0"
 		},
 		{
+			"checksumSHA1": "inV1CKdIf6mjiuguSuDTcu0Amag=",
+			"path": "github.com/gofrs/flock",
+			"revision": "971941c0819da74ed7c5d5329b7cebaa5a6f276c",
+			"revisionTime": "2018-10-23T08:20:22Z"
+		},
+		{
 			"checksumSHA1": "2XtrajUc7LktpQETiH+H2hbd200=",
 			"path": "github.com/gogo/protobuf/gogoproto",
 			"revision": "fcdc5011193ff531a548e9b0301828d5a5b97fd8",
