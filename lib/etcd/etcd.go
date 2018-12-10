@@ -27,6 +27,7 @@ const (
 	FrameWork           = "/overlord/framework"
 	AppidsDir           = "/overlord/appids"
 	SpecsDir            = "/overlord/specs"
+	FileServer          = "/overlord/fs"
 )
 
 // define watch event

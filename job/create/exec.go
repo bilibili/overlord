@@ -39,7 +39,7 @@ func SetWorkDir(path string) {
 // must be serialized and deserialized by json
 type DeployInfo struct {
 	// JobID is the id of global job
-	JobID  string
+	JobID   string
 	Cluster string
 
 	CacheType proto.CacheType
@@ -111,7 +111,7 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		log.Errorf("unsupported cachetype %s", info.CacheType)
 	}
 	// fileserver is not required,ignore fileserver err
-	info.FileServer, _ = e.Get(sub, "/fileserver")
+	info.FileServer, _ = e.Get(sub, etcd.FileServer)
 	info.JobID, err = e.Get(sub, fmt.Sprintf("%s/jobid", instanceDir))
 	if err != nil {
 		return
@@ -215,7 +215,7 @@ func downloadBinary(info *DeployInfo) error {
 	} else {
 		cacheType = "redis"
 	}
-	url := fmt.Sprintf("%s/%s/%s.tar.gz", info.FileServer, cacheType, info.Version)
+	url := fmt.Sprintf("%s/%s-%s.tar.gz", info.FileServer, cacheType, info.Version)
 
 	fileName := fmt.Sprintf("/tmp/overlord/%s-%s.tar.gz", cacheType, info.Version)
 	err := downloadFile(fileName, url)

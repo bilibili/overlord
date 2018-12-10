@@ -9,3 +9,4 @@
 /data/etcd/etcdctl mkdir /overlord/framework
 /data/etcd/etcdctl mkdir /overlord/appids
 /data/etcd/etcdctl mkdir /overlord/specs
+/data/etcd/etcdctl set /overlord/fs "http://172.22.20.48:20080"
