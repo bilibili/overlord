@@ -67,7 +67,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 	}
 
 	instances := []*model.Instance{}
-	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, cname))
+	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances/", etcd.ClusterDir, cname))
 	if err != nil && !client.IsKeyNotFound(err) {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 
 		if info.CacheType != proto.CacheTypeRedisCluster {
-			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDirPrefix, node.Key))
+			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDirPrefix, node.Value))
 			if err != nil {
 				continue
 			}
