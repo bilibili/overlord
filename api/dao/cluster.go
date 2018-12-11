@@ -52,33 +52,8 @@ func (d *Dao) ScaleCluster(ctx context.Context, p *model.ParamScale) (jobID stri
 	return d.saveJob(sub, j)
 }
 
-// GetCluster will search clusters by given cluster name
-func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, error) {
-	istr, err := d.e.ClusterInfo(ctx, cname)
-	if err != nil {
-		return nil, err
-	}
-	info := &create.CacheInfo{}
-	de := json.NewDecoder(strings.NewReader(istr))
-	err = de.Decode(info)
-	if err != nil {
-		return nil, err
-	}
-
-	clusterState, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
-	if err != nil {
-		clusterState = model.StateError
-	}
-
-	if clusterState == job.StateDone {
-		clusterState = model.StateDone
-	} else if clusterState == job.StateLost || clusterState == job.StateFail {
-		clusterState = model.StateError
-	} else {
-		clusterState = model.StateWaiting
-	}
-
-	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances/", etcd.ClusterDir, cname))
+func (d *Dao) getClusterInstances(ctx context.Context, info *create.CacheInfo, state string) ([]*model.Instance, error) {
+	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances/", etcd.ClusterDir, info.Name))
 	if err != nil && !client.IsKeyNotFound(err) {
 		return nil, err
 	}
@@ -93,23 +68,24 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		inst := &model.Instance{
 			IP:     vsp[0],
 			Port:   int(val),
+			State:  state,
 			Weight: -1,
 		}
 
 		if info.CacheType != proto.CacheTypeRedisCluster {
 			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDirPrefix, node.Value))
-			if err != nil {
-				continue
+			if err != nil && !client.IsKeyNotFound(err) {
+				return nil, err
 			}
 			inst.Alias = alias
 
 			weight, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/weight", etcd.InstanceDirPrefix, node.Value))
-			if err != nil {
-				continue
+			if err != nil && !client.IsKeyNotFound(err) {
+				return nil, err
 			}
 			w, err := strconv.ParseInt(weight, 10, 64)
-			if err != nil {
-				continue
+			if err != nil && !client.IsKeyNotFound(err) {
+				return nil, err
 			}
 			inst.Weight = int(w)
 			state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
@@ -120,10 +96,68 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 		instances = append(instances, inst)
 	}
+	return instances, nil
+}
+
+func (d *Dao) getClusterAppids(ctx context.Context, cname string) ([]string, error) {
+	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/appids", etcd.ClusterDir, cname))
+	if client.IsKeyNotFound(err) {
+		return []string{}, nil
+	}else if err != nil {
+		return nil, err
+	}
+
+	appids := make([]string, len(nodes))
+	for i, node := range nodes {
+		_, key := filepath.Split(node.Key)
+		appids[i] = key
+	}
+	return appids, nil
+}
+
+// GetCluster will search clusters by given cluster name
+func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, error) {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	istr, err := d.e.ClusterInfo(sub, cname)
+	if err != nil {
+		return nil, err
+	}
+	info := &create.CacheInfo{}
+	de := json.NewDecoder(strings.NewReader(istr))
+	err = de.Decode(info)
+	if err != nil {
+		return nil, err
+	}
+
+	clusterState, err := d.e.Get(sub, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
+	if err != nil {
+		clusterState = model.StateError
+	}
+
+	if clusterState == job.StateDone {
+		clusterState = model.StateDone
+	} else if clusterState == job.StateLost || clusterState == job.StateFail {
+		clusterState = model.StateError
+	} else {
+		clusterState = model.StateWaiting
+	}
+
+	instances, err := d.getClusterInstances(sub, info, clusterState)
+	if err != nil {
+		return nil, err
+	}
+
+	appids, err := d.getClusterAppids(sub, info.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	c := &model.Cluster{
 		Name:      info.Name,
 		CacheType: string(info.CacheType),
+		Appids: appids,
 		MaxMemory: info.MaxMemory,
 		Thread:    info.Thread,
 		Version:   info.Version,
