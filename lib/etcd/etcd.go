@@ -19,7 +19,7 @@ const (
 	ClusterDir          = "/overlord/clusters"
 	ClusterInstancesDir = "/overlord/clusters/%s/instances/"
 	InstanceDir         = "/overlord/instances/%s:%d"
-	InstanceDirPrefix   = "/ovelord/instances"
+	InstanceDirPrefix   = "/overlord/instances"
 	HeartBeatDir        = "/overlord/heartbeat"
 	ConfigDir           = "/overlord/config"
 	JobsDir             = "/overlord/jobs"

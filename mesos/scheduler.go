@@ -464,10 +464,10 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		case ms.TASK_KILLED:
 			log.Infof("task(%v) killed", status.TaskID)
 		case ms.TASK_RUNNING:
-			taskid := status.TaskID.String()
+			taskid := status.TaskID.GetValue()
 			idx := strings.IndexByte(taskid, '-')
 			addr := taskid[:idx]
-			s.db.Set(ctx, etcd.InstanceDirPrefix+addr, job.StateRunning)
+			s.db.Set(ctx, etcd.InstanceDirPrefix+"/"+addr, job.StateRunning)
 		}
 		return nil
 	}
