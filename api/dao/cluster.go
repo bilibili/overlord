@@ -66,11 +66,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
-	instances := []*model.Instance{}
-	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances/", etcd.ClusterDir, cname))
-	if err != nil && !client.IsKeyNotFound(err) {
-		return nil, err
-	}
 
 	clusterState, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
 	if err != nil {
@@ -85,6 +80,11 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		clusterState = model.StateWaiting
 	}
 
+	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/instances/", etcd.ClusterDir, cname))
+	if err != nil && !client.IsKeyNotFound(err) {
+		return nil, err
+	}
+	instances := []*model.Instance{}
 	for _, node := range nodes {
 		vsp := strings.Split(node.Value, ":")
 		val, err := strconv.ParseInt(vsp[1], 10, 64)
@@ -118,6 +118,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 		instances = append(instances, inst)
 	}
+
 
 	c := &model.Cluster{
 		Name:      info.Name,

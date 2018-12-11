@@ -53,7 +53,7 @@ func (d *Dao) GetGroupedAppid(ctx context.Context, appid string) (*model.Grouped
 	for _, node := range nodes {
 		cluster, err := d.GetCluster(sub, node.Value)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		if cluster != nil {
 			groups[cluster.Group] = append(groups[cluster.Group], cluster)
