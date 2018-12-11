@@ -374,7 +374,7 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 			//  plus the port obtained by adding 10000 to the data port for redis cluster.
 			Resources: makeResources(info.CPU, info.MaxMemory, uint64(addr.Port)),
 		}
-		s.db.SetTaskID(context.Background(), addr.String(), task.TaskID.String()+","+task.AgentID.String())
+		s.db.SetTaskID(context.Background(), addr.String(), task.TaskID.GetValue()+","+task.AgentID.GetValue())
 		data := &TaskData{
 			IP:         addr.IP,
 			Port:       addr.Port,
