@@ -41,7 +41,6 @@ type ParamFilterCluster struct {
 
 // ParamAssign is the model used for server.assgnAppid and server.unassignAppid
 type ParamAssign struct {
-	ClusterName string `json:"cluster_name" validate:"required"`
 	Appid       string `json:"appid" validate:"required"`
 }
 

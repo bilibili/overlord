@@ -24,7 +24,9 @@ func Run(cfg *config.ServerConfig, s *service.Service) {
 	}
 }
 
-func initRouter(e *gin.Engine) {
+func initRouter(ge *gin.Engine) {
+	e := ge.Group("/api/v1")
+
 	clusters := e.Group("/clusters")
 	clusters.POST("/", createCluster)
 	clusters.GET("/", getClusters)

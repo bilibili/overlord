@@ -7,8 +7,8 @@ import (
 
 // Version is the info or version dir
 type Version struct {
-	CacheType string `json:"cache_type"`
-	Versions []string `json:"versions"`
+	CacheType string   `json:"cache_type"`
+	Versions  []string `json:"versions"`
 }
 
 // Job is the json-encodable struct
@@ -17,6 +17,13 @@ type Job struct {
 	State string `json:"state"`
 	Param string `json:"param"`
 }
+
+// define cluster and instance state
+const (
+	StateWaiting = "waiting"
+	StateDone     = "done"
+	StateError    = "error"
+)
 
 // Cluster is the special struct in model
 type Cluster struct {
@@ -51,7 +58,7 @@ type Appid struct {
 
 // GroupedAppid is the struct contains grouped appids
 type GroupedAppid struct {
-	Name            string           `json:"name"`
+	Name            string             `json:"name"`
 	GroupedClusters []*GroupedClusters `json:"grouped_clusters"`
 }
 
