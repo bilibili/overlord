@@ -147,7 +147,8 @@ func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.C
 		}
 		cluster, err = d.GetCluster(ctx, cname)
 		if err != nil {
-			return
+			log.Error("GetClusters.GetCluster err %s", err)
+			contine
 		}
 		clusters = append(clusters, cluster)
 	}
