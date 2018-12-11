@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"overlord/api/model"
 	"overlord/job"
-	"overlord/job/balance"
 	"overlord/job/create"
 	"overlord/lib/etcd"
 	"overlord/lib/log"
@@ -66,7 +65,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
-
 	clusterState, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
 	if err != nil {
 		clusterState = model.StateError
@@ -95,7 +93,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		inst := &model.Instance{
 			IP:     vsp[0],
 			Port:   int(val),
-			State:  clusterState,
 			Weight: -1,
 		}
 
@@ -115,10 +112,14 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 				continue
 			}
 			inst.Weight = int(w)
+			state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
+			if err != nil {
+				continue
+			}
+			inst.State = state
 		}
 		instances = append(instances, inst)
 	}
-
 
 	c := &model.Cluster{
 		Name:      info.Name,
@@ -216,14 +217,14 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	}
 
 	// TODO: move it into mesos framework task
-	if ctype == proto.CacheTypeRedisCluster {
-		go func(name string) {
-			err := balance.Balance(p.Name, d.e)
-			if err != nil {
-				log.Errorf("fail to balance cluster %s due to %v", name, err)
-			}
-		}(p.Name)
-	}
+	// if ctype == proto.CacheTypeRedisCluster {
+	// 	go func(name string) {
+	// 		err := balance.Balance(p.Name, d.e)
+	// 		if err != nil {
+	// 			log.Errorf("fail to balance cluster %s due to %v", name, err)
+	// 		}
+	// 	}(p.Name)
+	// }
 
 	taskID, err := d.saveJob(subctx, t)
 	if err != nil {

@@ -27,6 +27,13 @@ func (d *Dao) GetJob(ctx context.Context, jobID string) (*model.Job, error) {
 	return t, nil
 }
 
+// SetJobState update job state.
+func (d *Dao) SetJobState(ctx context.Context, group, jobID, state string) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	d.e.SetJobState(ctx, group, jobID, state)
+}
+
 // GetJobs will get all jobs from etcd
 func (d *Dao) GetJobs(ctx context.Context) ([]*model.Job, error) {
 	sub, cancel := context.WithCancel(ctx)
@@ -66,4 +73,17 @@ func getLastField(etcdKey string) string {
 // ApproveJob will approve the given job
 func (d *Dao) ApproveJob(ctx context.Context, jobID string) error {
 	return d.e.Cas(ctx, fmt.Sprintf("%s/%s/state", etcd.JobsDir, jobID), job.StateWaitApprove, job.StateApproved)
+}
+
+// WatchJob watch on
+func (d *Dao) WatchJob(ctx context.Context) (j chan *model.Job) {
+	key, _ := d.e.WatchOn(ctx, etcd.JobsDir, "")
+	j = make(chan *model.Job)
+	go func() {
+		node := <-key
+		key := getLastField(node.Key)
+		job := &model.Job{ID: key, Param: node.Value}
+		j <- job
+	}()
+	return
 }

@@ -32,6 +32,7 @@ overlord
         /taskid # mesos taskid
         /alias # alias of node
         /weight  # instance weight number
+        /state # instance state
         /nodes.conf
         /server.conf (服务配置文件 eg:redis.conf memcached.conf)
     /heartbeat

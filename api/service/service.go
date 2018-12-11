@@ -9,11 +9,11 @@ import (
 // New create new service of overlord
 func New(cfg *config.ServerConfig) *Service {
 	s := &Service{
-		cfg: cfg,
+		cfg:    cfg,
 		client: myredis.New(),
-		d:   dao.New(cfg),
+		d:      dao.New(cfg),
 	}
-
+	go s.jobManager()
 	return s
 }
 
@@ -23,4 +23,3 @@ type Service struct {
 	client *myredis.Client
 	cfg    *config.ServerConfig
 }
-

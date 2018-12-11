@@ -20,3 +20,7 @@ func New(cfg *config.ServerConfig) *Dao {
 type Dao struct {
 	e *etcd.Etcd
 }
+
+func (d *Dao) ETCD() *etcd.Etcd {
+	return d.e
+}
