@@ -86,7 +86,6 @@ func (s *Scheduler) Run() (err error) {
 		}
 		go s.taskEvent(ch)
 	}
-
 	s.cli = buildHTTPSched(s.c)
 	s.cli = callrules.New(callrules.WithFrameworkID(mstore.GetIgnoreErrors(s))).Caller(s.cli)
 	err = controller.Run(context.TODO(),
