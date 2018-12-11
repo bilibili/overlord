@@ -2,19 +2,25 @@
   <div>
     <p class="job-page__title">Job 列表</p>
     <el-table
-      :data="tableData"
+      :data="jobList"
+      v-loading="loading"
       border>
       <el-table-column
         prop="id"
-        label="Id">
+        label="Id"
+        width="220">
       </el-table-column>
       <el-table-column
         prop="param"
         label="Param">
+        <template slot-scope="{ row }">
+          <vue-json-pretty v-if="row.param" :data="JSON.parse(row.param)"></vue-json-pretty>
+        </template>
       </el-table-column>
       <el-table-column
         prop="state"
-        label="State">
+        label="State"
+        width="100">
       <template slot-scope="{ row }">
         <el-tag>{{ row.state }}</el-tag>
       </template>
@@ -24,34 +30,31 @@
 </template>
 
 <script>
+import { getJobsApi } from '@/http/api'
+import VueJsonPretty from 'vue-json-pretty'
+
 export default {
   data () {
     return {
-      tableData: [{
-        id: '000000000002',
-        param: '{"abc":"def"}',
-        state: 'running'
-      }, {
-        id: '000000000002',
-        param: '{"abc":"def"}',
-        state: 'running'
-      }, {
-        id: '000000000002',
-        param: '{"abc":"def"}',
-        state: 'running'
-      }, {
-        id: '000000000002',
-        param: '{"abc":"def"}',
-        state: 'running'
-      }]
+      jobList: [],
+      loading: true
     }
   },
+  components: {
+    VueJsonPretty
+  },
   created () {
-
+    this.loadData()
   },
   methods: {
-    loadData () {
-
+    async loadData () {
+      this.loading = true
+      try {
+        const { data } = await getJobsApi()
+        this.jobList = data.items
+      } catch (error) {
+      }
+      this.loading = false
     }
   }
 }
@@ -63,5 +66,11 @@ export default {
 .job-page__title {
   @include page-title-font;
   margin: 10px 0;
+}
+</style>
+
+<style lang="scss">
+.vjs__tree {
+  font-size: 12px;
 }
 </style>

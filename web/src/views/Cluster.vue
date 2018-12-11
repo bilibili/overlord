@@ -1,109 +1,144 @@
 <template>
   <div class="cluster-page">
-    <div class="cluster-panel">
+    <el-breadcrumb separator="/" class="breadcrumb">
+      <el-breadcrumb-item><a href="#" @click="$router.back()">返回</a></el-breadcrumb-item>
+      <el-breadcrumb-item>{{ clusterData.name }}</el-breadcrumb-item>
+    </el-breadcrumb>
+    <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
         <span class="cluster-header__title">集群信息</span>
       </div>
       <div class="cluster-detail cluster-info">
         <div>
-          <p>名称: <span>test-cluster</span></p>
-          <p>类型: <span>Redis Cluster</span></p>
-          <p>容量: <span>20G</span></p>
+          <p>名称: <span>{{ clusterData.name }}</span></p>
+          <p>类型: <span>{{ clusterData.cache_type || '--' }}</span></p>
+          <p>容量: <span>{{ clusterData.max_memory * clusterData.number || '--' }} MB</span></p>
         </div>
         <div>
-          <p>单节点容量: <span>2G</span></p>
-          <p>主节点数量: <span>10</span></p>
-          <p>从节点数量: <span>10</span></p>
+          <p>单节点容量: <span>{{ clusterData.max_memory }} MB</span></p>
+          <p>主节点数量: <span>{{ clusterData.number }}</span></p>
+          <p>从节点数量: <span>{{ clusterData.cache_type === 'redis_cluster' ? clusterData.number : 0 }}</span></p>
         </div>
         <div>
-          <p>集群状态: <span>良好</span></p>
-          <p>组名: <span>Group1</span></p>
-          <p>监控连接: <span>http://1212312/asdasd</span></p>
+          <p>集群状态: <span>
+              <el-tag :type="stateMap[clusterData.state]">
+                <i v-if="clusterData.state === 'waiting'" class="el-icon-loading"></i>{{ clusterData.state }}
+              </el-tag>
+            </span>
+          </p>
+          <p>组名: <span>{{ GROUP_MAP[clusterData.group] }}</span></p>
+          <p>监控连接: <span><a href="http://1212312/asdasd">http://1212312/asdasd</a></span></p>
         </div>
       </div>
     </div>
-    <div class="cluster-panel">
+    <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
         <span class="cluster-header__title">关联的 APPID 列表</span>
       </div>
-      <div class="cluster-detail cluster-appid">
-        <p>main.community.pikachu</p>
-        <p>pika.chu.live.pika.pika</p>
-        <p>kachu.kachu.kachu</p>
+      <div v-if="clusterData.appids && clusterData.appids.length" class="cluster-detail cluster-appid">
+        <p v-for="(appid, index) in clusterData.appids" :key="index" >
+          <router-link :to="{ name: 'appId', query: { name: appid } }">{{ appid }}</router-link>
+        </p>
+      </div>
+      <div v-else class="cluster-detail cluster-appid">
+        暂无数据
       </div>
     </div>
-    <div class="cluster-panel">
+    <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
         <span class="cluster-header__title">节点列表</span>
       </div>
-      <div class="cluster-detail cluster-nodes">
-        <div class="cluster-nodes__header">
+      <div class="cluster-detail cluster-instances">
+        <!-- TODO(feature): 二期开放 -->
+        <!-- <div v-if="clusterData.instances && clusterData.instances.length" class="cluster-instances__header">
           <el-button type="primary" size="mini" plain>批量重启</el-button>
           <el-button type="success" size="mini" plain>批量启动</el-button>
           <el-button type="danger" size="mini" plain>批量删除</el-button>
-        </div>
+        </div> -->
           <el-table
             ref="multipleTable"
-            :data="tableData3"
+            :data="clusterData.instances"
             border
+            max-height="400"
             @selection-change="handleSelectionChange">
-            <el-table-column
+            <!-- TODO(feature): 二期开放 -->
+            <!-- <el-table-column
               type="selection"
               width="55">
+            </el-table-column> -->
+            <el-table-column
+              type="index"
+              width="50">
             </el-table-column>
             <el-table-column
-              label="地址"
-              width="120">
-              <template slot-scope="scope">{{ scope.row.date }}</template>
+              label="IP"
+              min-width="100">
+              <template slot-scope="scope">{{ scope.row.ip }}</template>
             </el-table-column>
             <el-table-column
-              prop="name"
-              label="alias"
-              width="120">
+              prop="port"
+              label="端口"
+              min-width="80">
             </el-table-column>
             <el-table-column
-              prop="address"
+              label="别名">
+              <template slot-scope="{ row }">
+                {{ row.alias || '--' }}
+              </template>
+            </el-table-column>
+            <el-table-column
               label="权重"
-              show-overflow-tooltip>
+              width="150">
+              <template slot-scope="{ row }">
+                <div v-if="weightInfo.type === 'view'" class="instance-weight-item">
+                  {{ row.weight }}
+                  <i class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row)"></i>
+                </div>
+                <div v-if="weightInfo.type === 'edit'" class="instance-weight-item">
+                  <el-input class="table-mini-input" v-model="weightInfo.value" placeholder="weight" size="mini"></el-input>
+                  <i class="el-icon-success edit-weight-icon" @click="saveInstanceWeight(row)"></i>
+                </div>
+              </template>
             </el-table-column>
             <el-table-column
-              prop="address"
-              label="角色"
-              show-overflow-tooltip>
-            </el-table-column>
-            <el-table-column
-              prop="address"
+              prop="state"
               label="状态"
-              show-overflow-tooltip>
+              width="100">
+              <template slot-scope="{ row }">
+                <el-tag :type="stateMap[row.state]">
+                  <i v-if="row.state === 'waiting'" class="el-icon-loading"></i>{{ row.state }}
+                </el-tag>
+              </template>
             </el-table-column>
-            <el-table-column label="操作" width="200">
+            <!-- TODO(feature): 二期开放 -->
+            <!-- <el-table-column label="操作" width="200">
               <template slot-scope="{ row }">
                 <el-button type="text" @click="linkToSetting(row)">重启</el-button>
                 <el-button type="text" @click="linkToSetting(row)">开关</el-button>
                 <el-button type="text" @click="linkToSetting(row)">删除</el-button>
                 <el-button type="text" @click="linkToSetting(row)">监控</el-button>
               </template>
-            </el-table-column>
+            </el-table-column> -->
           </el-table>
       </div>
     </div>
 
-    <div class="cluster-panel">
+    <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
-        <span class="cluster-header__title">集群操作（前方高能！）</span>
+        <span class="cluster-header__title">集群操作（前方高能!!!）</span>
       </div>
       <div class="cluster-detail cluster-danger">
         <div class="cluster-danger__item">
           <p>扩容：我不管我就是要扩容我的集群我不管你必须得让我扩容 </p>
-          <el-button type="danger">扩容</el-button>
+          <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-rank">扩容</el-button>
         </div>
         <div class="cluster-danger__item">
           <p>再平衡: 我想要尝试 rebalance 一下  </p>
-          <el-button type="danger">再平衡</el-button>
+          <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-refresh">再平衡</el-button>
         </div>
         <div class="cluster-danger__item">
           <p>删除: 请看我的坚定的眼神(๑•̀ㅂ•́)و我就是要删掉这个集群( *・ω・)✄╰ひ╯</p>
-          <el-button type="danger">删除</el-button>
+          <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-delete">删除</el-button>
         </div>
       </div>
     </div>
@@ -111,20 +146,58 @@
 </template>
 
 <script>
+import { getClusterDetailApi, patchInstanceWeightApi } from '@/http/api'
+import GROUP_MAP from '@/constants/GROUP'
+
 export default {
   data () {
     return {
+      GROUP_MAP,
       multipleSelection: [],
-      tableData3: [{
-        date: '2016-05-03',
-        name: '王小虎',
-        address: '上海市普陀区金沙江路 1518 弄'
-      }]
+      clusterData: [],
+      loading: true,
+      weightInfo: {
+        value: null,
+        type: 'view'
+      },
+      stateMap: {
+        running: 'success',
+        waiting: 'warning',
+        error: 'danger'
+      }
     }
   },
+  created () {
+    this.getClusterData()
+  },
   methods: {
+    async getClusterData () {
+      this.loading = true
+      try {
+        const { data } = await getClusterDetailApi(this.$route.params.name)
+        this.clusterData = data
+      } catch (error) {
+      }
+      this.loading = false
+    },
     handleSelectionChange (val) {
       this.multipleSelection = val
+    },
+    editInstanceWeight ({ weight }) {
+      this.weightInfo.value = weight
+      this.weightInfo.type = 'edit'
+    },
+    async saveInstanceWeight ({ weight, addr, port }) {
+      try {
+        await patchInstanceWeightApi(this.clusterData.name, `${addr}:${port}`, {
+          weight
+        })
+        this.weightInfo.type = 'view'
+        this.$message.success('修改成功')
+        this.getClusterData()
+      } catch (error) {
+        this.$message.error('errors')
+      }
     }
   }
 }
@@ -133,6 +206,9 @@ export default {
 <style lang="scss">
 .cluster-page {
   padding: 5px 24px;
+}
+.breadcrumb {
+  margin: 10px 0;
 }
 .cluster-panel {
   margin:  0 0 20px 0;
@@ -157,6 +233,9 @@ export default {
     > div p {
       margin: 10px 0;
     }
+    > div span {
+      margin: 0 5px;
+    }
   }
   .cluster-appid {
     padding: 12px;
@@ -164,11 +243,21 @@ export default {
       margin: 10px 0;
     }
   }
-  .cluster-nodes {
+  .cluster-instances {
     padding: 12px;
     &__header {
       display: flex;
       margin-bottom: 10px;
+    }
+    .instance-weight-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .edit-weight-icon {
+      font-size: 16px;
+      margin-left: 10px;
+      cursor: pointer;
     }
   }
   .cluster-danger {

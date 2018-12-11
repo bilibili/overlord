@@ -2,7 +2,7 @@
   <div id="app">
     <SideBar/>
     <div class="layout">
-      <Header/>
+      <!-- <Header/> -->
       <transition class="transition" name="slide-fade" mode="out-in" appear>
         <router-view/>
       </transition>
@@ -11,12 +11,12 @@
 </template>
 
 <script>
-import Header from '@/layout/Header.vue'
+// import Header from '@/layout/Header.vue'
 import SideBar from '@/layout/SideBar.vue'
 
 export default {
   components: {
-    Header,
+    // Header,
     SideBar
   }
 }

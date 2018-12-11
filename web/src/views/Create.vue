@@ -13,11 +13,10 @@
       </el-steps>
 
       <!-- step: 1 选择名称 -->
-      <div v-if="active === 0" class="create-container__panel">
-        <div class="create-container__panel--name">
-          <el-input v-model="clusterForm.name" placeholder="集群名称"></el-input>
-        </div>
+      <div v-if="active === 0" class="create-container__panel create-container__panel--name">
+        <el-input v-model="clusterForm.name" placeholder="集群名称"></el-input>
       </div>
+
       <!-- step: 2 选择类型 -->
       <div v-if="active === 1" class="create-container__panel">
         <div class="create-container__panel--type">
@@ -74,7 +73,7 @@
         </div>
       </div>
 
-      <!-- step: 4 关联 APPID -->
+      <!-- step: 5 关联 APPID -->
       <div v-if="active === 4" class="create-container__panel create-container__panel--appid">
         <el-select v-model="clusterForm.appids" multiple filterable placeholder="请选择需要关联 APPID">
           <el-option
@@ -91,21 +90,33 @@
         <el-form label-width="120px" :model="clusterForm" size="mini">
           <el-form-item label="名称">
             {{clusterForm.name || '--'}}
+            <i class="el-icon-edit-outline edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="类型">
             {{clusterForm.cache_type || '--'}}
+            <i class="el-icon-edit-outline edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="型号">
             {{clusterForm.spec || '--'}}
+            <i class="el-icon-edit-outline edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="总容量">
             {{clusterForm.total_memory || '--'}} M
+            <i class="el-icon-edit-outline edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="机房">
             {{clusterForm.group || '--'}}
+            <i class="el-icon-edit-outline  edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="APPID">
             {{clusterForm.appids}}
+            <i class="el-icon-edit-outline edit-icon"></i>
+            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
         </el-form>
       </div>
@@ -212,6 +223,7 @@ export default {
 
 <style lang="scss" scoped>
 @import '@/style/mixin.scss';
+$edit-icon-color: #1890ff;
 
 .create-page__title {
   @include page-title-font;
@@ -225,7 +237,9 @@ export default {
   border-radius: 5px;
   &__panel {
     margin: 20px 5%;
+    min-height: 350px;
     &--name {
+      @include flex-vertical-justify-center;
       padding: 30px 100px;
       .el-input {
         min-width: 300px;
@@ -283,6 +297,9 @@ export default {
     }
     &--appid {
       @include flex-vertical-justify-center;
+      .el-select {
+        max-width: 600px;
+      }
     }
     &--submit {
       @include flex-horizon-justify-center;
@@ -292,6 +309,14 @@ export default {
       .el-form-item--mini.el-form-item {
         margin-bottom: 8px;
       }
+    }
+  }
+  .edit-icon {
+    cursor: pointer;
+    color: $edit-icon-color;
+    margin-left: 10px;
+    &:hover {
+      color: lighten($edit-icon-color, 15%);
     }
   }
   .card-item {

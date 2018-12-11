@@ -1,12 +1,9 @@
 <template>
   <div class="home-page">
-
     <div class="search-panel">
-      <div class="search-panel__header">
-        Cluster Search
-      </div>
+      <div class="search-panel__header">Cluster Search</div>
       <div class="search-panel__input">
-        <el-input v-model="cluster" placeholder="集群名关键字" size="large" @keyup.native="searchCluster">
+        <el-input v-model="clusterKeyword" placeholder="集群名关键字" size="large" @keyup.native="searchCluster">
           <i slot="prefix" class="el-input__icon el-icon-search"></i>
         </el-input>
       </div>
@@ -14,16 +11,9 @@
     <transition name="slide-fade" mode="out-in" appear>
       <div v-if="clusterList.length" class="search-result">
         <el-table :data="clusterList" border>
-          <el-table-column prop="name" label="集群名字" width="150">
-          </el-table-column>
-          <el-table-column prop="appids" label="AppId" width="150">
-            <template slot-scope="{ row }">
-              <p v-for="(item, index) in row.appids" :key="index">{{ item }}</p>
-            </template>
+          <el-table-column prop="name" label="集群名字" min-width="100">
           </el-table-column>
           <el-table-column prop="cache_type" label="缓存类型">
-          </el-table-column>
-          <el-table-column prop="port" label="监听端口">
           </el-table-column>
           <el-table-column prop="max_memory" label="总容量">
           </el-table-column>
@@ -31,51 +21,43 @@
           </el-table-column>
           <el-table-column label="详情" width="150">>
             <template slot-scope="{ row }">
-              <el-button type="text" @click="linkToSetting(row)">监控</el-button>
+              <el-button type="text" @click="linkToMoni(row)">监控</el-button>
               <el-button type="text" @click="linkToClusterDetail(row)">集群详情</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
     </transition>
-
   </div>
 </template>
 
 <script>
+import { getClusterListByQueryApi } from '@/http/api'
+import { throttle } from 'lodash'
+
 export default {
   name: 'home',
   data () {
     return {
-      cluster: null,
+      clusterKeyword: null,
       clusterList: []
     }
   },
   methods: {
-    // searchCluster: throttle(function queryKeyUpHandler () {
-    //   this.applyFilters();
-    // }, 1000),
-    searchCluster () {
-      this.clusterList = [{
-        'appids': ['test.app1', 'test.app2'],
-        'name': 'test-cluster',
-        'max_memory': 2048,
-        'cache_type': 'redis',
-        'number': 20,
-        'port': 1277
-      }, {
-        'appids': ['test.app1', 'test.app2'],
-        'name': 'test-cluster',
-        'max_memory': 2048,
-        'cache_type': 'redis',
-        'number': 20,
-        'port': 1277
-      }]
+    searchCluster: throttle(function searchCluster () {
+      this.loadClusterData()
+    }, 1000),
+    async loadClusterData () {
+      try {
+        const { data } = await getClusterListByQueryApi()
+        this.clusterList = data.items
+      } catch (error) {
+      }
     },
     linkToClusterDetail ({ name }) {
       this.$router.push({ name: 'cluster', params: { name } })
     },
-    linkToSetting () {
+    linkToMoni () {
 
     }
   }
@@ -109,10 +91,6 @@ export default {
     &__input {
       display: flex;
       width: 100%;
-    }
-
-    .el-input {
-      margin-right: 10px;
     }
   }
 
