@@ -72,6 +72,19 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
+	clusterState, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
+	if err != nil {
+		clusterState = model.StateError
+	}
+
+	if clusterState == job.StateDone {
+		clusterState = model.StateDone
+	} else if clusterState == job.StateLost || clusterState == job.StateFail {
+		clusterState = model.StateError
+	} else {
+		clusterState = model.StateWaiting
+	}
+
 	for _, node := range nodes {
 		vsp := strings.Split(node.Value, ":")
 		val, err := strconv.ParseInt(vsp[1], 10, 64)
@@ -80,10 +93,9 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 
 		inst := &model.Instance{
-			IP:   vsp[0],
-			Port: int(val),
-			// TODO: change it as really state.
-			State:  "RUNNING",
+			IP:     vsp[0],
+			Port:   int(val),
+			State:  clusterState,
 			Weight: -1,
 		}
 
@@ -107,11 +119,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		instances = append(instances, inst)
 	}
 
-	val, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
-	if err != nil {
-		val = "UNKNOWN"
-	}
-
 	c := &model.Cluster{
 		Name:      info.Name,
 		CacheType: string(info.CacheType),
@@ -119,7 +126,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		Thread:    info.Thread,
 		Version:   info.Version,
 		Number:    info.Number,
-		State:     val,
+		State:     clusterState,
 		Instances: instances,
 		Group:     info.Group,
 	}
