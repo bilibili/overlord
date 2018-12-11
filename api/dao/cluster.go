@@ -319,7 +319,7 @@ func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...stri
 		nodes, err = d.e.LS(ctx, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
 		for _, node := range nodes {
 			if node.Value == cluster {
-				err = d.e.Delete(ctx, fmt.Sprintf("%s/%s/%s", etcd.AppidsDir, appid, node.Key))
+				err = d.e.Delete(ctx, node.Key)
 				if err != nil {
 					return
 				}
