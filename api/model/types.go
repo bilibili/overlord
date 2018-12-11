@@ -37,6 +37,7 @@ type Cluster struct {
 	Version   string  `json:"version" validate:"required"`
 	Number    int     `json:"number" validate:"required"`
 	Group     string  `json:"group"`
+	Monitor   string  `json:"monitor"`
 
 	Instances []*Instance `json:"instances"`
 }

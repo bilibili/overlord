@@ -90,7 +90,7 @@ func (d *Dao) AssignAppid(ctx context.Context, cname, appid string) error {
 // UnassignAppid will assign appid with cluster
 func (d *Dao) UnassignAppid(ctx context.Context, cname, appid string) error {
 	_, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cname, appid))
-	if err != nil {
+	if err != nil && !client.IsKeyNotFound(err) {
 		return err
 	}
 	return d.unassignAppids(ctx, cname, appid)
