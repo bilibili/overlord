@@ -19,5 +19,5 @@ func New(cfg *config.ServerConfig) *Dao {
 // Dao is the dao level abstraction
 type Dao struct {
 	e *etcd.Etcd
-	m *config.Monitor
+	m *config.MonitorConfig
 }
