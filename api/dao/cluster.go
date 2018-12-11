@@ -100,13 +100,13 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		}
 
 		if info.CacheType != proto.CacheTypeRedisCluster {
-			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDir, node.Key))
+			alias, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/alias", etcd.InstanceDirPrefix, node.Key))
 			if err != nil {
 				continue
 			}
 			inst.Alias = alias
 
-			weight, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/weight", etcd.InstanceDir, node.Value))
+			weight, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/weight", etcd.InstanceDirPrefix, node.Value))
 			if err != nil {
 				continue
 			}
@@ -148,7 +148,7 @@ func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.C
 		cluster, err = d.GetCluster(ctx, cname)
 		if err != nil {
 			log.Error("GetClusters.GetCluster err %s", err)
-			contine
+			continue
 		}
 		clusters = append(clusters, cluster)
 	}
