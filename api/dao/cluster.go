@@ -66,7 +66,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
-
 	clusterState, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
 	if err != nil {
 		clusterState = model.StateError
@@ -119,7 +118,6 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		instances = append(instances, inst)
 	}
 
-
 	c := &model.Cluster{
 		Name:      info.Name,
 		CacheType: string(info.CacheType),
@@ -130,6 +128,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		State:     clusterState,
 		Instances: instances,
 		Group:     info.Group,
+		Monitor:   d.m.Href(info.Name),
 	}
 
 	return c, nil
@@ -247,7 +246,6 @@ func (d *Dao) mapCacheType(cacheType string) (proto.CacheType, error) {
 	if ct != proto.CacheTypeMemcache && ct != proto.CacheTypeRedis && ct != proto.CacheTypeRedisCluster {
 		return ct, ErrCacheTypeNotSupport
 	}
-
 	return ct, nil
 }
 
@@ -320,7 +318,7 @@ func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...stri
 		for _, node := range nodes {
 			if node.Value == cluster {
 				err = d.e.Delete(ctx, node.Key)
-				if err != nil {
+				if err != nil && !client.IsKeyNotFound(err) {
 					return
 				}
 			}
