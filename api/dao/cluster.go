@@ -103,7 +103,7 @@ func (d *Dao) getClusterAppids(ctx context.Context, cname string) ([]string, err
 	nodes, err := d.e.LS(ctx, fmt.Sprintf("%s/%s/appids", etcd.ClusterDir, cname))
 	if client.IsKeyNotFound(err) {
 		return []string{}, nil
-	}else if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -157,7 +157,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 	c := &model.Cluster{
 		Name:      info.Name,
 		CacheType: string(info.CacheType),
-		Appids: appids,
+		Appids:    appids,
 		MaxMemory: info.MaxMemory,
 		Thread:    info.Thread,
 		Version:   info.Version,
@@ -295,7 +295,7 @@ func (d *Dao) parseSpecification(spec string) (cpu float64, maxMem float64, err 
 	if strings.HasSuffix(ssp[1], "m") {
 		maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
 	} else if strings.HasSuffix(ssp[1], "g") {
-		maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "m"), 64)
+		maxMem, err = strconv.ParseFloat(strings.TrimRight(ssp[1], "g"), 64)
 		maxMem = maxMem * 1024.0
 	}
 	return
