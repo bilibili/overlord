@@ -10,5 +10,5 @@ import (
 func (d *Dao) SetInstanceWeight(ctx context.Context, addr string, weight int) error {
 	sub, cancel := context.WithCancel(ctx)
 	defer cancel()
-	return d.e.Set(sub, fmt.Sprintf("%s/%s/weight", etcd.InstanceDir, addr), fmt.Sprint(weight))
+	return d.e.Set(sub, fmt.Sprintf("%s/%s/weight", etcd.InstanceDirPrefix, addr), fmt.Sprint(weight))
 }
