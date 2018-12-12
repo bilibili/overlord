@@ -127,7 +127,7 @@ func (m *Message) MarkEnd() {
 
 // ResetSubs will return the Msg data to flush and reset
 func (m *Message) ResetSubs() {
-	for i := range m.subs {
+	for i := range m.subs[:m.reqn] {
 		m.subs[i].Reset()
 	}
 	m.reqn = 0
@@ -226,7 +226,7 @@ func (m *Message) Err() error {
 	if m.err != nil {
 		return m.err
 	}
-	for _, s := range m.subs {
+	for _, s := range m.subs[:m.reqn] {
 		if s.err != nil {
 			return s.err
 		}
