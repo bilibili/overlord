@@ -49,9 +49,12 @@ export default {
     }, 1000),
     async loadClusterData () {
       try {
-        const { data } = await getClusterListByQueryApi()
+        const { data } = await getClusterListByQueryApi({
+          name: this.clusterKeyword
+        })
         this.clusterList = data.items
       } catch (error) {
+        console.log(error)
       }
     },
     linkToClusterDetail ({ name }) {

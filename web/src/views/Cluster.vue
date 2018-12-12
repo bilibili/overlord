@@ -8,7 +8,7 @@
       <div class="cluster-header">
         <span class="cluster-header__title">集群信息</span>
       </div>
-      <div class="cluster-detail cluster-info">
+      <div class="cluster-info">
         <div>
           <p>名称: <span>{{ clusterData.name }}</span></p>
           <p>类型: <span>{{ clusterData.cache_type || '--' }}</span></p>
@@ -33,14 +33,14 @@
     </div>
     <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
-        <span class="cluster-header__title">关联的 APPID 列表</span>
+        <span class="cluster-header__title">关联的 AppId 列表</span>
       </div>
-      <div v-if="clusterData.appids && clusterData.appids.length" class="cluster-detail cluster-appid">
+      <div v-if="clusterData.appids && clusterData.appids.length" class="cluster-appid">
         <p v-for="(appid, index) in clusterData.appids" :key="index" >
           <router-link :to="{ name: 'appId', query: { name: appid } }">{{ appid }}</router-link>
         </p>
       </div>
-      <div v-else class="cluster-detail cluster-appid">
+      <div v-else class="cluster-appid hint">
         暂无数据
       </div>
     </div>
@@ -48,7 +48,7 @@
       <div class="cluster-header">
         <span class="cluster-header__title">节点列表</span>
       </div>
-      <div class="cluster-detail cluster-instances">
+      <div class="cluster-instances">
         <!-- TODO(feature): 二期开放 -->
         <!-- <div v-if="clusterData.instances && clusterData.instances.length" class="cluster-instances__header">
           <el-button type="primary" size="mini" plain>批量重启</el-button>
@@ -90,12 +90,12 @@
               label="权重"
               width="150">
               <template slot-scope="{ row }">
-                <div v-if="weightInfo.type === 'view'" class="instance-weight-item">
+                <div v-if="row.weightInfo.type === 'view'" class="instance-weight-item">
                   {{ row.weight }}
                   <i class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row)"></i>
                 </div>
-                <div v-if="weightInfo.type === 'edit'" class="instance-weight-item">
-                  <el-input class="table-mini-input" v-model="weightInfo.value" placeholder="weight" size="mini"></el-input>
+                <div v-if="row.weightInfo.type === 'edit'" class="instance-weight-item">
+                  <el-input class="table-mini-input" v-model="row.weightInfo.value" placeholder="weight" size="mini"></el-input>
                   <i class="el-icon-success edit-weight-icon" @click="saveInstanceWeight(row)"></i>
                 </div>
               </template>
@@ -127,7 +127,7 @@
       <div class="cluster-header">
         <span class="cluster-header__title">集群操作（前方高能!!!）</span>
       </div>
-      <div class="cluster-detail cluster-danger">
+      <div class="cluster-danger">
         <div class="cluster-danger__item">
           <p>扩容：我不管我就是要扩容我的集群我不管你必须得让我扩容 </p>
           <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-rank">扩容</el-button>
@@ -176,6 +176,12 @@ export default {
       try {
         const { data } = await getClusterDetailApi(this.$route.params.name)
         this.clusterData = data
+        this.clusterData.instances.forEach(item => {
+          this.$set(item, 'weightInfo', {
+            value: item.weight,
+            type: 'view'
+          })
+        })
       } catch (error) {
       }
       this.loading = false
@@ -183,16 +189,17 @@ export default {
     handleSelectionChange (val) {
       this.multipleSelection = val
     },
-    editInstanceWeight ({ weight }) {
-      this.weightInfo.value = weight
-      this.weightInfo.type = 'edit'
+    editInstanceWeight (item) {
+      item.weightInfo.type = 'edit'
     },
-    async saveInstanceWeight ({ weight, addr, port }) {
+    async saveInstanceWeight (item) {
+      const { weight, ip, port } = item
+      console.log(item)
       try {
-        await patchInstanceWeightApi(this.clusterData.name, `${addr}:${port}`, {
+        await patchInstanceWeightApi(this.clusterData.name, `${ip}:${port}`, {
           weight
         })
-        this.weightInfo.type = 'view'
+        item.weightInfo.type = 'view'
         this.$message.success('修改成功')
         this.getClusterData()
       } catch (error) {
@@ -204,6 +211,8 @@ export default {
 </script>
 
 <style lang="scss">
+$hint-text-color: #909399;
+
 .cluster-page {
   padding: 5px 24px;
 }
@@ -222,8 +231,6 @@ export default {
     border-bottom: 1px solid #e9f2f7;
     font-weight: bold;
     font-size: 14px;
-  }
-  .cluster-detail {
   }
   .cluster-info {
     padding: 12px;
@@ -276,5 +283,9 @@ export default {
       }
     }
   }
+}
+
+.hint {
+  color: $hint-text-color;
 }
 </style>

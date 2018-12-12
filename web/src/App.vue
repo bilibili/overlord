@@ -43,7 +43,7 @@ $backgroud-color: #F8FAFC;
   height: 100vh;
   overflow-x: hidden;
   & > div:last-child {
-    padding: 12px 24px;
+    padding: 24px;
   }
 }
 </style>

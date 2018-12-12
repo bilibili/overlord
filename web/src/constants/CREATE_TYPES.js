@@ -20,11 +20,11 @@ const TYPE_OPTIONS = [{
 const SPEC_OPTIONS = [{
   name: '小型',
   active: true,
-  value: '0.5c1g',
+  value: '0.25c2g',
   desc: '0.5 核 1 G'
 }, {
   name: '中型 ',
-  value: '1c2g',
+  value: '0.5c2g',
   desc: '1 核 2 G'
 }, {
   name: '大型',

@@ -189,6 +189,7 @@ export default {
 .appid-container {
   display: flex;
 }
+
 .appid-tree {
   flex-shrink: 0;
   width: 230px;
@@ -196,11 +197,17 @@ export default {
   background: #fff;
   padding: 10px;
   margin-right: 10px;
+
+  .el-tree {
+    margin: 10px 0;
+  }
 }
+
 .appid-info {
   width: 100%;
   min-height: 500px;
 }
+
 .appid-header {
   height: 40px;
   width: 100%;
@@ -212,10 +219,12 @@ export default {
   justify-content: space-between;
   padding: 0 10px;
 }
+
 .appid-group {
   padding: 10px;
   margin: 10px 0;
   background: #fff;
+
   &__title {
     font-size: 15px;
     font-weight: bold;

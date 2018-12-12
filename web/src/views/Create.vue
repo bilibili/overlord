@@ -5,13 +5,12 @@
       <el-steps :active="active" finish-status="success" align-center>
         <el-step title="集群名称"></el-step>
         <el-step title="选择类型/版本"></el-step>
-        <el-step title="选择型号/容量"></el-step>
+        <el-step title="选择容量/型号"></el-step>
         <el-step title="选择分组"></el-step>
         <el-step title="关联 APPID"></el-step>
         <el-step title="确认"></el-step>
-        <el-step title="完成"></el-step>
       </el-steps>
-
+{{clusterForm}}
       <!-- step: 1 选择名称 -->
       <div v-if="active === 0" class="create-container__panel create-container__panel--name">
         <el-input v-model="clusterForm.name" placeholder="集群名称"></el-input>
@@ -34,8 +33,8 @@
       </div>
 
       <!-- step: 3 选择型号 -->
-      <div v-if="active === 2" class="create-container__panel">
-        <div class="create-container__panel--spec">
+      <div v-if="active === 2" class="create-container__panel create-container__panel--spec">
+        <div>
           <el-radio v-model="clusterForm.spec"
             :label="item.value"
             v-for="(item, index) in specOptions"
@@ -45,32 +44,31 @@
             <h2>{{ item.name }}</h2>
             <p v-if="item.value !== 'custom'">{{ item.desc }}</p>
             <div v-else>
-            <el-input class="mini-input" v-model="clusterForm.name" size="mini">
+            <el-input class="mini-input" v-model="specForm.core" size="mini" type="number">
               <template slot="append">核</template>
             </el-input>
-            <el-input class="mini-input" v-model="clusterForm.name" size="mini">
+            <el-input class="mini-input" v-model="specForm.gigabyte" size="mini" type="number">
               <template slot="append">G</template>
             </el-input>
             </div>
           </el-radio>
         </div>
-        <div class="create-container__panel--memory">
-          <el-input v-model="clusterForm.total_memory" placeholder="总容量">
-            <template slot="append">G</template>
+        <div>
+          <span>总容量:</span>
+          <el-input v-model="clusterForm.total_memory" type="number">
+            <template slot="append">M</template>
           </el-input>
         </div>
       </div>
 
       <!-- step: 4 选择分组 -->
-      <div v-if="active === 3" class="create-container__panel">
-        <div class="create-container__panel--group">
-          <el-radio v-model="clusterForm.group" :label="item.value" v-for="(item, index) in groupOptions"
-          class="card-item group-item"
-          :class="{ 'card-item--active': item.value === clusterForm.group }"
-          :key="index">
-            <span>{{ item.name }}</span>
-          </el-radio>
-        </div>
+      <div v-if="active === 3" class="create-container__panel create-container__panel--group">
+        <el-radio v-model="clusterForm.group" :label="item.value" v-for="(item, index) in groupOptions"
+        class="card-item group-item"
+        :class="{ 'card-item--active': item.value === clusterForm.group }"
+        :key="index">
+          <span>{{ item.name }}</span>
+        </el-radio>
       </div>
 
       <!-- step: 5 关联 APPID -->
@@ -90,41 +88,23 @@
         <el-form label-width="120px" :model="clusterForm" size="mini">
           <el-form-item label="名称">
             {{clusterForm.name || '--'}}
-            <i class="el-icon-edit-outline edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="类型">
             {{clusterForm.cache_type || '--'}}
-            <i class="el-icon-edit-outline edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="型号">
             {{clusterForm.spec || '--'}}
-            <i class="el-icon-edit-outline edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="总容量">
             {{clusterForm.total_memory || '--'}} M
-            <i class="el-icon-edit-outline edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="机房">
             {{clusterForm.group || '--'}}
-            <i class="el-icon-edit-outline  edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
           </el-form-item>
           <el-form-item label="APPID">
-            {{clusterForm.appids}}
-            <i class="el-icon-edit-outline edit-icon"></i>
-            <!-- <el-button type="text" size="mini">编辑</el-button> -->
+            <el-tag size="mini" v-for="(item, index) in clusterForm.appids" :key="index">{{ item }}</el-tag>
           </el-form-item>
         </el-form>
-      </div>
-
-      <!-- step: 4 选择分组 -->
-      <div v-if="active === 6" class="create-container__panel">
-        完成
-        去查看
       </div>
 
       <div v-if="active !== 6" class="create-container__footer">
@@ -133,7 +113,6 @@
       </div>
 
       <div v-else class="create-container__footer">
-        <el-button>再创建一个</el-button>
         <el-button type="primary" @click="linkToClusterDetail">去查看集群</el-button>
       </div>
     </div>
@@ -142,6 +121,8 @@
 </template>
 
 <script>
+import { createClusterApi } from '@/http/api'
+
 import { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS } from '@/constants/CREATE_TYPES'
 export default {
   data () {
@@ -154,10 +135,14 @@ export default {
       groupOptions: GROUP_OPTIONS,
       clusterForm: {
         cache_type: 'redis_cluster',
-        spec: '1c2g',
+        spec: '0.25c2g',
         total_memory: null,
         group: 'sh001',
         appids: []
+      },
+      specForm: {
+        core: null,
+        gigabyte: null
       },
       options: [{
         'name': 'main.platform.overlord',
@@ -181,6 +166,9 @@ export default {
         return !this.clusterForm.cache_type
       }
       if (this.active === 2) {
+        if (this.clusterForm.spec === 'custom') {
+          return !this.specForm.core || !this.specForm.gigabyte
+        }
         return !this.clusterForm.total_memory
       }
       if (this.active === 3) {
@@ -211,8 +199,22 @@ export default {
       this.$router.replace({ name: 'create', query: { step: this.active + 1 } })
     },
     next () {
+      if (this.active === 5) {
+        this.submit()
+        return
+      }
       if (this.active++ > 5) this.active = 0
       this.$router.replace({ name: 'create', query: { step: this.active + 1 } })
+    },
+    async submit () {
+      this.clusterForm.total_memory = Number(this.clusterForm.total_memory)
+      const params = this.clusterForm.spec === 'custom' ? this.clusterForm.spec = `${this.specForm.core}c${this.specForm.gigabyte}g` : this.clusterForm
+      try {
+        await createClusterApi(params)
+        this.$router.push({ name: 'cluster', params: { name: this.clusterForm.name } })
+      } catch (error) {
+
+      }
     },
     handleSelectAppIdChange () {
       // if (this.active === type) return
@@ -235,9 +237,12 @@ $edit-icon-color: #1890ff;
   margin-top: 20px;
   background: #fff;
   border-radius: 5px;
-  &__panel {
-    margin: 20px 5%;
+}
+
+.create-container__panel {
+   margin: 20px 5%;
     min-height: 350px;
+    // 名称
     &--name {
       @include flex-vertical-justify-center;
       padding: 30px 100px;
@@ -268,33 +273,47 @@ $edit-icon-color: #1890ff;
         }
       }
     }
+    // 容量
     &--spec {
-      @include flex-horizon-justify-center;
-      .spec-item {
-        width: 23%;
-        height: 100px;
-        cursor: pointer;
-        h2 {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      & > div:first-child {
+        margin: 30px 0;
+        @include flex-horizon-justify-center;
+        .spec-item {
+          width: 23%;
+          height: 100px;
+          cursor: pointer;
+          h2 {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px;
+          }
+        }
+      }
+      & > div:last-child {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 10px;
+        span {
           font-size: 16px;
-          font-weight: bold;
-          margin: 10px;
+          margin: 0 10px;
+        }
+        .el-input {
+          width: 150px;
         }
       }
     }
-    &--memory {
-      margin: 30px 5px;
-      display: flex;
-      align-items: center;
-      .el-input {
-        width: 300px;
-      }
-    }
+    // 分组
     &--group {
       @include flex-horizon-justify-center;
       .group-item {
         width: 130px;
       }
     }
+    // appid
     &--appid {
       @include flex-vertical-justify-center;
       .el-select {
@@ -310,37 +329,38 @@ $edit-icon-color: #1890ff;
         margin-bottom: 8px;
       }
     }
+}
+
+.edit-icon {
+  cursor: pointer;
+  color: $edit-icon-color;
+  margin-left: 10px;
+  &:hover {
+    color: lighten($edit-icon-color, 15%);
   }
-  .edit-icon {
-    cursor: pointer;
-    color: $edit-icon-color;
-    margin-left: 10px;
-    &:hover {
-      color: lighten($edit-icon-color, 15%);
-    }
+}
+
+.card-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 10px;
+  margin: 10px;
+  border-radius: 5px;
+  transition: .3s;
+  border: 1px solid rgba(121, 142, 187, 0.4);
+  &:hover {
+    @include box-shadow(0.3);
   }
-  .card-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 10px;
-    margin: 10px;
-    border-radius: 5px;
-    transition: .3s;
-    border: 2px solid rgba(101, 121, 162, 0);
-    @include box-shadow(0.2);
-    &:hover {
-      @include box-shadow(0.3);
-    }
-    &--active {
-      border: 2px solid rgba(101, 121, 162, 0.7);
-      @include box-shadow(1);
-    }
+  &--active {
+    border: 2px solid rgba(101, 121, 162, 0.7);
+    @include box-shadow(1);
   }
-  &__footer {
-    margin: 50px 0 20px 0;
-    @include flex-horizon-justify-center;
-  }
+}
+
+.create-container__footer {
+  margin: 50px 0 20px 0;
+  @include flex-horizon-justify-center;
 }
 </style>
 

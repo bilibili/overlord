@@ -34,9 +34,12 @@ const getClusterDetailApi = params => {
 }
 
 const patchInstanceWeightApi = (clusterName, addr, params) => {
-  return http.patch(`/${clusterName}/instances/${addr}`, {
-    params
-  })
+  return http.patch(`api/v1/clusters/${clusterName}/instances/${addr}`, params)
 }
 
-export { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, getClusterDetailApi, patchInstanceWeightApi, getJobsApi }
+const createClusterApi = params => {
+  return http.post('api/v1/clusters', params)
+}
+
+export { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, getClusterDetailApi, patchInstanceWeightApi, getJobsApi,
+  createClusterApi }
