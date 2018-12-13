@@ -4,7 +4,6 @@ const getClusterListByQueryApi = params => {
   return http.get(`api/v1/clusters`, {
     params
   })
-  // return http.get('https://easy-mock.com/mock/5c073aa78eae976e080b800f/overlord/search')
 }
 
 const getAppidsApi = params => {
@@ -19,18 +18,16 @@ const getJobsApi = params => {
 
 const getAppidDetailApi = params => {
   return http.get(`api/v1/appids/${params}`)
-  // return http.get('https://easy-mock.com/mock/5c073aa78eae976e080b800f/overlord/getClusterListByAppid')
 }
 
 const removeCorrelationApi = (clusterName, params) => {
-  return http.delete(`/clusters/${clusterName}/appid`, {
-    params
+  return http.delete(`api/v1/clusters/${clusterName}/appid`, {
+    data: params
   })
 }
 
 const getClusterDetailApi = params => {
   return http.get(`api/v1/clusters/${params}`)
-  // return http.get('https://easy-mock.com/mock/5c073aa78eae976e080b800f/overlord/cluster')
 }
 
 const patchInstanceWeightApi = (clusterName, addr, params) => {
@@ -41,5 +38,18 @@ const createClusterApi = params => {
   return http.post('api/v1/clusters', params)
 }
 
-export { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, getClusterDetailApi, patchInstanceWeightApi, getJobsApi,
-  createClusterApi }
+const addCorrelationApi = (clusterName, params) => {
+  return http.post(`api/v1/clusters/${clusterName}/appid`, params)
+}
+
+export {
+  getClusterListByQueryApi,
+  getAppidsApi,
+  getAppidDetailApi,
+  removeCorrelationApi,
+  getClusterDetailApi,
+  patchInstanceWeightApi,
+  getJobsApi,
+  createClusterApi,
+  addCorrelationApi
+}

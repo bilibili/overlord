@@ -7,10 +7,16 @@
     <div v-loading="loading" class="cluster-panel">
       <div class="cluster-header">
         <span class="cluster-header__title">集群信息</span>
+        <el-tag :type="stateMap[clusterData.state]">
+          <i v-if="clusterData.state === 'waiting'" class="el-icon-loading"></i>{{ clusterData.state }}
+        </el-tag>
+        <!-- <el-tag :type="stateMap[clusterData.state]">
+          <i v-if="clusterData.state === 'waiting'"></i>集群创建中...
+        </el-tag> -->
       </div>
       <div class="cluster-info">
         <div>
-          <p>名称: <span>{{ clusterData.name }}</span></p>
+          <p>名称: <span class="cluster-info__name">{{ clusterData.name }}</span></p>
           <p>类型: <span>{{ clusterData.cache_type || '--' }}</span></p>
           <p>容量: <span>{{ clusterData.max_memory * clusterData.number || '--' }} MB</span></p>
         </div>
@@ -20,14 +26,12 @@
           <p>从节点数量: <span>{{ clusterData.cache_type === 'redis_cluster' ? clusterData.number : 0 }}</span></p>
         </div>
         <div>
-          <p>集群状态: <span>
-              <el-tag :type="stateMap[clusterData.state]">
-                <i v-if="clusterData.state === 'waiting'" class="el-icon-loading"></i>{{ clusterData.state }}
-              </el-tag>
-            </span>
+          <p>集群版本: <span>
+            <el-tag size="mini">{{ clusterData.version || '--' }}</el-tag>
+          </span>
           </p>
           <p>组名: <span>{{ GROUP_MAP[clusterData.group] }}</span></p>
-          <p>监控连接: <span><a href="http://1212312/asdasd">http://1212312/asdasd</a></span></p>
+          <p>监控连接: <span><a target="_blank" :href="clusterData.monitor">去查看</a></span></p>
         </div>
       </div>
     </div>
@@ -92,10 +96,10 @@
               <template slot-scope="{ row }">
                 <div v-if="row.weightInfo.type === 'view'" class="instance-weight-item">
                   {{ row.weight }}
-                  <i class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row)"></i>
+                  <i v-if="clusterData.state !== 'waiting'" class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row)"></i>
                 </div>
                 <div v-if="row.weightInfo.type === 'edit'" class="instance-weight-item">
-                  <el-input class="table-mini-input" v-model="row.weightInfo.value" placeholder="weight" size="mini"></el-input>
+                  <el-input class="table-mini-input" v-model="row.weightInfo.value" placeholder="weight" size="mini" type="number"></el-input>
                   <i class="el-icon-success edit-weight-icon" @click="saveInstanceWeight(row)"></i>
                 </div>
               </template>
@@ -103,7 +107,7 @@
             <el-table-column
               prop="state"
               label="状态"
-              width="100">
+              width="80">
               <template slot-scope="{ row }">
                 <el-tag :type="stateMap[row.state]">
                   <i v-if="row.state === 'waiting'" class="el-icon-loading"></i>{{ row.state }}
@@ -164,7 +168,9 @@ export default {
         running: 'success',
         waiting: 'warning',
         error: 'danger'
-      }
+      },
+      timer: null
+
     }
   },
   created () {
@@ -182,6 +188,11 @@ export default {
             type: 'view'
           })
         })
+        if (this.clusterData.state === 'waiting') {
+          this.timer = setTimeout(() => {
+            this.getClusterData()
+          }, 5000) // 1 min
+        }
       } catch (error) {
       }
       this.loading = false
@@ -193,11 +204,11 @@ export default {
       item.weightInfo.type = 'edit'
     },
     async saveInstanceWeight (item) {
-      const { weight, ip, port } = item
+      const { weightInfo, ip, port } = item
       console.log(item)
       try {
         await patchInstanceWeightApi(this.clusterData.name, `${ip}:${port}`, {
-          weight
+          weight: Number(weightInfo.value)
         })
         item.weightInfo.type = 'view'
         this.$message.success('修改成功')
@@ -243,9 +254,13 @@ $hint-text-color: #909399;
     > div span {
       margin: 0 5px;
     }
+    &__name {
+      font-weight: bold;
+    }
   }
   .cluster-appid {
     padding: 12px;
+    font-size: 14px;
     & > p {
       margin: 10px 0;
     }

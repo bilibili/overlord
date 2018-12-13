@@ -11,7 +11,7 @@
     <transition name="slide-fade" mode="out-in" appear>
       <div v-if="clusterList.length" class="search-result">
         <el-table :data="clusterList" border>
-          <el-table-column prop="name" label="集群名字" min-width="100">
+          <el-table-column prop="name" label="集群名称" min-width="100">
           </el-table-column>
           <el-table-column prop="cache_type" label="缓存类型">
           </el-table-column>
@@ -48,20 +48,20 @@ export default {
       this.loadClusterData()
     }, 1000),
     async loadClusterData () {
+      if (!this.clusterKeyword) return
       try {
         const { data } = await getClusterListByQueryApi({
           name: this.clusterKeyword
         })
         this.clusterList = data.items
       } catch (error) {
-        console.log(error)
       }
     },
     linkToClusterDetail ({ name }) {
       this.$router.push({ name: 'cluster', params: { name } })
     },
-    linkToMoni () {
-
+    linkToMoni ({ monitor }) {
+      window.open(monitor)
     }
   }
 }
@@ -85,6 +85,7 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
+    flex-shrink: 0;
 
     &__header {
       font-size: 35px;

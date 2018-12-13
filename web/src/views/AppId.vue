@@ -12,6 +12,7 @@
           v-loading="appidLoading"
           class="filter-tree"
           :data="appidTree"
+          :highlight-current="true"
           :props="defaultProps"
           @node-click="handleNodeClick"
           default-expand-all
@@ -28,7 +29,7 @@
         <div class="appid-group" v-for="(groupItem, index) in groupedClusters" :key="index">
           <div class="appid-group__title">{{ GROUP_MAP[groupItem.group] }}</div>
           <el-table :data="groupItem.clusters" border>
-            <el-table-column prop="name" label="集群名字" min-width="100">
+            <el-table-column prop="name" label="集群名称" min-width="100">
             </el-table-column>
             <el-table-column prop="cache_type" label="缓存类型">
             </el-table-column>
@@ -47,11 +48,18 @@
             </el-table-column>
           </el-table>
         </div>
+        <div v-if="!groupedClusters.length" class="appid-group appid-group--empty" >
+          暂无集群，去关联
+        </div>
       </div>
     </div>
 
-    <el-dialog title="新关联" :visible.sync="dialogVisible" width="600px" custom-class="correlation-dialog">
-      <el-input placeholder="输入集群关键字进行搜索" clearable v-model="clusterKeyword" @keyup.native="searchCluster">
+    <el-dialog title="添加新关联" :visible.sync="dialogVisible" width="600px" custom-class="correlation-dialog">
+      <el-input
+        placeholder="输入集群关键字进行搜索"
+        clearable
+        v-model="clusterKeyword"
+        @keyup.native="searchCluster">
       </el-input>
       <el-table :data="clusterList" border max-height="300px">
         <el-table-column prop="name" label="集群" width="150">
@@ -63,7 +71,7 @@
         </el-table-column>
         <el-table-column label="详情" width="200">
           <template slot-scope="{ row }">
-            <el-button type="text" @click="removeCorrelation(row)">关联到 {{ appid }}</el-button>
+            <el-button type="text" @click="addCorrelation(row)">关联到 {{ appid }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -79,7 +87,7 @@
 <script>
 import GROUP_MAP from '@/constants/GROUP'
 
-import { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi } from '@/http/api'
+import { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, addCorrelationApi } from '@/http/api'
 import { throttle } from 'lodash'
 export default {
   data () {
@@ -120,7 +128,7 @@ export default {
           format: 'tree'
         })
         this.appidTree = data.items
-        this.getClusterList(this.appidTree[0].children[0])
+        this.getClusterList(this.$route.query || this.appidTree[0].children[0])
       } catch (error) {
       }
       this.appidLoading = false
@@ -156,12 +164,35 @@ export default {
     },
     async confirmRemoveCorrelation (name) {
       try {
-        const { data } = await removeCorrelationApi(name, {
+        await removeCorrelationApi(name, {
           appid: this.appid
         })
-        this.groupedClusters = data.grouped_clusters
-        this.appid = data.name
+
+        this.getClusterList({ name })
+        this.$message.success('解除成功')
       } catch (error) {
+      }
+    },
+    addCorrelation ({ name }) {
+      this.$confirm(`将关联集群【${name}】和 AppId【${this.appid}】 , 是否继续?`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }).then(() => {
+        this.confirmAddCorrelation(name)
+      }).catch(() => {
+      })
+    },
+    async confirmAddCorrelation (name) {
+      try {
+        await addCorrelationApi(name, {
+          appid: this.appid
+        })
+        this.dialogVisible = false
+        this.getClusterList({ name })
+        this.$message.success('关联成功')
+      } catch (error) {
+        this.$message.error('关联失败')
       }
     },
     linkToCluster ({ name }) {
@@ -170,13 +201,17 @@ export default {
     linkToSetting () {
 
     },
-
     searchCluster: throttle(function searchCluster () {
       this.loadClusterData()
     }, 1000),
     async loadClusterData () {
+      console.log(22)
+
+      if (!this.clusterKeyword) return
       try {
-        const { data } = await getClusterListByQueryApi()
+        const { data } = await getClusterListByQueryApi({
+          name: this.clusterKeyword
+        })
         this.clusterList = data.items
       } catch (error) {
       }
@@ -186,6 +221,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+$hint-text-color: #909399;
+
 .appid-container {
   display: flex;
 }
@@ -229,6 +266,14 @@ export default {
     font-size: 15px;
     font-weight: bold;
     margin: 10px 0 5px 2px;
+  }
+
+  &--empty {
+    min-height: 250px;
+    color: $hint-text-color;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
