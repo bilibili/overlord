@@ -57,4 +57,8 @@ func TestMessage(t *testing.T) {
 	msg.WithError(errors.New("some error"))
 	err := msg.Err()
 	assert.EqualError(t, err, "some error")
+
+	emsg := ErrMessage(errors.New("some error"))
+	err = emsg.Err()
+	assert.EqualError(t, err, "some error")
 }
