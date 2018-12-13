@@ -128,6 +128,9 @@ func (m *Message) MarkEnd() {
 
 // ResetSubs will return the Msg data to flush and reset
 func (m *Message) ResetSubs() {
+	if !m.IsBatch() {
+		return
+	}
 	for i := range m.subs[:m.reqn] {
 		m.subs[i].Reset()
 	}
