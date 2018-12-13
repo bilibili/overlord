@@ -61,17 +61,16 @@ func Init(c *Config) (b bool) {
 		hs = append(hs, NewStdHandler())
 		b = true
 	}
-	if c == nil {
-		return
-	}
-	if c.Debug && !logStd {
-		hs = append(hs, NewStdHandler())
-	}
-	if c.Log != "" {
-		hs = append(hs, NewFileHandler(c.Log))
+	if c != nil {
+		if c.Debug && !logStd {
+			hs = append(hs, NewStdHandler())
+		}
+		if c.Log != "" {
+			hs = append(hs, NewFileHandler(c.Log))
+		}
+		DefaultVerboseLevel = c.LogVL
 	}
 	if len(hs) > 0 {
-		DefaultVerboseLevel = c.LogVL
 		h = Handlers(hs)
 		b = true
 	}

@@ -20,7 +20,8 @@ func TestEtcd(t *testing.T) {
 	assert.NoError(t, err)
 }
 func TestSet(t *testing.T) {
-	e, err := New("http://172.22.33.167:2379")
+	e, err := New("http://172.22.33.198:2379")
+	assert.NoError(t, err)
 	ctx := context.TODO()
 	assert.NoError(t, err)
 	mcjob := job.Job{
