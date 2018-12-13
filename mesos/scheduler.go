@@ -615,7 +615,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 			log.Errorf("get cluster etcd info err %v", err)
 			return
 		}
-		s.db.RMDir(ctx, fmt.Sprintf(etcd.ClusterInstancesDir, ci.Name))
+		s.db.RMDir(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, ci.Name))
 		for _, node := range nodes {
 			s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
 		}

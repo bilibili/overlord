@@ -197,13 +197,15 @@ func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.C
 func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, err error) {
 	sub, cancel := context.WithCancel(ctx)
 	defer cancel()
-	var nodes []*etcd.Node
-	nodes, err = d.e.LS(sub, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, cname))
-	if err != nil && !client.IsKeyNotFound(err) {
+	var (
+		appids []*etcd.Node
+	)
+
+	appids, err = d.e.LS(sub, fmt.Sprintf("%s/%s/appids", etcd.ClusterDir, cname))
+	if err != nil {
 		return
 	}
-
-	if len(nodes) > 0 {
+	if len(appids) > 0 {
 		err = ErrClusterAssigned
 		return
 	}
