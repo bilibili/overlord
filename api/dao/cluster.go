@@ -183,7 +183,11 @@ func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.C
 			continue
 		}
 		cluster, err = d.GetCluster(ctx, cname)
-		if err != nil {
+
+		if client.IsKeyNotFound(err) {
+			err = nil
+			continue
+		} else if err != nil {
 			log.Errorf("GetClusters.GetCluster err %s", err)
 			continue
 		}
@@ -226,7 +230,7 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	p.SpecCPU = specCPU
 	p.SpecMemory = specMaxMem
 
-	number := p.TotalMemory / int(p.SpecMemory)
+	number := int(p.TotalMemory) / int(p.SpecMemory)
 
 	// check if master num is even
 	ctype := proto.CacheType(p.CacheType)
@@ -368,12 +372,12 @@ func (d *Dao) unassignAppids(ctx context.Context, cluster string, appids ...stri
 
 func (d *Dao) assignAppids(ctx context.Context, cluster string, appids ...string) (err error) {
 	for _, appid := range appids {
-		err = d.e.Set(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cluster, appid), "")
+		_, err = d.e.GenID(ctx, fmt.Sprintf("%s/%s/", etcd.AppidsDir, appid), cluster)
 		if err != nil {
 			return
 		}
 
-		_, err = d.e.GenID(ctx, fmt.Sprintf("%s/%s/", etcd.AppidsDir, appid), cluster)
+		err = d.e.Set(ctx, fmt.Sprintf("%s/%s/appids/%s", etcd.ClusterDir, cluster, appid), "")
 		if err != nil {
 			return
 		}

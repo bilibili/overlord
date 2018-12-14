@@ -6,10 +6,19 @@ import (
 	"overlord/api/model"
 	"overlord/lib/etcd"
 	"path/filepath"
+
 	"strings"
 
 	"go.etcd.io/etcd/client"
 )
+
+// CreateAppid create new appid
+func (d *Dao) CreateAppid(ctx context.Context, appid string) error {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	return d.e.Mkdir(sub, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
+}
 
 // GetPlainAppid will get all plain text appid list
 func (d *Dao) GetPlainAppid(ctx context.Context) ([]string, error) {
@@ -17,10 +26,12 @@ func (d *Dao) GetPlainAppid(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	appids := make([]string, len(nodes))
-	for i, node := range nodes {
+	appids := make([]string, 0)
+	for _, node := range nodes {
 		_, appid := filepath.Split(node.Key)
-		appids[i] = appid
+		if strings.Contains(appid, ".") {
+			appids = append(appids, appid)
+		}
 	}
 	return appids, nil
 }
@@ -31,10 +42,12 @@ func (d *Dao) GetTreeAppid(ctx context.Context) ([]*model.TreeAppid, error) {
 	if err != nil {
 		return nil, err
 	}
-	appids := make([]string, len(nodes))
-	for i, node := range nodes {
+	appids := make([]string, 0)
+	for _, node := range nodes {
 		_, appid := filepath.Split(node.Key)
-		appids[i] = appid
+		if strings.Contains(appid, ".") {
+			appids = append(appids, appid)
+		}
 	}
 
 	return model.BuildTreeAppids(appids), nil

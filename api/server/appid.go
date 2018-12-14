@@ -2,9 +2,31 @@ package server
 
 import (
 	"net/http"
+	"overlord/api/model"
 
 	"github.com/gin-gonic/gin"
 )
+
+func createAppid(c *gin.Context) {
+	p := new(model.ParamAppid)
+	if err := c.ShouldBind(p); err != nil {
+		c.JSON(http.StatusBadRequest, err)
+		return
+	}
+
+	if err := p.Validate(); err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	err := svc.CreateAppid(p.Appid)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+
+	done(c)
+}
 
 func getAppids(c *gin.Context) {
 	format := c.DefaultQuery("format", "plain")

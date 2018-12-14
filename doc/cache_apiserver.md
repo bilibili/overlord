@@ -251,7 +251,31 @@ get the job response by given id
 
 appid 列表
 
-### Get /appids/
+
+### POST /appids/
+
+<details>
+<summary>创建新的appid</summary>
+
+#### body param
+
+
+| name      | type   | description     |
+|-----------|--------|-----------------|
+| **appid** | string | 全局唯一的appid |
+
+#### example resoponse
+
+```
+{
+  "message" : "done",
+}
+```
+
+
+</details>
+
+### GET /appids/
 
 <details>
 <summary>取得所有的appid</summary>
@@ -260,7 +284,7 @@ appid 列表
 
 | name   | type   | description                                         |
 |--------|--------|-----------------------------------------------------|
-| format | string | 输出格式，不写则为 `tree`，可选项有 `tree`、`plain` |
+| format | string | 输出格式，不写则为 `plain`，可选项有 `tree`、`plain` |
 
 
 #### example respones

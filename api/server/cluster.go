@@ -17,6 +17,12 @@ func createCluster(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}
+
+	if err := p.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, err)
+		return
+	}
+
 	log.Infof("create new cluster with param %v", *p)
 	jobid, err := svc.CreateCluster(p)
 	if err != nil {

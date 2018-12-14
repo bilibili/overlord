@@ -1,5 +1,10 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+)
+
 // ParamCluster is be used to create new or modify cluster
 type ParamCluster struct {
 	Name        string   `json:"name" validate:"required"`
@@ -7,12 +12,23 @@ type ParamCluster struct {
 	Spec        string   `json:"spec" validate:"required"`
 	Version     string   `json:"version" validate:"required"`
 	CacheType   string   `json:"cache_type" validate:"required"`
-	TotalMemory int      `json:"total_memory" validate:"required"`
+	TotalMemory float64  `json:"total_memory" validate:"required"`
 	Group       string   `json:"group" validate:"required"`
 
 	Number     int     `json:"-"`
 	SpecCPU    float64 `json:"-"`
 	SpecMemory float64 `json:"-"`
+}
+
+// Validate will check if the cluster param is right enough.
+func (pc *ParamCluster) Validate() error {
+	// check appids
+	for _, appid := range pc.Appids {
+		if !strings.Contains(appid, ".") {
+			return fmt.Errorf("error: appid %s must contains period(.)", appid)
+		}
+	}
+	return nil
 }
 
 // ParamScale parase from data to used to scale cluster
@@ -39,9 +55,20 @@ type ParamFilterCluster struct {
 	Appid string `json:"appid"`
 }
 
+// ParamAppid is the alias of appid for create
+type ParamAppid = ParamAssign
+
 // ParamAssign is the model used for server.assgnAppid and server.unassignAppid
 type ParamAssign struct {
-	Appid       string `json:"appid" validate:"required"`
+	Appid string `json:"appid" validate:"required"`
+}
+
+// Validate check the param is ok
+func (p *ParamAssign) Validate() error {
+	if !strings.Contains(p.Appid, ".") {
+		return fmt.Errorf("error: appid %s must contains period(.)", p.Appid)
+	}
+	return nil
 }
 
 // ParamScaleWeight change the weight of cluster
