@@ -34,11 +34,11 @@ func (d *Dao) GetTreeAppid(ctx context.Context) ([]*model.TreeAppid, error) {
 	if err != nil {
 		return nil, err
 	}
-	appids := make([]string, len(nodes))
-	for i, node := range nodes {
+	appids := make([]string, 0)
+	for _, node := range nodes {
 		_, appid := filepath.Split(node.Key)
 		if strings.Contains(appid, ".") {
-			appids[i] = appid
+			appids = append(appids, appid)
 		}
 	}
 
