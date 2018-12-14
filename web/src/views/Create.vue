@@ -1,6 +1,6 @@
 <template>
   <div class="create-page">
-    <p class="create-page__title">集群创建</p>
+    <p class="create-page__title">创建集群</p>
     <div class="create-container">
       <el-form :model="clusterForm" :rules="rules" ref="clusterForm" label-width="80px">
 
@@ -10,7 +10,17 @@
 
         <el-form-item label="总容量" prop="total_memory" required>
           <el-input v-model="clusterForm.total_memory" type="number">
-            <template slot="append">G</template>
+            <template slot="append">
+              G
+              <!-- <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item"
+                  :label="item"
+                  :value="item">
+                </el-option>
+              </el-select> -->
+            </template>
           </el-input>
         </el-form-item>
 
@@ -20,8 +30,8 @@
           </el-radio-group>
           <el-tooltip class="item" effect="light" placement="bottom-start">
             <div slot="content" class="type-tooltip">
-              <h6>Redis Cluster</h6>
-              <p>如果你不知道用什么缓存的话，<b>我们推荐选择本项</b>。</p>
+              <h6>Redis Cluster<i>*</i></h6>
+              <p>如果你不知道用什么缓存的话，<b>我们推荐选择 Redis Cluster</b>。</p>
               <p>Cluster 提供了比单节点更高的安全性和比 Memcache 更强、更多的第三方工具。</p>
               <p>Redis Cluster 的主从机制为您的数据保驾护航。</p>
               <h6>Redis</h6>
@@ -90,22 +100,43 @@ import { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS } from '@/constants/CREATE_TY
 
 export default {
   data () {
+    const checkName = (rule, value, callback) => {
+      if (!value) {
+        callback(new Error('请输入名称'))
+      }
+      if (!/^\w+$/.test(value)) {
+        callback(new Error('仅支持英文大小写、数字和下划线_'))
+      }
+      callback()
+    }
+    const checkTotalMemory = (rule, value, callback) => {
+      if (!value) {
+        callback(new Error('请输入总容量'))
+      }
+      if (value <= 0) {
+        callback(new Error('请输入大于0的数值'))
+      }
+      callback()
+    }
     const checCustomSpec = (rule, value, callback) => {
       if (value === 'custom' && (!this.specCustomForm.core || !this.specCustomForm.memory)) {
         callback(new Error('请输入规格'))
       }
+      if (value === 'custom' && (this.specCustomForm.core <= 0 || this.specCustomForm.memory <= 0)) {
+        callback(new Error('请输入大于0的数值'))
+      }
       callback()
     }
     return {
+      value: 'G',
+      options: ['G', 'M'],
       rules: {
         name: [{
-          required: true,
-          message: '请输入名称',
+          validator: checkName,
           trigger: 'change'
         }],
         total_memory: [{
-          required: true,
-          message: '请输入总容量',
+          validator: checkTotalMemory,
           trigger: 'change'
         }],
         spec: [{
@@ -185,6 +216,7 @@ export default {
 <style lang="scss" scoped>
 @import '@/style/mixin.scss';
 $edit-icon-color: #1890ff;
+$green: #67C23A;
 
 .create-page__title {
   @include page-title-font;
@@ -202,6 +234,10 @@ $edit-icon-color: #1890ff;
 }
 
 .type-tooltip {
+  i {
+    color: $green;
+    font-size: 18px;
+  }
   h6 {
     margin: 8px 0 5px 0;
   }

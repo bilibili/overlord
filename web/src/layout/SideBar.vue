@@ -31,14 +31,17 @@
 
 <script>
 export default {
-  name: 'SideBar',
-  methods: {
-  }
+  name: 'SideBar'
 }
 </script>
 
 <style lang="scss">
 @import '@/style/mixin.scss';
+
+@font-face {
+  font-family: titleFont;
+  src: url('~@/assets/Starbounder-2.otf');
+}
 
 .side-bar {
   float: left;
@@ -51,6 +54,10 @@ export default {
     text-align: center;
     color: #fff;
     border-bottom: 1px solid #3a5173;
+
+    h1 {
+      font-family: 'titleFont';
+    }
   }
 }
 </style>

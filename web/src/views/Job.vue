@@ -1,29 +1,20 @@
 <template>
   <div>
     <p class="job-page__title">Job 列表</p>
-    <el-table
-      :data="jobList"
-      v-loading="loading"
-      border>
-      <el-table-column
-        prop="id"
-        label="Id"
-        width="220">
-      </el-table-column>
-      <el-table-column
-        prop="param"
-        label="Param">
+    <el-table :data="jobList" ref="dataTable" v-loading="loading" border @current-change="onSelectionChanged">
+      <el-table-column type="expand">
         <template slot-scope="{ row }">
           <vue-json-pretty v-if="row.param" :data="JSON.parse(row.param)"></vue-json-pretty>
         </template>
       </el-table-column>
-      <el-table-column
-        prop="state"
-        label="State"
-        width="100">
-      <template slot-scope="{ row }">
-        <el-tag>{{ row.state }}</el-tag>
-      </template>
+      <el-table-column type="index" width="80">
+      </el-table-column>
+      <el-table-column prop="id" label="Id">
+      </el-table-column>
+      <el-table-column prop="state" label="State">
+        <template slot-scope="{ row }">
+          <el-tag>{{ row.state }}</el-tag>
+        </template>
       </el-table-column>
     </el-table>
   </div>
@@ -34,14 +25,14 @@ import { getJobsApi } from '@/http/api'
 import VueJsonPretty from 'vue-json-pretty'
 
 export default {
+  components: {
+    VueJsonPretty
+  },
   data () {
     return {
       jobList: [],
       loading: true
     }
-  },
-  components: {
-    VueJsonPretty
   },
   created () {
     this.loadData()
@@ -55,6 +46,11 @@ export default {
       } catch (error) {
       }
       this.loading = false
+    },
+    onSelectionChanged (newRow) {
+      const table = this.$refs.dataTable
+      table.toggleRowExpansion(newRow)
+      table.setCurrentRow()
     }
   }
 }

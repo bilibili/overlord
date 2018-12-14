@@ -42,6 +42,10 @@ const addCorrelationApi = (clusterName, params) => {
   return http.post(`api/v1/clusters/${clusterName}/appid`, params)
 }
 
+const addAppIdApi = (params) => {
+  return http.post('api/v1/appids', params)
+}
+
 export {
   getClusterListByQueryApi,
   getAppidsApi,
@@ -51,5 +55,6 @@ export {
   patchInstanceWeightApi,
   getJobsApi,
   createClusterApi,
-  addCorrelationApi
+  addCorrelationApi,
+  addAppIdApi
 }

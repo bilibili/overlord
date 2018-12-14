@@ -3,7 +3,7 @@
     <div class="search-panel">
       <div class="search-panel__header">Cluster Search</div>
       <div class="search-panel__input">
-        <el-input v-model="clusterKeyword" placeholder="集群名关键字" size="large" @keyup.native="searchCluster">
+        <el-input v-model="clusterKeyword" placeholder="请输入集群名关键字进行搜索" size="large" @keyup.native="searchCluster">
           <i slot="prefix" class="el-input__icon el-icon-search"></i>
         </el-input>
       </div>
@@ -16,6 +16,9 @@
           <el-table-column prop="cache_type" label="缓存类型">
           </el-table-column>
           <el-table-column prop="max_memory" label="总容量">
+            <template slot-scope="{ row }">
+              {{ row.max_memory }} MB
+            </template>
           </el-table-column>
           <el-table-column prop="number" label="节点数">
           </el-table-column>
@@ -43,6 +46,10 @@ export default {
       clusterList: []
     }
   },
+  created () {
+    this.clusterKeyword = this.$route.query.key
+    this.loadClusterData()
+  },
   methods: {
     searchCluster: throttle(function searchCluster () {
       this.loadClusterData()
@@ -54,7 +61,9 @@ export default {
           name: this.clusterKeyword
         })
         this.clusterList = data.items
-      } catch (error) {
+        this.$router.replace({ name: 'home', query: { key: this.clusterKeyword } })
+      } catch ({ error }) {
+        this.$message.error(error || '获取失败')
       }
     },
     linkToClusterDetail ({ name }) {
