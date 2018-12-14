@@ -189,11 +189,17 @@ func (e *Etcd) WatchOnExpire(ctx context.Context, dir string) (key chan string, 
 
 // WatchOn will watch the given path forever
 func (e *Etcd) WatchOn(ctx context.Context, path string, interestings ...string) (key chan *cli.Node, err error) {
-	fmt.Printf("watch on %v", path)
+	log.Infof("watch on %v", path)
 	evtMap := make(map[string]struct{})
 	for _, interest := range interestings {
-		evtMap[interest] = struct{}{}
+		switch interest {
+		case ActionSet, ActionDelete, ActionUpdate, ActionCreate, ActionCompareAndSwap, ActionCompareAndDelete, ActionExpire:
+			evtMap[interest] = struct{}{}
+		default:
+			log.Infof("bad interest with %s", interest)
+		}
 	}
+
 	var (
 		resp *cli.Response
 	)

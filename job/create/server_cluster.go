@@ -21,6 +21,9 @@ const (
 const (
 	SubStatePending = "pending"
 	SubStateRunning = "running"
+	SubStateDivide = "divide_slots"
+	SubStateSetupIDMap = "setup_idmap"
+	SubStateSetupSlaveOf = "setup_slaveof"
 )
 
 // RedisClusterJob description a job for create new cluster.
@@ -54,6 +57,7 @@ func (c *RedisClusterJob) Create() error {
 func (c *RedisClusterJob) buildTplTree() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	c.e.SetJobState(ctx, c.info.Group, c.info.JobID, StateBuildTplTree)
 
 	var sb strings.Builder
 	err = json.NewEncoder(&sb).Encode(c.info)
@@ -129,6 +133,8 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 }
 
 func (c *RedisClusterJob) divideSlots() {
+	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateDivide)
+
 	per := ClusterSlotsCount / c.info.Number
 	left := ClusterSlotsCount % c.info.Number
 	base := 0
@@ -159,6 +165,7 @@ func (c *RedisClusterJob) divideSlots() {
 }
 
 func (c *RedisClusterJob) setupSlaveOf() {
+	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateSetupSlaveOf)
 	for _, chunk := range c.info.Chunks {
 		for _, node := range chunk.Nodes {
 			id := c.info.IDMap[node.Name][node.Port]
@@ -171,6 +178,7 @@ func (c *RedisClusterJob) setupSlaveOf() {
 }
 
 func (c *RedisClusterJob) setupIDMap() error {
+	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateSetupIDMap)
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
 	hostmap := chunk.GetHostCountInChunks(c.info.Chunks)
 	idMap := make(map[string]map[int]string)

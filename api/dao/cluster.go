@@ -88,12 +88,13 @@ func (d *Dao) getClusterInstances(ctx context.Context, info *create.CacheInfo, s
 				return nil, err
 			}
 			inst.Weight = int(w)
-			state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
-			if err != nil {
-				continue
-			}
-			inst.State = state
 		}
+
+		state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
+		if err != nil {
+			continue
+		}
+		inst.State = state
 		instances = append(instances, inst)
 	}
 	return instances, nil
@@ -131,7 +132,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
-	clusterState, err := d.e.Get(sub, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID))
+	clusterState, err := d.e.Get(sub, fmt.Sprintf("%s/%s/%s/state", etcd.JobDetailDir, info.Group, info.JobID))
 	if err != nil {
 		clusterState = model.StateError
 	}

@@ -12,6 +12,12 @@ import (
 	"text/template"
 )
 
+// define consts
+const (
+	StateSetupInstanceDir = "setup_instance_dir"
+	StateBuildTplTree = "state_build_tpl_tree"
+)
+
 // NewCacheJob will create deploy cache job.
 func NewCacheJob(e *etcd.Etcd, info *CacheInfo) *CacheJob {
 	return &CacheJob{e: e, info: info}
@@ -41,6 +47,7 @@ func (c *CacheJob) saveTplFile(ctx context.Context, path, conf, name string, dat
 func (c *CacheJob) buildTplTree() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	c.e.SetJobState(ctx, c.info.Group, c.info.JobID, StateBuildTplTree)
 
 	var sb strings.Builder
 	err := json.NewEncoder(&sb).Encode(c.info)
@@ -124,6 +131,8 @@ func (c *CacheJob) buildTplTree() error {
 func (c *CacheJob) setupInstanceDir() error {
 	sub, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	c.e.SetJobState(sub, c.info.Group, c.info.JobID, StateSetupInstanceDir)
+
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
 
 	for _, addr := range c.info.Dist.Addrs {

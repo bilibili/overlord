@@ -6,6 +6,7 @@ import (
 	"overlord/api/model"
 	"overlord/job"
 	"overlord/job/balance"
+	"overlord/lib/log"
 	"overlord/proto"
 	"time"
 )
@@ -58,16 +59,17 @@ func (s *Service) jobManager() (err error) {
 			}
 			if done {
 				if jobDetail.CacheType == proto.CacheTypeRedisCluster {
-					balance.Balance(jobDetail.Cluster, s.d.ETCD())
+					err := balance.Balance(jobDetail.Cluster, s.d.ETCD())
+					if err != nil {
+						log.Errorf("error when balance %s", err)
+					}
 				}
 				s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
 				delete(undoneJob, j.ID)
 			}
 		}
-		select {
-		case j := <-newJob:
-			undoneJob[j.ID] = j
-		}
+		j := <-newJob
+		undoneJob[j.ID] = j
 		if len(undoneJob) == 0 {
 			time.Sleep(time.Second * 10)
 		} else {
