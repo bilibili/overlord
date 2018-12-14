@@ -522,6 +522,9 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		}
 		jobChunks = newChunk
 		chunks = append(chunks, newChunk...)
+	case job.OpDestroy:
+		s.destroyCluster(t)
+		return
 	}
 
 	log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
@@ -596,29 +599,8 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		}
 		jobDist = dist
 	case job.OpDestroy:
-		ci, err = s.getInfoFromEtcd(ctx, t.Name)
-		if err != nil {
-			return
-		}
-		for _, d := range ci.Dist.Addrs {
-			var id string
-			id, err = s.db.TaskID(ctx, d.String())
-			if err != nil {
-				return
-			}
-			s.kill(id)
-		}
-		// clear etcd info
-		var nodes []*etcd.Node
-		nodes, err = s.db.LS(ctx, fmt.Sprintf(etcd.ClusterInstancesDir, ci.Name))
-		if err != nil {
-			log.Errorf("get cluster etcd info err %v", err)
-			return
-		}
-		s.db.RMDir(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, ci.Name))
-		for _, node := range nodes {
-			s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
-		}
+		s.destroyCluster(t)
+		return
 	case job.OpScale:
 		var (
 			newDist *chunk.Dist
@@ -709,6 +691,37 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		err = errors.WithStack(err)
 	}
 	return
+}
+func (s *Scheduler) destroyCluster(t job.Job) {
+	var (
+		ctx = context.Background()
+	)
+	ci, err := s.getInfoFromEtcd(ctx, t.Name)
+	if err != nil {
+		log.Errorf("get info fail err %v", err)
+	}
+	if ci != nil {
+		for _, d := range ci.Dist.Addrs {
+			var id string
+			id, err = s.db.TaskID(ctx, d.String())
+			if err != nil {
+				log.Errorf("get task(%s) err %v", d.String(), err)
+				continue
+			}
+			s.kill(id)
+		}
+	}
+	// clear etcd info
+	var nodes []*etcd.Node
+	nodes, err = s.db.LS(ctx, fmt.Sprintf(etcd.ClusterInstancesDir, ci.Name))
+	if err != nil {
+		log.Errorf("get cluster(%s) nodes info err %v", ci.Name, err)
+	}
+	s.db.RMDir(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, ci.Name))
+	for _, node := range nodes {
+		err = s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
+		log.Errorf("rm instance dir (%s) fail", node.Value)
+	}
 }
 func (s *Scheduler) kill(id string) {
 	ids := strings.Split(id, ",")
