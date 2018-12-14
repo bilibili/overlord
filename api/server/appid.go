@@ -13,6 +13,12 @@ func createAppid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err)
 		return
 	}
+
+	if err := p.Validate(); err != nil {
+		eJSON(c, err)
+		return
+	}
+
 	err := svc.CreateAppid(p.Appid)
 	if err != nil {
 		eJSON(c, err)

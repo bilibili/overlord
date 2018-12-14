@@ -25,7 +25,7 @@ func (pc *ParamCluster) Validate() error {
 	// check appids
 	for _, appid := range pc.Appids {
 		if !strings.Contains(appid, ".") {
-			return fmt.Errorf("error: appid must contains period(.)")
+			return fmt.Errorf("error: appid %s must contains period(.)", appid)
 		}
 	}
 	return nil
@@ -61,6 +61,14 @@ type ParamAppid = ParamAssign
 // ParamAssign is the model used for server.assgnAppid and server.unassignAppid
 type ParamAssign struct {
 	Appid string `json:"appid" validate:"required"`
+}
+
+// Validate check the param is ok
+func (p *ParamAssign) Validate() error {
+	if !strings.Contains(p.Appid, ".") {
+		return fmt.Errorf("error: appid %s must contains period(.)", p.Appid)
+	}
+	return nil
 }
 
 // ParamScaleWeight change the weight of cluster
