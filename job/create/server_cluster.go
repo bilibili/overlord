@@ -72,6 +72,10 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 	for _, cc := range c.info.Chunks {
 		for _, node := range cc.Nodes {
 			instanceDir := fmt.Sprintf(etcd.InstanceDir, node.Name, node.Port)
+			err = cleanEtcdDirtyDir(ctx, c.e, instanceDir)
+			if err != nil {
+				log.Errorf("error clean dirty etcd dir %s", err)
+			}
 
 			err = c.e.Mkdir(ctx, instanceDir)
 			if err != nil {
@@ -180,6 +184,10 @@ func (c *RedisClusterJob) setupSlaveOf() {
 func (c *RedisClusterJob) setupIDMap() error {
 	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateSetupIDMap)
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
+	err := c.e.RMDir(context.Background(), path)
+	if err != nil {
+		log.Errorf("error clean previous data fail %s", err)
+	}
 	hostmap := chunk.GetHostCountInChunks(c.info.Chunks)
 	idMap := make(map[string]map[int]string)
 	for node, ports := range hostmap {
