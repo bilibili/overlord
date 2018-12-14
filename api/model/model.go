@@ -12,7 +12,7 @@ type ParamCluster struct {
 	Spec        string   `json:"spec" validate:"required"`
 	Version     string   `json:"version" validate:"required"`
 	CacheType   string   `json:"cache_type" validate:"required"`
-	TotalMemory int      `json:"total_memory" validate:"required"`
+	TotalMemory float64  `json:"total_memory" validate:"required"`
 	Group       string   `json:"group" validate:"required"`
 
 	Number     int     `json:"-"`
