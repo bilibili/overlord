@@ -205,7 +205,6 @@ export default {
     },
     async saveInstanceWeight (item) {
       const { weightInfo, ip, port } = item
-      console.log(item)
       try {
         await patchInstanceWeightApi(this.clusterData.name, `${ip}:${port}`, {
           weight: Number(weightInfo.value)
