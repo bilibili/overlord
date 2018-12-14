@@ -5,6 +5,11 @@ import (
 	"overlord/api/model"
 )
 
+// CreateAppid create new appid
+func (s *Service) CreateAppid(appid string) error {
+	return s.d.CreateAppid(context.Background(), appid)
+}
+
 // GetPlainAppid will get appid by plain format
 func (s *Service) GetPlainAppid() ([]string, error) {
 	return s.d.GetPlainAppid(context.Background())

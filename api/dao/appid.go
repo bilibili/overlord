@@ -12,6 +12,14 @@ import (
 	"go.etcd.io/etcd/client"
 )
 
+// CreateAppid create new appid
+func (d *Dao) CreateAppid(ctx context.Context, appid string) error {
+	sub, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	return d.e.Mkdir(sub, fmt.Sprintf("%s/%s", etcd.AppidsDir, appid))
+}
+
 // GetPlainAppid will get all plain text appid list
 func (d *Dao) GetPlainAppid(ctx context.Context) ([]string, error) {
 	nodes, err := d.e.LS(ctx, etcd.AppidsDir)

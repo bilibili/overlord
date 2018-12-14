@@ -55,6 +55,9 @@ type ParamFilterCluster struct {
 	Appid string `json:"appid"`
 }
 
+// ParamAppid is the alias of appid for create
+type ParamAppid = ParamAssign
+
 // ParamAssign is the model used for server.assgnAppid and server.unassignAppid
 type ParamAssign struct {
 	Appid string `json:"appid" validate:"required"`
