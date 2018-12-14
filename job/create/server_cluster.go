@@ -72,7 +72,7 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 	for _, cc := range c.info.Chunks {
 		for _, node := range cc.Nodes {
 			instanceDir := fmt.Sprintf(etcd.InstanceDir, node.Name, node.Port)
-			err = cleanEtcdDirtyDir(ctx, c.e, instanceDir)
+			err = cleanEtcdDirtyDir(ctx, c.e, fmt.Sprintf("%s:%d", node.Name, node.Port))
 			if err != nil {
 				log.Errorf("error clean dirty etcd dir %s", err)
 			}

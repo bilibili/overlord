@@ -62,7 +62,7 @@ func (c *CacheJob) buildTplTree() error {
 
 	for _, addr := range c.info.Dist.Addrs {
 		instanceDir := fmt.Sprintf(etcd.InstanceDir, addr.IP, addr.Port)
-		err = cleanEtcdDirtyDir(ctx, c.e, instanceDir)
+		err = cleanEtcdDirtyDir(ctx, c.e, fmt.Sprintf("%s:%s", addr.IP, addr.Port))
 		if err != nil {
 			log.Errorf("error clean dirty etcd dir %s", err)
 		}
