@@ -5,8 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"overlord/lib/log"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -19,6 +19,7 @@ func main() {
 	flag.StringVar(&cmd, "cmd", "", "cli cmd")
 	flag.StringVar(&name, "name", "", "cluster name")
 	flag.Parse()
+	log.Init(nil)
 	switch {
 	case cmd == "create":
 		createCluster(defCreate)
@@ -96,6 +97,6 @@ func newReq(method, url, body string) (err error) {
 	}
 	defer resp.Body.Close()
 	bs, err := ioutil.ReadAll(resp.Body)
-	log.Printf("bs %v err %v\n", string(bs), err)
+	log.Infof("bs %v err %v\n", string(bs), err)
 	return
 }

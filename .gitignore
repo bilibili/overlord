@@ -19,4 +19,5 @@ cmd/executor/executor
 cmd/apiserver/apiserver
 cmd/scheduler/scheduler
 cmd/balancer/balancer
+cmd/apicli/apicli
 coverage.txt

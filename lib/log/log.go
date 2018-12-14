@@ -57,17 +57,25 @@ var (
 // Init log.
 func Init(c *Config) (b bool) {
 	var hs []Handler
-	if logStd {
-		hs = append(hs, NewStdHandler())
-		b = true
+
+	if c == nil {
+		c = &Config{}
 	}
-	if c != nil {
-		if c.Debug && !logStd {
-			hs = append(hs, NewStdHandler())
-		}
-		if c.Log != "" {
-			hs = append(hs, NewFileHandler(c.Log))
-		}
+	if logFile != "" {
+		c.Log = logFile
+	}
+	if logVl != 0 {
+		c.LogVL = logVl
+	}
+	c.Stdout = logStd
+	c.Debug = debug
+	if c.Debug || c.Stdout {
+		hs = append(hs, NewStdHandler())
+	}
+	if c.Log != "" {
+		hs = append(hs, NewFileHandler(c.Log))
+	}
+	if c.LogVL != 0 {
 		DefaultVerboseLevel = c.LogVL
 	}
 	if len(hs) > 0 {
