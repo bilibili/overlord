@@ -19,7 +19,7 @@ func createAppid(c *gin.Context) {
 		return
 	}
 
-	return done(c)
+	done(c)
 }
 
 func getAppids(c *gin.Context) {
