@@ -6,6 +6,7 @@ import (
 	"overlord/api/model"
 	"overlord/lib/etcd"
 	"path/filepath"
+
 	"strings"
 
 	"go.etcd.io/etcd/client"
@@ -17,10 +18,12 @@ func (d *Dao) GetPlainAppid(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	appids := make([]string, len(nodes))
-	for i, node := range nodes {
+	appids := make([]string, 0)
+	for _, node := range nodes {
 		_, appid := filepath.Split(node.Key)
-		appids[i] = appid
+		if strings.Contains(appid, ".") {
+			appids = append(appids, appid)
+		}
 	}
 	return appids, nil
 }
@@ -34,7 +37,9 @@ func (d *Dao) GetTreeAppid(ctx context.Context) ([]*model.TreeAppid, error) {
 	appids := make([]string, len(nodes))
 	for i, node := range nodes {
 		_, appid := filepath.Split(node.Key)
-		appids[i] = appid
+		if strings.Contains(appid, ".") {
+			appids[i] = appid
+		}
 	}
 
 	return model.BuildTreeAppids(appids), nil

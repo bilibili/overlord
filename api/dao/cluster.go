@@ -183,7 +183,9 @@ func (d *Dao) GetClusters(ctx context.Context, name string) (clusters []*model.C
 			continue
 		}
 		cluster, err = d.GetCluster(ctx, cname)
-		if err != nil {
+		if client.IsKeyNotFound(err) {
+			err = nil
+		} else if err != nil {
 			log.Error("GetClusters.GetCluster err %s", err)
 			continue
 		}

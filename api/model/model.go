@@ -1,5 +1,10 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+)
+
 // ParamCluster is be used to create new or modify cluster
 type ParamCluster struct {
 	Name        string   `json:"name" validate:"required"`
@@ -13,6 +18,17 @@ type ParamCluster struct {
 	Number     int     `json:"-"`
 	SpecCPU    float64 `json:"-"`
 	SpecMemory float64 `json:"-"`
+}
+
+// Validate will check if the cluster param is right enough.
+func (pc *ParamCluster) Validate() error {
+	// check appids
+	for _, appid := range pc.Appids {
+		if !strings.Contains(appid, ".") {
+			return fmt.Errorf("error: appid must contains period(.)")
+		}
+	}
+	return nil
 }
 
 // ParamScale parase from data to used to scale cluster
@@ -41,7 +57,7 @@ type ParamFilterCluster struct {
 
 // ParamAssign is the model used for server.assgnAppid and server.unassignAppid
 type ParamAssign struct {
-	Appid       string `json:"appid" validate:"required"`
+	Appid string `json:"appid" validate:"required"`
 }
 
 // ParamScaleWeight change the weight of cluster
