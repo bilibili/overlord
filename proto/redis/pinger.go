@@ -12,6 +12,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	pingBufferSize = 128
+)
+
 // errors
 var (
 	ErrPingClosed = errs.New("ping interface has been closed")
@@ -36,7 +40,7 @@ type pinger struct {
 func NewPinger(conn *libnet.Conn) proto.Pinger {
 	return &pinger{
 		conn:  conn,
-		br:    bufio.NewReader(conn, bufio.NewBuffer(7)),
+		br:    bufio.NewReader(conn, bufio.NewBuffer(pingBufferSize)),
 		bw:    bufio.NewWriter(conn),
 		state: opened,
 	}

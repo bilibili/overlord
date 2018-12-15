@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	pingBufferSize = 8
+	pingBufferSize = 128
 )
 
 var (
@@ -32,8 +32,8 @@ type mcPinger struct {
 func NewPinger(nc *libnet.Conn) proto.Pinger {
 	return &mcPinger{
 		conn: nc,
-		bw:   bufio.NewWriter(nc),
 		br:   bufio.NewReader(nc, bufio.NewBuffer(pingBufferSize)),
+		bw:   bufio.NewWriter(nc),
 	}
 }
 
