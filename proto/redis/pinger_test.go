@@ -3,8 +3,6 @@ package redis
 import (
 	"testing"
 
-	"overlord/lib/bufio"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +27,7 @@ func TestPingerWrongResp(t *testing.T) {
 	conn := _createConn([]byte("-Error: iam more than 7 bytes\r\n"))
 	p := NewPinger(conn)
 	err := p.Ping()
-	assert.Equal(t, bufio.ErrBufferFull, errors.Cause(err))
+	assert.Equal(t, ErrBadPong, errors.Cause(err))
 
 	conn = _createConn([]byte("-Err\r\n"))
 	p = NewPinger(conn)
