@@ -255,6 +255,9 @@ func parseSlots(Data []byte) ([]string, error) {
 	lines := strings.Split(dataStr, "\n")
 	slots := make([]string, 16384)
 
+	if len(lines) < 3 {
+		return nil, ErrNoNode
+	}
 	for _, line := range lines {
 		if strings.Contains(line, chunk.RoleSlave) {
 			continue

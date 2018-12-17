@@ -157,7 +157,9 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 		}
 
 		consistent, err = b.client.IsConsistent()
-		if err != nil {
+		if err == myredis.ErrNoNode {
+			return err
+		} else if err != nil {
 			log.Errorf("fail to check consistent due to %s", err)
 			continue
 		}
