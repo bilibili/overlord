@@ -7,7 +7,7 @@ const TYPE_OPTIONS = [{
   value: 'redis'
 }, {
   name: 'Memcache',
-  value: 'memcached'
+  value: 'memcache'
 }]
 
 // 集群型号

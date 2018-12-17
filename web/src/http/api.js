@@ -16,18 +16,22 @@ const getJobsApi = params => {
   return http.get('api/v1/jobs')
 }
 
+const getVersionsApi = params => {
+  return http.get('api/v1/versions')
+}
+
 const getAppidDetailApi = params => {
   return http.get(`api/v1/appids/${params}`)
+}
+
+const getClusterDetailApi = params => {
+  return http.get(`api/v1/clusters/${params}`)
 }
 
 const removeCorrelationApi = (clusterName, params) => {
   return http.delete(`api/v1/clusters/${clusterName}/appid`, {
     data: params
   })
-}
-
-const getClusterDetailApi = params => {
-  return http.get(`api/v1/clusters/${params}`)
 }
 
 const patchInstanceWeightApi = (clusterName, addr, params) => {
@@ -49,11 +53,12 @@ const addAppIdApi = (params) => {
 export {
   getClusterListByQueryApi,
   getAppidsApi,
-  getAppidDetailApi,
-  removeCorrelationApi,
-  getClusterDetailApi,
-  patchInstanceWeightApi,
   getJobsApi,
+  getVersionsApi,
+  getAppidDetailApi,
+  getClusterDetailApi,
+  removeCorrelationApi,
+  patchInstanceWeightApi,
   createClusterApi,
   addCorrelationApi,
   addAppIdApi

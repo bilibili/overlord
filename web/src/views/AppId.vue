@@ -19,7 +19,7 @@
           :filter-node-method="filterNode"
           ref="appidTree">
         </el-tree>
-        <el-button type="text" @click="addIdDialogVisible = true">添加 AppId</el-button>
+        <el-button size="mini" type="text" plain @click="addIdDialogVisible = true">添加 AppId</el-button>
 
       </div>
       <div class="appid-info" v-loading="clusterLoading">
@@ -29,7 +29,7 @@
         </div>
         <div class="appid-group" v-for="(groupItem, index) in groupedClusters" :key="index">
           <div class="appid-group__title">{{ GROUP_MAP[groupItem.group] }}</div>
-          <el-table :data="groupItem.clusters" border>
+          <el-table :data="groupItem.clusters" border max-height="500">
             <el-table-column prop="name" label="集群名称" min-width="100">
             </el-table-column>
             <el-table-column prop="cache_type" label="缓存类型">
@@ -104,7 +104,6 @@
 
 <script>
 import GROUP_MAP from '@/constants/GROUP'
-
 import { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, addCorrelationApi, addAppIdApi } from '@/http/api'
 import { throttle } from 'lodash'
 export default {
@@ -283,6 +282,10 @@ $hint-text-color: #909399;
 
   .el-tree {
     margin: 10px 0;
+  }
+
+  .el-button {
+    width: 100%;
   }
 }
 

@@ -11,21 +11,20 @@
         <el-form-item label="总容量" prop="total_memory" required>
           <el-input v-model="clusterForm.total_memory" type="number">
             <template slot="append">
-              G
-              <!-- <el-select v-model="value" placeholder="请选择">
+              <el-select v-model="memoryUnit" placeholder="请选择">
                 <el-option
-                  v-for="item in options"
+                  v-for="item in memoryUnitOptions"
                   :key="item"
                   :label="item"
                   :value="item">
                 </el-option>
-              </el-select> -->
+              </el-select>
             </template>
           </el-input>
         </el-form-item>
 
         <el-form-item label="类型" required>
-          <el-radio-group v-model="clusterForm.cache_type">
+          <el-radio-group v-model="clusterForm.cache_type" @change="typeChange">
             <el-radio :label="item.value" v-for="(item, index) in typeOptions" :key="index">{{ item.name }}</el-radio>
           </el-radio-group>
           <el-tooltip class="item" effect="light" placement="bottom-start">
@@ -43,6 +42,12 @@
             </div>
             <i class="el-icon-info type-icon"></i>
           </el-tooltip>
+        </el-form-item>
+
+        <el-form-item label="版本" required>
+          <el-radio-group v-model="clusterForm.version">
+            <el-radio :label="item" v-for="(item, index) in versionOptions" :key="index">{{ item }}</el-radio>
+          </el-radio-group>
         </el-form-item>
 
         <el-form-item label="型号" required>
@@ -75,6 +80,7 @@
             </el-option>
           </el-select>
         </el-form-item>
+
         <el-form-item label="APPID" prop="appids">
           <el-select v-model="clusterForm.appids" class="appid-select" multiple filterable placeholder="请选择需要关联 APPID">
             <el-option
@@ -85,6 +91,7 @@
             </el-option>
           </el-select>
         </el-form-item>
+
         <el-form-item class="footer-item">
           <el-button type="primary" @click="submitForm('clusterForm')" :disabled="submitDisabled">立即创建</el-button>
         </el-form-item>
@@ -95,7 +102,7 @@
 </template>
 
 <script>
-import { createClusterApi, getAppidsApi } from '@/http/api'
+import { getVersionsApi, createClusterApi, getAppidsApi } from '@/http/api'
 import { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS } from '@/constants/CREATE_TYPES'
 
 export default {
@@ -128,8 +135,8 @@ export default {
       callback()
     }
     return {
-      value: 'G',
-      options: ['G', 'M'],
+      memoryUnit: 'G',
+      memoryUnitOptions: ['G', 'M'],
       rules: {
         name: [{
           validator: checkName,
@@ -155,12 +162,15 @@ export default {
         cache_type: 'redis_cluster',
         spec: '0.25c2g',
         total_memory: null,
+        version: null,
         group: 'sh001',
         appids: []
       },
       typeOptions: TYPE_OPTIONS,
       specOptions: SPEC_OPTIONS,
       groupOptions: GROUP_OPTIONS,
+      allVersionOptions: [],
+      versionOptions: [],
       specCustomForm: {
         core: null,
         memory: null
@@ -171,6 +181,7 @@ export default {
   },
   created () {
     this.getAppids()
+    this.getVersions()
   },
   methods: {
     async getAppids () {
@@ -183,6 +194,22 @@ export default {
         this.$message.error('AppId 列表获取失败')
       }
     },
+    typeChange () {
+      this.clusterForm.version = null
+      this.versionOptions = []
+      this.versionOptions = this.allVersionOptions.find(item => item.cache_type === this.clusterForm.cache_type).versions
+      this.clusterForm.version = this.versionOptions[0]
+    },
+    async getVersions () {
+      try {
+        const { data } = await getVersionsApi()
+        this.allVersionOptions = data.items
+        this.versionOptions = this.allVersionOptions.find(item => item.cache_type === this.clusterForm.cache_type).versions
+        this.clusterForm.version = this.versionOptions[0]
+      } catch (error) {
+        this.$message.error('版本列表获取失败')
+      }
+    },
     submitForm (formName) {
       this.$refs[formName].validate((valid) => {
         if (valid) {
@@ -193,7 +220,7 @@ export default {
       })
     },
     async onSubmit () {
-      this.clusterForm.total_memory = Number(this.clusterForm.total_memory) * 1024
+      this.clusterForm.total_memory = this.memoryUnit === 'G' ? Number(this.clusterForm.total_memory) * 1024 : Number(this.clusterForm.total_memory)
       if (this.clusterForm.spec === 'custom') {
         this.clusterForm.spec = `${this.specCustomForm.core}c${this.specCustomForm.memory}g`
       }
@@ -228,6 +255,7 @@ $green: #67C23A;
   margin-top: 20px;
   background: #fff;
   border-radius: 5px;
+
   .el-form {
     max-width: 600px;
   }
@@ -238,12 +266,15 @@ $green: #67C23A;
     color: $green;
     font-size: 18px;
   }
+
   h6 {
     margin: 8px 0 5px 0;
   }
+
   p {
     margin: 3px 0;
   }
+
   .emphasis-text {
     color: #000;
   }
@@ -253,15 +284,18 @@ $green: #67C23A;
   margin: 2px 10px;
 }
 
-.appid-select, .group-select {
+.appid-select,
+.group-select {
   width: 100%;
 }
 
 .custom-spec {
   display: flex;
+
   .el-input {
     width: 150px;
     margin-right: 5px;
+
     .el-input-group__append {
       padding: 0 5px;
     }
@@ -272,5 +306,13 @@ $green: #67C23A;
   margin-top: 50px;
   display: flex;
   justify-content: flex-end;
+}
+</style>
+
+<style lang="scss">
+.create-page {
+  .el-input-group__append {
+    width: 60px;
+  }
 }
 </style>

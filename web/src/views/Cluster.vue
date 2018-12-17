@@ -178,6 +178,7 @@ export default {
   },
   methods: {
     async getClusterData () {
+      if (!this.$route.params.name) return
       this.loading = true
       try {
         const { data } = await getClusterDetailApi(this.$route.params.name)

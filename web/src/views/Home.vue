@@ -24,7 +24,7 @@
           </el-table-column>
           <el-table-column label="详情" width="150">>
             <template slot-scope="{ row }">
-              <el-button type="text" @click="linkToMoni(row)">监控</el-button>
+              <el-button v-if="row.monitor" type="text" @click="linkToMoni(row)">监控</el-button>
               <el-button type="text" @click="linkToClusterDetail(row)">集群详情</el-button>
             </template>
           </el-table-column>
