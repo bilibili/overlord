@@ -41,6 +41,7 @@ func (s *Service) jobManager() (err error) {
 	log.Infof("[jobManager] recovery jobs for %v", undoneJob)
 	newJob := s.d.WatchJob(ctx)
 	for {
+		removed := make([]string, 0)
 		for _, j := range undoneJob {
 			var jobDetail job.Job
 			err = json.Unmarshal([]byte(j.Param), &jobDetail)
@@ -62,19 +63,30 @@ func (s *Service) jobManager() (err error) {
 			}
 			if done {
 				if jobDetail.CacheType == proto.CacheTypeRedisCluster {
-					log.Infof("start balance tracing job %v", *j)
-					err := balance.Balance(jobDetail.Cluster, s.d.ETCD())
-					if err != nil {
-						log.Errorf("[jobManager.Balance]error when balance %s", err)
-					} else {
-						log.Infof("balance success tracing job %v", *j)
-					}
+					go func(cluster, jid string) {
+						log.Infof("start balance tracing job %v", *j)
+						err := balance.Balance(cluster, s.d.ETCD())
+						if err != nil {
+							log.Errorf("[jobManager.Balance]error when balance %s", err)
+						} else {
+							s.d.SetJobState(ctx, cluster, jid, job.StateDone)
+							log.Infof("balance success tracing job %v", *j)
+						}
+					} (jobDetail.Cluster, jobDetail.ID)
+
+					removed = append(removed, j.ID)
+					continue
 				}
 				s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
 				log.Infof("[jobManager] job finish done")
-				delete(undoneJob, j.ID)
+				removed = append(removed, j.ID)
 			}
 		}
+
+		for _, jid := range removed{
+			delete(undoneJob, jid)
+		}
+
 		j := <-newJob
 		log.Infof("[jobManager] receive new job %v", *j)
 		undoneJob[j.ID] = j
