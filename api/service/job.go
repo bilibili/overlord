@@ -75,11 +75,11 @@ func (s *Service) jobManager() (err error) {
 					} (jobDetail.Cluster, jobDetail.ID)
 
 					removed = append(removed, j.ID)
-					continue
+				}else {
+					s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
+					log.Infof("[jobManager] job %v finish done", *j)
+					removed = append(removed, j.ID)
 				}
-				s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
-				log.Infof("[jobManager] job finish done")
-				removed = append(removed, j.ID)
 			}
 		}
 
