@@ -170,6 +170,7 @@ func (c *Client) TryBalance() error {
 			}
 		}
 	}
+	log.Infof("succeed balanced executed to %v", c.chunks)
 	return nil
 }
 

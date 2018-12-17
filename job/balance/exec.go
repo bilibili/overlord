@@ -199,6 +199,7 @@ func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 			log.Errorf("try execute balanced command fail to %s due to %s", b.info.Cluster, err)
 			continue
 		}
+		log.Infof("succeed execute TryBalance for %s", b.info.Cluster)
 	}
 }
 
@@ -257,6 +258,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 
 		return
 	}
+	log.Infof("success executed balance really for %s", b.info.Cluster)
 
 	if isTrace {
 		err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobBalanced)
