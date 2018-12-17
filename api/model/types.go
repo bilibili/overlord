@@ -49,6 +49,7 @@ type Instance struct {
 	Weight int    `json:"weight"`
 	Alias  string `json:"alias"`
 	State  string `json:"state"`
+	Role   string `json:"role"`
 }
 
 // Appid is the struct conttains many cluster name

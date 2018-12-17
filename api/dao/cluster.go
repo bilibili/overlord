@@ -88,6 +88,12 @@ func (d *Dao) getClusterInstances(ctx context.Context, info *create.CacheInfo, s
 				return nil, err
 			}
 			inst.Weight = int(w)
+		} else {
+			role, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/role", etcd.InstanceDirPrefix, node.Value))
+			if err != nil && !client.IsKeyNotFound(err) {
+				return nil, err
+			}
+			inst.Role = role
 		}
 
 		state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
