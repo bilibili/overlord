@@ -259,6 +259,10 @@ func parseSlots(Data []byte) ([]string, error) {
 	}
 
 	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+
 		if strings.Contains(line, chunk.RoleSlave) {
 			continue
 		}
