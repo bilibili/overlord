@@ -32,8 +32,8 @@ func (d *Dao) GetJob(ctx context.Context, jobID string) (*model.Job, error) {
 func (d *Dao) SetJobState(ctx context.Context, group, jobID, state string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	err := d.e.SetJobState(ctx, group, jobID, state)
-	log.Errorf("fail to set job state to %s.%s as %s due to %s", group, jobID, state, err)
+	log.Infof("set job state to %s.%s as %s", group, jobID, state)
+	d.e.SetJobState(ctx, group, jobID, state)
 }
 
 // GetJobs will get all jobs from etcd
