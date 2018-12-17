@@ -15,7 +15,7 @@ import (
 // define consts
 const (
 	StateSetupInstanceDir = "setup_instance_dir"
-	StateBuildTplTree = "state_build_tpl_tree"
+	StateBuildTplTree     = "state_build_tpl_tree"
 )
 
 // NewCacheJob will create deploy cache job.
@@ -62,6 +62,10 @@ func (c *CacheJob) buildTplTree() error {
 
 	for _, addr := range c.info.Dist.Addrs {
 		instanceDir := fmt.Sprintf(etcd.InstanceDir, addr.IP, addr.Port)
+		err = cleanEtcdDirtyDir(ctx, c.e, fmt.Sprintf("%s:%s", addr.IP, addr.Port))
+		if err != nil {
+			log.Errorf("error clean dirty etcd dir %s", err)
+		}
 
 		err = c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), string(c.info.CacheType))
 		if err != nil {
@@ -135,8 +139,14 @@ func (c *CacheJob) setupInstanceDir() error {
 
 	path := fmt.Sprintf(etcd.ClusterInstancesDir, c.info.Name)
 
+	err := c.e.RMDir(sub, path)
+	if err != nil {
+		log.Errorf("error clean dirty etcd dir %s", err)
+	}
+
 	for _, addr := range c.info.Dist.Addrs {
 		host := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
+
 		// if addr already had id,update value.
 		if addr.ID != "" {
 			c.e.Set(sub, path+addr.ID, host)

@@ -3,13 +3,31 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"overlord/api/model"
 
 	"github.com/gin-gonic/gin"
+	"go.etcd.io/etcd/client"
 )
 
 // eJSON will report error json into body
 func eJSON(c *gin.Context, err error) {
-	c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": fmt.Sprintf("%v", err)})
+	merr := map[string]interface{}{"error": fmt.Sprintf("%v", err)}
+
+	if client.IsKeyNotFound(err) {
+		c.JSON(http.StatusNotFound, err)
+		return
+	}
+
+	if err == model.ErrNotFound {
+		c.JSON(http.StatusNotFound, merr)
+		return
+	}
+	if err == model.ErrConflict {
+		c.JSON(http.StatusConflict, merr)
+		return
+	}
+
+	c.JSON(http.StatusInternalServerError, merr)
 }
 
 type list struct {

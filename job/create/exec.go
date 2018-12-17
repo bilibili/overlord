@@ -135,6 +135,7 @@ func renderTplTree(tplTree map[string]string) (err error) {
 		if err != nil {
 			return
 		}
+
 		err = dir.MkDirAll(basename)
 		if err != nil {
 			return
@@ -330,9 +331,19 @@ func buildServiceName(cacheType proto.CacheType, version string, port int) strin
 // 	return tpl.Execute(fd, map[string]string{"Version": info.Version})
 // }
 
+
+func cleanDirtyDir(port int) error {
+	return os.RemoveAll(fmt.Sprintf(_workDir, port))
+}
+
 // SetupCacheService will create new cache service
 func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
-
+	// 0 . clean dir before
+	err = cleanDirtyDir(info.Port)
+	if err != nil {
+		log.Warnf("error when clean dirty dir /data/%d", info.Port)
+		return
+	}
 	// 1. render template tree into the path
 	//   1.1 foreach fpath, content in TplTree
 	//   1.2 mkdir for fpath's basedir.
