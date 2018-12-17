@@ -48,7 +48,7 @@ func (s *Service) jobManager() (err error) {
 				log.Warnf("[jobManager] fail to decode job.Job due to %v", err)
 				continue
 			}
-			cluster, err := s.d.GetCluster(ctx, jobDetail.Group)
+			cluster, err := s.d.GetCluster(ctx, jobDetail.Name)
 			if err != nil {
 				log.Warnf("[jobManager] fail to fetch cluster info due to %v", err)
 				continue
