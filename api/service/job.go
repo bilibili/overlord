@@ -67,10 +67,10 @@ func (s *Service) jobManager() (err error) {
 						log.Infof("start balance tracing job %v", *j)
 						err := balance.Balance(cluster, s.d.ETCD())
 						if err != nil {
-							log.Errorf("[jobManager.Balance]error when balance %s", err)
+							log.Errorf("[jobManager.Balance]error when balance %s due to %s", cluster, err)
 						} else {
 							s.d.SetJobState(ctx, group, jid, job.StateDone)
-							log.Infof("balance success tracing job %v", *j)
+							log.Infof("balance success tracing cluster %s jid %s.%s", cluster, group, jid)
 						}
 					}(jobDetail.Name, jobDetail.Group, jobDetail.ID)
 

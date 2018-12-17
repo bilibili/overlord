@@ -6,6 +6,7 @@ import (
 	"overlord/api/model"
 	"overlord/job"
 	"overlord/lib/etcd"
+	"overlord/lib/log"
 	"path/filepath"
 	"strings"
 )
@@ -32,9 +33,7 @@ func (d *Dao) SetJobState(ctx context.Context, group, jobID, state string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	err := d.e.SetJobState(ctx, group, jobID, state)
-	if err != nil {
-		panic(err)
-	}
+	log.Errorf("fail to set job state to %s.%s as %s due to %s", group, jobID, state, err)
 }
 
 // GetJobs will get all jobs from etcd
