@@ -227,13 +227,17 @@ func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, er
 	)
 
 	appids, err = d.e.LS(sub, fmt.Sprintf("%s/%s/appids", etcd.ClusterDir, cname))
-	if err != nil {
+	if client.IsKeyNotFound(err) {
+		err = nil
+	}else if err != nil {
 		return
 	}
+
 	if len(appids) > 0 {
 		err = ErrClusterAssigned
 		return
 	}
+
 	j := d.createDestroyClusterJob(ctx, cname)
 	jobid, err = d.saveJob(ctx, j)
 	return

@@ -31,8 +31,9 @@ func initRouter(ge *gin.Engine) {
 	clusters.POST("/", createCluster)
 	clusters.GET("/", getClusters)
 
-	clusters.GET("/:cluster_name", getCluster)
 	clusters.DELETE("/:cluster_name", removeCluster)
+	clusters.GET("/:cluster_name", getCluster)
+
 	clusters.PATCH("/:cluster_name/instances/:instance_addr",  changeInstanceWeight)
 	clusters.PATCH("/:cluster_name/instances", scaleCluster)
 	// TODO: impl it
