@@ -77,7 +77,7 @@ func (d *Dao) ApproveJob(ctx context.Context, jobID string) error {
 
 // WatchJob watch on
 func (d *Dao) WatchJob(ctx context.Context) (j chan *model.Job) {
-	key, _ := d.e.WatchOn(ctx, etcd.JobsDir)
+	key, _ := d.e.WatchOn(ctx, etcd.JobsDir, etcd.ActionSet, etcd.ActionCreate)
 	j = make(chan *model.Job)
 	go func() {
 		node := <-key

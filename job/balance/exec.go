@@ -212,7 +212,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 		// should not report status of job
 		log.Info("skip report job by unset TraceJobID")
 	} else {
-		log.Infof("trying to balanced the cluster %s with trace job %s in balancer", b.info.Cluster, b.info.TraceJobID)
+		log.Infof("trying to balance the cluster %s with trace job %s in balancer", b.info.Cluster, b.info.TraceJobID)
 	}
 
 	if isTrace {
@@ -221,6 +221,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 			return
 		}
 	}
+
 	err = b.waitForConsistent(sub)
 	if err != nil {
 		return

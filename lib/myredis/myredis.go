@@ -241,7 +241,7 @@ func (n *node) Close() error {
 }
 
 func (n *node) execute(command string) (*Command, error) {
-	if n.err == nil {
+	if n.err != nil {
 		return nil, n.err
 	}
 
