@@ -85,12 +85,23 @@
               min-width="80">
             </el-table-column>
             <el-table-column
+              v-if="clusterData.cache_type === 'redis_cluster'"
+              prop="role"
+              label="角色"
+              min-width="80">
+              <template slot-scope="{ row }">
+                <el-tag :type="row.role === 'master' ? 'warning' : 'info'">{{ row.role }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-if="clusterData.cache_type !== 'redis_cluster'"
               label="别名">
               <template slot-scope="{ row }">
                 {{ row.alias || '--' }}
               </template>
             </el-table-column>
             <el-table-column
+              v-if="clusterData.cache_type !== 'redis_cluster'"
               label="权重"
               width="150">
               <template slot-scope="{ row }">
@@ -132,6 +143,7 @@
         <span class="cluster-header__title">集群操作（前方高能!!!）</span>
       </div>
       <div class="cluster-danger">
+        <!-- TODO(feature): 二期开放 -->
         <!-- <div class="cluster-danger__item">
           <p>扩容：我不管我就是要扩容我的集群我不管你必须得让我扩容 </p>
           <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-rank">扩容</el-button>
@@ -196,7 +208,6 @@ export default {
   },
   methods: {
     async getClusterData () {
-      console.log(this.$route.params.name)
       if (!this.$route.params.name) return
       this.loading = true
       try {
@@ -208,14 +219,14 @@ export default {
             type: 'view'
           })
         })
-        console.log('111', this.clusterData.state)
 
         if (this.clusterData.state === 'waiting') {
           this.timer = setTimeout(() => {
             this.getClusterData()
           }, 5000)
         }
-      } catch (error) {
+      } catch ({ error }) {
+        this.$message.error(`获取失败：${error}`)
       }
       this.loading = false
     },
@@ -234,8 +245,8 @@ export default {
         item.weightInfo.type = 'view'
         this.$message.success('修改成功')
         this.getClusterData()
-      } catch (error) {
-        this.$message.error('errors')
+      } catch ({ error }) {
+        this.$message.error(error)
       }
     },
     async confirmDeleteCluster () {

@@ -18,6 +18,7 @@ export default {
   align-items: center;
   flex-direction: row-reverse;
   flex-shrink: 0;
+
   &__user {
     font-size: 15px;
   }

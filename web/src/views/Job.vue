@@ -11,7 +11,11 @@
       </el-table-column>
       <el-table-column prop="id" label="Id">
       </el-table-column>
-      <el-table-column prop="state" label="State">
+      <el-table-column prop="state"
+        label="State"
+        :filters="stateFilters"
+        :filter-method="filterTag"
+        filter-placement="bottom-end">
         <template slot-scope="{ row }">
           <el-tag>{{ row.state }}</el-tag>
         </template>
@@ -31,6 +35,7 @@ export default {
   data () {
     return {
       jobList: [],
+      stateFilters: [],
       loading: true
     }
   },
@@ -38,12 +43,23 @@ export default {
     this.loadData()
   },
   methods: {
+
+    filterTag (value, row) {
+      return row.state === value
+    },
     async loadData () {
       this.loading = true
       try {
         const { data } = await getJobsApi()
         this.jobList = data.items
-      } catch (error) {
+        this.stateFilters = this.jobList.map(job => job.state)
+          .filter((item, index, arr) => arr.indexOf(item) === index)
+          .map(state => ({
+            text: state,
+            value: state
+          }))
+      } catch ({ error }) {
+        this.$message.error(`获取失败：${error}`)
       }
       this.loading = false
     },

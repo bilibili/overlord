@@ -23,7 +23,7 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item label="类型" required>
+        <el-form-item label="类型" prop="cache_type" required>
           <el-radio-group v-model="clusterForm.cache_type" @change="typeChange">
             <el-radio :label="item.value" v-for="(item, index) in typeOptions" :key="index">{{ item.name }}</el-radio>
           </el-radio-group>
@@ -44,7 +44,7 @@
           </el-tooltip>
         </el-form-item>
 
-        <el-form-item label="版本" required>
+        <el-form-item label="版本" prop="version" required>
           <el-radio-group v-model="clusterForm.version">
             <el-radio :label="item" v-for="(item, index) in versionOptions" :key="index">{{ item }}</el-radio>
           </el-radio-group>
@@ -160,12 +160,6 @@ export default {
         spec: [{
           validator: checCustomSpec,
           trigger: 'change'
-        }],
-        appids: [{
-          type: 'array',
-          required: true,
-          message: '请至少选择一个 AppId',
-          trigger: 'change'
         }]
       },
       clusterForm: {
@@ -201,7 +195,7 @@ export default {
           format: 'plain'
         })
         this.appidOptions = data.items
-      } catch (error) {
+      } catch (_) {
         this.$message.error('AppId 列表获取失败')
       }
     },
@@ -217,7 +211,7 @@ export default {
         this.allVersionOptions = data.items
         this.versionOptions = this.allVersionOptions.find(item => item.cache_type === this.clusterForm.cache_type).versions
         this.clusterForm.version = this.versionOptions[0]
-      } catch (error) {
+      } catch (_) {
         this.$message.error('版本列表获取失败')
       }
     },
@@ -232,23 +226,26 @@ export default {
     },
     resetForm (formName) {
       this.$refs[formName].resetFields()
-      this.clusterForm.cache_type = 'redis_cluster'
+      // this.clusterForm.spec = null
       this.clusterForm.version = this.versionOptions[0]
+      this.memoryUnit = 'G'
+      this.specMemoryUnit = 'G'
     },
     async onSubmit () {
-      this.clusterForm.total_memory = this.memoryUnit === 'G' ? Number(this.clusterForm.total_memory) * 1024 : Number(this.clusterForm.total_memory)
-      if (this.clusterForm.spec === 'custom') {
-        this.clusterForm.spec = `${this.specCustomForm.core}c${this.specCustomForm.core}${this.specMemoryUnit === 'G' ? 'g' : 'm'}`
+      let params = JSON.parse(JSON.stringify(this.clusterForm))
+      params.total_memory = this.memoryUnit === 'G' ? Number(params.total_memory) * 1024 : Number(params.total_memory)
+      if (params.spec === 'custom') {
+        params.spec = `${this.specCustomForm.core}c${this.specCustomForm.memory}${this.specMemoryUnit === 'G' ? 'g' : 'm'}`
       }
       this.submitDisabled = true
       try {
-        await createClusterApi(this.clusterForm)
+        await createClusterApi(params)
         this.$message.success('创建中，请等待')
         setTimeout(() => {
           this.$router.push({ name: 'cluster', params: { name: this.clusterForm.name } })
         }, 3000)
-      } catch (error) {
-        this.$message.error('创建失败')
+      } catch ({ error }) {
+        this.$message.error(`创建失败：${error}`)
       }
       this.submitDisabled = false
     }

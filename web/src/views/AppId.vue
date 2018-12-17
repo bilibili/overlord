@@ -19,7 +19,7 @@
           :filter-node-method="filterNode"
           ref="appidTree">
         </el-tree>
-        <el-button size="mini" type="text" plain @click="addIdDialogVisible = true">添加 AppId</el-button>
+        <el-button size="mini" type="text" @click="addIdDialogVisible = true">添加 AppId</el-button>
 
       </div>
       <div class="appid-info" v-loading="clusterLoading">
@@ -179,7 +179,7 @@ export default {
       }
     },
     removeCorrelation ({ id, name }) {
-      this.$confirm(`您将解除集群：【${name}】和 AppId【${this.appid}】的关联, 是否继续?`, '解除提示', {
+      this.$confirm(`您将解除集群【${name}】和 AppId【${this.appid}】的关联, 是否继续?`, '解除提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
@@ -330,9 +330,11 @@ $hint-text-color: #909399;
   .el-input {
     margin-bottom: 10px;
   }
+
   .addid-panel {
     display: flex;
     align-items: center;
+
     .el-input {
       margin: 0 5px;
     }

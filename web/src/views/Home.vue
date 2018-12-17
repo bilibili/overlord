@@ -3,14 +3,19 @@
     <div class="search-panel">
       <div class="search-panel__header">Cluster Search</div>
       <div class="search-panel__input">
-        <el-input v-model="clusterKeyword" placeholder="请输入集群名关键字进行搜索" size="large" @keyup.native="searchCluster">
+        <el-input
+          v-model="clusterKeyword"
+          placeholder="请输入集群名关键字进行搜索"
+          size="large"
+          @keyup.native="searchCluster"
+          clearable>
           <i slot="prefix" class="el-input__icon el-icon-search"></i>
         </el-input>
       </div>
     </div>
     <transition name="slide-fade" mode="out-in" appear>
       <div v-if="clusterList.length" class="search-result">
-        <el-table :data="clusterList" border>
+        <el-table :data="clusterList" border max-height="500">
           <el-table-column prop="name" label="集群名称" min-width="100">
           </el-table-column>
           <el-table-column prop="cache_type" label="缓存类型">
@@ -63,7 +68,7 @@ export default {
         this.clusterList = data.items
         this.$router.replace({ name: 'home', query: { key: this.clusterKeyword } })
       } catch ({ error }) {
-        this.$message.error(error || '获取失败')
+        this.$message.error(`获取失败：${error}`)
       }
     },
     linkToClusterDetail ({ name }) {
