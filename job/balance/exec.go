@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"overlord/job"
 	"overlord/job/create"
 	"overlord/lib/chunk"
 	"overlord/lib/etcd"
@@ -35,7 +34,7 @@ func Balance(clusterName string, e *etcd.Etcd) error {
 
 // genTryBalanceJob generate balanced job into job
 func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
 
 	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
@@ -52,12 +51,14 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		val, err := e.Get(ctx, path)
 
 		if client.IsKeyNotFound(err) {
+			log.Infof("waiting cluster %v for info was setted", clusterName)
 			_, val, err = e.WatchOneshot(ctx, path, etcd.ActionSet)
 			if err != nil {
 				log.Warnf("fail to watch cluster due time")
 				continue
 			}
 		} else if err != nil {
+			log.Infof("get cluster %v error %v", clusterName, err)
 			continue
 		}
 		rd := strings.NewReader(val)
@@ -69,6 +70,7 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		break
 	}
 
+	log.Infof("fetch instances for %s", clusterName)
 	nodes, err := e.LS(ctx, fmt.Sprintf("%s/%s/instances", etcd.ClusterDir, clusterName))
 	if err != nil {
 		return nil, err
@@ -83,17 +85,21 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 
 		allIsRunning := true
 		for _, node := range nodes {
-			val, err := e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
+			spath := fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value)
+			val, err := e.Get(ctx, spath)
 			if err != nil {
-				return nil, err
+				log.Infof("cluster %s get state %s fail", clusterName, spath)
+				continue
 			}
 			allIsRunning = allIsRunning && (val == create.SubStateRunning)
 			if !allIsRunning {
+				log.Infof("cluster %s node %s not done", clusterName, node.Value)
 				break
 			}
 		}
 
 		if allIsRunning {
+			log.Infof("cluster %s all instances is done now", clusterName)
 			break
 		}
 	}
