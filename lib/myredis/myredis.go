@@ -158,7 +158,7 @@ func (c *Client) TryBalance() error {
 				continue
 			}
 
-			cmd, err := c.Execute(node.Addr(), "CLUSTER FAILOVER")
+			cmd, err := c.Execute(node.Addr(), "CLUSTER FAILOVER FORCE")
 			if err != nil {
 				return err
 			}

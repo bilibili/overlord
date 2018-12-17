@@ -186,17 +186,17 @@ func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 
 		balanced, err = b.client.IsBalanced()
 		if err != nil {
-			log.Errorf("check balanced fail due to %s", err)
+			log.Errorf("check balanced for cluster %s fail due to %s", b.info.Cluster, err)
 			continue
 		}
 		if balanced {
-			log.Info("succeed to balanced the cluster")
+			log.Info("succeed to balanced the cluster %s", b.info.Cluster)
 			return
 		}
 
 		err = b.client.TryBalance()
 		if err != nil {
-			log.Errorf("try execute balanced command fail due to %s", err)
+			log.Errorf("try execute balanced command fail to %s due to %s", b.info.Cluster, err)
 			continue
 		}
 	}
