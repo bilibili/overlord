@@ -90,6 +90,7 @@ func (m *Message) Reset() {
 // clear will clean the msg
 func (m *Message) clear() {
 	m.Reset()
+	m.reqn = 0
 	m.req = nil
 	m.wg = nil
 	m.subs = nil
@@ -127,7 +128,10 @@ func (m *Message) MarkEnd() {
 
 // ResetSubs will return the Msg data to flush and reset
 func (m *Message) ResetSubs() {
-	for i := range m.subs {
+	if !m.IsBatch() {
+		return
+	}
+	for i := range m.subs[:m.reqn] {
 		m.subs[i].Reset()
 	}
 	m.reqn = 0
@@ -226,7 +230,10 @@ func (m *Message) Err() error {
 	if m.err != nil {
 		return m.err
 	}
-	for _, s := range m.subs {
+	if !m.IsBatch() {
+		return nil
+	}
+	for _, s := range m.subs[:m.reqn] {
 		if s.err != nil {
 			return s.err
 		}
