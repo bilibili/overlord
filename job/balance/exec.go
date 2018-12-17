@@ -51,7 +51,7 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		val, err := e.Get(ctx, path)
 
 		if client.IsKeyNotFound(err) {
-			log.Infof("waiting cluster %v for info was setted", clusterName)
+			log.Infof("waiting cluster %s for info was setted", clusterName)
 			_, val, err = e.WatchOneshot(ctx, path, etcd.ActionSet)
 			if err != nil {
 				log.Warnf("fail to watch cluster due time")

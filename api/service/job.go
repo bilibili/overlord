@@ -72,10 +72,10 @@ func (s *Service) jobManager() (err error) {
 							s.d.SetJobState(ctx, cluster, jid, job.StateDone)
 							log.Infof("balance success tracing job %v", *j)
 						}
-					} (jobDetail.Cluster, jobDetail.ID)
+					}(jobDetail.Name, jobDetail.ID)
 
 					removed = append(removed, j.ID)
-				}else {
+				} else {
 					s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
 					log.Infof("[jobManager] job %v finish done", *j)
 					removed = append(removed, j.ID)
@@ -83,7 +83,7 @@ func (s *Service) jobManager() (err error) {
 			}
 		}
 
-		for _, jid := range removed{
+		for _, jid := range removed {
 			delete(undoneJob, jid)
 		}
 
