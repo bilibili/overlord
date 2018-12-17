@@ -45,7 +45,7 @@ func (s *Service) jobManager() (err error) {
 		removed := make([]string, 0)
 		for key, j := range undoneJob {
 			keySplit := strings.Split(key, ".")
-			jobGroup := keySplit[0]
+			// jobGroup := keySplit[0]
 			jobID := keySplit[1]
 
 			var jobDetail job.Job
