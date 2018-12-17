@@ -272,6 +272,9 @@ func parseSlots(Data []byte) ([]string, error) {
 		}
 
 		lsp := strings.Split(line, " ")
+		if len(lsp) < 8 {
+			continue
+		}
 		addr := lsp[1]
 		if strings.Contains(addr, "@") {
 			addrsp := strings.Split(addr, "@")
