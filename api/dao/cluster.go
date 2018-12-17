@@ -116,13 +116,33 @@ func (d *Dao) getClusterAppids(ctx context.Context, cname string) ([]string, err
 	return appids, nil
 }
 
+func (d *Dao) checkClusterExists(ctx context.Context, cname string) (bool, error) {
+	_, err := d.e.LS(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, cname))
+	if client.IsKeyNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetCluster will search clusters by given cluster name
 func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, error) {
 	sub, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	istr, err := d.e.ClusterInfo(sub, cname)
+	exists, err := d.checkClusterExists(sub, cname)
 	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, model.ErrNotFound
+	}
+
+	istr, err := d.e.ClusterInfo(sub, cname)
+	if client.IsKeyNotFound(err) {
+		return &model.Cluster{Name: cname, State: model.StateWaiting}, nil
+	} else if err != nil {
 		return nil, err
 	}
 	info := &create.CacheInfo{}
