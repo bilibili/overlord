@@ -229,7 +229,7 @@ func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, er
 	appids, err = d.e.LS(sub, fmt.Sprintf("%s/%s/appids", etcd.ClusterDir, cname))
 	if client.IsKeyNotFound(err) {
 		err = nil
-	}else if err != nil {
+	} else if err != nil {
 		return
 	}
 
@@ -238,7 +238,11 @@ func (d *Dao) RemoveCluster(ctx context.Context, cname string) (jobid string, er
 		return
 	}
 
-	j := d.createDestroyClusterJob(ctx, cname)
+	j, err := d.createDestroyClusterJob(ctx, cname)
+	if err != nil {
+		log.Errorf("create destroy cluster job fail %v", err)
+		return
+	}
 	jobid, err = d.saveJob(ctx, j)
 	return
 }
@@ -412,11 +416,24 @@ func (d *Dao) assignAppids(ctx context.Context, cluster string, appids ...string
 }
 
 // createDestroyClusterJob will create remove cluster job.
-func (d *Dao) createDestroyClusterJob(ctx context.Context, cname string) (j *job.Job) {
+func (d *Dao) createDestroyClusterJob(ctx context.Context, cname string) (j *job.Job, err error) {
+	var info string
+	info, err = d.e.ClusterInfo(ctx, cname)
+	if err != nil {
+		log.Errorf("get cluster info err %v", err)
+		return
+	}
+	t := new(create.CacheInfo)
+	err = json.Unmarshal([]byte(info), t)
+	if err != nil {
+		log.Errorf("get cacheinfo err%v", err)
+		return
+	}
 	j = &job.Job{
-		OpType: job.OpDestroy,
-		Name:   cname,
-		Group:  "sh001",
+		OpType:    job.OpDestroy,
+		Name:      cname,
+		Group:     t.Group,
+		CacheType: t.CacheType,
 	}
 	return
 }

@@ -29,6 +29,11 @@ func main() {
 		} else {
 			cluster(name)
 		}
+	case cmd == "delete":
+		if name == "" {
+			panic("delete cluster name can not be nil")
+		}
+		deleteCluster(name)
 	}
 }
 
@@ -69,7 +74,7 @@ func cluster(name string) (err error) {
 	return newReq(http.MethodGet, server+base+"?"+fmt.Sprintf("name=%s", name), "")
 }
 func deleteCluster(name string) (err error) {
-	return
+	return newReq(http.MethodDelete, server+base+"?"+fmt.Sprintf("name=%s", name), "")
 }
 func addAppID(cluster string, appid string) (err error) {
 	return

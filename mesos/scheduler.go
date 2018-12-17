@@ -107,7 +107,7 @@ func (s *Scheduler) taskEvent(ch chan *cli.Node) {
 		}
 		t.ID = splitJobID(n.Key)
 		s.task.PushBack(t)
-		log.Infof("get task (%v)", t)
+		log.Infof("get task (%+v)", t)
 		// revive offer when task comming.
 		revice := calls.Revive()
 		if err := calls.CallNoData(context.Background(), s.cli, revice); err != nil {
