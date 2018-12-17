@@ -141,6 +141,7 @@ func (c *Client) IsBalanced() (bool, error) {
 			for _, line := range lsp {
 				if strings.Contains(line, "role") {
 					if !strings.HasSuffix(line, chunk.RoleMaster) {
+						log.Info("check balance fail due on %s", node.Addr())
 						return false, nil
 					}
 				}
