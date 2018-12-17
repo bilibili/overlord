@@ -63,20 +63,20 @@ func (s *Service) jobManager() (err error) {
 			}
 			if done {
 				if jobDetail.CacheType == proto.CacheTypeRedisCluster {
-					go func(cluster, jid string) {
+					go func(cluster, group, jid string) {
 						log.Infof("start balance tracing job %v", *j)
 						err := balance.Balance(cluster, s.d.ETCD())
 						if err != nil {
 							log.Errorf("[jobManager.Balance]error when balance %s", err)
 						} else {
-							s.d.SetJobState(ctx, cluster, jid, job.StateDone)
+							s.d.SetJobState(ctx, group, jid, job.StateDone)
 							log.Infof("balance success tracing job %v", *j)
 						}
-					}(jobDetail.Name, jobDetail.ID)
+					}(jobDetail.Name, jobDetail.Group, jobDetail.ID)
 
 					removed = append(removed, j.ID)
 				} else {
-					s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
+					s.d.SetJobState(ctx, jobDetail.Group, jobDetail.ID, job.StateDone)
 					log.Infof("[jobManager] job %v finish done", *j)
 					removed = append(removed, j.ID)
 				}
