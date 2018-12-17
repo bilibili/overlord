@@ -65,7 +65,16 @@
               <template slot="append">核</template>
             </el-input>
             <el-input v-model="specCustomForm.memory" size="mini" type="number">
-              <template slot="append">G</template>
+              <template slot="append">
+                <el-select v-model="specMemoryUnit" placeholder="请选择">
+                  <el-option
+                    v-for="item in memoryUnitOptions"
+                    :key="item"
+                    :label="item"
+                    :value="item">
+                  </el-option>
+                </el-select>
+              </template>
             </el-input>
             </div>
         </el-form-item>
@@ -93,6 +102,7 @@
         </el-form-item>
 
         <el-form-item class="footer-item">
+          <el-button @click="resetForm('clusterForm')">重置</el-button>
           <el-button type="primary" @click="submitForm('clusterForm')" :disabled="submitDisabled">立即创建</el-button>
         </el-form-item>
       </el-form>
@@ -136,6 +146,7 @@ export default {
     }
     return {
       memoryUnit: 'G',
+      specMemoryUnit: 'G',
       memoryUnitOptions: ['G', 'M'],
       rules: {
         name: [{
@@ -219,10 +230,15 @@ export default {
         }
       })
     },
+    resetForm (formName) {
+      this.$refs[formName].resetFields()
+      this.clusterForm.cache_type = 'redis_cluster'
+      this.clusterForm.version = this.versionOptions[0]
+    },
     async onSubmit () {
       this.clusterForm.total_memory = this.memoryUnit === 'G' ? Number(this.clusterForm.total_memory) * 1024 : Number(this.clusterForm.total_memory)
       if (this.clusterForm.spec === 'custom') {
-        this.clusterForm.spec = `${this.specCustomForm.core}c${this.specCustomForm.memory}g`
+        this.clusterForm.spec = `${this.specCustomForm.core}c${this.specCustomForm.core}${this.specMemoryUnit === 'G' ? 'g' : 'm'}`
       }
       this.submitDisabled = true
       try {
