@@ -60,6 +60,7 @@ func (r *Resp) decodeBulk(br *bufio.ReadWriter, line []byte) error {
 	}
 	buf := make([]byte, count+2)
 	_, err = io.ReadFull(br, buf)
+	r.Data = buf
 	return err
 }
 

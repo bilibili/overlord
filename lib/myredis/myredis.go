@@ -103,6 +103,7 @@ func (c *Client) IsConsistent() (bool, error) {
 			if command.Reply.RType != RespBulk {
 				return false, fmt.Errorf("get wrong Reply %v", *command.Reply)
 			}
+
 			slots, err := parseSlots(command.Reply.Data)
 			if err != nil {
 				return false, err
@@ -253,9 +254,10 @@ func parseSlots(Data []byte) ([]string, error) {
 	slots := make([]string, 16384)
 
 	if len(lines) < 3 {
-		log.Warnf("get trash node as dataStr %s", dataStr)
+		log.Warnf("get trash node as dataStr %v", lines)
 		return nil, ErrTrashNode
 	}
+
 	for _, line := range lines {
 		if strings.Contains(line, chunk.RoleSlave) {
 			continue
