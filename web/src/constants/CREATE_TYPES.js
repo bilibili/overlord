@@ -28,24 +28,6 @@ const SPEC_OPTIONS = [{
 const GROUP_OPTIONS = [{
   name: '上海核心',
   value: 'sh001'
-}, {
-  name: '上海腾讯云',
-  value: 'sh002'
-}, {
-  name: '上海金山云',
-  value: 'sh005'
-}, {
-  name: '杭州下沙',
-  value: 'hz001'
-}, {
-  name: '上海嘉定',
-  value: 'sh004'
-}, {
-  name: '苏州新海宜',
-  value: 'sz001'
-}, {
-  name: '广州腾讯',
-  value: 'gz001'
 }]
 
 export { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS }

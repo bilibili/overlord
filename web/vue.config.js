@@ -1,6 +1,5 @@
 module.exports = {
   devServer: {
-    host: 'dev-overlord.bilibili.co',
     port: 8083,
     proxy: {
       '/api/v1': {
