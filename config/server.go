@@ -25,7 +25,7 @@ type MonitorConfig struct {
 
 // Href get monitory href
 func (mc *MonitorConfig) Href(cname string) string {
-	return fmt.Sprintf("%s/%s?orgId=%d&var-{%s}=%s", mc.URL, mc.Panel, mc.OrgID, mc.NameVar, cname)
+	return fmt.Sprintf("%s/%s?orgId=%d&var-%s=%s", mc.URL, mc.Panel, mc.OrgID, mc.NameVar, cname)
 }
 
 // VersionConfig is the config for used version
