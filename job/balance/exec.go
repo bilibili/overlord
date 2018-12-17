@@ -158,6 +158,7 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 
 		consistent, err = b.client.IsConsistent()
 		if err == myredis.ErrNoNode {
+			log.Errorf("get an trash cluster err %s", err)
 			return err
 		} else if err != nil {
 			log.Errorf("fail to check consistent due to %s", err)
