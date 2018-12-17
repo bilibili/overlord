@@ -259,7 +259,7 @@ export default {
 <style lang="scss" scoped>
 @import '@/style/mixin.scss';
 $edit-icon-color: #1890ff;
-$green: #67C23A;
+$green-color: #67C23A;
 
 .create-page__title {
   @include page-title-font;
@@ -279,7 +279,7 @@ $green: #67C23A;
 
 .type-tooltip {
   i {
-    color: $green;
+    color: $green-color;
     font-size: 18px;
   }
 

@@ -15,15 +15,15 @@
       </el-menu-item>
       <el-menu-item index="/appid">
         <i class="el-icon-document"></i>
-        <span slot="title">Appid</span>
+        <span slot="title">AppId List</span>
       </el-menu-item>
       <el-menu-item index="/job">
         <i class="el-icon-time"></i>
-        <span slot="title">Job</span>
+        <span slot="title">Job List</span>
       </el-menu-item>
       <el-menu-item index="/create">
         <i class="el-icon-circle-plus-outline"></i>
-        <span slot="title">Create</span>
+        <span slot="title">Add Cluster</span>
       </el-menu-item>
     </el-menu>
   </div>

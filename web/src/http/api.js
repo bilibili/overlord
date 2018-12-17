@@ -34,6 +34,10 @@ const removeCorrelationApi = (clusterName, params) => {
   })
 }
 
+const deleteClusterApi = (clusterName, params) => {
+  return http.delete(`api/v1/clusters/${clusterName}`)
+}
+
 const patchInstanceWeightApi = (clusterName, addr, params) => {
   return http.patch(`api/v1/clusters/${clusterName}/instances/${addr}`, params)
 }
@@ -58,6 +62,7 @@ export {
   getAppidDetailApi,
   getClusterDetailApi,
   removeCorrelationApi,
+  deleteClusterApi,
   patchInstanceWeightApi,
   createClusterApi,
   addCorrelationApi,

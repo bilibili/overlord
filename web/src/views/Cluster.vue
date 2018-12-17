@@ -132,25 +132,41 @@
         <span class="cluster-header__title">集群操作（前方高能!!!）</span>
       </div>
       <div class="cluster-danger">
-        <div class="cluster-danger__item">
+        <!-- <div class="cluster-danger__item">
           <p>扩容：我不管我就是要扩容我的集群我不管你必须得让我扩容 </p>
           <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-rank">扩容</el-button>
         </div>
         <div class="cluster-danger__item">
           <p>再平衡: 我想要尝试 rebalance 一下  </p>
           <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-refresh">再平衡</el-button>
-        </div>
+        </div> -->
         <div class="cluster-danger__item">
           <p>删除: 请看我的坚定的眼神(๑•̀ㅂ•́)و我就是要删掉这个集群( *・ω・)✄╰ひ╯</p>
-          <el-button :disabled="clusterData.state === 'waiting'" type="danger" icon="el-icon-delete">删除</el-button>
+          <el-button @click="deleteClusterDialogVisible = true"
+            :disabled="clusterData.state === 'waiting'"
+            type="danger"
+            icon="el-icon-delete">删除</el-button>
         </div>
       </div>
     </div>
+
+    <el-dialog title="你确定删除集群吗？" :visible.sync="deleteClusterDialogVisible" width="400px" custom-class="delete-dialog">
+      <div class="delete-dialog__tips">
+        <b><i class="el-icon-warning"></i>删除集群之前请先撤销所有与本集群关联的 AppId</b>
+        <p><i class="el-icon-warning"></i>该操作无法撤销，将永久删除集群 {{  clusterData.name }} 及其节点等数据。
+        请输入您要删除的集群名称进行确认：</p>
+      </div>
+      <el-input v-model.trim="confirmClusterName"></el-input>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="deleteClusterDialogVisible = false">取 消</el-button>
+        <el-button type="danger" @click="confirmDeleteCluster" :disabled="confirmClusterName !== clusterData.name">确认删除集群</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { getClusterDetailApi, patchInstanceWeightApi } from '@/http/api'
+import { getClusterDetailApi, patchInstanceWeightApi, deleteClusterApi } from '@/http/api'
 import GROUP_MAP from '@/constants/GROUP'
 
 export default {
@@ -169,7 +185,9 @@ export default {
         waiting: 'warning',
         error: 'danger'
       },
-      timer: null
+      timer: null,
+      deleteClusterDialogVisible: false,
+      confirmClusterName: null
 
     }
   },
@@ -178,21 +196,24 @@ export default {
   },
   methods: {
     async getClusterData () {
+      console.log(this.$route.params.name)
       if (!this.$route.params.name) return
       this.loading = true
       try {
         const { data } = await getClusterDetailApi(this.$route.params.name)
         this.clusterData = data
-        this.clusterData.instances.forEach(item => {
+        this.clusterData.instances && this.clusterData.instances.forEach(item => {
           this.$set(item, 'weightInfo', {
             value: item.weight,
             type: 'view'
           })
         })
+        console.log('111', this.clusterData.state)
+
         if (this.clusterData.state === 'waiting') {
           this.timer = setTimeout(() => {
             this.getClusterData()
-          }, 5000) // 1 min
+          }, 5000)
         }
       } catch (error) {
       }
@@ -216,13 +237,29 @@ export default {
       } catch (error) {
         this.$message.error('errors')
       }
+    },
+    async confirmDeleteCluster () {
+      try {
+        await deleteClusterApi(this.confirmClusterName)
+        this.$message.success('删除成功')
+        this.$router.back()
+      } catch ({ error }) {
+        this.$message.error(`删除失败：${error}`)
+      }
     }
+  },
+  beforeRouteLeave (to, from, next) {
+    if (this.timer) {
+      clearInterval(this.timer)
+    }
+    next()
   }
 }
 </script>
 
 <style lang="scss">
 $hint-text-color: #909399;
+$daner-color: #f56c6c;
 
 .cluster-page {
   padding: 5px 24px;
@@ -302,5 +339,16 @@ $hint-text-color: #909399;
 
 .hint {
   color: $hint-text-color;
+}
+
+.delete-dialog {
+  &__tips {
+    margin: 0 0 10px 0;
+    line-height: 24px;
+  }
+  .el-icon-warning {
+    color: $daner-color;
+    margin-right: 10px;
+  }
 }
 </style>
