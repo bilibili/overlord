@@ -341,7 +341,13 @@ func (d *Dao) checkVersion(version string) error {
 }
 
 func (d *Dao) checkClusterName(cname string) error {
-	return nil
+	_, err := d.e.LS(context.Background(), fmt.Sprintf("%s/%s/", etcd.ClusterDir, cname))
+	if client.IsKeyNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return fmt.Errorf("cluster %s has been existed", cname)
 }
 
 func (d *Dao) mapCacheType(cacheType string) (proto.CacheType, error) {
