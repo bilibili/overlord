@@ -3,9 +3,10 @@ package server
 import (
 	"net/http"
 
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"go.etcd.io/etcd/client"
-	"strings"
 )
 
 // getJob get the job by given number
