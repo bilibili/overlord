@@ -1,5 +1,9 @@
 listen = "0.0.0.0:8880"
 etcd = "http://127.0.0.1:2379"
+log_vl = 10
+log = "info"
+debug = true
+stdout = true
 
 [monitor]
   url = "http://127.0.0.1:1234"

@@ -33,7 +33,7 @@ func Balance(clusterName string, e *etcd.Etcd) error {
 
 // genTryBalanceJob generate balanced job into job
 func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*180)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
 
 	path := fmt.Sprintf("%s/%s/info", etcd.ClusterDir, clusterName)
