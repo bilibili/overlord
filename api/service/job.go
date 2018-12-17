@@ -38,16 +38,19 @@ func (s *Service) jobManager() (err error) {
 			undoneJob[j.ID] = j
 		}
 	}
+	log.Infof("[jobManager] recovery jobs for %v", undoneJob)
 	newJob := s.d.WatchJob(ctx)
 	for {
 		for _, j := range undoneJob {
 			var jobDetail job.Job
 			err = json.Unmarshal([]byte(j.Param), &jobDetail)
 			if err != nil {
+				log.Warnf("[jobManager] fail to decode job.Job due to %v", err)
 				continue
 			}
 			cluster, err := s.d.GetCluster(ctx, jobDetail.Group)
 			if err != nil {
+				log.Warnf("[jobManager] fail to fetch cluster info due to %v", err)
 				continue
 			}
 			var done = true
@@ -59,16 +62,21 @@ func (s *Service) jobManager() (err error) {
 			}
 			if done {
 				if jobDetail.CacheType == proto.CacheTypeRedisCluster {
+					log.Infof("start balance tracing job %v", *j)
 					err := balance.Balance(jobDetail.Cluster, s.d.ETCD())
 					if err != nil {
-						log.Errorf("error when balance %s", err)
+						log.Errorf("[jobManager.Balance]error when balance %s", err)
+					} else {
+						log.Infof("balance success tracing job %v", *j)
 					}
 				}
 				s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
+				log.Infof("[jobManager] job finish done")
 				delete(undoneJob, j.ID)
 			}
 		}
 		j := <-newJob
+		log.Infof("[jobManager] receive new job %v", *j)
 		undoneJob[j.ID] = j
 		if len(undoneJob) == 0 {
 			time.Sleep(time.Second * 10)
