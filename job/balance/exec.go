@@ -12,6 +12,8 @@ import (
 	"overlord/lib/myredis"
 	"strings"
 	"time"
+
+	"go.etcd.io/etcd/client"
 )
 
 // define state
@@ -47,12 +49,17 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		case <-ticker.C:
 		}
 
-		_, val, err := e.WatchOneshot(ctx, path, etcd.ActionSet)
-		if err != nil {
-			log.Warnf("fail to watch cluster due time")
+		val, err := e.Get(ctx, path)
+
+		if client.IsKeyNotFound(err) {
+			_, val, err = e.WatchOneshot(ctx, path, etcd.ActionSet)
+			if err != nil {
+				log.Warnf("fail to watch cluster due time")
+				continue
+			}
+		} else if err != nil {
 			continue
 		}
-
 		rd := strings.NewReader(val)
 		decoder := json.NewDecoder(rd)
 		err = decoder.Decode(info)
@@ -91,16 +98,16 @@ func genTryBalanceJob(clusterName string, e *etcd.Etcd) (*TryBalanceJob, error) 
 		}
 	}
 
-	for {
-		_, val, err := e.WatchOneshot(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID), etcd.ActionSet)
-		if err != nil {
-			return nil, err
-		}
+	// for {
+	// 	_, val, err := e.WatchOneshot(ctx, fmt.Sprintf("%s/%s/state", etcd.JobDetailDir, info.JobID), etcd.ActionSet)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		if val == job.StateNeedBalance {
-			break
-		}
-	}
+	// 	if val == job.StateNeedBalance {
+	// 		break
+	// 	}
+	// }
 
 	tbi := &TryBalanceInfo{
 		TraceJobID: info.JobID,
