@@ -140,7 +140,7 @@ func (c *Client) IsBalanced() (bool, error) {
 			lsp := strings.Split(content, "\n")
 			for _, line := range lsp {
 				if strings.Contains(line, "role") && !strings.Contains(line, chunk.RoleMaster) {
-					log.Infof("check balance fail due on %s", node.Addr())
+					log.Infof("check balance fail due on %s with lines %s", node.Addr(), content)
 					return false, nil
 				}
 			}
