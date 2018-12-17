@@ -103,6 +103,7 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 		status := ec.newStatus(task.TaskID)
 		if err != nil {
 			status.State = ms.TASK_FAILED.Enum()
+			ec.shouldQuit = true
 		} else {
 			status.State = ms.TASK_RUNNING.Enum()
 		}
@@ -147,18 +148,21 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 	ec.p, err = create.SetupCacheService(dpinfo)
 	if err != nil {
 		log.Errorf("start cache service err %v", err)
+		return
 	}
 
 	instanceDir := fmt.Sprintf(etcd.InstanceDir, tdata.IP, tdata.Port)
 	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/state", instanceDir), create.SubStateRunning)
 	if err != nil {
 		log.Errorf("set state to %s/state err due %v", instanceDir, err)
+		return
 	}
 
 	host := fmt.Sprintf("%s:%d", tdata.IP, tdata.Port)
 	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/%s", etcd.HeartBeatDir, host), task.TaskID.String())
 	if err != nil {
 		log.Errorf("set heartbeat key err %v", err)
+		return
 	}
 	ec.monitor(dpinfo.CacheType, host)
 	return
