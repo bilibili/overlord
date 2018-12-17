@@ -42,7 +42,11 @@ func (s *Service) jobManager() (err error) {
 	newJob := s.d.WatchJob(ctx)
 	for {
 		removed := make([]string, 0)
-		for _, j := range undoneJob {
+		for key, j := range undoneJob {
+			keySplit := strings.Split(key, ".")
+			jobGroup := keySplit[0]
+			jobID := keySplit[1]
+
 			var jobDetail job.Job
 			err = json.Unmarshal([]byte(j.Param), &jobDetail)
 			if err != nil {
@@ -72,11 +76,11 @@ func (s *Service) jobManager() (err error) {
 							s.d.SetJobState(ctx, group, jid, job.StateDone)
 							log.Infof("balance success tracing cluster %s jid %s.%s", cluster, group, jid)
 						}
-					}(jobDetail.Name, jobDetail.Group, j.ID)
+					}(jobDetail.Name, jobDetail.Group, jobID)
 
 					removed = append(removed, j.ID)
 				} else {
-					s.d.SetJobState(ctx, jobDetail.Group, jobDetail.ID, job.StateDone)
+					s.d.SetJobState(ctx, jobDetail.Group, jobID, job.StateDone)
 					log.Infof("[jobManager] job %v finish done", *j)
 					removed = append(removed, j.ID)
 				}
