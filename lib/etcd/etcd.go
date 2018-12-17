@@ -310,7 +310,7 @@ func (e *Etcd) Sequence(ctx context.Context, key string) (int64, error) {
 			return -1, err
 		}
 
-		err = e.Cas(ctx, key, fmt.Sprintf("%d", ival+1), val)
+		err = e.Cas(ctx, key, val, fmt.Sprintf("%d", ival+1))
 		if err != nil {
 			continue
 		}
