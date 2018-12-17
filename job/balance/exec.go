@@ -175,13 +175,14 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 	var (
 		balanced = false
+		ticker   = time.NewTicker(time.Second * 3)
 	)
 	for {
 		select {
 		case <-ctx.Done():
 			err = ctx.Err()
 			return
-		default:
+		case <-ticker.C:
 		}
 
 		balanced, err = b.client.IsBalanced()
@@ -190,9 +191,10 @@ func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 			continue
 		}
 		if balanced {
-			log.Info("succeed to balanced the cluster %s", b.info.Cluster)
+			log.Infof("succeed to balanced the cluster %s", b.info.Cluster)
 			return
 		}
+		log.Warnf("cluster %s is not balanced", b.info.Cluster)
 
 		err = b.client.TryBalance()
 		if err != nil {
@@ -258,7 +260,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 
 		return
 	}
-	log.Infof("success executed balance really for %s", b.info.Cluster)
+	log.Infof("success executed balance really for %s for job %s.%s", b.info.Cluster, b.info.Group, b.info.TraceJobID)
 
 	if isTrace {
 		err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobBalanced)

@@ -8,6 +8,7 @@ import (
 	"overlord/job/balance"
 	"overlord/lib/log"
 	"overlord/proto"
+	"strings"
 	"time"
 )
 
@@ -42,7 +43,11 @@ func (s *Service) jobManager() (err error) {
 	newJob := s.d.WatchJob(ctx)
 	for {
 		removed := make([]string, 0)
-		for _, j := range undoneJob {
+		for key, j := range undoneJob {
+			keySplit := strings.Split(key, ".")
+			// jobGroup := keySplit[0]
+			jobID := keySplit[1]
+
 			var jobDetail job.Job
 			err = json.Unmarshal([]byte(j.Param), &jobDetail)
 			if err != nil {
@@ -63,20 +68,20 @@ func (s *Service) jobManager() (err error) {
 			}
 			if done {
 				if jobDetail.CacheType == proto.CacheTypeRedisCluster {
-					go func(cluster, jid string) {
-						log.Infof("start balance tracing job %v", *j)
+					go func(cluster, group, jid string) {
+						log.Infof("start balance tracing job cluster %s with %s.%s", cluster, group, jid)
 						err := balance.Balance(cluster, s.d.ETCD())
 						if err != nil {
-							log.Errorf("[jobManager.Balance]error when balance %s", err)
+							log.Errorf("[jobManager.Balance]error when balance %s due to %s", cluster, err)
 						} else {
-							s.d.SetJobState(ctx, cluster, jid, job.StateDone)
-							log.Infof("balance success tracing job %v", *j)
+							s.d.SetJobState(ctx, group, jid, job.StateDone)
+							log.Infof("balance success tracing cluster %s jid %s.%s", cluster, group, jid)
 						}
-					}(jobDetail.Name, jobDetail.ID)
+					}(jobDetail.Name, jobDetail.Group, jobID)
 
 					removed = append(removed, j.ID)
 				} else {
-					s.d.SetJobState(ctx, jobDetail.Cluster, jobDetail.ID, job.StateDone)
+					s.d.SetJobState(ctx, jobDetail.Group, jobID, job.StateDone)
 					log.Infof("[jobManager] job %v finish done", *j)
 					removed = append(removed, j.ID)
 				}

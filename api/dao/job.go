@@ -6,6 +6,7 @@ import (
 	"overlord/api/model"
 	"overlord/job"
 	"overlord/lib/etcd"
+	"overlord/lib/log"
 	"path/filepath"
 	"strings"
 )
@@ -31,6 +32,7 @@ func (d *Dao) GetJob(ctx context.Context, jobID string) (*model.Job, error) {
 func (d *Dao) SetJobState(ctx context.Context, group, jobID, state string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	log.Infof("set job state to %s.%s as %s", group, jobID, state)
 	d.e.SetJobState(ctx, group, jobID, state)
 }
 

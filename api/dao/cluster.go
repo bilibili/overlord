@@ -88,6 +88,12 @@ func (d *Dao) getClusterInstances(ctx context.Context, info *create.CacheInfo, s
 				return nil, err
 			}
 			inst.Weight = int(w)
+		} else {
+			role, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/role", etcd.InstanceDirPrefix, node.Value))
+			if err != nil && !client.IsKeyNotFound(err) {
+				return nil, err
+			}
+			inst.Role = role
 		}
 
 		state, err := d.e.Get(ctx, fmt.Sprintf("%s/%s/state", etcd.InstanceDirPrefix, node.Value))
@@ -175,18 +181,32 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		return nil, err
 	}
 
+	var fePort int64
+	feport, err := d.e.Get(sub, fmt.Sprintf("%s/%s/fe-port", etcd.ClusterDir, cname))
+	if client.IsKeyNotFound(err) {
+		fePort = -1
+	} else if err != nil {
+		return nil, err
+	} else {
+		fePort, err = strconv.ParseInt(feport, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	c := &model.Cluster{
-		Name:      info.Name,
-		CacheType: string(info.CacheType),
-		Appids:    appids,
-		MaxMemory: info.MaxMemory,
-		Thread:    info.Thread,
-		Version:   info.Version,
-		Number:    info.Number,
-		State:     clusterState,
-		Instances: instances,
-		Group:     info.Group,
-		Monitor:   d.m.Href(info.Name),
+		Name:         info.Name,
+		CacheType:    string(info.CacheType),
+		Appids:       appids,
+		FrontEndPort: int(fePort),
+		MaxMemory:    info.MaxMemory,
+		Thread:       info.Thread,
+		Version:      info.Version,
+		Number:       info.Number,
+		State:        clusterState,
+		Instances:    instances,
+		Group:        info.Group,
+		Monitor:      d.m.Href(info.Name),
 	}
 
 	return c, nil
@@ -280,6 +300,17 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 		return "", err
 	}
 
+	seq, err := d.e.Sequence(subctx, etcd.PortSequence)
+	if err != nil {
+		log.Errorf("fail to create front-end port due to %s", err)
+		return "", err
+	}
+	err = d.e.Set(subctx, fmt.Sprintf("%s/%s/fe-port", etcd.ClusterDir, p.Name), fmt.Sprintf("%d", seq))
+	if err != nil {
+		log.Errorf("fail to set front-end port due to %s", err)
+		return "", err
+	}
+
 	t, err := d.createCreateClusterJob(p)
 	if err != nil {
 		log.Infof("create fail due to %s", err)
@@ -310,7 +341,13 @@ func (d *Dao) checkVersion(version string) error {
 }
 
 func (d *Dao) checkClusterName(cname string) error {
-	return nil
+	_, err := d.e.LS(context.Background(), fmt.Sprintf("%s/%s/", etcd.ClusterDir, cname))
+	if client.IsKeyNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return fmt.Errorf("cluster %s has been existed", cname)
 }
 
 func (d *Dao) mapCacheType(cacheType string) (proto.CacheType, error) {

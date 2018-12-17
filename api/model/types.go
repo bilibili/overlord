@@ -21,15 +21,16 @@ type Job struct {
 // define cluster and instance state
 const (
 	StateWaiting = "waiting"
-	StateDone     = "done"
-	StateError    = "error"
+	StateDone    = "done"
+	StateError   = "error"
 )
 
 // Cluster is the special struct in model
 type Cluster struct {
-	Name   string   `json:"name"`
-	Appids []string `json:"appids"`
-	State  string   `json:"state"`
+	Name         string   `json:"name"`
+	Appids       []string `json:"appids"`
+	State        string   `json:"state"`
+	FrontEndPort int      `json:"front_end_port"`
 
 	CacheType string  `json:"cache_type"`
 	Thread    int     `json:"cpu" validate:"required"`
@@ -49,6 +50,7 @@ type Instance struct {
 	Weight int    `json:"weight"`
 	Alias  string `json:"alias"`
 	State  string `json:"state"`
+	Role   string `json:"role"`
 }
 
 // Appid is the struct conttains many cluster name
