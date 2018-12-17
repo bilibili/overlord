@@ -3,7 +3,6 @@ package myredis
 import (
 	"bufio"
 	"bytes"
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"net"
@@ -90,8 +89,7 @@ func (c *Client) Execute(node, command string) (*Command, error) {
 
 // IsConsistent will trying to to check if the cluster nodes info is consistent.
 func (c *Client) IsConsistent() (bool, error) {
-	var latest []byte
-	var hash = md5.New()
+	var latest []string
 	for _, cc := range c.chunks {
 		for _, n := range cc.Nodes {
 			node := c.cluster.getNode(n.Addr())
@@ -107,16 +105,13 @@ func (c *Client) IsConsistent() (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			hash.Reset()
-			for _, addr := range slots {
-				hash.Write([]byte(addr))
-			}
 			if latest == nil {
-				latest = hash.Sum(nil)
+				latest = slots
 				continue
-			} else {
-				val := hash.Sum(nil)
-				if !bytes.Equal(latest, val) {
+			}
+
+			for i := range latest {
+				if latest[i] != slots[i] {
 					return false, nil
 				}
 			}
