@@ -10,6 +10,9 @@ import (
 	"overlord/job"
 	"overlord/lib/log"
 
+	"strconv"
+
+	"go.etcd.io/etcd/client"
 	cli "go.etcd.io/etcd/client"
 )
 
@@ -28,6 +31,7 @@ const (
 	AppidsDir           = "/overlord/appids"
 	SpecsDir            = "/overlord/specs"
 	FileServer          = "/overlord/fs"
+	PortSequence        = "/overlord/port_sequence"
 )
 
 // define watch event
@@ -288,4 +292,29 @@ func (e *Etcd) GetAllSpecs(ctx context.Context) ([]string, error) {
 func (e *Etcd) Cas(ctx context.Context, key, old, newer string) error {
 	_, err := e.kapi.Set(ctx, key, newer, &cli.SetOptions{PrevValue: old})
 	return err
+}
+
+// Sequence get the auto increment value of the special key
+func (e *Etcd) Sequence(ctx context.Context, key string) (int64, error) {
+	for {
+		val, err := e.Get(ctx, key)
+		if client.IsKeyNotFound(err) {
+			err = e.Set(ctx, key, "20000")
+			return 20000, err
+		} else if err != nil {
+			return -1, err
+		}
+
+		ival, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return -1, err
+		}
+
+		err = e.Cas(ctx, key, fmt.Sprintf("%d", ival+1), val)
+		if err != nil {
+			continue
+		}
+
+		return ival + 1, nil
+	}
 }
