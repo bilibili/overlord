@@ -35,6 +35,10 @@ import (
 	cli "go.etcd.io/etcd/client"
 )
 
+const (
+	maxRetry = 5
+)
+
 var (
 	errTaskID = errors.New("error taskid format")
 )
@@ -151,8 +155,12 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	return frameworkInfo
 }
 
+func eventLog(l *scheduler.Event) {
+	log.Infof("[Event] %v", l)
+}
+
 func (s *Scheduler) buildEventHandle() events.Handler {
-	logger := controller.LogEvents(nil)
+	logger := controller.LogEvents(eventLog)
 	return eventrules.New().Handle(events.Handlers{
 		scheduler.Event_FAILURE: logger.HandleF(failure),
 		scheduler.Event_OFFERS:  s.trackOffersReceived().HandleF(s.resourceOffers()),
@@ -161,13 +169,13 @@ func (s *Scheduler) buildEventHandle() events.Handler {
 			logger,
 			controller.TrackSubscription(s, time.Second*30),
 		),
-	}.Otherwise(logger.HandleEvent))
+	})
 }
 
 func (s *Scheduler) trackOffersReceived() eventrules.Rule {
 	return func(ctx context.Context, e *scheduler.Event, err error, chain eventrules.Chain) (context.Context, *scheduler.Event, error) {
 		if err == nil {
-			log.Infof("get offer %v ", e.GetOffers().GetOffers())
+			log.Infof("get offer num %v ", len(e.GetOffers().GetOffers()))
 		}
 		return chain(ctx, e, err)
 	}
@@ -279,6 +287,10 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		return
 	}
 	log.Infof("try recover task(%v)", t)
+	if id > maxRetry {
+		log.Errorf("drop recovery because of retry over than %s", t.GetValue())
+		return
+	}
 	info, err = s.getInfoFromEtcd(context.Background(), cluster)
 	if err != nil {
 		return
@@ -529,9 +541,8 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 
 	log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
 	var (
-		ofm     = make(map[string]ms.Offer)
-		tasks   = make(map[string][]ms.TaskInfo)
-		offerid = make(map[ms.OfferID]struct{})
+		ofm   = make(map[string]ms.Offer)
+		tasks = make(map[string][]ms.TaskInfo)
 	)
 	rtask := create.NewRedisClusterJob(s.db, &create.CacheInfo{
 		Chunks:    chunks,
@@ -561,6 +572,11 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 				//  plus the port obtained by adding 10000 to the data port for redis cluster.
 				Resources: makeResources(cpu, mem, uint64(node.Port)),
 			}
+			taskid := task.TaskID.GetValue() + "," + task.AgentID.GetValue()
+			err = s.db.SetTaskID(context.Background(), node.Addr(), taskid)
+			if err != nil {
+				log.Errorf("node %s set taskid(%s) err(%v)", node.Addr(), taskid, err)
+			}
 			//	s.db.Set(ctx context.Context, k string, v string)
 			data := &TaskData{
 				IP:         node.Name,
@@ -568,7 +584,6 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 				DBEndPoint: s.c.DBEndPoint,
 			}
 			task.Data, _ = json.Marshal(data)
-			offerid[ofm[node.Name].ID] = struct{}{}
 			tasks[node.Name] = append(tasks[node.Name], task)
 		}
 	}

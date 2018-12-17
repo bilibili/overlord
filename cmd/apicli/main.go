@@ -20,8 +20,12 @@ func main() {
 	flag.StringVar(&name, "name", "", "cluster name")
 	flag.Parse()
 	log.Init(nil)
+	var err error
 	switch {
 	case cmd == "create":
+		if name != "" {
+			defCreate.Name = name
+		}
 		createCluster(defCreate)
 	case cmd == "getcluster":
 		if name == "" {
@@ -33,7 +37,11 @@ func main() {
 		if name == "" {
 			panic("delete cluster name can not be nil")
 		}
-		deleteCluster(name)
+		err = deleteCluster(name)
+
+	}
+	if err != nil {
+		fmt.Printf("err %v", err)
 	}
 }
 
@@ -43,7 +51,7 @@ var (
 	server    string
 	defCreate = &model.ParamCluster{
 		Name:        "default",
-		Appids:      []string{"appid"},
+		Appids:      []string{"appid.test.appid"},
 		Spec:        "0.25c10m",
 		Version:     "4.0.11",
 		TotalMemory: 200,
@@ -74,7 +82,7 @@ func cluster(name string) (err error) {
 	return newReq(http.MethodGet, server+base+"?"+fmt.Sprintf("name=%s", name), "")
 }
 func deleteCluster(name string) (err error) {
-	return newReq(http.MethodDelete, server+base+"?"+fmt.Sprintf("name=%s", name), "")
+	return newReq(http.MethodDelete, server+base+name, "")
 }
 func addAppID(cluster string, appid string) (err error) {
 	return
@@ -102,6 +110,6 @@ func newReq(method, url, body string) (err error) {
 	}
 	defer resp.Body.Close()
 	bs, err := ioutil.ReadAll(resp.Body)
-	log.Infof("bs %v err %v\n", string(bs), err)
+	log.Infof("url %s resp %v err %v\n", url, string(bs), err)
 	return
 }

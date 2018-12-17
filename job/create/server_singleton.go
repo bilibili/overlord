@@ -10,6 +10,8 @@ import (
 	"overlord/proto"
 	"strings"
 	"text/template"
+
+	"github.com/pkg/errors"
 )
 
 // define consts
@@ -62,14 +64,14 @@ func (c *CacheJob) buildTplTree() error {
 
 	for _, addr := range c.info.Dist.Addrs {
 		instanceDir := fmt.Sprintf(etcd.InstanceDir, addr.IP, addr.Port)
-		err = cleanEtcdDirtyDir(ctx, c.e, fmt.Sprintf("%s:%s", addr.IP, addr.Port))
+		err = cleanEtcdDirtyDir(ctx, c.e, fmt.Sprintf("%s:%d", addr.IP, addr.Port))
 		if err != nil {
 			log.Errorf("error clean dirty etcd dir %s", err)
 		}
 
 		err = c.e.Set(ctx, fmt.Sprintf("%s/type", instanceDir), string(c.info.CacheType))
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		if c.info.CacheType == proto.CacheTypeRedis {
