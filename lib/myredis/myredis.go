@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"net"
 	"overlord/lib/chunk"
+	"overlord/lib/log"
 	"strconv"
 	"strings"
 )
 
 // errors
 var (
-	ErrNoNode = errors.New("node not exists in cluster")
+	ErrNoNode    = errors.New("node not exists in cluster")
+	ErrTrashNode = errors.New("trash nodes")
 )
 
 // New create client with singleton node.
@@ -251,7 +253,8 @@ func parseSlots(Data []byte) ([]string, error) {
 	slots := make([]string, 16384)
 
 	if len(lines) < 3 {
-		return nil, ErrNoNode
+		log.Warnf("get trash node as dataStr %s", dataStr)
+		return nil, ErrTrashNode
 	}
 	for _, line := range lines {
 		if strings.Contains(line, chunk.RoleSlave) {
