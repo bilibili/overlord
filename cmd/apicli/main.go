@@ -18,6 +18,7 @@ func main() {
 	flag.StringVar(&server, "server", "", "api server addr")
 	flag.StringVar(&cmd, "cmd", "", "cli cmd")
 	flag.StringVar(&name, "name", "", "cluster name")
+	flag.StringVar(&appid, "appid", "", "appid name")
 	flag.Parse()
 	log.Init(nil)
 	var err error
@@ -38,7 +39,10 @@ func main() {
 			panic("delete cluster name can not be nil")
 		}
 		err = deleteCluster(name)
-
+	case cmd == "assign":
+		addAppID(name, appid)
+	case cmd == "unassign":
+		deleteAppID(name, appid)
 	}
 	if err != nil {
 		fmt.Printf("err %v", err)
@@ -49,6 +53,7 @@ var (
 	name      string
 	cmd       string
 	server    string
+	appid     string
 	defCreate = &model.ParamCluster{
 		Name:        "default",
 		Appids:      []string{"appid.test.appid"},
@@ -79,16 +84,24 @@ func clusters() (err error) {
 	return newReq(http.MethodGet, server+base+name, "")
 }
 func cluster(name string) (err error) {
-	return newReq(http.MethodGet, server+base+"?"+fmt.Sprintf("name=%s", name), "")
+	return newReq(http.MethodGet, server+base+name, "")
 }
 func deleteCluster(name string) (err error) {
 	return newReq(http.MethodDelete, server+base+name, "")
 }
 func addAppID(cluster string, appid string) (err error) {
-	return
+	arg := &model.ParamAssign{
+		Appid: appid,
+	}
+	bs, _ := json.Marshal(arg)
+	return newReq(http.MethodPost, fmt.Sprintf("%s%s%s/appid", server, base, cluster), string(bs))
 }
 func deleteAppID(cluster string, appid string) (err error) {
-	return
+	arg := &model.ParamAssign{
+		Appid: appid,
+	}
+	bs, _ := json.Marshal(arg)
+	return newReq(http.MethodDelete, fmt.Sprintf("%s%s%s/appid", server, base, cluster), string(bs))
 }
 func getJobs() (err error) {
 	return
