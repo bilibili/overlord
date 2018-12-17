@@ -161,8 +161,9 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 			return err
 		} else if err != nil {
 			log.Errorf("fail to check consistent due to %s", err)
-			continue
+			return
 		}
+
 		if consistent {
 			log.Info("succeed to consistent with cluster")
 			return
