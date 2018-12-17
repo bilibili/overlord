@@ -226,8 +226,10 @@ func (b *TryBalanceJob) Balance() (err error) {
 		}
 	}
 
+	log.Infof("trying to wait balance for cluster %s", b.info.Cluster)
 	err = b.waitForConsistent(sub)
 	if err != nil {
+		log.Warnf("trying to wait consistent %s fail due %s", b.info.Cluster, err)
 		return
 	}
 
@@ -238,8 +240,11 @@ func (b *TryBalanceJob) Balance() (err error) {
 		}
 	}
 
+	log.Infof("trying to execute balance really for %s", b.info.Cluster)
 	err = b.tryBalance(sub)
 	if err != nil {
+		log.Errorf("fail to balance the whole cluster %s due %s", b.info.Cluster, err)
+
 		if err == context.DeadlineExceeded {
 			if isTrace {
 				err = b.e.SetJobState(sub, b.info.Group, b.info.TraceJobID, TraceJobUnBalanced)
