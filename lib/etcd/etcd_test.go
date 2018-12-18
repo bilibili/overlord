@@ -51,3 +51,18 @@ func TestSet(t *testing.T) {
 	// err = e.Set(ctx, "/overlord/jobs/job12", string(bs))
 	// assert.NoError(t, err)
 }
+
+func TestSequnenceOk(t *testing.T) {
+	e, err := New("http://127.0.0.1:2379")
+	assert.NoError(t, err)
+	ctx := context.Background()
+	e.Delete(ctx, PortSequence)
+
+	port, err := e.Sequence(ctx, PortSequence)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(20000), port)
+
+	port, err = e.Sequence(ctx, PortSequence)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(20001), port)
+}

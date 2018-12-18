@@ -280,6 +280,10 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	p.SpecMemory = specMaxMem
 
 	number := int(p.TotalMemory) / int(p.SpecMemory)
+	if number == 0 {
+		return "", fmt.Errorf(
+			"total memory(%dm) is less than each node's max memory(%dm) we can only create 0 node, reject", p.SpecMemory, p.TotalMemory)
+	}
 
 	// check if master num is even
 	ctype := proto.CacheType(p.CacheType)
