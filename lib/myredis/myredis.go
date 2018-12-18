@@ -10,6 +10,7 @@ import (
 	"overlord/lib/log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // errors
@@ -122,6 +123,38 @@ func (c *Client) IsConsistent() (bool, error) {
 	}
 
 	return true, nil
+}
+
+// BumpEpoch will bump epoch to each master
+func (c *Client) BumpEpoch() error {
+	for _, cc := range c.chunks {
+		for _, node := range cc.Nodes {
+			role := chunk.RoleMaster
+			cmd, err := c.Execute(node.Addr(), "INFO REPLICATION")
+			if err != nil {
+				return err
+			}
+			content := string(cmd.Reply.Data)
+			lsp := strings.Split(content, "\n")
+			for _, line := range lsp {
+				if strings.Contains(line, "role") {
+					if !strings.Contains(line, chunk.RoleMaster) {
+						role = chunk.RoleSlave
+					}
+					break
+				}
+			}
+
+			if role == chunk.RoleMaster {
+				_, err := c.Execute(node.Addr(), "CLUSTER BUMPEPOCH")
+				if err != nil {
+					return err
+				}
+				time.Sleep(time.Second * 2)
+			}
+		}
+	}
+	return nil
 }
 
 // IsBalanced will create check if the cluster is balanced

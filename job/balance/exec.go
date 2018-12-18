@@ -169,6 +169,12 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 			log.Info("succeed to consistent with cluster")
 			return
 		}
+
+		err := b.client.BumpEpoch()
+		if err != nil {
+			log.Errorf("bump epoch to cluster %s fail due %s", b.info.Cluster, err)
+			return
+		}
 	}
 }
 
