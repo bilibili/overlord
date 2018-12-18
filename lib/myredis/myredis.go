@@ -10,7 +10,6 @@ import (
 	"overlord/lib/log"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // errors
@@ -150,7 +149,6 @@ func (c *Client) BumpEpoch() error {
 				if err != nil {
 					return err
 				}
-				time.Sleep(time.Second * 2)
 			}
 		}
 	}

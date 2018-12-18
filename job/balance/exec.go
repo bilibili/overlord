@@ -170,6 +170,7 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 			return
 		}
 
+		log.Infof("trying to bumpepoch for the cluster %s", b.info.Cluster)
 		err := b.client.BumpEpoch()
 		if err != nil {
 			log.Errorf("bump epoch to cluster %s fail due %s", b.info.Cluster, err)
@@ -235,7 +236,7 @@ func (b *TryBalanceJob) Balance() (err error) {
 		}
 	}
 
-	log.Infof("trying to wait balance for cluster %s", b.info.Cluster)
+	log.Infof("trying to wait consistent for cluster %s", b.info.Cluster)
 	err = b.waitForConsistent(sub)
 	if err != nil {
 		log.Warnf("trying to wait consistent %s fail due %s", b.info.Cluster, err)
