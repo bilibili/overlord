@@ -92,7 +92,7 @@ func (j *JobManager) fetchNewJob(ctx context.Context) error {
 
 	select {
 	case mJob := <-j.newJob:
-		log.Infof("get new job %d as params %v", mJob.ID, *mJob)
+		log.Infof("get new job %s as params %v", mJob.ID, *mJob)
 		j.undoneJobs[mJob.ID] = mJob
 	default:
 	}

@@ -83,8 +83,9 @@ func (d *Dao) WatchJob(ctx context.Context) (j chan *model.Job) {
 	j = make(chan *model.Job)
 	go func() {
 		node := <-key
-		key := getLastField(node.Key)
-		job := &model.Job{ID: key, Param: node.Value}
+		pre, id := filepath.Split(node.Key)
+		_, group := filepath.Split(pre[:len(pre)-1])
+		job := &model.Job{ID: fmt.Sprintf("%s.%s", group, id), Param: node.Value}
 		j <- job
 	}()
 	return
