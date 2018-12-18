@@ -282,7 +282,7 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 	number := int(p.TotalMemory) / int(p.SpecMemory)
 	if number == 0 {
 		return "", fmt.Errorf(
-			"total memory(%dm) is less than each node's max memory(%dm) we can only create 0 node, reject", p.SpecMemory, p.TotalMemory)
+			"total memory(%fm) is less than each node's max memory(%fm) we can only create 0 node, reject", p.SpecMemory, p.TotalMemory)
 	}
 
 	// check if master num is even
