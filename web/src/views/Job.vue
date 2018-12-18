@@ -25,43 +25,28 @@
 </template>
 
 <script>
-import { getJobsApi } from '@/http/api'
 import VueJsonPretty from 'vue-json-pretty'
+import { mapState, mapGetters } from 'vuex'
 
 export default {
   components: {
     VueJsonPretty
   },
-  data () {
-    return {
-      jobList: [],
-      stateFilters: [],
-      loading: true
-    }
+  computed: {
+    ...mapState({
+      jobList: state => state.jobs.all,
+      loading: state => state.jobs.loading
+    }),
+    ...mapGetters('jobs', {
+      stateFilters: 'jobStateList'
+    })
   },
   created () {
-    this.loadData()
+    this.$store.dispatch('jobs/getAllJobs')
   },
   methods: {
-
     filterTag (value, row) {
       return row.state === value
-    },
-    async loadData () {
-      this.loading = true
-      try {
-        const { data } = await getJobsApi()
-        this.jobList = data.items
-        this.stateFilters = this.jobList.map(job => job.state)
-          .filter((item, index, arr) => arr.indexOf(item) === index)
-          .map(state => ({
-            text: state,
-            value: state
-          }))
-      } catch ({ error }) {
-        this.$message.error(`获取失败：${error}`)
-      }
-      this.loading = false
     },
     onSelectionChanged (newRow) {
       const table = this.$refs.dataTable

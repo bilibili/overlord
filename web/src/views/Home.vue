@@ -20,6 +20,8 @@
           </el-table-column>
           <el-table-column prop="cache_type" label="缓存类型">
           </el-table-column>
+          <el-table-column prop="front_end_port" label="前端端口">
+          </el-table-column>
           <el-table-column prop="max_memory" label="总容量">
             <template slot-scope="{ row }">
               {{ row.max_memory }} MB

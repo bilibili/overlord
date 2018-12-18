@@ -32,18 +32,18 @@
           <el-table :data="groupItem.clusters" border max-height="500">
             <el-table-column prop="name" label="集群名称" min-width="100">
             </el-table-column>
-            <el-table-column prop="cache_type" label="缓存类型">
+            <el-table-column prop="cache_type" label="缓存类型" min-width="90">
             </el-table-column>
-            <el-table-column prop="version" label="版本">
+            <el-table-column prop="front_end_port" label="前端端口">
             </el-table-column>
             <el-table-column prop="max_memory" label="总容量">
               <template slot-scope="{ row }">
                 {{ row.max_memory }} MB
               </template>
             </el-table-column>
-            <el-table-column prop="number" label="节点数">
+            <el-table-column prop="number" label="节点数" min-width="70">
             </el-table-column>
-            <el-table-column label="详情" min-width="150">
+            <el-table-column label="详情" min-width="135">
               <template slot-scope="{ row }">
                 <el-button type="text" @click="removeCorrelation(row)">解除关联</el-button>
                 <!-- <el-button type="text" @click="linkToSetting(row)">编辑关联</el-button> -->
@@ -151,7 +151,7 @@ export default {
           format: 'tree'
         })
         this.appidTree = data.items
-        this.getClusterList(this.$route.query || this.appidTree[0].children[0])
+        this.getClusterList(this.$route.query.name || this.appidTree[0].children[0].name)
       } catch ({ error }) {
         this.$message.error(`获取失败：${error}`)
       }
@@ -161,7 +161,7 @@ export default {
       if (!value) return true
       return data.label.indexOf(value) !== -1
     },
-    async getClusterList ({ name }) {
+    async getClusterList (name) {
       if (!name) return
       this.clusterLoading = true
       try {
@@ -175,7 +175,7 @@ export default {
     },
     handleNodeClick (data) {
       if (!data.children) {
-        this.getClusterList(data)
+        this.getClusterList(data.name)
       }
     },
     removeCorrelation ({ id, name }) {
@@ -193,7 +193,7 @@ export default {
         await removeCorrelationApi(name, {
           appid: this.appid
         })
-        this.getClusterList({ name: this.appid })
+        this.getClusterList(this.appid)
         this.$message.success('解除成功')
       } catch ({ error }) {
         this.$message.error(`解除失败：${error}`)
@@ -215,7 +215,7 @@ export default {
           appid: this.appid
         })
         this.dialogVisible = false
-        this.getClusterList({ name: this.appid })
+        this.getClusterList(this.appid)
         this.$message.success('关联成功')
       } catch ({ error }) {
         this.$message.error(`关联失败：${error}`)

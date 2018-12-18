@@ -19,6 +19,7 @@
           <p>名称: <span class="cluster-info__name">{{ clusterData.name }}</span></p>
           <p>类型: <span>{{ clusterData.cache_type || '--' }}</span></p>
           <p>容量: <span>{{ clusterData.max_memory * clusterData.number || '--' }} MB</span></p>
+          <p>前端端口: <span>{{ clusterData.front_end_port || '--' }}</span></p>
         </div>
         <div>
           <p>单节点容量: <span>{{ clusterData.max_memory }} MB</span></p>
@@ -104,14 +105,19 @@
               v-if="clusterData.cache_type !== 'redis_cluster'"
               label="权重"
               width="150">
-              <template slot-scope="{ row }">
+              <template slot-scope="{ row, $index }">
                 <div v-if="row.weightInfo.type === 'view'" class="instance-weight-item">
                   {{ row.weight }}
-                  <i v-if="clusterData.state !== 'waiting'" class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row)"></i>
+                  <i v-if="clusterData.state !== 'waiting'" class="el-icon-edit-outline edit-weight-icon" @click="editInstanceWeight(row, $index)"></i>
                 </div>
                 <div v-if="row.weightInfo.type === 'edit'" class="instance-weight-item">
-                  <el-input class="table-mini-input" v-model="row.weightInfo.value" placeholder="weight" size="mini" type="number"></el-input>
-                  <i class="el-icon-success edit-weight-icon" @click="saveInstanceWeight(row)"></i>
+                  <el-input class="table-mini-input"
+                    :value="row.weightInfo.value"
+                    @input="updateInstance($event, $index)"
+                    placeholder="weight"
+                    size="mini"
+                    type="number"></el-input>
+                  <i class="el-icon-success edit-weight-icon" @click="saveInstanceWeight(row, $index)"></i>
                 </div>
               </template>
             </el-table-column>
@@ -178,20 +184,16 @@
 </template>
 
 <script>
-import { getClusterDetailApi, patchInstanceWeightApi, deleteClusterApi } from '@/http/api'
+import { patchInstanceWeightApi, deleteClusterApi } from '@/http/api'
 import GROUP_MAP from '@/constants/GROUP'
+import { mapState } from 'vuex'
 
+// mapGetters
 export default {
   data () {
     return {
       GROUP_MAP,
       multipleSelection: [],
-      clusterData: [],
-      loading: true,
-      weightInfo: {
-        value: null,
-        type: 'view'
-      },
       stateMap: {
         running: 'success',
         waiting: 'warning',
@@ -203,46 +205,59 @@ export default {
 
     }
   },
+  computed: {
+    ...mapState({
+      clusterData: state => state.clusters.clusterDetail,
+      loading: state => state.clusters.loading
+    })
+  },
   created () {
     this.getClusterData()
   },
   methods: {
+    updateInstance (value, index) {
+      this.$store.dispatch('clusters/updateInstance', {
+        changeType: 'value',
+        index,
+        weightValue: value
+      })
+    },
     async getClusterData () {
       if (!this.$route.params.name) return
-      this.loading = true
-      try {
-        const { data } = await getClusterDetailApi(this.$route.params.name)
-        this.clusterData = data
-        this.clusterData.instances && this.clusterData.instances.forEach(item => {
-          this.$set(item, 'weightInfo', {
-            value: item.weight,
-            type: 'view'
-          })
-        })
-
-        if (this.clusterData.state === 'waiting') {
-          this.timer = setTimeout(() => {
-            this.getClusterData()
-          }, 5000)
-        }
-      } catch ({ error }) {
-        this.$message.error(`获取失败：${error}`)
+      this.$store.dispatch('clusters/getClusterDetail', {
+        name: this.$route.params.name
+      })
+      if (this.clusterData.state === 'waiting') {
+        this.timer = setTimeout(() => {
+          this.getClusterData()
+        }, 5000)
       }
-      this.loading = false
     },
     handleSelectionChange (val) {
       this.multipleSelection = val
     },
-    editInstanceWeight (item) {
-      item.weightInfo.type = 'edit'
+    editInstanceWeight (item, index) {
+      this.$store.dispatch('clusters/updateInstance', {
+        changeType: 'display',
+        index,
+        item,
+        newType: 'edit'
+      })
     },
-    async saveInstanceWeight (item) {
+    async saveInstanceWeight (item, index) {
+      this.$store.dispatch('clusters/getClusterDetail', {
+        name: this.$route.params.name
+      })
       const { weightInfo, ip, port } = item
       try {
         await patchInstanceWeightApi(this.clusterData.name, `${ip}:${port}`, {
           weight: Number(weightInfo.value)
         })
-        item.weightInfo.type = 'view'
+        this.$store.dispatch('clusters/updateInstance', {
+          index,
+          item,
+          newType: 'view'
+        })
         this.$message.success('修改成功')
         this.getClusterData()
       } catch ({ error }) {
