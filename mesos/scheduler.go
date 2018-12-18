@@ -565,7 +565,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 	for _, ck := range jobChunks {
 		for _, node := range ck.Nodes {
 			task := ms.TaskInfo{
-				Name:     node.Name,
+				Name:     node.Addr(),
 				TaskID:   ms.TaskID{Value: node.Addr() + "-" + t.Name + "-" + "0"},
 				AgentID:  ofm[node.Name].AgentID,
 				Executor: s.buildExcutor(node.Addr(), []ms.Resource{}),

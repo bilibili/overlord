@@ -68,7 +68,7 @@ func New(endpoint string) (e *Etcd, err error) {
 		Endpoints: []string{endpoint},
 		Transport: cli.DefaultTransport,
 		// set timeout per request to fail fast when the target endpoint is unavailable
-		HeaderTimeoutPerRequest: time.Second,
+		HeaderTimeoutPerRequest: time.Second * 2,
 	}
 	e.cli, err = cli.New(e.cfg)
 	if err != nil {
