@@ -285,6 +285,10 @@ func (d *Dao) CreateCluster(ctx context.Context, p *model.ParamCluster) (string,
 			"total memory(%fm) is less than each node's max memory(%fm) we can only create 0 node, reject", p.SpecMemory, p.TotalMemory)
 	}
 
+	if number > 1024 {
+		return "", fmt.Errorf("cluster is too large. node number(%d) is more than 1024", number)
+	}
+
 	// check if master num is even
 	ctype := proto.CacheType(p.CacheType)
 	if ctype == proto.CacheTypeRedisCluster && number%2 != 0 {
