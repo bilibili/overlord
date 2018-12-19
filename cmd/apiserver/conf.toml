@@ -23,3 +23,11 @@ stdout = true
 [[versions]]
   cache_type = "memcache"
   versions = ["1.5.0"]
+
+[cluster]
+dial_timeout = 1000
+read_timeout = 1000
+write_timeout = 1000
+node_connections = 2
+ping_fail_limit = 3
+ping_auto_eject = true

@@ -132,6 +132,15 @@ func (d *Dao) checkClusterExists(ctx context.Context, cname string) (bool, error
 	return true, nil
 }
 
+func (d *Dao) fillDefaultClusterConfig(cluster *model.Cluster) {
+	cluster.DialTimeout = d.c.DialTimeout
+	cluster.ReadTimeout = d.c.ReadTimeout
+	cluster.WriteTimeout = d.c.WriteTimeout
+	cluster.NodeConns = d.c.NodeConns
+	cluster.PingFailLimit = d.c.PingFailLimit
+	cluster.PingAutoEject = d.c.PingAutoEject
+}
+
 // GetCluster will search clusters by given cluster name
 func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, error) {
 	sub, cancel := context.WithCancel(ctx)
@@ -208,7 +217,7 @@ func (d *Dao) GetCluster(ctx context.Context, cname string) (*model.Cluster, err
 		Group:        info.Group,
 		Monitor:      d.m.Href(info.Name),
 	}
-
+	d.fillDefaultClusterConfig(c)
 	return c, nil
 }
 

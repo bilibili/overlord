@@ -40,6 +40,13 @@ type Cluster struct {
 	Group     string  `json:"group"`
 	Monitor   string  `json:"monitor"`
 
+	DialTimeout   int  `json:"dial_timeout"`
+	ReadTimeout   int  `json:"read_timeout"`
+	WriteTimeout  int  `json:"write_timeout"`
+	NodeConns     int  `json:"node_connections"`
+	PingFailLimit int  `json:"ping_fail_limit"`
+	PingAutoEject bool `json:"ping_auto_eject"`
+
 	Instances []*Instance `json:"instances"`
 }
 

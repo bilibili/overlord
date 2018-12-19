@@ -7,11 +7,22 @@ import (
 
 // ServerConfig is apiserver's config
 type ServerConfig struct {
-	Listen   string           `toml:"listen"`
-	Etcd     string           `toml:"etcd"`
-	Versions []*VersionConfig `toml:"versions"`
-	Monitor  *MonitorConfig   `toml:"monitor"`
+	Listen   string                `toml:"listen"`
+	Etcd     string                `toml:"etcd"`
+	Versions []*VersionConfig      `toml:"versions"`
+	Monitor  *MonitorConfig        `toml:"monitor"`
+	Cluster  *DefaultClusterConfig `toml:"cluster"`
 	*log.Config
+}
+
+// DefaultClusterConfig is the config used to write into cluster
+type DefaultClusterConfig struct {
+	DialTimeout   int  `toml:"dial_timeout"`
+	ReadTimeout   int  `toml:"read_timeout"`
+	WriteTimeout  int  `toml:"write_timeout"`
+	NodeConns     int  `toml:"node_connections"`
+	PingFailLimit int  `toml:"ping_fail_limit"`
+	PingAutoEject bool `toml:"ping_auto_eject"`
 }
 
 // MonitorConfig types

@@ -12,7 +12,7 @@ func New(cfg *config.ServerConfig) *Dao {
 		panic(err)
 	}
 
-	d := &Dao{e: e, m: cfg.Monitor}
+	d := &Dao{e: e, m: cfg.Monitor, c: cfg.Cluster}
 	return d
 }
 
@@ -20,6 +20,7 @@ func New(cfg *config.ServerConfig) *Dao {
 type Dao struct {
 	e *etcd.Etcd
 	m *config.MonitorConfig
+	c *config.DefaultClusterConfig
 }
 
 func (d *Dao) ETCD() *etcd.Etcd {
