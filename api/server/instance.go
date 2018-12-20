@@ -1,7 +1,9 @@
 package server
 
 import (
+	"net/http"
 	"overlord/api/model"
+	"overlord/job"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,4 +26,15 @@ func changeInstanceWeight(c *gin.Context) {
 		return
 	}
 	done(c)
+}
+
+func restartInstance(c *gin.Context) {
+	cname := c.Param("cluster_name")
+	addr := c.Param("instance_addr")
+	jobid, err := svc.RestartInstance(cname, addr)
+	if err != nil {
+		eJSON(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, &model.Job{ID: jobid, State: job.StatePending})
 }

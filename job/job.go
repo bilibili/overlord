@@ -30,7 +30,8 @@ const (
 
 	// Balance will balance the given cluster
 	OpBalance OpType = "balance"
-	// restart fail node if need.
+
+	// OpRestart will trying to restart the special node
 	OpRestart OpType = "restart"
 )
 
