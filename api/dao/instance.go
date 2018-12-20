@@ -6,6 +6,7 @@ import (
 	"overlord/api/model"
 	"overlord/job"
 	"overlord/lib/etcd"
+	"overlord/proto"
 )
 
 // SetInstanceWeight will change the given instance weight
@@ -25,7 +26,7 @@ func (d *Dao) RestartInstance(ctx context.Context, cname, addr string) (string, 
 	}
 	contains := false
 	for _, inst := range cluster.Instances {
-		if fmt.Sprintf("%s:%s", inst.IP, inst.Port) == addr {
+		if fmt.Sprintf("%s:%d", inst.IP, inst.Port) == addr {
 			contains = true
 			break
 		}
@@ -40,10 +41,11 @@ func (d *Dao) RestartInstance(ctx context.Context, cname, addr string) (string, 
 
 func (d *Dao) createResartInstance(c *model.Cluster, addr string) *job.Job {
 	j := &job.Job{
-		Cluster: c.Name,
-		Nodes:   []string{addr},
-		OpType:  job.OpRestart,
-		Group:   c.Group,
+		Cluster:   c.Name,
+		Nodes:     []string{addr},
+		OpType:    job.OpRestart,
+		Group:     c.Group,
+		CacheType: proto.CacheType(c.CacheType),
 	}
 	return j
 }
