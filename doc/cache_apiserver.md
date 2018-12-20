@@ -421,16 +421,15 @@ output in `plain` format:
 
 
 
-# V1 版本API整理
 
-## PATCH /:cluster_name/instances/:instance_id
+### PATCH /clusters/:cluster_name/instances/:instance_addr
 
 
 <details>
 <summary>修改权重</summary>
 
 
-### body arguments
+#### body arguments
 
 ```json
 {
@@ -443,6 +442,22 @@ output in `plain` format:
 ```json
 {
   "message": "done",
+}
+```
+</details>
+
+
+### POST /clusters/:cluster_name/instance/:instance_addr/restart
+
+<details>
+<summary> 发送重启对应节点的任务 </summary>
+
+#### example response
+
+```
+{
+  "id": "sh002.0000000001",
+  "state": "pending",
 }
 ```
 </details>

@@ -30,6 +30,9 @@ const (
 
 	// Balance will balance the given cluster
 	OpBalance OpType = "balance"
+
+	// OpRestart will trying to restart the special node
+	OpRestart OpType = "restart"
 )
 
 // Job is a single POD type which represent a single job.
