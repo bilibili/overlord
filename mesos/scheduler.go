@@ -175,7 +175,11 @@ func (s *Scheduler) buildEventHandle() events.Handler {
 func (s *Scheduler) trackOffersReceived() eventrules.Rule {
 	return func(ctx context.Context, e *scheduler.Event, err error, chain eventrules.Chain) (context.Context, *scheduler.Event, error) {
 		if err == nil {
-			log.Infof("get offer num %v ", len(e.GetOffers().GetOffers()))
+			offers := e.GetOffers().GetOffers()
+			log.Infof("get offer num %v ", len(offers))
+			for _, offer := range offers {
+				log.Infof("[offer detail] %v ", offer.Resources)
+			}
 		}
 		return chain(ctx, e, err)
 	}

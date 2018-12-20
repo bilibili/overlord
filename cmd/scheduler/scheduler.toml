@@ -2,7 +2,7 @@
 user = "root"
 name = "overlord"
 checkpoint = true
-master = "172.22.33.198:5050"
+master = "172.22.33.167:5050"
 executor_url = "http://172.22.33.198:20001/executor"
 db_end_point = "http://172.22.33.198:2379"
 fail_voer = "72h"

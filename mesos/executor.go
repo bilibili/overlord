@@ -245,8 +245,8 @@ func (ec *Executor) Run(c context.Context) {
 
 func (ec *Executor) quitCheck() {
 	for {
-		if ec.shouldQuit {
-			log.Info("executor exit")
+		if ec.p != nil {
+			log.Infof("executor exit with err %v", ec.p.Wait())
 			os.Exit(0)
 		}
 		time.Sleep(time.Second * 5)
