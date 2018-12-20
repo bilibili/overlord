@@ -1,4 +1,8 @@
 # Overlord
+
+## Version 1.5.2
+1. max redirects 5.
+
 ## Version 1.5.1
 1. reset sub message only in nedd.
 

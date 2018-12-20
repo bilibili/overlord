@@ -15,6 +15,7 @@ import (
 
 const (
 	respRedirect = '-'
+	maxRedirects = 5
 )
 
 var (
@@ -29,6 +30,8 @@ type nodeConn struct {
 	nc proto.NodeConn
 
 	sb strings.Builder
+
+	redirects int
 
 	state int32
 }
@@ -66,6 +69,12 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	if reply.Type() != respRedirect {
 		return
 	}
+	if nc.redirects >= 5 { // NOTE: check max redirects
+		if log.V(4) {
+			log.Infof("Redis Cluster NodeConn key(%s) already max redirects", req.Key())
+		}
+		return
+	}
 	data := reply.Data()
 	if !bytes.HasPrefix(data, askBytes) && !bytes.HasPrefix(data, movedBytes) {
 		return
@@ -78,15 +87,22 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	if err = nc.redirectProcess(m, req, addr, isAsk); err != nil && log.V(2) {
 		log.Errorf("Redis Cluster NodeConn redirectProcess addr:%s error:%v", addr, err)
 	}
+	nc.redirects = 0
 	return
 }
 
 func (nc *nodeConn) redirectProcess(m *proto.Message, req *redis.Request, addr string, isAsk bool) (err error) {
+	// next redirect
+	nc.redirects++
+	if log.V(5) {
+		log.Infof("Redis Cluster NodeConn key(%s) redirect count(%d)", req.Key(), nc.redirects)
+	}
+	// start redirect
 	nnc := newNodeConn(nc.c, addr)
 	tmp := nnc.(*nodeConn)
+	tmp.redirects = nc.redirects // NOTE: for check max redirects
 	rnc := tmp.nc.(*redis.NodeConn)
 	defer nnc.Close()
-	// rnc := rdt.nc
 	if isAsk {
 		if err = rnc.Bw().Write(askingResp); err != nil {
 			err = errors.WithStack(err)
