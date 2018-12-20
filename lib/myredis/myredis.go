@@ -101,7 +101,7 @@ func (c *Client) IsConsistent() (bool, error) {
 			}
 
 			if command.Reply.RType != RespBulk {
-				return false, fmt.Errorf("get wrong Reply %v", *command.Reply)
+				return false, fmt.Errorf("get wrong reply of %s %s", n.Addr(), strconv.Quote(string(command.Reply.Data)))
 			}
 
 			slots, err := parseSlots(command.Reply.Data)
