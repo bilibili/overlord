@@ -3,6 +3,7 @@ package chunk
 import (
 	"errors"
 	"fmt"
+	"overlord/lib/log"
 	"sort"
 	"strings"
 
@@ -147,9 +148,10 @@ func mapIntoHostRes(offers []ms.Offer, mem float64, cpu float64) (hosts []*hostR
 
 		ports := getOfferRange(offer, ResNamePorts)
 		portsNode := len(ports)
-
 		// we only need even count node
 		count := minInt(memNode, cpuNode, portsNode) / 2 * 2
+
+		log.Infof("[chunk] get the resources memory:%f cpu:%f ports-count:%d and finally count %d", m, c, len(ports), count)
 		hosts = append(hosts, &hostRes{name: offer.GetHostname(), count: count})
 	}
 	return
