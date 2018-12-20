@@ -25,7 +25,7 @@ func (d *Dao) RestartInstance(ctx context.Context, cname, addr string) (string, 
 	}
 	contains := false
 	for _, inst := range cluster.Instances {
-		if fmt.Sprintf("%s:%s", inst.IP, inst.Port) == addr {
+		if fmt.Sprintf("%s:%d", inst.IP, inst.Port) == addr {
 			contains = true
 			break
 		}
