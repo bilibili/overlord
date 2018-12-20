@@ -41,6 +41,7 @@ const (
 
 var (
 	errTaskID = errors.New("error taskid format")
+	errOffer  = errors.New("invalid offer")
 )
 
 // Scheduler mesos scheduler.
@@ -216,7 +217,7 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 
 		select {
 		case taskid := <-s.failTask:
-			s.tryRecovery(taskid, offers)
+			s.tryRecovery(taskid, offers, false)
 			return nil
 		default:
 		}
@@ -268,10 +269,9 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 	}
 }
 
-func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
+func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err error) {
 
 	var (
-		err           error
 		cluster, port string
 		info          *create.CacheInfo
 		ip            string
@@ -291,7 +291,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		return
 	}
 	log.Infof("try recover task(%v)", t)
-	if id > maxRetry {
+	if id > maxRetry && !force {
 		log.Errorf("drop recovery because of retry over than %s", t.GetValue())
 		return
 	}
@@ -315,10 +315,14 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 	for _, offer := range offers {
 		// try to recover from origin agent with the same info.
 		if offer.Hostname == ip {
+			if !checkOffer(offer, info.CPU, info.MaxMemory, uport) {
+				err = errOffer
+				return
+			}
 			task.AgentID = offer.GetAgentID()
 			s.db.SetTaskID(context.Background(), task.Name, task.TaskID.String()+task.AgentID.String())
 			accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(*task)}.WithOffers(offer.ID))
-			err := calls.CallNoData(context.Background(), s.cli, accept)
+			err = calls.CallNoData(context.Background(), s.cli, accept)
 			if err == nil {
 				log.Info("recover task successfully")
 				// decline other offer
@@ -337,14 +341,17 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 	switch info.CacheType {
 	case proto.CacheTypeMemcache, proto.CacheTypeRedis:
 		// delete old host
-		var alias string
+		var (
+			alias   string
+			newDist *chunk.Dist
+		)
 		for i, addr := range info.Dist.Addrs {
 			if addr.String() == ip+port {
 				info.Dist.Addrs = append(info.Dist.Addrs[:i], info.Dist.Addrs[i+1:]...)
 				alias = addr.ID
 			}
 		}
-		newDist, err := chunk.DistAppendIt(string(info.CacheType), info.Dist, 1, info.MaxMemory, info.CPU, offers...)
+		newDist, err = chunk.DistAppendIt(string(info.CacheType), info.Dist, 1, info.MaxMemory, info.CPU, offers...)
 		if err != nil {
 			log.Errorf("chunk,DistAppend err %v", err)
 			return
@@ -364,14 +371,34 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer) {
 		}
 
 	case proto.CacheTypeRedisCluster:
+		err = fmt.Errorf("restart redis cluster err")
 		log.Error("can not revoer redis-cluster from origin agent,need to be rescale by op")
 		// if cluster cann't recovery from origin agent.
 		// set status as WaitApprove,and then should be recover by op with chunkrecover
 	default:
 		log.Errorf("recover from err cache type")
 	}
+	return
 }
 
+func checkOffer(offer ms.Offer, cpu, mem float64, port uint64) bool {
+	for _, res := range offer.GetResources() {
+		switch {
+		case res.GetName() == "cpus":
+			return res.GetScalar().Value > cpu
+		case res.GetName() == "mem":
+			return res.GetScalar().Value > mem
+		case res.GetName() == "ports":
+			for _, rg := range res.GetRanges().GetRange() {
+				if port > rg.GetBegin() && port < rg.GetEnd() {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	return false
+}
 func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers []ms.Offer) (err error) {
 	var (
 		ofm     = make(map[string]ms.Offer)
@@ -541,6 +568,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 	case job.OpDestroy:
 		s.destroyCluster(t)
 		return
+	case job.OpRestart:
 	}
 
 	log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
@@ -741,6 +769,26 @@ func (s *Scheduler) destroyCluster(t job.Job) {
 		err = s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
 		log.Errorf("rm instance dir (%s) fail err %v", node.Value, err)
 	}
+}
+
+func (s *Scheduler) restartNode(job *job.Job, offers []ms.Offer) (err error) {
+	ctx := context.Background()
+	// restart one node each time.
+	node := job.Nodes[0]
+	var id string
+	id, err = s.db.Get(ctx, fmt.Sprintf("%s/%s/%s", etcd.InstanceDirPrefix, node, "taskid"))
+	if err != nil {
+		log.Errorf("get taskid err %v", err)
+		return
+	}
+	taskid := ms.TaskID{
+		Value: id,
+	}
+	if err = s.tryRecovery(taskid, offers, true); err == nil {
+		return
+	}
+	log.Errorf("try restart node from origin agent fail")
+	return
 }
 func (s *Scheduler) kill(id string) {
 	ids := strings.Split(id, ",")
