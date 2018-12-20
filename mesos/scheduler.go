@@ -569,6 +569,8 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		s.destroyCluster(t)
 		return
 	case job.OpRestart:
+		s.restartNode(t, offers)
+		return
 	}
 
 	log.Infof("get chunks(%v) by offers (%v)", chunks, offers)
@@ -771,7 +773,7 @@ func (s *Scheduler) destroyCluster(t job.Job) {
 	}
 }
 
-func (s *Scheduler) restartNode(job *job.Job, offers []ms.Offer) (err error) {
+func (s *Scheduler) restartNode(job job.Job, offers []ms.Offer) (err error) {
 	ctx := context.Background()
 	// restart one node each time.
 	node := job.Nodes[0]

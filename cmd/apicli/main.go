@@ -19,6 +19,7 @@ func main() {
 	flag.StringVar(&cmd, "cmd", "", "cli cmd")
 	flag.StringVar(&name, "name", "", "cluster name")
 	flag.StringVar(&appid, "appid", "", "appid name")
+	flag.StringVar(&addr, "addr", "", "addr of node to restart")
 	flag.Parse()
 	log.Init(nil)
 	var err error
@@ -43,6 +44,8 @@ func main() {
 		addAppID(name, appid)
 	case cmd == "unassign":
 		deleteAppID(name, appid)
+	case cmd == "restart":
+		restartNode(name, addr)
 	}
 	if err != nil {
 		fmt.Printf("err %v", err)
@@ -54,6 +57,7 @@ var (
 	cmd       string
 	server    string
 	appid     string
+	addr      string
 	defCreate = &model.ParamCluster{
 		Name:        "default",
 		Appids:      []string{"appid.test.appid"},
@@ -102,6 +106,9 @@ func deleteAppID(cluster string, appid string) (err error) {
 	}
 	bs, _ := json.Marshal(arg)
 	return newReq(http.MethodDelete, fmt.Sprintf("%s%s%s/appid", server, base, cluster), string(bs))
+}
+func restartNode(cluster string, addr string) (err error) {
+	return newReq(http.MethodPost, fmt.Sprintf("%s%s%s/instance/%s/restart", server, base, cluster, addr), "")
 }
 func getJobs() (err error) {
 	return
