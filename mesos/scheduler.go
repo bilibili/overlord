@@ -521,7 +521,8 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 // if id not equal zero mean task had fail before and been recover.
 func parseTaskID(t ms.TaskID) (cluster, ip, port string, id int64, err error) {
 	v := t.GetValue()
-	ss := strings.Split(v, "-")
+	tids := strings.Split(v, ",")
+	ss := strings.Split(tids[0], "-")
 	if len(ss) != 3 {
 		err = errTaskID
 		return
