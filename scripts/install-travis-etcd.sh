@@ -1,18 +1,12 @@
 #!/bin/sh
 
-ETCD_VER=v3.3.10
-
-# choose either URL
-GOOGLE_URL=https://storage.googleapis.com/etcd
-GITHUB_URL=https://github.com/etcd-io/etcd/releases/download
-DOWNLOAD_URL=${GOOGLE_URL}
-
-rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
-rm -rf /tmp/etcd-download-test && mkdir -p /tmp/etcd-download-test
-
-curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
-tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp/etcd-download-test --strip-components=1
-rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
-
-/tmp/etcd-download-test/etcd --version
-ETCDCTL_API=3 /tmp/etcd-download-test/etcdctl version
+docker run -d -v /usr/share/ca-certificates/:/etc/ssl/certs -p 4001:4001 -p 2380:2380 -p 2379:2379 \
+       --name etcd quay.io/coreos/etcd:v2.3.8 \
+       -name etcd0 \
+       -advertise-client-urls http://${HostIP}:2379,http://${HostIP}:4001 \
+       -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001 \
+       -initial-advertise-peer-urls http://${HostIP}:2380 \
+       -listen-peer-urls http://0.0.0.0:2380 \
+       -initial-cluster-token etcd-cluster-1 \
+       -initial-cluster etcd0=http://${HostIP}:2380 \
+       -initial-cluster-state new
