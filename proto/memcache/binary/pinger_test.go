@@ -25,10 +25,7 @@ func TestPingerPingEOF(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = pinger.Ping()
-	assert.Error(t, err)
-
-	err = errors.Cause(err)
-	assert.Equal(t, bufio.ErrBufferFull, err)
+	assert.NoError(t, err)
 }
 
 func TestPingerPing100Ok(t *testing.T) {
@@ -41,8 +38,7 @@ func TestPingerPing100Ok(t *testing.T) {
 	}
 
 	err := pinger.Ping()
-	assert.Error(t, err)
-	_causeEqual(t, bufio.ErrBufferFull, err)
+	assert.NoError(t, err)
 }
 
 func TestPingerFlushErr(t *testing.T) {
