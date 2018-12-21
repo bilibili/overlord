@@ -125,6 +125,12 @@
 			"revisionTime": "2018-10-24T15:28:41Z"
 		},
 		{
+			"checksumSHA1": "r6ZMyP/HsdeToXIxvgP3ntL6Bds=",
+			"path": "github.com/konsorten/go-windows-terminal-sequences",
+			"revision": "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242",
+			"revisionTime": "2018-10-04T22:41:46Z"
+		},
+		{
 			"checksumSHA1": "GiVgQkx5acnq+JZtYiuHPlhHoso=",
 			"path": "github.com/mattn/go-isatty",
 			"revision": "3fb116b820352b7f0c281308a4d6250c22d94e27",
@@ -425,10 +431,10 @@
 			"revisionTime": "2018-12-05T16:12:34Z"
 		},
 		{
-			"checksumSHA1": "//pb4co1t6JuiPSorAZiLrDh+00=",
+			"checksumSHA1": "Rq+zqkFV0wJgi0MARcgx0QT+9lE=",
 			"path": "github.com/sirupsen/logrus",
-			"revision": "29d7eb25e8ffa54207ff5a9a5c3d63e95be2cc39",
-			"revisionTime": "2018-11-22T06:14:47Z"
+			"revision": "2067ea4241cec716fbd0ac90f42f339f963bff92",
+			"revisionTime": "2018-12-15T15:21:19Z"
 		},
 		{
 			"checksumSHA1": "c6pbpF7eowwO59phRTpF8cQ80Z0=",
@@ -471,6 +477,12 @@
 			"path": "go.etcd.io/etcd/version",
 			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
 			"revisionTime": "2018-11-28T02:58:43Z"
+		},
+		{
+			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "1a580b3eff7814fc9b40602fd35256c63b50f491",
+			"revisionTime": "2018-05-14T23:55:10Z"
 		},
 		{
 			"checksumSHA1": "hgMzrmP2ui9O0+y5w8lQQdGnPLE=",
