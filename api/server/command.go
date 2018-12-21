@@ -14,7 +14,7 @@ func executeCommand(c *gin.Context) {
 
 	cmd := c.PostForm("command")
 
-	rcmd, err := svc.Execute(fmt.Sprintf("%s:%d", ip, port), cmd)
+	rcmd, err := svc.Execute(fmt.Sprintf("%s:%s", ip, port), cmd)
 	if err != nil {
 		eJSON(c, err)
 		return
