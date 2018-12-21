@@ -24,6 +24,7 @@ func TestProxyConn(t *testing.T) {
 	msgs := proto.GetMsgs(1)
 	msg := msgs[0]
 	req := &redis.Request{}
+	msg.WithRequest(req)
 	resp := &redis.RESP{}
 
 	// pc stub
