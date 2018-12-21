@@ -11,6 +11,7 @@ services:
   - docker
 
 install:
+  - docker run -d --rm -e "IP=0.0.0.0" -p7000-7007:7000-7007 grokzen/redis-cluster:4.0.9
   - bash scripts/install-travis-etcd.sh
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
