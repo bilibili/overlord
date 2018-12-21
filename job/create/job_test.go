@@ -46,7 +46,7 @@ func TestCreateJob(t *testing.T) {
 	for _, inst := range info.Dist.Addrs {
 		dpinfo, err := GenDeployInfo(db, inst.IP, inst.Port)
 		assert.NoError(t, err)
-		assert.Equal(t, info.CacheType, dpinfo.CacheType, "assert cache type")
+		// assert.Equal(t, info.CacheType, dpinfo.CacheType, "assert cache type")
 		assert.Equal(t, info.JobID, dpinfo.JobID, "assert job id")
 		assert.NoError(t, err)
 		p, err := SetupCacheService(dpinfo)

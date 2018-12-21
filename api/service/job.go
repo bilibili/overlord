@@ -156,6 +156,12 @@ func (j *JobManager) scanJobs(ctx context.Context) error {
 			continue
 		}
 		myjob.ID = jobID
+		if myjob.OpType != job.OpCreate {
+			removed = append(removed, mJob.ID)
+			delete(j.retryCounter, mJob.ID)
+			continue
+		}
+
 
 		cluster, err := j.svc.d.GetCluster(ctx, myjob.Name)
 		if err != nil {

@@ -1,4 +1,4 @@
-etcd = "http://10.211.55.4:2379"
+etcd = "http://172.22.33.198:2379"
 etcd_path = "/overlord/clusters"
-sd_config = "/tmp/sd_config"
+sd_config_dir = "/tmp/sd_config"
 default_owner = "user1,user2"

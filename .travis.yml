@@ -9,6 +9,7 @@ services:
   - memcached
   - redis
   - docker
+  - etcd
 
 install:
   - go get -u github.com/alecthomas/gometalinter

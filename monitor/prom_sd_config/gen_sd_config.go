@@ -13,6 +13,8 @@ import (
 	"overlord/lib/etcd"
 	"overlord/lib/log"
 
+	"os"
+
 	"github.com/BurntSushi/toml"
 )
 
@@ -25,7 +27,7 @@ type ServerConfig struct {
 	Listen       string `toml:"listen"`
 	Etcd         string `toml:"etcd"`
 	EtcdPath     string `toml:"etcd_path"`
-	SdConfig     string `toml:"sd_config"`
+	SdConfig     string `toml:"sd_config_dir"`
 	DefaultOwner string `toml:"default_owner"`
 	*log.Config
 }
@@ -80,13 +82,14 @@ func genMetric(conf *ServerConfig, info *create.CacheInfo) (data MetricInfo) {
 	return
 }
 
+// genSdConfig generate prom_sd_config
 func genSdConfig(conf *ServerConfig, e *etcd.Etcd) {
 	nodes, err := e.LS(context.TODO(), "/overlord/clusters")
 	if err != nil {
 		panic(err)
 	}
 
-	var metrics []MetricInfo
+	metricsMap := make(map[string][]MetricInfo)
 
 	for _, node := range nodes {
 		var (
@@ -106,18 +109,58 @@ func genSdConfig(conf *ServerConfig, e *etcd.Etcd) {
 			continue
 		}
 		metricInfo := genMetric(conf, info)
-		metrics = append(metrics, metricInfo)
+
+		if info.CacheType == "redis" || info.CacheType == "redis-cluster" {
+			if _, ok := metricsMap["redis"]; !ok {
+				metricsMap["redis"] = []MetricInfo{}
+			}
+			metricsMap["redis"] = append(metricsMap["redis"], metricInfo)
+
+		} else if info.CacheType == "memcache" {
+			if _, ok := metricsMap["memcache"]; !ok {
+				metricsMap["memcache"] = []MetricInfo{}
+			}
+			metricsMap["memcache"] = append(metricsMap["memcache"], metricInfo)
+		}
 	}
 
+	for cacheType, metrics := range metricsMap {
+		var confPath string
+		if cacheType == "redis" {
+			confPath = fmt.Sprintf("%s/redis.json", conf.SdConfig)
+		} else if cacheType == "memcache" {
+			confPath = fmt.Sprintf("%s/memcache.json", conf.SdConfig)
+		}
+
+		fmt.Println(confPath)
+		file, err := os.Open(confPath)
+		if err != nil && os.IsNotExist(err) {
+			file, err = os.Create(confPath)
+			if err != nil {
+				panic(err)
+			}
+			file.Close()
+		}
+
+		err = writeToFile(confPath, metrics)
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}
+}
+
+// writeToFile write metrics to file
+func writeToFile(filePath string, metrics []MetricInfo) (err error) {
 	b, err := json.MarshalIndent(metrics, "", "\t")
 	if err != nil {
 		log.Error(err.Error())
 	}
 
-	err = ioutil.WriteFile(conf.SdConfig, b, 0644)
+	err = ioutil.WriteFile(filePath, b, 0644)
 	if err != nil {
-		log.Warn("%s file write failed.", conf.SdConfig)
+		log.Warn("%s file write failed.", filePath)
 	}
+	return
 }
 
 func main() {
@@ -131,7 +174,6 @@ func main() {
 	if log.Init(conf.Config) {
 		defer log.Close()
 	}
-
 	e, err := etcd.New(conf.Etcd)
 	if err != nil {
 		panic(err)

@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"overlord/job/create"
-	"overlord/lib/etcd"
-	"testing"
-
 	"fmt"
 	"strings"
+	"testing"
+
+	"overlord/job/create"
+	"overlord/lib/etcd"
 
 	"github.com/stretchr/testify/assert"
 )

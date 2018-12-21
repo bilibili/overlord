@@ -147,7 +147,7 @@ type TryBalanceJob struct {
 }
 
 func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
-	var consistent = false
+	var consistent bool
 	for {
 		select {
 		case <-ctx.Done():
@@ -182,7 +182,7 @@ func (b *TryBalanceJob) waitForConsistent(ctx context.Context) (err error) {
 
 func (b *TryBalanceJob) tryBalance(ctx context.Context) (err error) {
 	var (
-		balanced = false
+		balanced bool
 		ticker   = time.NewTicker(time.Second * 3)
 	)
 	for {

@@ -9,10 +9,15 @@ import (
 )
 
 func TestLog(t *testing.T) {
-	std := log.NewStdHandler()
-	f := log.NewFileHandler("/tmp/overlord.log")
+	// std := log.NewStdHandler()
+	// f := log.NewFileHandler("/tmp/overlord.log")
 
-	log.Init(std, f)
+	log.Init(&log.Config{
+		Stdout: true,
+		Debug:  true,
+		Log:    "/tmp/overlord.log",
+		LogVL:  10,
+	})
 
 	log.Info("test1")
 	log.Info("test1", "test2")
