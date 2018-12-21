@@ -15,6 +15,12 @@
 			"revisionTime": "2016-08-04T10:47:26Z"
 		},
 		{
+			"checksumSHA1": "HSoVXzX8jWK/yHnhCoKnjlFJ71w=",
+			"path": "github.com/bouk/monkey",
+			"revision": "e8ac0cba3b42082cac2c6549eaa3c60f18373c76",
+			"revisionTime": "2018-09-14T09:56:44Z"
+		},
+		{
 			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
