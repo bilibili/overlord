@@ -158,7 +158,7 @@ func writeToFile(filePath string, metrics []MetricInfo) (err error) {
 
 	err = ioutil.WriteFile(filePath, b, 0644)
 	if err != nil {
-		log.Warn("%s file write failed.", filePath)
+		log.Warn(filePath, " file write failed.", )
 	}
 	return
 }

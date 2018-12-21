@@ -25,7 +25,7 @@ func TestGenSdConfig(t *testing.T) {
 	clusterPath = "/overlord/clusters/test-1"
 	clusterInfo = fmt.Sprintf("%s/%s", "/overlord/clusters/test-1", "info")
 
-	e, err := etcd.New("http://10.211.55.4:2379")
+	e, err := etcd.New("http://127.0.0.1:2379")
 	assert.NoError(t, err)
 	ctx := context.TODO()
 
