@@ -72,7 +72,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 	if err != nil {
 		panic(err)
 	}
-	log.Infof("overlord proxy cluster[%s] addr(%s) already listened", cc.Name, cc.ListenAddr)
+	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", cc.Name, cc.ListenAddr)
 	go p.accept(cc, l, forwarder)
 }
 

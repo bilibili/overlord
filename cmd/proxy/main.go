@@ -17,7 +17,7 @@ import (
 
 const (
 	// VERSION version
-	VERSION = "1.5.0"
+	VERSION = "1.5.2"
 )
 
 var (
@@ -160,12 +160,12 @@ func signalHandler() {
 	var ch = make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for {
-		log.Infof("overlord proxy version[%s] already started", VERSION)
+		log.Infof("overlord proxy version[%s] start serving", VERSION)
 		si := <-ch
 		log.Infof("overlord proxy version[%s] signal(%s) stop the process", VERSION, si.String())
 		switch si {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			log.Infof("overlord proxy version[%s] already exited", VERSION)
+			log.Infof("overlord proxy version[%s] exited", VERSION)
 			return
 		case syscall.SIGHUP:
 		default:
