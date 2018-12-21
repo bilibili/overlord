@@ -125,10 +125,6 @@
 			"revisionTime": "2018-10-24T15:28:41Z"
 		},
 		{
-			"path": "github.com/konsorten/go-windows-terminal-sequences",
-			"revision": ""
-		},
-		{
 			"checksumSHA1": "GiVgQkx5acnq+JZtYiuHPlhHoso=",
 			"path": "github.com/mattn/go-isatty",
 			"revision": "3fb116b820352b7f0c281308a4d6250c22d94e27",
@@ -475,10 +471,6 @@
 			"path": "go.etcd.io/etcd/version",
 			"revision": "829c9b2129dd02fbf8caf7f1d322fbe7011321c4",
 			"revisionTime": "2018-11-28T02:58:43Z"
-		},
-		{
-			"path": "golang.org/x/crypto/ssh/terminal",
-			"revision": ""
 		},
 		{
 			"checksumSHA1": "hgMzrmP2ui9O0+y5w8lQQdGnPLE=",
