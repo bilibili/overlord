@@ -9,9 +9,9 @@ services:
   - memcached
   - redis
   - docker
-  - etcd
 
 install:
+  - bash scripts/install-travis-etcd.sh
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
   - docker pull grokzen/redis-cluster:4.0.9
