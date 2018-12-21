@@ -23,7 +23,7 @@ func (a *Addr) String() string {
 	return fmt.Sprintf("%s:%d", a.IP, a.Port)
 }
 
-func mapHostResIntoDist(name string, idx int, hrs []*hostRes, portsMap map[string][]int) *Dist {
+func mapHostResIntoDist(hrs []*hostRes, portsMap map[string][]int) *Dist {
 	addrs := make([]*Addr, 0)
 	portsCountMap := make(map[string]int)
 	for name := range portsMap {
@@ -33,7 +33,6 @@ func mapHostResIntoDist(name string, idx int, hrs []*hostRes, portsMap map[strin
 	for _, hr := range hrs {
 		for i := 0; i < hr.count; i++ {
 			count := portsCountMap[hr.name]
-			idx++
 			addrs = append(addrs, &Addr{IP: hr.name, Port: portsMap[hr.name][count]})
 			portsCountMap[hr.name] = count + 1
 		}
@@ -43,19 +42,19 @@ func mapHostResIntoDist(name string, idx int, hrs []*hostRes, portsMap map[strin
 }
 
 // DistIt will cacluate Dist by the given offer.
-func DistIt(name string, num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err error) {
+func DistIt(num int, mem, cpu float64, offers ...ms.Offer) (dist *Dist, err error) {
 	hrs := dpFillHostRes(nil, nil, mapIntoHostRes(offers, mem, cpu), num, 1)
 	if !checkDist(hrs, num) {
 		err = ErrBadDist
 		return
 	}
 	portsMap := mapIntoPortsMap(offers)
-	dist = mapHostResIntoDist(name, 0, hrs, portsMap)
+	dist = mapHostResIntoDist(hrs, portsMap)
 	return
 }
 
 // DistAppendIt will re-dist it by append new nodes.
-func DistAppendIt(name string, dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
+func DistAppendIt(dist *Dist, num int, memory, cpu float64, offers ...ms.Offer) (newDist *Dist, err error) {
 	if num <= 0 {
 		return
 	}
@@ -108,6 +107,6 @@ func DistAppendIt(name string, dist *Dist, num int, memory, cpu float64, offers 
 		newHrs = append(newHrs, &hostRes{name: addr, count: count})
 	}
 	portsMap := mapIntoPortsMap(offers)
-	newDist = mapHostResIntoDist(name, len(dist.Addrs), newHrs, portsMap)
+	newDist = mapHostResIntoDist(newHrs, portsMap)
 	return
 }

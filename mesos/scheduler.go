@@ -351,7 +351,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 				alias = addr.ID
 			}
 		}
-		newDist, err = chunk.DistAppendIt(string(info.CacheType), info.Dist, 1, info.MaxMemory, info.CPU, offers...)
+		newDist, err = chunk.DistAppendIt(info.Dist, 1, info.MaxMemory, info.CPU, offers...)
 		if err != nil {
 			log.Errorf("chunk,DistAppend err %v", err)
 			return
@@ -642,7 +642,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 	)
 	switch t.OpType {
 	case job.OpCreate:
-		dist, err = chunk.DistIt(string(t.CacheType), t.Num, t.MaxMem, t.CPU, offers...)
+		dist, err = chunk.DistIt(t.Num, t.MaxMem, t.CPU, offers...)
 		if err != nil {
 			err = errors.WithStack(err)
 			return
@@ -663,7 +663,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		dist = ci.Dist
 		delta := t.Num - len(dist.Addrs)
 		if delta >= 0 {
-			newDist, err = chunk.DistAppendIt(string(t.CacheType), dist, t.Num, t.MaxMem, t.CPU, offers...)
+			newDist, err = chunk.DistAppendIt(dist, t.Num, t.MaxMem, t.CPU, offers...)
 			if err != nil {
 				err = errors.WithStack(err)
 				return
@@ -706,7 +706,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		}
 
 		num := len(alias)
-		newDist, err = chunk.DistAppendIt(string(t.CacheType), ci.Dist, num, ci.MaxMemory, ci.CPU, offers...)
+		newDist, err = chunk.DistAppendIt(ci.Dist, num, ci.MaxMemory, ci.CPU, offers...)
 		if err != nil {
 			err = errors.WithStack(err)
 			return
