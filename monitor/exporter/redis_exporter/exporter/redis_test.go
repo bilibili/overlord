@@ -1066,7 +1066,7 @@ func TestNonExistingHost(t *testing.T) {
 func TestMoreThanOneHost(t *testing.T) {
 
 	firstHost := defaultRedisHost.Addrs[0]
-	secondHost := "redis://localhost:6380"
+	secondHost := "redis://localhost:6379"
 
 	c, err := redis.DialURL(secondHost)
 	if err != nil {
