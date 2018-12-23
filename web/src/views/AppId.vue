@@ -66,7 +66,7 @@
         v-model="clusterKeyword"
         @keyup.native="searchCluster">
       </el-input>
-      <el-table :data="clusterList" border max-height="300px">
+      <el-table :data="clusterList" v-loading="queryLoading" border max-height="300px">
         <el-table-column prop="name" label="集群" width="150">
         </el-table-column>
         <el-table-column prop="group" label="机房">
@@ -104,8 +104,10 @@
 
 <script>
 import GROUP_MAP from '@/constants/GROUP'
-import { getClusterListByQueryApi, getAppidsApi, getAppidDetailApi, removeCorrelationApi, addCorrelationApi, addAppIdApi } from '@/http/api'
+import { getAppidsApi, getAppidDetailApi, removeCorrelationApi, addCorrelationApi, addAppIdApi } from '@/http/api'
+import { mapState } from 'vuex'
 import { throttle } from 'lodash'
+
 export default {
   data () {
     return {
@@ -123,7 +125,6 @@ export default {
       // dialog
       dialogVisible: false,
       clusterKeyword: null,
-      clusterList: [],
       // dialog
       addIdDialogVisible: false,
       appidForm: {
@@ -134,6 +135,12 @@ export default {
   },
   created () {
     this.getAppids()
+  },
+  computed: {
+    ...mapState({
+      clusterList: state => state.clusters.clusterResult,
+      queryLoading: state => state.clusters.queryLoading
+    })
   },
   watch: {
     filterText (val) {
@@ -252,14 +259,9 @@ export default {
     }, 1000),
     async loadClusterData () {
       if (!this.clusterKeyword) return
-      try {
-        const { data } = await getClusterListByQueryApi({
-          name: this.clusterKeyword
-        })
-        this.clusterList = data.items
-      } catch ({ error }) {
-        this.$message.error(`获取失败：${error}`)
-      }
+      this.$store.dispatch('clusters/getClusterResult', {
+        name: this.clusterKeyword
+      })
     }
   }
 }

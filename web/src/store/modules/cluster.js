@@ -1,12 +1,14 @@
 import Vue from 'vue'
 import * as types from '../mutation-types'
 import { Message } from 'element-ui'
-import { getClusterDetailApi } from '@/http/api'
+import { getClusterDetailApi, getClusterListByQueryApi } from '@/http/api'
 
 // initial state
 const state = {
   clusterDetail: {},
-  loading: false
+  loading: false,
+  clusterResult: [],
+  queryLoading: false
 }
 
 // getters
@@ -33,6 +35,18 @@ const actions = {
   },
   updateInstance ({ commit }, { changeType, index, item, newType, weightValue }) {
     commit(types.UPDATE_CLUSTER_INSTANCES, { changeType, index, item, newType, weightValue })
+  },
+  async getClusterResult ({ commit }, { name }) {
+    commit(types.SAVE_CLUSTER_DETAIL_LOADING, true)
+    try {
+      const { data: { items } } = await getClusterListByQueryApi({
+        name
+      })
+      commit(types.SAVE_CLUSTER_BY_QUERY, items)
+    } catch ({ error }) {
+      Message.error(`获取失败：${error}`)
+    }
+    commit(types.SAVE_CLUSTER_DETAIL_LOADING, false)
   }
 }
 
@@ -50,6 +64,12 @@ const mutations = {
     } else {
       state.clusterDetail.instances[index].weightInfo.value = weightValue
     }
+  },
+  [types.SAVE_CLUSTER_BY_QUERY] (state, data) {
+    state.clusterResult = data
+  },
+  [types.SAVE_CLUSTER_BY_QUERY_LOADING] (state, queryLoading) {
+    state.queryLoading = queryLoading
   }
 }
 
