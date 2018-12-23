@@ -54,6 +54,10 @@ const addAppIdApi = (params) => {
   return http.post('api/v1/appids', params)
 }
 
+const restartInstanceApi = (clusterName, instance) => {
+  return http.post(`api/v1/clusters/${clusterName}/instance/${instance}/restart`)
+}
+
 export {
   getClusterListByQueryApi,
   getAppidsApi,
@@ -66,5 +70,6 @@ export {
   patchInstanceWeightApi,
   createClusterApi,
   addCorrelationApi,
-  addAppIdApi
+  addAppIdApi,
+  restartInstanceApi
 }
