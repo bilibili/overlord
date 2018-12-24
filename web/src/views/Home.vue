@@ -42,20 +42,24 @@
 </template>
 
 <script>
-import { getClusterListByQueryApi } from '@/http/api'
 import { throttle } from 'lodash'
+import { mapState } from 'vuex'
 
 export default {
   name: 'home',
   data () {
     return {
-      clusterKeyword: null,
-      clusterList: []
+      clusterKeyword: null
     }
   },
   created () {
     this.clusterKeyword = this.$route.query.key
     this.loadClusterData()
+  },
+  computed: {
+    ...mapState({
+      clusterList: state => state.clusters.clusterResult
+    })
   },
   methods: {
     searchCluster: throttle(function searchCluster () {
@@ -63,15 +67,10 @@ export default {
     }, 1000),
     async loadClusterData () {
       if (!this.clusterKeyword) return
-      try {
-        const { data } = await getClusterListByQueryApi({
-          name: this.clusterKeyword
-        })
-        this.clusterList = data.items
-        this.$router.replace({ name: 'home', query: { key: this.clusterKeyword } })
-      } catch ({ error }) {
-        this.$message.error(`获取失败：${error}`)
-      }
+      this.$store.dispatch('clusters/getClusterResult', {
+        name: this.clusterKeyword
+      })
+      this.$router.replace({ name: 'home', query: { key: this.clusterKeyword } })
     },
     linkToClusterDetail ({ name }) {
       this.$router.push({ name: 'cluster', params: { name } })

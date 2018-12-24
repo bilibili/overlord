@@ -10,9 +10,6 @@
         <el-tag :type="stateMap[clusterData.state]">
           <i v-if="clusterData.state === 'waiting'" class="el-icon-loading"></i>{{ clusterData.state }}
         </el-tag>
-        <!-- <el-tag :type="stateMap[clusterData.state]">
-          <i v-if="clusterData.state === 'waiting'"></i>集群创建中...
-        </el-tag> -->
       </div>
       <div class="cluster-info">
         <div>
@@ -131,15 +128,15 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <!-- TODO(feature): 二期开放 -->
-            <!-- <el-table-column label="操作" width="200">
+            <el-table-column label="操作" width="80">
               <template slot-scope="{ row }">
-                <el-button type="text" @click="linkToSetting(row)">重启</el-button>
-                <el-button type="text" @click="linkToSetting(row)">开关</el-button>
+                <el-button type="text" @click="restartInstance(row)">重启</el-button>
+                <!-- TODO(feature): 二期开放 -->
+                <!-- <el-button type="text" @click="linkToSetting(row)">开关</el-button>
                 <el-button type="text" @click="linkToSetting(row)">删除</el-button>
-                <el-button type="text" @click="linkToSetting(row)">监控</el-button>
+                <el-button type="text" @click="linkToSetting(row)">监控</el-button> -->
               </template>
-            </el-table-column> -->
+            </el-table-column>
           </el-table>
       </div>
     </div>
@@ -184,7 +181,7 @@
 </template>
 
 <script>
-import { patchInstanceWeightApi, deleteClusterApi } from '@/http/api'
+import { patchInstanceWeightApi, deleteClusterApi, restartInstanceApi } from '@/http/api'
 import GROUP_MAP from '@/constants/GROUP'
 import { mapState } from 'vuex'
 
@@ -271,6 +268,14 @@ export default {
         this.$router.back()
       } catch ({ error }) {
         this.$message.error(`删除失败：${error}`)
+      }
+    },
+    async restartInstance ({ ip, port }) {
+      try {
+        await restartInstanceApi(this.clusterData.name, `${ip}:${port}`)
+        this.$message.success('重启成功')
+      } catch ({ error }) {
+        this.$message.error(`重启失败：${error}`)
       }
     }
   },
