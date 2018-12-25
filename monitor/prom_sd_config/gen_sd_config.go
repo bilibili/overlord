@@ -53,7 +53,7 @@ func genMetric(conf *ServerConfig, info *create.CacheInfo) (data MetricInfo) {
 		addrs        []string
 	)
 
-	if info.CacheType == "redis" || info.CacheType == "redis-cluster" {
+	if info.CacheType == "redis" || info.CacheType == "redis_cluster" {
 		metricLabels = MetricLabels{
 			Job:      "redis_exporter",
 			Owner:    conf.DefaultOwner,
@@ -70,10 +70,20 @@ func genMetric(conf *ServerConfig, info *create.CacheInfo) (data MetricInfo) {
 		}
 	}
 
-	// get redis/redis-cluster/memcache addrs
-	for _, addr := range info.Dist.Addrs {
-		addrs = append(addrs, addr.String())
+	// get redis/redis_cluster/memcache addrs
+	if info.CacheType == "redis" || info.CacheType == "memcache" {
+		for _, addr := range info.Dist.Addrs {
+			addrs = append(addrs, addr.String())
+		}
+	} else if info.CacheType == "redis_cluster" {
+		for _, nodes := range info.Chunks {
+			for _, addr := range nodes.Nodes {
+				address := fmt.Sprintf("%s:%d", addr.Name, addr.Port)
+				addrs = append(addrs, address)
+			}
+		}
 	}
+
 
 	data = MetricInfo{
 		Labels:  metricLabels,
@@ -110,7 +120,7 @@ func genSdConfig(conf *ServerConfig, e *etcd.Etcd) {
 		}
 		metricInfo := genMetric(conf, info)
 
-		if info.CacheType == "redis" || info.CacheType == "redis-cluster" {
+		if info.CacheType == "redis" || info.CacheType == "redis_cluster" {
 			if _, ok := metricsMap["redis"]; !ok {
 				metricsMap["redis"] = []MetricInfo{}
 			}
