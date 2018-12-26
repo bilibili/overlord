@@ -674,6 +674,9 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 			// TODO:scale down
 			return
 		}
+	case job.OpRestart:
+		s.restartNode(t, offers)
+		return
 	case job.OpMigrate:
 		var (
 			newDist *chunk.Dist
@@ -751,14 +754,29 @@ func (s *Scheduler) destroyCluster(t job.Job) {
 		log.Errorf("get info fail err %v", err)
 	}
 	if ci != nil {
-		for _, d := range ci.Dist.Addrs {
-			var id string
-			id, err = s.db.TaskID(ctx, d.String())
-			if err != nil {
-				log.Errorf("get task(%s) err %v", d.String(), err)
-				continue
+		switch t.CacheType {
+		case proto.CacheTypeRedisCluster:
+			for _, ck := range ci.Chunks {
+				for _, n := range ck.Nodes {
+					var id string
+					id, err = s.db.TaskID(ctx, n.Addr())
+					if err != nil {
+						log.Errorf("get task(%s) err %v", n.Addr(), err)
+						continue
+					}
+					s.kill(id)
+				}
 			}
-			s.kill(id)
+		default:
+			for _, d := range ci.Dist.Addrs {
+				var id string
+				id, err = s.db.TaskID(ctx, d.String())
+				if err != nil {
+					log.Errorf("get task(%s) err %v", d.String(), err)
+					continue
+				}
+				s.kill(id)
+			}
 		}
 	}
 	// clear etcd info
