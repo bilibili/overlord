@@ -293,6 +293,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 	log.Infof("try recover task(%v)", t)
 	if id > maxRetry && !force {
 		log.Errorf("drop recovery because of retry over than %s", t.GetValue())
+		err = errors.Errorf("retry over max")
 		return
 	}
 	info, err = s.getInfoFromEtcd(context.Background(), cluster)
