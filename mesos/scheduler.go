@@ -326,7 +326,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 				return
 			}
 			task.AgentID = offer.GetAgentID()
-			s.db.SetTaskID(context.Background(), task.Name, task.TaskID.GetValue()+task.AgentID.GetValue())
+			s.db.SetTaskID(context.Background(), task.Name, task.TaskID.GetValue()+","+task.AgentID.GetValue())
 			accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(*task)}.WithOffers(offer.ID))
 			err = calls.CallNoData(context.Background(), s.cli, accept)
 			if err == nil {
