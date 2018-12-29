@@ -22,4 +22,16 @@ func TestRequestNewRequest(t *testing.T) {
 	assert.Equal(t, "LLEN", req.CmdString())
 	assert.Equal(t, []byte("LLEN"), req.Cmd())
 	assert.Equal(t, "mylist", string(req.Key()))
+	assert.True(t, req.IsSupport())
+	assert.False(t, req.IsCtl())
+}
+
+func BenchmarkCmdTypeCheck(b *testing.B) {
+	req := getReq()
+	req.resp.array = append(req.resp.array, &resp{
+		data: []byte("3\r\nSET"),
+	})
+	for i := 0; i < b.N; i++ {
+		req.IsSupport()
+	}
 }

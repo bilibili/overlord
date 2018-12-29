@@ -30,10 +30,10 @@ type proxyConn struct {
 }
 
 // NewProxyConn creates new redis cluster Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn, executer proto.Executor) proto.ProxyConn {
+func NewProxyConn(conn *libnet.Conn, fer proto.Forwarder) proto.ProxyConn {
 	var c *cluster
-	if executer != nil {
-		c = executer.(*cluster)
+	if fer != nil {
+		c = fer.(*cluster)
 	}
 	r := &proxyConn{
 		c:  c,
@@ -69,7 +69,8 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 					err = pcc.Bw().Write(notSupportBytes)
 					return
 				}
-				m.WithError(ErrInvalidArgument)
+				err = errors.WithStack(ErrInvalidArgument)
+				return
 			}
 		}
 	}
@@ -77,8 +78,5 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 }
 
 func (pc *proxyConn) Flush() (err error) {
-	if err = pc.pc.Flush(); err != nil {
-		err = errors.Wrap(err, "Redis Cluster ProxyConn flush response")
-	}
-	return
+	return pc.pc.Flush()
 }

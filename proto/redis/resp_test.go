@@ -252,4 +252,14 @@ func TestRESPExportFunc(t *testing.T) {
 	}
 	assert.Equal(t, "abcde", string(r.Data()))
 	assert.Equal(t, respString, r.Type())
+	assert.Len(t, r.Array(), 0)
+
+	br := bufio.NewReader(_createConn([]byte("get a\r\n")), bufio.Get(1024))
+	br.Read()
+	err := r.Decode(br)
+	assert.NoError(t, err)
+
+	bw := bufio.NewWriter(_createConn(nil))
+	err = r.encode(bw)
+	assert.NoError(t, err)
 }

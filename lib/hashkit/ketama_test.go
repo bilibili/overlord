@@ -1,15 +1,13 @@
-package hashkit_test
+package hashkit
 
 import (
 	"bytes"
 	"strconv"
 	"testing"
-
-	"overlord/lib/hashkit"
 )
 
 var (
-	ring  = hashkit.Ketama()
+	ring  = Ketama()
 	nodes = []string{
 		"test1.server.com",
 		"test2.server.com",
@@ -42,7 +40,7 @@ func TestGetInfo(t *testing.T) {
 
 	ring.DelNode("wocao")
 	testHash(t)
-	t.Log("----del exist node test ok:expect 0 1 2 1 5----\n")
+	t.Log("----del not exist node test ok:expect 0 1 2 1 5----\n")
 
 	for _, node := range nodes {
 		ring.DelNode(node)
@@ -73,4 +71,12 @@ func testHash(t *testing.T) {
 		t.Log(node, m[node])
 	}
 	t.Log(node5, m[node5])
+}
+
+func BenchmarkHash(b *testing.B) {
+	ring.Init(nodes, sis)
+	for i := 0; i < b.N; i++ {
+		s := "test value" + strconv.FormatUint(uint64(i), 10)
+		ring.GetNode([]byte(s))
+	}
 }

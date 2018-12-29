@@ -6,14 +6,16 @@ import (
 	"sync/atomic"
 
 	"overlord/lib/conv"
+	"overlord/lib/log"
 	"overlord/proto"
 	"overlord/proto/redis"
 
-	pkgerrs "github.com/pkg/errors"
+	"github.com/pkg/errors"
 )
 
 const (
 	respRedirect = '-'
+	maxRedirects = 5
 )
 
 var (
@@ -27,122 +29,99 @@ type nodeConn struct {
 	c  *cluster
 	nc proto.NodeConn
 
-	mba *proto.MsgBatchAllocator
-	sb  strings.Builder
+	sb strings.Builder
+
+	redirects int
 
 	state int32
 }
 
-func newNodeConn(c *cluster, addr string) proto.NodeConn {
-	return &nodeConn{
-		c:   c,
-		nc:  redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
-		mba: proto.GetMsgBatchAllocator(),
-	}
-}
-
-func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
-	err = nc.nc.WriteBatch(mb)
-	if err != nil {
-		if atomic.LoadInt32(&nc.state) == closed {
-			err = pkgerrs.Wrap(err, "maybe write closed")
-			return
-		}
+func newNodeConn(c *cluster, addr string) (nc proto.NodeConn) {
+	nc = &nodeConn{
+		c:  c,
+		nc: redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
 	}
 	return
 }
 
-func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
-	if err = nc.nc.ReadBatch(mb); err != nil {
-		if err != nil {
-			if atomic.LoadInt32(&nc.state) == closed {
-				err = pkgerrs.Wrap(err, "maybe read closed")
-				return
-			}
+func (nc *nodeConn) Write(m *proto.Message) (err error) {
+	if err = nc.nc.Write(m); err != nil {
+		err = errors.WithStack(err)
+	}
+	return
+}
+
+func (nc *nodeConn) Flush() error {
+	return nc.nc.Flush()
+}
+
+func (nc *nodeConn) Read(m *proto.Message) (err error) {
+	if err = nc.nc.Read(m); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	req := m.Request().(*redis.Request)
+	// check request
+	if !req.IsSupport() || req.IsCtl() {
+		return
+	}
+	reply := req.Reply()
+	if reply.Type() != respRedirect {
+		return
+	}
+	if nc.redirects >= 5 { // NOTE: check max redirects
+		if log.V(4) {
+			log.Infof("Redis Cluster NodeConn key(%s) already max redirects", req.Key())
 		}
 		return
 	}
-	var (
-		isRe    bool
-		addrAsk map[string]bool
-	)
-	for i := 0; i < mb.Count(); i++ {
-		m := mb.Nth(i)
-		req := m.Request().(*redis.Request)
-		reply := req.Reply()
-		if reply.Type() != respRedirect {
-			continue
-		}
-		data := reply.Data()
-		if !bytes.HasPrefix(data, askBytes) && !bytes.HasPrefix(data, movedBytes) {
-			continue
-		}
-		addrBs, _, isAsk, _ := parseRedirect(data)
-		nc.sb.Reset()
-		nc.sb.Write(addrBs)
-		addr := nc.sb.String()
-		nc.mba.AddMsg(addr, m)
-		isRe = true
-		if addrAsk == nil {
-			addrAsk = make(map[string]bool)
-		}
-		addrAsk[addr] = isAsk
+	data := reply.Data()
+	if !bytes.HasPrefix(data, askBytes) && !bytes.HasPrefix(data, movedBytes) {
+		return
 	}
-	if isRe {
-		err = nc.redirectProcess(addrAsk)
+	addrBs, _, isAsk, _ := parseRedirect(data)
+	nc.sb.Reset()
+	nc.sb.Write(addrBs)
+	addr := nc.sb.String()
+	// redirect process
+	if err = nc.redirectProcess(m, req, addr, isAsk); err != nil && log.V(2) {
+		log.Errorf("Redis Cluster NodeConn redirectProcess addr:%s error:%v", addr, err)
 	}
+	nc.redirects = 0
 	return
 }
 
-func (nc *nodeConn) redirectProcess(addrAsk map[string]bool) (err error) {
-	for addr, mb := range nc.mba.MsgBatchs() {
-		if mb.Count() == 0 {
-			continue
-		}
-		rdt := nc.c.getRedirectNodeConn(addr)
-		rdt.lock.Lock()
-		if rdt.nc == nil {
-			rdt.lock.Unlock()       // NOTE: unlock
-			return ErrClusterClosed // FIXME(felix): when closed by closeRedirectNodeConn, how
-		}
-		rnc := rdt.nc
-		isAsk := addrAsk[addr]
-		for _, m := range mb.Msgs() {
-			req, ok := m.Request().(*redis.Request)
-			if !ok {
-				rdt.lock.Unlock() // NOTE: unlock
-				m.WithError(redis.ErrBadAssert)
-				return redis.ErrBadAssert
-			}
-			if !req.IsSupport() || req.IsCtl() {
-				continue
-			}
-			if isAsk {
-				if err = rnc.Bw().Write(askingResp); err != nil {
-					rdt.lock.Unlock() // NOTE: unlock
-					m.WithError(err)
-					return
-				}
-			}
-			if err = req.RESP().Encode(rnc.Bw()); err != nil {
-				rdt.lock.Unlock() // NOTE: unlock
-				m.WithError(err)
-				return err
-			}
-			m.MarkWrite()
-		}
-		if err = rnc.Bw().Flush(); err != nil {
-			rdt.lock.Unlock() // NOTE: unlock
-			return
-		}
-		if err = rnc.ReadBatch(mb); err != nil {
-			rdt.lock.Unlock() // NOTE: unlock
-			return
-		}
-		rdt.lock.Unlock() // NOTE: unlock
-		nc.c.closeRedirectNodeConn(addr, isAsk)
+func (nc *nodeConn) redirectProcess(m *proto.Message, req *redis.Request, addr string, isAsk bool) (err error) {
+	// next redirect
+	nc.redirects++
+	if log.V(5) {
+		log.Infof("Redis Cluster NodeConn key(%s) redirect count(%d)", req.Key(), nc.redirects)
 	}
-	nc.mba.Reset()
+	// start redirect
+	nnc := newNodeConn(nc.c, addr)
+	tmp := nnc.(*nodeConn)
+	tmp.redirects = nc.redirects // NOTE: for check max redirects
+	rnc := tmp.nc.(*redis.NodeConn)
+	defer nnc.Close()
+	if isAsk {
+		if err = rnc.Bw().Write(askingResp); err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+	}
+	if err = req.RESP().Encode(rnc.Bw()); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	if err = rnc.Bw().Flush(); err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	// NOTE: even if the client waits a long time before reissuing the query, and in the meantime the cluster configuration
+	// changed, the destination node will reply again with a MOVED error if the hash slot is now served by another node.
+	if err = nnc.Read(m); err != nil {
+		err = errors.WithStack(err)
+	}
 	return
 }
 

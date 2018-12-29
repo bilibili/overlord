@@ -8,7 +8,6 @@ import (
 
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
-	"overlord/lib/prom"
 	"overlord/proto"
 
 	"github.com/pkg/errors"
@@ -17,6 +16,8 @@ import (
 const (
 	opened = int32(0)
 	closed = int32(1)
+
+	nodeReadBufSize = 2 * 1024 * 1024 // NOTE: 2MB
 )
 
 type nodeConn struct {
@@ -38,47 +39,19 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 		addr:    addr,
 		conn:    conn,
 		bw:      bufio.NewWriter(conn),
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(nodeReadBufSize)),
 	}
 	return
 }
 
-func (n *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+func (n *nodeConn) Write(m *proto.Message) (err error) {
 	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Writer write")
-		return
-	}
-	var (
-		m   *proto.Message
-		idx int
-	)
-	for {
-		m = mb.Nth(idx)
-		if m == nil {
-			break
-		}
-		err = n.write(m)
-		if err != nil {
-			m.WithError(err)
-			return err
-		}
-		m.MarkWrite()
-		idx++
-	}
-	if err = n.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Writer flush message bytes")
-	}
-	return
-}
-
-func (n *nodeConn) write(m *proto.Message) (err error) {
-	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Writer write")
+		err = errors.WithStack(ErrClosed)
 		return
 	}
 	mcr, ok := m.Request().(*MCRequest)
 	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Writer assert request")
+		err = errors.WithStack(ErrAssertReq)
 		return
 	}
 	_ = n.bw.Write(magicReqBytes)
@@ -94,89 +67,61 @@ func (n *nodeConn) write(m *proto.Message) (err error) {
 	_ = n.bw.Write(zeroTwoBytes)
 	_ = n.bw.Write(mcr.bodyLen)
 	_ = n.bw.Write(mcr.opaque)
-	_ = n.bw.Write(mcr.cas)
+	err = n.bw.Write(mcr.cas)
 	if !bytes.Equal(mcr.bodyLen, zeroFourBytes) {
-		_ = n.bw.Write(mcr.data)
+		err = n.bw.Write(mcr.data)
 	}
 	return
 }
 
-func (n *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
+func (n *nodeConn) Flush() error {
 	if n.Closed() {
-		err = errors.Wrap(ErrClosed, "MC Reader read batch message")
-		return
+		return errors.WithStack(ErrClosed)
 	}
-	defer n.br.ResetBuffer(nil)
-	n.br.ResetBuffer(mb.Buffer())
-	var (
-		size   int
-		cursor int
-		nth    int
-		m      *proto.Message
-
-		mcr *MCRequest
-		ok  bool
-	)
-	m = mb.Nth(nth)
-	mcr, ok = m.Request().(*MCRequest)
-	if !ok {
-		err = errors.Wrap(ErrAssertReq, "MC Reader assert request")
-		return
-	}
-	for {
-		err = n.br.Read()
-		if err != nil {
-			err = errors.Wrap(err, "MC Reader while read")
-			return
-		}
-		for {
-			size, err = n.fillMCRequest(mcr, n.br.Buffer().Bytes()[cursor:])
-			if err == bufio.ErrBufferFull {
-				err = nil
-				break
-			} else if err != nil {
-				return
-			}
-			m.MarkRead()
-
-			cursor += size
-			nth++
-
-			m = mb.Nth(nth)
-			if m == nil {
-				return
-			}
-			mcr, ok = m.Request().(*MCRequest)
-			if !ok {
-				err = errors.Wrap(ErrAssertReq, "MC Reader assert request")
-				return
-			}
-		}
-	}
+	return n.bw.Flush()
 }
 
-func (n *nodeConn) fillMCRequest(mcr *MCRequest, data []byte) (size int, err error) {
-	if len(data) < requestHeaderLen {
-		return 0, bufio.ErrBufferFull
-	}
-	parseHeader(data[0:requestHeaderLen], mcr, false)
-
-	bl := binary.BigEndian.Uint32(mcr.bodyLen)
-	if bl == 0 {
-		size = requestHeaderLen
+func (n *nodeConn) Read(m *proto.Message) (err error) {
+	if n.Closed() {
+		err = errors.WithStack(ErrClosed)
 		return
 	}
-	if len(data[requestHeaderLen:]) < int(bl) {
-		return 0, bufio.ErrBufferFull
+	mcr, ok := m.Request().(*MCRequest)
+	if !ok {
+		err = errors.WithStack(ErrAssertReq)
+		return
 	}
-	size = requestHeaderLen + int(bl)
-	mcr.data = data[requestHeaderLen : requestHeaderLen+bl]
-
-	if mcr.rTp == RequestTypeGet || mcr.rTp == RequestTypeGetQ || mcr.rTp == RequestTypeGetK || mcr.rTp == RequestTypeGetKQ {
-		if prom.On {
-			prom.Hit(n.cluster, n.addr)
+REREAD:
+	var bs []byte
+	if bs, err = n.br.ReadExact(requestHeaderLen); err == bufio.ErrBufferFull {
+		if err = n.br.Read(); err != nil {
+			err = errors.WithStack(err)
+			return
 		}
+		goto REREAD
+	} else if err != nil {
+		err = errors.WithStack(err)
+		return
 	}
+	parseHeader(bs, mcr, false)
+	bl := binary.BigEndian.Uint32(mcr.bodyLen)
+	if bl == 0 {
+		return
+	}
+REREADData:
+	var data []byte
+	if data, err = n.br.ReadExact(int(bl)); err == bufio.ErrBufferFull {
+		if err = n.br.Read(); err != nil {
+			err = errors.WithStack(err)
+			return
+		}
+		goto REREADData
+	} else if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+	mcr.data = mcr.data[:0]
+	mcr.data = append(mcr.data, data...)
 	return
 }
 

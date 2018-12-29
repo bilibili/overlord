@@ -118,29 +118,6 @@ func (r *Reader) ReadExact(n int) (data []byte, err error) {
 	return
 }
 
-// ResetBuffer reset buf.
-func (r *Reader) ResetBuffer(b *Buffer) {
-	if b == nil {
-		r.b = b
-		return
-	}
-	b.Reset()
-	var n int
-	if r.b != nil {
-		if r.b.buffered() > 0 {
-			for b.len() < r.b.buffered() {
-				b.grow()
-			}
-			n = copy(b.buf[b.w:], r.b.buf[r.b.r:r.b.w])
-			b.w += n
-		}
-	}
-	r.err = nil
-	r.b = b
-	r.b.r = b.r
-	r.b.w = b.w
-}
-
 const (
 	maxWritevSize = 1024
 )

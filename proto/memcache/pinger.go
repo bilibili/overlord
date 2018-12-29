@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	pingBufferSize = 8
+	pingBufferSize = 128
 )
 
 var (
@@ -32,32 +32,30 @@ type mcPinger struct {
 func NewPinger(nc *libnet.Conn) proto.Pinger {
 	return &mcPinger{
 		conn: nc,
-		bw:   bufio.NewWriter(nc),
 		br:   bufio.NewReader(nc, bufio.NewBuffer(pingBufferSize)),
+		bw:   bufio.NewWriter(nc),
 	}
 }
 
 func (m *mcPinger) Ping() (err error) {
 	if atomic.LoadInt32(&m.state) == closed {
-		err = ErrPingerPong
+		err = errors.WithStack(ErrPingerPong)
 		return
 	}
-	if err = m.bw.Write(pingBytes); err != nil {
-		err = errors.Wrap(err, "MC ping write")
-		return
-	}
+	m.bw.Write(pingBytes)
 	if err = m.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC ping flush")
+		err = errors.WithStack(err)
 		return
 	}
 	_ = m.br.Read()
+	defer m.br.AdvanceTo(0)
 	var b []byte
 	if b, err = m.br.ReadLine(); err != nil {
-		err = errors.Wrap(err, "MC ping read response")
+		err = errors.WithStack(err)
 		return
 	}
 	if !bytes.Equal(b, pongBytes) {
-		err = ErrPingerPong
+		err = errors.WithStack(ErrPingerPong)
 	}
 	return
 }

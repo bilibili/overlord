@@ -38,8 +38,9 @@ type ProxyConn interface {
 
 // NodeConn handle Msg to backend cache server and read response.
 type NodeConn interface {
-	WriteBatch(*MsgBatch) error
-	ReadBatch(*MsgBatch) error
+	Write(*Message) error
+	Read(*Message) error
+	Flush() error
 	Close() error
 }
 
@@ -49,8 +50,8 @@ type Pinger interface {
 	Close() error
 }
 
-// Executor is the interface for backend run and process the messages.
-type Executor interface {
-	Execute(mba *MsgBatchAllocator, msgs []*Message) error
+// Forwarder is the interface for backend run and process the messages.
+type Forwarder interface {
+	Forward([]*Message) error
 	Close() error
 }

@@ -10,8 +10,6 @@ import (
 const (
 	statConns = "overlord_proxy_conns"
 	statErr   = "overlord_proxy_err"
-	statHit   = "overlord_proxy_hit"
-	statMiss  = "overlord_proxy_miss"
 
 	statProxyTimer   = "overlord_proxy_timer"
 	statHandlerTimer = "overlord_proxy_handler_timer"
@@ -20,8 +18,6 @@ const (
 var (
 	conns        *prometheus.GaugeVec
 	gerr         *prometheus.GaugeVec
-	hit          *prometheus.CounterVec
-	miss         *prometheus.CounterVec
 	proxyTimer   *prometheus.HistogramVec
 	handlerTimer *prometheus.HistogramVec
 
@@ -48,18 +44,6 @@ func Init() {
 			Help: statErr,
 		}, clusterNodeErrLabels)
 	prometheus.MustRegister(gerr)
-	hit = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: statHit,
-			Help: statHit,
-		}, clusterNodeLabels)
-	prometheus.MustRegister(hit)
-	miss = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: statMiss,
-			Help: statMiss,
-		}, clusterNodeLabels)
-	prometheus.MustRegister(miss)
 	proxyTimer = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    statProxyTimer,
@@ -123,20 +107,4 @@ func ConnDecr(cluster string) {
 		return
 	}
 	conns.WithLabelValues(cluster).Dec()
-}
-
-// Hit increments one stat hit counter.
-func Hit(cluster, node string) {
-	if hit == nil {
-		return
-	}
-	hit.WithLabelValues(cluster, node).Inc()
-}
-
-// Miss decrements one stat miss counter.
-func Miss(cluster, node string) {
-	if miss == nil {
-		return
-	}
-	miss.WithLabelValues(cluster, node).Inc()
 }
