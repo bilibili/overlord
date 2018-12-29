@@ -69,7 +69,7 @@ func TestPipe(t *testing.T) {
 	nc3 := &mockNodeConn{}
 	nc3.num = whenErrNum
 	nc3.err = errors.New("some error")
-	ncp3 := NewNodeConnPipe(2, func() NodeConn {
+	ncp3 := NewNodeConnPipe(1, func() NodeConn {
 		return nc3
 	})
 	wg = &sync.WaitGroup{}
