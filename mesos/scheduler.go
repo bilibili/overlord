@@ -143,6 +143,10 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	if s.c.FailOver > 0 {
 		failOverTimeout := time.Duration(s.c.FailOver).Seconds()
 		frameworkInfo.FailoverTimeout = &failOverTimeout
+	} else {
+		// default one week to failover.
+		failOverTimeout := time.Duration(time.Hour * 24 * 7).Seconds()
+		frameworkInfo.FailoverTimeout = &failOverTimeout
 	}
 	if len(s.c.Roles) != 0 {
 		frameworkInfo.Roles = s.c.Roles
@@ -150,7 +154,7 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	if s.c.Hostname != "" {
 		frameworkInfo.Hostname = &s.c.Hostname
 	}
-	frameworkInfo.Checkpoint = &s.c.Checkpoint
+	fmt.Println(s.c.Checkpoint)
 	if s.c.Principal != "" {
 		frameworkInfo.Principal = &s.c.Principal
 	}
@@ -489,6 +493,9 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			msg += " with message '" + m + "'"
 		}
 		log.Info(msg)
+		taskid := status.TaskID.GetValue()
+		idx := strings.IndexByte(taskid, '-')
+		addr := taskid[:idx]
 		switch st := status.GetState(); st {
 		case ms.TASK_FINISHED:
 			log.Info("state finish")
@@ -507,12 +514,10 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 			if err := calls.CallNoData(context.Background(), s.cli, revice); err != nil {
 				log.Errorf("err call to revie %v", err)
 			}
+			s.db.Set(ctx, etcd.InstanceDirPrefix+"/"+addr, job.StateFail)
 		case ms.TASK_KILLED:
 			log.Infof("task(%v) killed", status.TaskID)
 		case ms.TASK_RUNNING:
-			taskid := status.TaskID.GetValue()
-			idx := strings.IndexByte(taskid, '-')
-			addr := taskid[:idx]
 			s.db.Set(ctx, etcd.InstanceDirPrefix+"/"+addr, job.StateRunning)
 		}
 		return nil

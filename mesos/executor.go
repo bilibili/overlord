@@ -81,6 +81,7 @@ func New() *Executor {
 	)
 	ec := &Executor{
 		subscriber:     subscriber,
+		cfg:            cfg,
 		unackedTasks:   make(map[ms.TaskID]ms.TaskInfo),
 		unackedUpdates: make(map[string]executor.Call_Update),
 		cli: calls.SenderWith(
@@ -105,7 +106,7 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 			status.State = ms.TASK_FAILED.Enum()
 			ec.shouldQuit = true
 		} else {
-			status.State = ms.TASK_RUNNING.Enum()
+			status.State = ms.TASK_STARTING.Enum()
 		}
 		err = ec.update(status)
 		if err != nil {
@@ -164,17 +165,22 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 		log.Errorf("set heartbeat key err %v", err)
 		return
 	}
-	ec.monitor(dpinfo.CacheType, host)
+	ec.monitor(e, dpinfo.CacheType, host)
 	return
 }
 
-func (ec *Executor) monitor(tp proto.CacheType, host string) {
+func (ec *Executor) monitor(e *executor.Event, tp proto.CacheType, host string) {
 	var cli Pinger
 	switch tp {
 	case proto.CacheTypeRedis, proto.CacheTypeRedisCluster:
 		cli = myredis.NewConn(host)
 	case proto.CacheTypeMemcache:
 		cli = memcache.New(host, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
+	}
+	if err := cli.Ping(); err != nil {
+		status := ec.newStatus(e.Launch.Task.TaskID)
+		status.State = ms.TASK_RUNNING.Enum()
+		ec.update(status)
 	}
 	go func() {
 		var errCount int
