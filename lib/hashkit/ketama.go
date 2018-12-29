@@ -43,7 +43,7 @@ type HashRing struct {
 // Default hash: fnv1a64
 func Ketama() (h *HashRing) {
 	h = new(HashRing)
-	h.hash = NewFnv1a64().fnv1a64
+	h.hash = fnv1a64
 	return
 }
 

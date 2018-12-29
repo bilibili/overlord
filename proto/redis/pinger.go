@@ -8,6 +8,12 @@ import (
 	"overlord/lib/bufio"
 	libnet "overlord/lib/net"
 	"overlord/proto"
+
+	"github.com/pkg/errors"
+)
+
+const (
+	pingBufferSize = 128
 )
 
 // errors
@@ -34,7 +40,7 @@ type pinger struct {
 func NewPinger(conn *libnet.Conn) proto.Pinger {
 	return &pinger{
 		conn:  conn,
-		br:    bufio.NewReader(conn, bufio.NewBuffer(7)),
+		br:    bufio.NewReader(conn, bufio.NewBuffer(pingBufferSize)),
 		bw:    bufio.NewWriter(conn),
 		state: opened,
 	}
@@ -42,20 +48,23 @@ func NewPinger(conn *libnet.Conn) proto.Pinger {
 
 func (p *pinger) Ping() (err error) {
 	if atomic.LoadInt32(&p.state) == closed {
-		err = ErrPingClosed
+		err = errors.WithStack(ErrPingClosed)
 		return
 	}
 	_ = p.bw.Write(pingBytes)
 	if err = p.bw.Flush(); err != nil {
-		return err
+		err = errors.WithStack(err)
+		return
 	}
 	_ = p.br.Read()
+	defer p.br.AdvanceTo(0)
 	data, err := p.br.ReadLine()
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 	if !bytes.Equal(data, pongBytes) {
-		err = ErrBadPong
+		err = errors.WithStack(ErrBadPong)
 	}
 	return
 }

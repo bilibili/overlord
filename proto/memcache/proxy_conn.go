@@ -71,11 +71,11 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 
 func (p *proxyConn) decode(m *proto.Message) (err error) {
 	// bufio reset buffer
-	line, err := p.br.ReadSlice(delim)
+	line, err := p.br.ReadLine()
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
-		err = errors.Wrapf(err, "MC decoder while reading text line")
+		err = errors.WithStack(err)
 		return
 	}
 	bg, ed := nextField(line)
@@ -116,7 +116,7 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	case "gats":
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	}
-	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command")
+	err = errors.WithStack(ErrBadRequest)
 	return
 }
 
@@ -124,13 +124,13 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder storage request legal key")
+		err = errors.WithStack(ErrBadKey)
 		return
 	}
 	// length
 	length, err := findLength(bs, cas)
 	if err != nil {
-		err = errors.Wrap(err, "MC decoder while parse length")
+		err = errors.WithStack(err)
 		return
 	}
 	keyOffset := len(bs) - keyE
@@ -140,11 +140,11 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.Bytes())))
 		return
 	} else if err != nil {
-		err = errors.Wrap(err, "MC decoder while read data by length")
+		err = errors.WithStack(err)
 		return
 	}
 	if !bytes.HasSuffix(data, crlfBytes) {
-		err = errors.Wrap(ErrBadRequest, "MC decoder data not end with CRLF")
+		err = errors.WithStack(ErrBadRequest)
 		return
 	}
 	p.withReq(m, mtype, key, data)
@@ -160,14 +160,12 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 		ns = ns[e:]
 		b, e = nextField(ns)
 		if !legalKey(ns[b:e]) {
-			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
+			err = errors.WithStack(ErrBadKey)
 			return
 		}
-
 		if b == len(ns)-2 {
 			break
 		}
-
 		p.withReq(m, reqType, ns[b:e], crlfBytes)
 	}
 	return
@@ -177,7 +175,7 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder delete request legal key")
+		err = errors.WithStack(ErrBadKey)
 		return
 	}
 	p.withReq(m, reqType, key, crlfBytes)
@@ -188,7 +186,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder incr/decr request legal key")
+		err = errors.WithStack(ErrBadKey)
 		return
 	}
 	ns := bs[keyE:]
@@ -196,7 +194,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 	valueBs := ns[vB:vE]
 	if !bytes.Equal(valueBs, oneBytes) {
 		if _, err = conv.Btoi(valueBs); err != nil {
-			err = errors.Wrapf(ErrBadRequest, "MC decoder incrDecr request parse value(%s)", valueBs)
+			err = errors.WithStack(ErrBadRequest)
 			return
 		}
 	}
@@ -208,7 +206,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
-		err = errors.Wrap(ErrBadKey, "MC decoder touch request legal key")
+		err = errors.WithStack(ErrBadKey)
 		return
 	}
 	ns := bs[keyE:]
@@ -216,7 +214,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 	expBs := ns[eB:eE]
 	if !bytes.Equal(expBs, zeroBytes) {
 		if _, err = conv.Btoi(expBs); err != nil {
-			err = errors.Wrapf(ErrBadRequest, "MC decoder touch request parse exptime(%s)", expBs)
+			err = errors.WithStack(ErrBadRequest)
 			return
 		}
 	}
@@ -229,7 +227,7 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 	expBs := bs[eB:eE]
 	if !bytes.Equal(expBs, zeroBytes) {
 		if _, err = conv.Btoi(expBs); err != nil {
-			err = errors.Wrapf(ErrBadRequest, "MC decoder touch request parse exptime(%s)", expBs)
+			err = errors.WithStack(ErrBadRequest)
 			return
 		}
 	}
@@ -241,7 +239,7 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 		ns = ns[e:]
 		b, e = nextField(ns)
 		if !legalKey(ns[b:e]) {
-			err = errors.Wrap(ErrBadKey, "MC Decoder retrieval Msg legal key")
+			err = errors.WithStack(ErrBadKey)
 			return
 		}
 		p.withReq(m, reqType, ns[b:e], expBs)
@@ -342,43 +340,47 @@ func revSpacIdx(bs []byte) int {
 
 // Encode encode response and write into writer.
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
-	if err = m.Err(); err != nil {
-		se := errors.Cause(err).Error()
-		_ = p.bw.Write(serverErrorBytes)
-		_ = p.bw.Write([]byte(se))
-		_ = p.bw.Write(crlfBytes)
-	} else {
-		var bs []byte
-		reqs := m.Requests()
-		for _, req := range reqs {
-			mcr, ok := req.(*MCRequest)
-			if !ok {
-				_ = p.bw.Write(serverErrorBytes)
-				_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-				_ = p.bw.Write(crlfBytes)
-			} else {
-				_, ok := withValueTypes[mcr.rTp]
-				if ok && m.IsBatch() {
-					bs = bytes.TrimSuffix(mcr.data, endBytes)
-				} else {
-					bs = mcr.data
-				}
-				if len(bs) == 0 {
-					continue
-				}
-				_ = p.bw.Write(bs)
-			}
+	if !m.IsBatch() {
+		if me := m.Err(); me != nil {
+			se := errors.Cause(me).Error()
+			_ = p.bw.Write(serverErrorBytes)
+			_ = p.bw.Write([]byte(se))
+			err = p.bw.Write(crlfBytes)
+			return
 		}
-		if m.IsBatch() {
-			_ = p.bw.Write(endBytes)
+		mcr, ok := m.Request().(*MCRequest)
+		if !ok {
+			_ = p.bw.Write(serverErrorBytes)
+			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
+			err = p.bw.Write(crlfBytes)
+			return
 		}
+		err = p.bw.Write(mcr.data)
+		return
 	}
+	for _, req := range m.Requests() {
+		mcr, ok := req.(*MCRequest)
+		if !ok {
+			_ = p.bw.Write(serverErrorBytes)
+			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
+			err = p.bw.Write(crlfBytes)
+			return
+		}
+		var bs []byte
+		if _, ok := withValueTypes[mcr.rTp]; ok {
+			bs = bytes.TrimSuffix(mcr.data, endBytes)
+		} else {
+			bs = mcr.data
+		}
+		if len(bs) == 0 {
+			continue
+		}
+		_ = p.bw.Write(bs)
+	}
+	err = p.bw.Write(endBytes)
 	return
 }
 
 func (p *proxyConn) Flush() (err error) {
-	if err = p.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC Encoder encode response flush bytes")
-	}
-	return
+	return p.bw.Flush()
 }

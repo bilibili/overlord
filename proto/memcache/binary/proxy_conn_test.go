@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"errors"
 	"testing"
 
 	"overlord/proto"
@@ -214,7 +215,7 @@ var (
 )
 
 func TestParseHeader(t *testing.T) {
-	req := &MCRequest{}
+	req := newReq()
 	parseHeader(getTestData, req, true)
 	assert.Equal(t, byte(0x80), req.magic)
 	assert.Equal(t, []byte{0xc}, req.rTp.Bytes())
@@ -291,17 +292,13 @@ func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
 
 	if !m.IsBatch() {
 		nc := _createNodeConn(resps[0])
-		batch := proto.NewMsgBatch()
-		batch.AddMsg(m)
-		err := nc.ReadBatch(batch)
+		err := nc.Read(m)
 		assert.NoError(t, err)
 	} else {
 		subs := m.Batch()
 		for idx, resp := range resps {
 			nc := _createNodeConn(resp)
-			batch := proto.NewMsgBatch()
-			batch.AddMsg(subs[idx])
-			err := nc.ReadBatch(batch)
+			err := nc.Read(subs[idx])
 			assert.NoError(t, err)
 		}
 	}
@@ -355,4 +352,24 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			assert.Equal(t, tt.Except, buf[:size])
 		})
 	}
+}
+
+func TestProxyConnEncodeErr(t *testing.T) {
+	conn := _createConn(nil)
+	p := NewProxyConn(conn)
+	msg := proto.NewMessage()
+	msg.WithRequest(&mockReq{})
+	err := p.Encode(msg)
+	_causeEqual(t, ErrAssertReq, err)
+
+	msg = proto.NewMessage()
+	msg.WithRequest(newReq())
+	msg.WithError(errors.New("some error"))
+	err = p.Encode(msg)
+	assert.NoError(t, err)
+	p.Flush()
+	c := conn.Conn.(*mockConn)
+	buf := make([]byte, 1024)
+	c.wbuf.Read(buf)
+	assert.Equal(t, resopnseStatusInternalErrBytes, buf[6:8])
 }

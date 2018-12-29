@@ -95,12 +95,12 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.mType = mergeTypeOK
 			r.resp.reset() // NOTE: *3\r\n
 			r.resp.rTp = respArray
-			r.resp.data = arrayLenThree
+			r.resp.data = append(r.resp.data, arrayLenThree...)
 			// array resp: mset
 			nre1 := r.resp.next() // NOTE: $4\r\nMSET\r\n
 			nre1.reset()
 			nre1.rTp = respBulk
-			nre1.data = cmdMSetBytes
+			nre1.data = append(nre1.data, cmdMSetBytes...)
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i*2+1])
@@ -114,12 +114,12 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.mType = mergeTypeJoin
 			r.resp.reset() // NOTE: *2\r\n
 			r.resp.rTp = respArray
-			r.resp.data = arrayLenTwo
+			r.resp.data = append(r.resp.data, arrayLenTwo...)
 			// array resp: get
 			nre1 := r.resp.next() // NOTE: $3\r\nGET\r\n
 			nre1.reset()
 			nre1.rTp = respBulk
-			nre1.data = cmdGetBytes
+			nre1.data = append(nre1.data, cmdGetBytes...)
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i])
@@ -130,7 +130,7 @@ func (pc *proxyConn) decode(m *proto.Message) (err error) {
 			r.mType = mergeTypeCount
 			r.resp.reset() // NOTE: *2\r\n
 			r.resp.rTp = respArray
-			r.resp.data = arrayLenTwo
+			r.resp.data = append(r.resp.data, arrayLenTwo...)
 			// array resp: get
 			nre1 := r.resp.next() // NOTE: $3\r\nDEL\r\n | $6\r\nEXISTS\r\n
 			nre1.copy(pc.resp.array[0])
@@ -153,6 +153,7 @@ func nextReq(m *proto.Message) *Request {
 		return r
 	}
 	r := req.(*Request)
+	r.mType = mergeTypeNo
 	return r
 }
 
@@ -168,35 +169,34 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if !ok {
 		return ErrBadAssert
 	}
-	if !m.IsBatch() {
+	switch req.mType {
+	case mergeTypeOK:
+		err = pc.mergeOK(m)
+	case mergeTypeJoin:
+		err = pc.mergeJoin(m)
+	case mergeTypeCount:
+		err = pc.mergeCount(m)
+	default:
 		if !req.IsSupport() {
 			req.reply.rTp = respError
-			req.reply.data = notSupportDataBytes
+			req.reply.data = req.reply.data[:0]
+			req.reply.data = append(req.reply.data, notSupportDataBytes...)
 		} else if req.IsCtl() {
 			reqData := req.resp.array[0].data
 			if bytes.Equal(reqData, cmdPingBytes) {
 				req.reply.rTp = respString
-				req.reply.data = pongDataBytes
+				req.reply.data = req.reply.data[:0]
+				req.reply.data = append(req.reply.data, pongDataBytes...)
 			} else if bytes.Equal(reqData, cmdQuitBytes) {
 				req.reply.rTp = respString
-				req.reply.data = justOkBytes
+				req.reply.data = req.reply.data[:0]
+				req.reply.data = append(req.reply.data, justOkBytes...)
 			}
 		}
 		err = req.reply.encode(pc.bw)
-	} else {
-		switch req.mType {
-		case mergeTypeOK:
-			err = pc.mergeOK(m)
-		case mergeTypeJoin:
-			err = pc.mergeJoin(m)
-		case mergeTypeCount:
-			err = pc.mergeCount(m)
-		default:
-			panic("unreachable merge path")
-		}
 	}
 	if err != nil {
-		err = errors.Wrap(err, "Redis Encoder before flush response")
+		err = errors.WithStack(err)
 	}
 	return
 }
@@ -250,8 +250,5 @@ func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 }
 
 func (pc *proxyConn) Flush() (err error) {
-	if err = pc.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "Redis Encoder flush response")
-	}
-	return
+	return pc.bw.Flush()
 }

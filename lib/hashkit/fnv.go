@@ -2,28 +2,12 @@ package hashkit
 
 import (
 	"hash"
-	"sync"
 )
 
-// Fnv define fnv1 hash.
-type Fnv struct {
-	pool sync.Pool
-}
-
-// NewFnv1a64 return fnv with fnv1a64.
-func NewFnv1a64() *Fnv {
-	h := &Fnv{}
-	h.pool.New = func() interface{} { return New64a() }
-	return h
-}
-
-func (f *Fnv) fnv1a64(key []byte) (value uint) {
-	hs := f.pool.Get().(hash.Hash64)
-	hs.Write(key)
-	value = uint(hs.Sum64())
-	hs.Reset()
-	f.pool.Put(hs)
-	return
+func fnv1a64(key []byte) (value uint) {
+	var s sum64a = offset64
+	s.Write(key)
+	return uint(s.Sum64())
 }
 
 type (

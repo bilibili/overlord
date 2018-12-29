@@ -48,17 +48,10 @@ func TestRequestTypeBytes(t *testing.T) {
 }
 
 func TestMCRequestFuncsOk(t *testing.T) {
-	req := &MCRequest{
-		rTp:      RequestTypeGet,
-		keyLen:   []byte("key"),
-		extraLen: []byte("extra"),
-		status:   []byte("status"),
-		bodyLen:  []byte("body"),
-		opaque:   []byte("opaque"),
-		cas:      []byte("cas"),
-		key:      []byte("abc"),
-		data:     []byte("\r\n"),
-	}
+	req := newReq()
+	req.rTp = RequestTypeGet
+	req.key = []byte("abc")
+	req.data = []byte("\r\n")
 	assert.Equal(t, []byte{byte(RequestTypeGet)}, req.Cmd())
 	assert.Equal(t, "abc", string(req.Key()))
 	assert.Equal(t, "type:get key:abc data:\r\n", req.String())
@@ -66,12 +59,12 @@ func TestMCRequestFuncsOk(t *testing.T) {
 	req.Put()
 
 	assert.Equal(t, RequestTypeUnknown, req.rTp)
-	assert.Nil(t, req.keyLen)
-	assert.Nil(t, req.extraLen)
-	assert.Nil(t, req.status)
-	assert.Nil(t, req.bodyLen)
-	assert.Nil(t, req.opaque)
-	assert.Nil(t, req.cas)
-	assert.Nil(t, req.key)
-	assert.Nil(t, req.data)
+	assert.Len(t, req.keyLen, 2)
+	assert.Len(t, req.extraLen, 1)
+	assert.Len(t, req.status, 2)
+	assert.Len(t, req.bodyLen, 4)
+	assert.Len(t, req.opaque, 4)
+	assert.Len(t, req.cas, 8)
+	assert.Len(t, req.key, 0)
+	assert.Len(t, req.data, 0)
 }

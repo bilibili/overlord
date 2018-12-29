@@ -59,22 +59,23 @@ func NewPinger(nc *libnet.Conn) proto.Pinger {
 
 func (m *mcPinger) Ping() (err error) {
 	if atomic.LoadInt32(&m.state) == closed {
-		err = ErrPingerPong
+		err = errors.WithStack(ErrPingerPong)
 		return
 	}
 	_ = m.bw.Write(pingBs)
 	if err = m.bw.Flush(); err != nil {
-		err = errors.Wrap(err, "MC ping flush")
+		err = errors.WithStack(err)
 		return
 	}
 	_ = m.br.Read()
+	defer m.br.AdvanceTo(0)
 	head, err := m.br.ReadExact(requestHeaderLen)
 	if err != nil {
-		err = errors.Wrap(err, "MC ping read exact")
+		err = errors.WithStack(err)
 		return
 	}
 	if !bytes.Equal(head, pongBs) {
-		err = ErrPingerPong
+		err = errors.WithStack(ErrPingerPong)
 	}
 	return
 }

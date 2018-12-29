@@ -25,6 +25,11 @@
 			"path": "github.com/coreos/go-semver/semver",
 			"revision": "e214231b295a8ea9479f11b70b35d5acf3556d9b",
 			"revisionTime": "2018-01-08T23:09:05Z"
+    },{
+			"checksumSHA1": "HSoVXzX8jWK/yHnhCoKnjlFJ71w=",
+			"path": "github.com/bouk/monkey",
+			"revision": "e8ac0cba3b42082cac2c6549eaa3c60f18373c76",
+			"revisionTime": "2018-09-14T09:56:44Z"
 		},
 		{
 			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",

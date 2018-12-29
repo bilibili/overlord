@@ -15,6 +15,8 @@ import (
 const (
 	opened = int32(0)
 	closed = int32(1)
+
+	nodeReadBufSize = 2 * 1024 * 1024 // NOTE: 2MB
 )
 
 var (
@@ -51,68 +53,65 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 		cluster: cluster,
 		addr:    addr,
 		conn:    conn,
-		br:      bufio.NewReader(conn, nil),
+		br:      bufio.NewReader(conn, bufio.Get(nodeReadBufSize)),
 		bw:      bufio.NewWriter(conn),
 	}
 }
 
-func (nc *nodeConn) WriteBatch(mb *proto.MsgBatch) (err error) {
+func (nc *nodeConn) Write(m *proto.Message) (err error) {
 	if nc.Closed() {
-		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		err = errors.WithStack(ErrNodeConnClosed)
 		return
 	}
-	for _, m := range mb.Msgs() {
-		req, ok := m.Request().(*Request)
-		if !ok {
-			m.WithError(ErrBadAssert)
-			return ErrBadAssert
-		}
-		if !req.IsSupport() || req.IsCtl() {
-			continue
-		}
-		if err = req.resp.encode(nc.bw); err != nil {
-			m.WithError(err)
-			return err
-		}
-		m.MarkWrite()
+	req, ok := m.Request().(*Request)
+	if !ok {
+		err = errors.WithStack(ErrBadAssert)
+		return
+	}
+	if !req.IsSupport() || req.IsCtl() {
+		return
+	}
+	m.MarkWrite()
+	if err = req.resp.encode(nc.bw); err != nil {
+		err = errors.WithStack(err)
+	}
+	return
+}
+
+func (nc *nodeConn) Flush() error {
+	if nc.Closed() {
+		return errors.WithStack(ErrNodeConnClosed)
 	}
 	return nc.bw.Flush()
 }
 
-func (nc *nodeConn) ReadBatch(mb *proto.MsgBatch) (err error) {
+func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	if nc.Closed() {
-		err = errors.Wrap(ErrNodeConnClosed, "Redis Reader read batch message")
+		err = errors.WithStack(ErrNodeConnClosed)
 		return
 	}
-	nc.br.ResetBuffer(mb.Buffer())
-	defer nc.br.ResetBuffer(nil)
-	begin := nc.br.Mark()
-	now := nc.br.Mark()
-	for i := 0; i < mb.Count(); {
-		m := mb.Nth(i)
-		req, ok := m.Request().(*Request)
-		if !ok {
-			return ErrBadAssert
-		}
-		if !req.IsSupport() || req.IsCtl() {
-			i++
-			continue
-		}
+	req, ok := m.Request().(*Request)
+	if !ok {
+		err = errors.WithStack(ErrBadAssert)
+		return
+	}
+	if !req.IsSupport() || req.IsCtl() {
+		return
+	}
+	for {
 		if err = req.reply.decode(nc.br); err == bufio.ErrBufferFull {
-			nc.br.AdvanceTo(begin)
 			if err = nc.br.Read(); err != nil {
+				err = errors.WithStack(err)
 				return
 			}
-			nc.br.AdvanceTo(now)
 			continue
 		} else if err != nil {
+			err = errors.WithStack(err)
 			return
 		}
 		m.MarkRead()
-		now = nc.br.Mark()
-		i++
+		return
 	}
-	return
 }
 
 func (nc *nodeConn) Close() (err error) {
