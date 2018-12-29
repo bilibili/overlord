@@ -148,7 +148,10 @@ func (mp *msgPipe) pipe() {
 			}
 			var rerr error
 			for i := 0; i < mp.count; i++ {
-				if rerr = nc.Read(mp.batch[i]); rerr != nil {
+				if rerr == nil {
+					rerr = nc.Read(mp.batch[i])
+				} // NOTE: no else!!!
+				if rerr != nil {
 					mp.batch[i].WithError(rerr)
 				}
 				mp.batch[i].Done()

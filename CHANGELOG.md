@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.5.3
+1. fix pipe read when one err.
+
 ## Version 1.5.2
 1. max redirects 5.
 
