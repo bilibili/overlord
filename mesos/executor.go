@@ -152,13 +152,6 @@ func (ec *Executor) launch(e *executor.Event) (err error) {
 		return
 	}
 
-	instanceDir := fmt.Sprintf(etcd.InstanceDir, tdata.IP, tdata.Port)
-	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/state", instanceDir), create.SubStateRunning)
-	if err != nil {
-		log.Errorf("set state to %s/state err due %v", instanceDir, err)
-		return
-	}
-
 	host := fmt.Sprintf("%s:%d", tdata.IP, tdata.Port)
 	err = ec.db.Set(context.Background(), fmt.Sprintf("%s/%s", etcd.HeartBeatDir, host), task.TaskID.String())
 	if err != nil {
@@ -177,13 +170,10 @@ func (ec *Executor) monitor(e *executor.Event, tp proto.CacheType, host string) 
 	case proto.CacheTypeMemcache:
 		cli = memcache.New(host, time.Millisecond*100, time.Millisecond*100, time.Millisecond*100)
 	}
-	if err := cli.Ping(); err != nil {
-		status := ec.newStatus(e.Launch.Task.TaskID)
-		status.State = ms.TASK_RUNNING.Enum()
-		ec.update(status)
-	}
+
 	go func() {
 		var errCount int
+		var running = false
 		for {
 			// close monitor when continuous fail over maxErr
 			if errCount > maxErr {
@@ -194,6 +184,12 @@ func (ec *Executor) monitor(e *executor.Event, tp proto.CacheType, host string) 
 			err := cli.Ping()
 			// refresh ttl no sucess.
 			if err == nil {
+				if !running {
+					status := ec.newStatus(e.Launch.Task.TaskID)
+					status.State = ms.TASK_RUNNING.Enum()
+					ec.update(status)
+					running = true
+				}
 				errCount = 0
 				ec.db.Refresh(context.Background(), host, nodeTTL)
 			} else {

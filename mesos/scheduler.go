@@ -794,7 +794,7 @@ func (s *Scheduler) destroyCluster(t job.Job) {
 	}
 	s.db.RMDir(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, ci.Name))
 	for _, node := range nodes {
-		err = s.db.RMDir(ctx, etcd.InstanceDirPrefix+node.Value)
+		err = s.db.RMDir(ctx, etcd.InstanceDirPrefix+"/"+node.Value)
 		log.Errorf("rm instance dir (%s) fail err %v", node.Value, err)
 	}
 }
