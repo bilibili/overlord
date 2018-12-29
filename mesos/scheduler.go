@@ -150,6 +150,7 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	if s.c.Hostname != "" {
 		frameworkInfo.Hostname = &s.c.Hostname
 	}
+	frameworkInfo.Checkpoint = &s.c.Checkpoint
 	if s.c.Principal != "" {
 		frameworkInfo.Principal = &s.c.Principal
 	}
