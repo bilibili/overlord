@@ -340,14 +340,14 @@ func revSpacIdx(bs []byte) int {
 
 // Encode encode response and write into writer.
 func (p *proxyConn) Encode(m *proto.Message) (err error) {
+	if me := m.Err(); me != nil {
+		se := errors.Cause(me).Error()
+		_ = p.bw.Write(serverErrorBytes)
+		_ = p.bw.Write([]byte(se))
+		err = p.bw.Write(crlfBytes)
+		return
+	}
 	if !m.IsBatch() {
-		if me := m.Err(); me != nil {
-			se := errors.Cause(me).Error()
-			_ = p.bw.Write(serverErrorBytes)
-			_ = p.bw.Write([]byte(se))
-			err = p.bw.Write(crlfBytes)
-			return
-		}
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
 			_ = p.bw.Write(serverErrorBytes)

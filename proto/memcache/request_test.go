@@ -46,6 +46,6 @@ func TestMCRequestFuncsOk(t *testing.T) {
 	req.Put()
 
 	assert.Equal(t, RequestTypeUnknown, req.rTp)
-	assert.Nil(t, req.key)
-	assert.Nil(t, req.data)
+	assert.Equal(t, []byte{}, req.key)
+	assert.Equal(t, []byte{}, req.data)
 }

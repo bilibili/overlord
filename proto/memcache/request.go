@@ -226,9 +226,9 @@ func NewReq() *MCRequest {
 
 // Put put req back to pool.
 func (r *MCRequest) Put() {
-	r.data = nil
 	r.rTp = RequestTypeUnknown
-	r.key = nil
+	r.key = r.key[:0]
+	r.data = r.data[:0]
 	msgPool.Put(r)
 }
 

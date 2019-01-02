@@ -84,6 +84,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
+	mcr.data = mcr.data[:0]
 REREAD:
 	var bs []byte
 	if bs, err = n.br.ReadLine(); err == bufio.ErrBufferFull {
@@ -97,7 +98,6 @@ REREAD:
 		return
 	}
 	if _, ok := withValueTypes[mcr.rTp]; !ok || bytes.Equal(bs, endBytes) || bytes.Equal(bs, errorBytes) {
-		mcr.data = mcr.data[:0]
 		mcr.data = append(mcr.data, bs...)
 		return
 	}
@@ -119,7 +119,6 @@ REREADData:
 		err = errors.WithStack(err)
 		return
 	}
-	mcr.data = mcr.data[:0]
 	mcr.data = append(mcr.data, bs...)
 	mcr.data = append(mcr.data, data...)
 	return

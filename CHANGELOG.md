@@ -1,10 +1,13 @@
 # Overlord
 
+## Version 1.5.3
+1. fix pipe read when one err.
+
 ## Version 1.5.2
 1. max redirects 5.
 
 ## Version 1.5.1
-1. reset sub message only in nedd.
+1. reset sub message only in need.
 
 ## Version 1.5.0
 1. refactor message pipeline.

@@ -236,6 +236,7 @@ func TestEncodeErr(t *testing.T) {
 	msg.Type = proto.CacheTypeMemcache
 	msg.WithRequest(&mockReq{})
 	msg.WithRequest(&mockReq{}) // NOTE: batch
+	msg.Batch()
 	err = p.Encode(msg)
 	assert.NoError(t, err)
 
