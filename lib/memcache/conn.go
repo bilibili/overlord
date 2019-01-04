@@ -14,6 +14,10 @@ import (
 // Conn mc conn
 type Conn struct {
 	conn *net.Conn
+	addr string
+	dt   time.Duration
+	wt   time.Duration
+	rt   time.Duration
 	bw   *bufio.Writer
 	br   *bufio.Reader
 }
@@ -27,6 +31,10 @@ var (
 // New mc conn.
 func New(addr string, dialTimeout, writeTimeout, readTimeout time.Duration) *Conn {
 	c := &Conn{
+		addr: addr,
+		dt:   dialTimeout,
+		wt:   writeTimeout,
+		rt:   readTimeout,
 		conn: net.DialWithTimeout(addr, dialTimeout, readTimeout, writeTimeout),
 	}
 	c.br = bufio.NewReader(c.conn, bufio.NewBuffer(1024))
@@ -36,6 +44,15 @@ func New(addr string, dialTimeout, writeTimeout, readTimeout time.Duration) *Con
 
 // Ping mc server.
 func (c *Conn) Ping() (err error) {
+	defer func() {
+		// reconnect if err happend.
+		if err != nil {
+			c.conn.Close()
+			c.conn = net.DialWithTimeout(c.addr, c.dt, c.rt, c.wt)
+			c.br = bufio.NewReader(c.conn, bufio.NewBuffer(1024))
+			c.bw = bufio.NewWriter(c.conn)
+		}
+	}()
 	if err = c.bw.Write(pingBytes); err != nil {
 		err = errors.WithStack(err)
 		return

@@ -752,6 +752,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 	}
 	return
 }
+
 func (s *Scheduler) destroyCluster(t job.Job) {
 	var (
 		ctx = context.Background()

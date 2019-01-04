@@ -206,12 +206,14 @@ func (c *Client) TryBalance() error {
 
 // Conn is the singleton connection to backend
 type Conn struct {
+	addr string
 	conn *node
 }
 
 // NewConn create new connection by given addr
 func NewConn(addr string) *Conn {
 	return &Conn{
+		addr: addr,
 		conn: newNode(addr),
 	}
 }
@@ -219,6 +221,10 @@ func NewConn(addr string) *Conn {
 // Ping will execute ping command
 func (c *Conn) Ping() (err error) {
 	_, err = c.conn.execute("ping")
+	if err != nil {
+		c.conn.Close()
+		c.conn = newNode(c.addr)
+	}
 	return
 }
 
