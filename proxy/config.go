@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"overlord/lib/log"
 	"overlord/proto"
 
 	"github.com/BurntSushi/toml"
@@ -13,9 +14,7 @@ import (
 // Config proxy config.
 type Config struct {
 	Pprof string
-	Debug bool
-	Log   string
-	LogVL int `toml:"log_vl"`
+	*log.Config
 	Proxy struct {
 		ReadTimeout    int   `toml:"read_timeout"`
 		WriteTimeout   int   `toml:"write_timeout"`

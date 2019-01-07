@@ -1,0 +1,45 @@
+@mixin linear-gradient($direction, $color-stops...) {
+  background: nth(nth($color-stops, 1), 1);
+  background: linear-gradient($direction, $color-stops);
+}
+
+@mixin slide-transition {
+  .slide-fade-enter-active {
+    transition: all .15s ease;
+  }
+
+  .slide-fade-leave-active {
+    transition: all .15s cubic-bezier(1.0, 0.5, 0.8, 1.0);
+  }
+
+  .slide-fade-enter,
+  .slide-fade-leave-to {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+// 垂直居中 水平居中
+@mixin flex-horizon-justify-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-vertical-justify-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-content: center;
+  // justify-items: center;
+  // align-content: center;
+}
+
+@mixin page-title-font {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@mixin box-shadow($opacity) {
+	box-shadow: 0 2px 5px 0 rgba(101, 121, 162 ,$opacity);
+}

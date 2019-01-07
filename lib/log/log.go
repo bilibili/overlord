@@ -1,8 +1,23 @@
 package log
 
 import (
+	"flag"
 	"fmt"
 )
+
+var (
+	logStd  bool
+	logFile string
+	logVl   int
+	debug   bool
+)
+
+func init() {
+	flag.BoolVar(&logStd, "std", false, "log will printing into stdout.")
+	flag.BoolVar(&debug, "debug", false, "debug model, will open stdout log. high priority than conf.debug.")
+	flag.StringVar(&logFile, "log", "", "log will printing file {log}. high priority than conf.log.")
+	flag.IntVar(&logVl, "log-vl", 0, "log verbose level. high priority than conf.log_vl.")
+}
 
 // Level of severity.
 type Level int
@@ -27,23 +42,51 @@ func (l Level) String() string {
 // Config log config.
 type Config struct {
 	Stdout bool
+	Debug  bool
+	Log    string
+	LogVL  int `toml:"log_vl"`
 	Family string
 	Host   string
-	Dir    string
 	// VLevel Enable V-leveled logging at the specified level.
-	VLevel int32
 }
 
 var (
 	h Handler
-	c *Config
 )
 
-// Init create logger with context.
-func Init(hs ...Handler) {
-	if len(hs) == 0 {
-		return
+// Init log.
+func Init(c *Config) (b bool) {
+	var hs []Handler
+
+	if c == nil {
+		c = &Config{}
 	}
+	if logFile != "" {
+		c.Log = logFile
+	}
+	if logVl != 0 {
+		c.LogVL = logVl
+	}
+	c.Stdout = logStd
+	c.Debug = debug
+	if c.Debug || c.Stdout {
+		hs = append(hs, NewStdHandler())
+	}
+	if c.Log != "" {
+		hs = append(hs, NewFileHandler(c.Log))
+	}
+	if c.LogVL != 0 {
+		DefaultVerboseLevel = c.LogVL
+	}
+	if len(hs) > 0 {
+		h = Handlers(hs)
+		b = true
+	}
+	return
+}
+
+// InitHandle with log handle.
+func InitHandle(hs ...Handler) {
 	h = Handlers(hs)
 }
 

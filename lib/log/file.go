@@ -68,7 +68,6 @@ func (r *fileHandler) roll() error {
 			return err
 		}
 	}
-
 	f, err := os.OpenFile(r.filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return err
