@@ -22,8 +22,6 @@ type fileHandler struct {
 	basePath string
 	filePath string
 	fileFrag string
-
-	closed bool
 }
 
 // NewFileHandler new file handler.
@@ -40,8 +38,8 @@ func NewFileHandler(basePath string) Handler {
 }
 
 func (r *fileHandler) Log(lv Level, msg string) {
-	r.roll()
-	r.l.Output(6, fmt.Sprintf("[%s] %s", lv, msg))
+	_ = r.roll()
+	_ = r.l.Output(6, fmt.Sprintf("[%s] %s", lv, msg))
 }
 
 func (r *fileHandler) Close() error {

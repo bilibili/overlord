@@ -6,7 +6,7 @@ import (
 
 func fnv1a64(key []byte) (value uint) {
 	var s sum64a = offset64
-	s.Write(key)
+	_, _ = s.Write(key)
 	return uint(s.Sum64())
 }
 

@@ -43,5 +43,5 @@ func main() {
 	}
 	log.Info("init etcd successful")
 	sched := mesos.NewScheduler(conf, db)
-	sched.Run()
+	_ = sched.Run()
 }

@@ -15,8 +15,8 @@ func TestEtcd(t *testing.T) {
 	e, err := New("http://127.0.0.1:2379")
 	ctx := context.TODO()
 	assert.NoError(t, err)
-	e.GenID(ctx, "/order", "1")
-	e.GenID(ctx, "/order", "2")
+	_, _ = e.GenID(ctx, "/order", "1")
+	_, _ = e.GenID(ctx, "/order", "2")
 	_, err = e.Get(ctx, "/order")
 	assert.NoError(t, err)
 }
@@ -57,7 +57,7 @@ func TestSequnenceOk(t *testing.T) {
 	e, err := New("http://127.0.0.1:2379")
 	assert.NoError(t, err)
 	ctx := context.Background()
-	e.Delete(ctx, PortSequence)
+	_ = e.Delete(ctx, PortSequence)
 
 	port, err := e.Sequence(ctx, PortSequence)
 	assert.NoError(t, err)

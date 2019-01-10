@@ -24,8 +24,8 @@ func TestReaderAdvance(t *testing.T) {
 	bts := _genData()
 
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-	b.Read()
-	b.ReadExact(5)
+	_ = b.Read()
+	_, _ = b.ReadExact(5)
 	b.Advance(5)
 
 	buf := b.Buffer()
@@ -35,7 +35,7 @@ func TestReaderAdvance(t *testing.T) {
 	b.Advance(-10)
 	assert.Len(t, buf.Bytes(), 512)
 
-	b.ReadExact(10)
+	_, _ = b.ReadExact(10)
 	m := b.Mark()
 	assert.Equal(t, 10, m)
 
@@ -61,7 +61,7 @@ func TestReaderReadSlice(t *testing.T) {
 	bts := _genData()
 
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-	b.Read()
+	_ = b.Read()
 	data, err := b.ReadSlice('c')
 	assert.NoError(t, err)
 	assert.Len(t, data, 3)
@@ -72,7 +72,7 @@ func TestReaderReadSlice(t *testing.T) {
 
 func TestReaderReadLine(t *testing.T) {
 	b := NewReader(bytes.NewBuffer([]byte("abcd\r\nabc")), Get(defaultBufferSize))
-	b.Read()
+	_ = b.Read()
 	data, err := b.ReadLine()
 	assert.NoError(t, err)
 	assert.Len(t, data, 6)
@@ -82,7 +82,7 @@ func TestReaderReadExact(t *testing.T) {
 	bts := _genData()
 
 	b := NewReader(bytes.NewBuffer(bts), Get(defaultBufferSize))
-	b.Read()
+	_ = b.Read()
 	data, err := b.ReadExact(5)
 	assert.NoError(t, err)
 	assert.Len(t, data, 5)

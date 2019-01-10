@@ -60,8 +60,8 @@ func main() {
 		buildInfo.WithLabelValues(VERSION, COMMIT_SHA1, BUILD_DATE, runtime.Version()).Set(1)
 
 		registry := prometheus.NewRegistry()
-		registry.Register(exp)
-		registry.Register(buildInfo)
+		_ = registry.Register(exp)
+		_ = registry.Register(buildInfo)
 
 		mfs, err := registry.Gather()
 		if err != nil {
@@ -74,7 +74,7 @@ func main() {
 				fmt.Println(err)
 			}
 		}
-		w.Write(buf.Bytes())
+		_, _ = w.Write(buf.Bytes())
 
 	})
 

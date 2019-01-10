@@ -34,7 +34,7 @@ func (d *Dao) SetJobState(ctx context.Context, group, jobID, state string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	log.Infof("set job state to %s.%s as %s", group, jobID, state)
-	d.e.SetJobState(ctx, group, jobID, state)
+	_ = d.e.SetJobState(ctx, group, jobID, state)
 }
 
 // GetJobs will get all jobs from etcd

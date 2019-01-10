@@ -617,7 +617,6 @@ func (mp *mockPing) SetErr(err error) {
 }
 
 type mockErr struct {
-	err error
 }
 
 func (e *mockErr) Error() string {

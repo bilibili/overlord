@@ -56,7 +56,7 @@ func (c *RedisClusterJob) Create() error {
 func (c *RedisClusterJob) buildTplTree() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c.e.SetJobState(ctx, c.info.Group, c.info.JobID, StateBuildTplTree)
+	_ = c.e.SetJobState(ctx, c.info.Group, c.info.JobID, StateBuildTplTree)
 
 	var sb strings.Builder
 	err = json.NewEncoder(&sb).Encode(c.info)
@@ -136,7 +136,7 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 }
 
 func (c *RedisClusterJob) divideSlots() {
-	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateDivide)
+	_ = c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateDivide)
 
 	per := ClusterSlotsCount / c.info.Number
 	left := ClusterSlotsCount % c.info.Number
@@ -168,7 +168,7 @@ func (c *RedisClusterJob) divideSlots() {
 }
 
 func (c *RedisClusterJob) setupSlaveOf() {
-	c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateSetupSlaveOf)
+	_ = c.e.SetJobState(context.TODO(), c.info.Group, c.info.JobID, SubStateSetupSlaveOf)
 	for _, chunk := range c.info.Chunks {
 		for _, node := range chunk.Nodes {
 			id := c.info.IDMap[node.Name][node.Port]

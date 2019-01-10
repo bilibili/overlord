@@ -44,7 +44,7 @@ func TestCreateJob(t *testing.T) {
 	db, err := newEtcd("http://127.0.0.1:2379")
 	assert.NoError(t, err)
 	job := NewCacheJob(db, info)
-	job.Create()
+	_ = job.Create()
 	for _, inst := range info.Dist.Addrs {
 		dpinfo, err := GenDeployInfo(db, inst.IP, inst.Port)
 		assert.NoError(t, err)

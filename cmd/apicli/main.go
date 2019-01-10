@@ -28,12 +28,12 @@ func main() {
 		if name != "" {
 			defCreate.Name = name
 		}
-		createCluster(defCreate)
+		err = createCluster(defCreate)
 	case cmd == "getcluster":
 		if name == "" {
-			clusters()
+			err = clusters()
 		} else {
-			cluster(name)
+			err = cluster(name)
 		}
 	case cmd == "delete":
 		if name == "" {
@@ -41,11 +41,11 @@ func main() {
 		}
 		err = deleteCluster(name)
 	case cmd == "assign":
-		addAppID(name, appid)
+		err = addAppID(name, appid)
 	case cmd == "unassign":
-		deleteAppID(name, appid)
+		err = deleteAppID(name, appid)
 	case cmd == "restart":
-		restartNode(name, addr)
+		err = restartNode(name, addr)
 	}
 	if err != nil {
 		fmt.Printf("err %v", err)
@@ -80,7 +80,7 @@ func createCluster(arg *model.ParamCluster) (err error) {
 		err = errors.WithStack(err)
 		return
 	}
-	newReq(http.MethodPost, server+base, string(bs))
+	err = newReq(http.MethodPost, server+base, string(bs))
 	return
 }
 

@@ -187,11 +187,11 @@ func (ec *Executor) monitor(e *executor.Event, tp types.CacheType, host string) 
 				if !running {
 					status := ec.newStatus(e.Launch.Task.TaskID)
 					status.State = ms.TASK_RUNNING.Enum()
-					ec.update(status)
+					_ = ec.update(status)
 					running = true
 				}
 				errCount = 0
-				ec.db.Refresh(context.Background(), host, nodeTTL)
+				_ = ec.db.Refresh(context.Background(), host, nodeTTL)
 			} else {
 				errCount++
 				log.Errorf("%v health check err %v", tp, err)

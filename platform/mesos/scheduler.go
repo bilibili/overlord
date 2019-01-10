@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,7 +50,6 @@ type Scheduler struct {
 	task      *list.List // use task list.
 	db        *etcd.Etcd
 	cli       calls.Caller
-	rwlock    sync.RWMutex
 	taskInfos map[string]*ms.TaskInfo // mesos tasks
 	failTask  chan ms.TaskID
 }

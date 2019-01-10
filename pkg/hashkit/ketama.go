@@ -100,7 +100,7 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 
 func (h *HashRing) ketamaHash(key string, kl, alignment int) (v uint) {
 	hs := md5.New()
-	hs.Write([]byte(key))
+	_, _ = hs.Write([]byte(key))
 	bs := hs.Sum(nil)
 	hs.Reset()
 	v = (uint(bs[3+alignment*4]&0xFF) << 24) | (uint(bs[2+alignment*4]&0xFF) << 16) | (uint(bs[1+alignment*4]&0xFF) << 8) | (uint(bs[0+alignment*4] & 0xFF))

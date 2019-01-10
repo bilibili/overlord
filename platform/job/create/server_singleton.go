@@ -150,7 +150,7 @@ func (c *CacheJob) setupInstanceDir() error {
 
 		// if addr already had id,update value.
 		if addr.ID != "" {
-			c.e.Set(sub, path+addr.ID, host)
+			_ = c.e.Set(sub, path+addr.ID, host)
 			continue
 		}
 		id, err := c.e.GenID(sub, path, host)

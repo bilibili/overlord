@@ -99,7 +99,7 @@ func (c *Command) execute(n *node) error {
 	if c.Reply == nil {
 		c.Reply = &Resp{}
 	}
-	n.wr.WriteString(c.command)
+	_, _ = n.wr.WriteString(c.command)
 	_, err := n.wr.WriteString("\r\n")
 	if err != nil {
 		return err
