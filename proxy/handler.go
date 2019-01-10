@@ -7,14 +7,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/log"
-	libnet "overlord/lib/net"
-	"overlord/lib/prom"
-	"overlord/proto"
-	"overlord/proto/memcache"
-	mcbin "overlord/proto/memcache/binary"
-	"overlord/proto/redis"
-	rclstr "overlord/proto/redis/cluster"
+	"overlord/pkg/log"
+	libnet "overlord/pkg/net"
+	"overlord/pkg/prom"
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
+	"overlord/proxy/proto/memcache"
+	mcbin "overlord/proxy/proto/memcache/binary"
+	"overlord/proxy/proto/redis"
+	rclstr "overlord/proxy/proto/redis/cluster"
 )
 
 const (
@@ -53,16 +54,16 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forwarder proto.Forw
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
 	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
+	case types.CacheTypeMemcache:
 		h.pc = memcache.NewProxyConn(h.conn)
-	case proto.CacheTypeMemcacheBinary:
+	case types.CacheTypeMemcacheBinary:
 		h.pc = mcbin.NewProxyConn(h.conn)
-	case proto.CacheTypeRedis:
+	case types.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
-	case proto.CacheTypeRedisCluster:
+	case types.CacheTypeRedisCluster:
 		h.pc = rclstr.NewProxyConn(h.conn, forwarder)
 	default:
-		panic(proto.ErrNoSupportCacheType)
+		panic(types.ErrNoSupportCacheType)
 	}
 	prom.ConnIncr(cc.Name)
 	return

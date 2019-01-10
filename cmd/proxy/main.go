@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"overlord/lib/log"
-	"overlord/lib/prom"
+	"overlord/pkg/log"
+	"overlord/pkg/prom"
 	"overlord/proxy"
 )
 

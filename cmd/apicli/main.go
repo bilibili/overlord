@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"overlord/lib/log"
 	"strings"
 
-	"github.com/pkg/errors"
+	"overlord/pkg/log"
+	"overlord/platform/api/model"
 
-	"overlord/api/model"
+	"github.com/pkg/errors"
 )
 
 func main() {

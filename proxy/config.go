@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"overlord/lib/log"
-	"overlord/proto"
+	"overlord/pkg/log"
+	"overlord/pkg/types"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -56,7 +56,7 @@ type ClusterConfig struct {
 	HashMethod       string          `toml:"hash_method"`
 	HashDistribution string          `toml:"hash_distribution"`
 	HashTag          string          `toml:"hash_tag"`
-	CacheType        proto.CacheType `toml:"cache_type"`
+	CacheType        types.CacheType `toml:"cache_type"`
 	ListenProto      string          `toml:"listen_proto"`
 	ListenAddr       string          `toml:"listen_addr"`
 	RedisAuth        string          `toml:"redis_auth"`
@@ -90,7 +90,7 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		if err = cc.Validate(); err != nil {
 			return err
 		}
-		if cc.CacheType == proto.CacheTypeRedisCluster {
+		if cc.CacheType == types.CacheTypeRedisCluster {
 			servers := make([]string, len(cc.Servers))
 			for i, server := range cc.Servers {
 				ssp := strings.Split(server, ":")

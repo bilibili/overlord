@@ -25,9 +25,8 @@ script:
     --skip=vendor \
     --skip=.git \
     --tests ./...
-  - ./codecov.sh
-  - cd cmd/proxy
-  - go build
+  - ./scripts/codecov.sh
+  - make build
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
