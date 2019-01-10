@@ -1,7 +1,11 @@
 language: go
 
 go:
-  - 1.10.x
+  - 1.11.x
+
+# Force-enable Go modules. This will be unnecessary when Go 1.12 lands.
+env:
+  - GO111MODULE=on
 
 go_import_path: overlord
 
@@ -17,14 +21,15 @@ install:
   - gometalinter --install
   - docker pull grokzen/redis-cluster:4.0.9
   - docker run -e "IP=0.0.0.0" -d -p 7000-7007:7000-7007 grokzen/redis-cluster:4.0.9
+  
+# Anything in before_script that returns a nonzero exit code will flunk the
+# build and immediately stop. It's sorta like having set -e enabled in bash.
+# Make sure golangci-lint is vendored.
+before_script:
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $GOPATH/bin
 
 script:
-  - gometalinter --vendor --disable-all --enable=gosimple --enable=golint --enable=vet --enable=ineffassign --enable=unconvert \
-    --exclude="by other packages, and that stutters; consider calling this" \
-    --skip=proto \
-    --skip=vendor \
-    --skip=.git \
-    --tests ./...
+  - golangci-lint run       # run a bunch of code checkers/linters in parallel
   - ./scripts/codecov.sh
   - make build
 
