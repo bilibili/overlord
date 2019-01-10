@@ -11,7 +11,9 @@ git:
 env:
   - GO111MODULE=on
 
-go_import_path: overlord
+# Skip the install step. Don't `go get` dependencies. Only build with the code
+# in vendor/
+install: true
 
 services:
   - memcached
