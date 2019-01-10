@@ -1,5 +1,8 @@
 # Overlord
 
+## Version 1.5.4
+1. ping timeout 100ms.
+
 ## Version 1.5.3
 1. fix pipe read when one err.
 
