@@ -7,10 +7,6 @@ go:
 git:
   depth: 1
 
-# Force-enable Go modules. This will be unnecessary when Go 1.12 lands.
-env:
-  - GO111MODULE=on
-
 # Skip the install step. Don't `go get` dependencies. Only build with the code
 # in vendor/
 install: true
