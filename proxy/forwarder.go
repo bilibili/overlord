@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/backoff"
 	"overlord/lib/conv"
 	"overlord/lib/hashkit"
 	"overlord/lib/log"
@@ -154,7 +153,6 @@ func (f defaultForwarder) processPing(p *pinger) {
 	for {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
-			p.retries = 0
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
 				_ = p.ping.Close()
 				p.ping = newPingConn(p.cc, p.node)
@@ -187,8 +185,7 @@ func (f defaultForwarder) processPing(p *pinger) {
 				log.Errorf("node ping node:%s fail times equals limit:%d then del", p.node, f.cc.PingFailLimit)
 			}
 		}
-		<-time.After(backoff.Backoff(p.retries))
-		p.retries++
+		time.Sleep(300 * time.Millisecond)
 	}
 }
 
@@ -229,7 +226,6 @@ type pinger struct {
 	weight int
 
 	failure int
-	retries int
 }
 
 func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
@@ -249,11 +245,8 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 }
 
 func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
-	dto := time.Duration(cc.DialTimeout) * time.Millisecond
-	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
-	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-
-	conn := libnet.DialWithTimeout(addr, dto, rto, wto)
+	const timeout = 100 * time.Millisecond
+	conn := libnet.DialWithTimeout(addr, timeout, timeout, timeout)
 	switch cc.CacheType {
 	case proto.CacheTypeMemcache:
 		return memcache.NewPinger(conn)
