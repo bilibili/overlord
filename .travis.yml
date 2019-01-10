@@ -34,13 +34,13 @@ install:
 
 
 script:
-  - golangci-lint run       # run a bunch of code checkers/linters in parallel
   - ./scripts/codecov.sh
   - make build
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  - golangci-lint run       # run a bunch of code checkers/linters in parallel 
   
 after_script:
 - docker stop redis-cluster
-- docker rm redis-clust
+- docker rm redis-cluster
