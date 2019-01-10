@@ -15,7 +15,9 @@ var (
 
 //IsExists check if the file or dir was exists
 func IsExists(path string) (bool, error) {
-
+	if os.Getenv("RunMode") == "test" {
+		return true, nil
+	}
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil

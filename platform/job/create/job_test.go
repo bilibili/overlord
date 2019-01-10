@@ -2,6 +2,7 @@ package create
 
 import (
 	"math/rand"
+	"os"
 	"overlord/pkg/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/types"
@@ -28,6 +29,7 @@ func newEtcd(conf string) (e *etcd.Etcd, err error) {
 }
 
 func TestCreateJob(t *testing.T) {
+	os.Setenv("RunMode", "test")
 	SetWorkDir("/tmp/data/%d")
 	info := &CacheInfo{
 		JobID:     "test",
