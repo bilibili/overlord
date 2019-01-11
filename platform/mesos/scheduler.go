@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
+	
 	"overlord/pkg/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/pkg/types"
 	"overlord/platform/job"
 	"overlord/platform/job/create"
-
+	
+	"github.com/pkg/errors"
 	pb "github.com/golang/protobuf/proto"
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding/codecs"

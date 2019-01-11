@@ -1,8 +1,6 @@
 package mesos
 
 import (
-	"time"
-
 	"overlord/pkg/log"
 )
 
@@ -28,15 +26,4 @@ type TaskData struct {
 	IP         string
 	Port       int
 	DBEndPoint string
-}
-
-// Duration parse toml time duration
-type Duration time.Duration
-
-func (d *Duration) UnmarshalText(text []byte) error {
-	tmp, err := time.ParseDuration(string(text))
-	if err == nil {
-		*d = Duration(tmp)
-	}
-	return err
 }
