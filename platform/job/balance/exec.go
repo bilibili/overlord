@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"overlord/pkg/chunk"
+	"overlord/platform/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/pkg/myredis"

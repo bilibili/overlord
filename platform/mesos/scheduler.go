@@ -10,7 +10,7 @@ import (
 	"time"
 
 	
-	"overlord/pkg/chunk"
+	"overlord/platform/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/pkg/types"

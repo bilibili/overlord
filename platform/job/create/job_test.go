@@ -3,7 +3,7 @@ package create
 import (
 	"math/rand"
 	"os"
-	"overlord/pkg/chunk"
+	"overlord/platform/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/types"
 	"testing"
