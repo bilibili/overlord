@@ -26,8 +26,7 @@ import (
 	"github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/eventrules"
 	mstore "github.com/mesos/mesos-go/api/v1/lib/extras/store"
 	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
-	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"
-	"github.com/mesos/mesos-go/api/v1/lib/resources"
+	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"	
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/calls"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/events"
@@ -159,9 +158,6 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	return frameworkInfo
 }
 
-func eventLog(l *scheduler.Event) {
-	log.Infof("[Event] %v", l)
-}
 
 func (s *Scheduler) buildEventHandle() events.Handler {
 	logger := controller.LogEvents(eventLog)
@@ -187,28 +183,6 @@ func (s *Scheduler) trackOffersReceived() eventrules.Rule {
 		}
 		return chain(ctx, e, err)
 	}
-}
-
-func failure(_ context.Context, e *scheduler.Event) error {
-	var (
-		f              = e.GetFailure()
-		eid, aid, stat = f.ExecutorID, f.AgentID, f.Status
-	)
-	if eid != nil {
-		// executor failed..
-		msg := "executor '" + eid.Value + "' terminated"
-		if aid != nil {
-			msg += " on agent '" + aid.Value + "'"
-		}
-		if stat != nil {
-			msg += " with status=" + strconv.Itoa(int(*stat))
-		}
-		log.Infof(msg)
-	} else if aid != nil {
-		// agent failed..
-		log.Infof("agent '" + aid.Value + "' terminated")
-	}
-	return nil
 }
 
 func (s *Scheduler) resourceOffers() events.HandlerFunc {
@@ -385,24 +359,6 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 	return
 }
 
-func checkOffer(offer ms.Offer, cpu, mem float64, port uint64) bool {
-	for _, res := range offer.GetResources() {
-		switch {
-		case res.GetName() == "cpus":
-			return res.GetScalar().Value > cpu
-		case res.GetName() == "mem":
-			return res.GetScalar().Value > mem
-		case res.GetName() == "ports":
-			for _, rg := range res.GetRanges().GetRange() {
-				if port > rg.GetBegin() && port < rg.GetEnd() {
-					return true
-				}
-			}
-			return false
-		}
-	}
-	return false
-}
 func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers []ms.Offer) (err error) {
 	var (
 		ofm     = make(map[string]ms.Offer)
@@ -451,19 +407,6 @@ func (s *Scheduler) getInfoFromEtcd(ctx context.Context, cluster string) (t *cre
 	}
 	t = new(create.CacheInfo)
 	err = json.Unmarshal([]byte(i), t)
-	return
-}
-
-func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
-	r.Add(
-		resources.NewCPUs(cpu).Resource,
-		resources.NewMemory(mem).Resource,
-	)
-	portRange := resources.BuildRanges()
-	for _, port := range ports {
-		portRange.Span(port, port)
-	}
-	r.Add(resources.Build().Name(resources.NamePorts).Ranges(portRange.Ranges).Resource)
 	return
 }
 
@@ -520,26 +463,6 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		}
 		return nil
 	}
-}
-
-// taskid should be ip:port-cluster-id
-// if id not equal zero mean task had fail before and been recover.
-func parseTaskID(t ms.TaskID) (cluster, ip, port string, id int64, err error) {
-	v := t.GetValue()
-	tids := strings.Split(v, ",")
-	ss := strings.Split(tids[0], "-")
-	if len(ss) != 3 {
-		err = errTaskID
-		return
-	}
-	host := ss[0]
-	cluster = ss[1]
-	ids := ss[2]
-	id, _ = strconv.ParseInt(ids, 10, 64)
-	idx := strings.IndexByte(host, ':')
-	ip = host[:idx]
-	port = host[idx+1:]
-	return
 }
 
 func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers []ms.Offer) (err error) {
@@ -817,6 +740,7 @@ func (s *Scheduler) restartNode(job job.Job, offers []ms.Offer) (err error) {
 	log.Errorf("try restart node from origin agent fail")
 	return
 }
+
 func (s *Scheduler) kill(id string) {
 	ids := strings.Split(id, ",")
 	if len(ids) != 2 {
