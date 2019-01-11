@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	libnet "overlord/lib/net"
-	"overlord/proto"
+	libnet "overlord/pkg/net"
+	"overlord/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("memcache"),
+			CacheType:        types.CacheType("memcache"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:22211",
 			RedisAuth:        "",
@@ -44,7 +44,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("memcache"),
+			CacheType:        types.CacheType("memcache"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21211",
 			RedisAuth:        "",
@@ -65,7 +65,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("memcache_binary"),
+			CacheType:        types.CacheType("memcache_binary"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21212",
 			RedisAuth:        "",
@@ -86,7 +86,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("redis"),
+			CacheType:        types.CacheType("redis"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:26379",
 			RedisAuth:        "",
@@ -107,7 +107,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("redis_cluster"),
+			CacheType:        types.CacheType("redis_cluster"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:27000",
 			RedisAuth:        "",
@@ -129,7 +129,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("redis"),
+			CacheType:        types.CacheType("redis"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:26380",
 			RedisAuth:        "",
@@ -150,7 +150,7 @@ var (
 			HashMethod:       "sha1",
 			HashDistribution: "ketama",
 			HashTag:          "",
-			CacheType:        proto.CacheType("memcache"),
+			CacheType:        types.CacheType("memcache"),
 			ListenProto:      "tcp",
 			ListenAddr:       "127.0.0.1:21221",
 			RedisAuth:        "",
@@ -617,7 +617,6 @@ func (mp *mockPing) SetErr(err error) {
 }
 
 type mockErr struct {
-	err error
 }
 
 func (e *mockErr) Error() string {

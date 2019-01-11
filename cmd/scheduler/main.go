@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"overlord/lib/etcd"
-	"overlord/lib/log"
-	"overlord/mesos"
+	"overlord/pkg/etcd"
+	"overlord/pkg/log"
+	"overlord/platform/mesos"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -43,5 +43,5 @@ func main() {
 	}
 	log.Info("init etcd successful")
 	sched := mesos.NewScheduler(conf, db)
-	sched.Run()
+	_ = sched.Run()
 }

@@ -8,16 +8,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/backoff"
-	"overlord/lib/conv"
-	"overlord/lib/hashkit"
-	"overlord/lib/log"
-	libnet "overlord/lib/net"
-	"overlord/proto"
-	"overlord/proto/memcache"
-	mcbin "overlord/proto/memcache/binary"
-	"overlord/proto/redis"
-	rclstr "overlord/proto/redis/cluster"
+	"overlord/pkg/backoff"
+	"overlord/pkg/conv"
+	"overlord/pkg/hashkit"
+	"overlord/pkg/log"
+	libnet "overlord/pkg/net"
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
+	"overlord/proxy/proto/memcache"
+	mcbin "overlord/proxy/proto/memcache/binary"
+	"overlord/proxy/proto/redis"
+	rclstr "overlord/proxy/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -35,10 +36,10 @@ var (
 )
 
 var (
-	defaultForwardCacheTypes = map[proto.CacheType]struct{}{
-		proto.CacheTypeMemcache:       struct{}{},
-		proto.CacheTypeMemcacheBinary: struct{}{},
-		proto.CacheTypeRedis:          struct{}{},
+	defaultForwardCacheTypes = map[types.CacheType]struct{}{
+		types.CacheTypeMemcache:       struct{}{},
+		types.CacheTypeMemcacheBinary: struct{}{},
+		types.CacheTypeRedis:          struct{}{},
 	}
 )
 
@@ -48,7 +49,7 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 	if _, ok := defaultForwardCacheTypes[cc.CacheType]; ok {
 		return newDefaultForwarder(cc)
 	}
-	if cc.CacheType == proto.CacheTypeRedisCluster {
+	if cc.CacheType == types.CacheTypeRedisCluster {
 		dto := time.Duration(cc.DialTimeout) * time.Millisecond
 		rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
@@ -237,14 +238,14 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
+	case types.CacheTypeMemcache:
 		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
-	case proto.CacheTypeMemcacheBinary:
+	case types.CacheTypeMemcacheBinary:
 		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
-	case proto.CacheTypeRedis:
+	case types.CacheTypeRedis:
 		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
-		panic(proto.ErrNoSupportCacheType)
+		panic(types.ErrNoSupportCacheType)
 	}
 }
 
@@ -255,14 +256,14 @@ func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
 
 	conn := libnet.DialWithTimeout(addr, dto, rto, wto)
 	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
+	case types.CacheTypeMemcache:
 		return memcache.NewPinger(conn)
-	case proto.CacheTypeMemcacheBinary:
+	case types.CacheTypeMemcacheBinary:
 		return mcbin.NewPinger(conn)
-	case proto.CacheTypeRedis:
+	case types.CacheTypeRedis:
 		return redis.NewPinger(conn)
 	default:
-		panic(proto.ErrNoSupportCacheType)
+		panic(types.ErrNoSupportCacheType)
 	}
 }
 

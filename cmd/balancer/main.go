@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"overlord/job/balance"
-	"overlord/lib/etcd"
-	"overlord/lib/log"
-
 	"strings"
+
+	"overlord/pkg/etcd"
+	"overlord/pkg/log"
+	"overlord/platform/job/balance"
 )
 
 var (

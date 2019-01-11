@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"overlord/lib/log"
-	"overlord/mesos"
+
+	"overlord/pkg/log"
+	"overlord/platform/mesos"
 )
 
 func main() {
