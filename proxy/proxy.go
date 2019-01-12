@@ -7,13 +7,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/log"
-	libnet "overlord/lib/net"
-	"overlord/proto"
-	"overlord/proto/memcache"
-	mcbin "overlord/proto/memcache/binary"
-	"overlord/proto/redis"
-	rclstr "overlord/proto/redis/cluster"
+	"overlord/pkg/log"
+	libnet "overlord/pkg/net"
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
+	"overlord/proxy/proto/memcache"
+	mcbin "overlord/proxy/proto/memcache/binary"
+	"overlord/proxy/proto/redis"
+	rclstr "overlord/proxy/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -91,13 +92,13 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwar
 				// cache type
 				var encoder proto.ProxyConn
 				switch cc.CacheType {
-				case proto.CacheTypeMemcache:
+				case types.CacheTypeMemcache:
 					encoder = memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case proto.CacheTypeMemcacheBinary:
+				case types.CacheTypeMemcacheBinary:
 					encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case proto.CacheTypeRedis:
+				case types.CacheTypeRedis:
 					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case proto.CacheTypeRedisCluster:
+				case types.CacheTypeRedisCluster:
 					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), nil)
 				}
 				if encoder != nil {

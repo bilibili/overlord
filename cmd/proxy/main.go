@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"overlord/lib/log"
-	"overlord/lib/prom"
+	"overlord/pkg/log"
+	"overlord/pkg/prom"
 	"overlord/proxy"
 )
 
@@ -53,10 +53,6 @@ func init() {
 	flag.Usage = usage
 	flag.BoolVar(&check, "t", false, "conf file check")
 	flag.BoolVar(&version, "v", false, "print version.")
-	flag.BoolVar(&logStd, "std", false, "log will printing into stdout.")
-	flag.BoolVar(&debug, "debug", false, "debug model, will open stdout log. high priority than conf.debug.")
-	flag.StringVar(&logFile, "log", "", "log will printing file {log}. high priority than conf.log.")
-	flag.IntVar(&logVl, "log-vl", 0, "log verbose level. high priority than conf.log_vl.")
 	flag.StringVar(&pprof, "pprof", "", "pprof listen addr. high priority than conf.pprof.")
 	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
 	flag.StringVar(&config, "conf", "", "run with the specific configuration.")
@@ -74,7 +70,7 @@ func main() {
 		os.Exit(0)
 	}
 	c, ccs := parseConfig()
-	if initLog(c) {
+	if log.Init(c.Config) {
 		defer log.Close()
 	}
 	// new proxy
@@ -95,22 +91,6 @@ func main() {
 	}
 	// hanlde signal
 	signalHandler()
-}
-
-func initLog(c *proxy.Config) bool {
-	var hs []log.Handler
-	if logStd || c.Debug {
-		hs = append(hs, log.NewStdHandler())
-	}
-	if c.Log != "" {
-		hs = append(hs, log.NewFileHandler(c.Log))
-	}
-	if len(hs) > 0 {
-		log.DefaultVerboseLevel = c.LogVL
-		log.Init(hs...)
-		return true
-	}
-	return false
 }
 
 func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {

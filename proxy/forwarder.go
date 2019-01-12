@@ -8,16 +8,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"overlord/lib/backoff"
-	"overlord/lib/conv"
-	"overlord/lib/hashkit"
-	"overlord/lib/log"
-	libnet "overlord/lib/net"
-	"overlord/proto"
-	"overlord/proto/memcache"
-	mcbin "overlord/proto/memcache/binary"
-	"overlord/proto/redis"
-	rclstr "overlord/proto/redis/cluster"
+	"overlord/pkg/conv"
+	"overlord/pkg/hashkit"
+	"overlord/pkg/log"
+	libnet "overlord/pkg/net"
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
+	"overlord/proxy/proto/memcache"
+	mcbin "overlord/proxy/proto/memcache/binary"
+	"overlord/proxy/proto/redis"
+	rclstr "overlord/proxy/proto/redis/cluster"
 
 	"github.com/pkg/errors"
 )
@@ -35,10 +35,10 @@ var (
 )
 
 var (
-	defaultForwardCacheTypes = map[proto.CacheType]struct{}{
-		proto.CacheTypeMemcache:       struct{}{},
-		proto.CacheTypeMemcacheBinary: struct{}{},
-		proto.CacheTypeRedis:          struct{}{},
+	defaultForwardCacheTypes = map[types.CacheType]struct{}{
+		types.CacheTypeMemcache:       struct{}{},
+		types.CacheTypeMemcacheBinary: struct{}{},
+		types.CacheTypeRedis:          struct{}{},
 	}
 )
 
@@ -48,7 +48,7 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 	if _, ok := defaultForwardCacheTypes[cc.CacheType]; ok {
 		return newDefaultForwarder(cc)
 	}
-	if cc.CacheType == proto.CacheTypeRedisCluster {
+	if cc.CacheType == types.CacheTypeRedisCluster {
 		dto := time.Duration(cc.DialTimeout) * time.Millisecond
 		rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
@@ -149,12 +149,48 @@ func (f defaultForwarder) Close() error {
 	return nil
 }
 
+func (f defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
+	var addr string
+	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
+		return
+	}
+	if f.alias {
+		if addr, ok = f.aliasMap[addr]; !ok {
+			return
+		}
+	}
+	ncp, ok = f.nodePipe[addr]
+	return
+}
+
+func (f defaultForwarder) trimHashTag(key []byte) []byte {
+	if len(f.hashTag) != 2 {
+		return key
+	}
+	bidx := bytes.IndexByte(key, f.hashTag[0])
+	if bidx == -1 {
+		return key
+	}
+	eidx := bytes.IndexByte(key[bidx+1:], f.hashTag[1])
+	if eidx == -1 {
+		return key
+	}
+	return key[bidx+1 : bidx+1+eidx]
+}
+
+// pingSleepTime for unit test override!!!
+var pingSleepTime = func(t bool) time.Duration {
+	if t {
+		return 5 * time.Minute
+	}
+	return time.Second
+}
+
 func (f defaultForwarder) processPing(p *pinger) {
 	del := false
 	for {
 		if err := p.ping.Ping(); err != nil {
 			p.failure++
-			p.retries = 0
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
 				_ = p.ping.Close()
 				p.ping = newPingConn(p.cc, p.node)
@@ -186,39 +222,11 @@ func (f defaultForwarder) processPing(p *pinger) {
 			if log.V(2) {
 				log.Errorf("node ping node:%s fail times equals limit:%d then del", p.node, f.cc.PingFailLimit)
 			}
+			time.Sleep(pingSleepTime(true))
+			continue
 		}
-		<-time.After(backoff.Backoff(p.retries))
-		p.retries++
+		time.Sleep(pingSleepTime(false))
 	}
-}
-
-func (f defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
-	var addr string
-	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
-		return
-	}
-	if f.alias {
-		if addr, ok = f.aliasMap[addr]; !ok {
-			return
-		}
-	}
-	ncp, ok = f.nodePipe[addr]
-	return
-}
-
-func (f defaultForwarder) trimHashTag(key []byte) []byte {
-	if len(f.hashTag) != 2 {
-		return key
-	}
-	bidx := bytes.IndexByte(key, f.hashTag[0])
-	if bidx == -1 {
-		return key
-	}
-	eidx := bytes.IndexByte(key[bidx+1:], f.hashTag[1])
-	if eidx == -1 {
-		return key
-	}
-	return key[bidx+1 : bidx+1+eidx]
 }
 
 type pinger struct {
@@ -229,7 +237,6 @@ type pinger struct {
 	weight int
 
 	failure int
-	retries int
 }
 
 func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
@@ -237,32 +244,29 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
+	case types.CacheTypeMemcache:
 		return memcache.NewNodeConn(cc.Name, addr, dto, rto, wto)
-	case proto.CacheTypeMemcacheBinary:
+	case types.CacheTypeMemcacheBinary:
 		return mcbin.NewNodeConn(cc.Name, addr, dto, rto, wto)
-	case proto.CacheTypeRedis:
+	case types.CacheTypeRedis:
 		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
-		panic(proto.ErrNoSupportCacheType)
+		panic(types.ErrNoSupportCacheType)
 	}
 }
 
 func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
-	dto := time.Duration(cc.DialTimeout) * time.Millisecond
-	rto := time.Duration(cc.ReadTimeout) * time.Millisecond
-	wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-
-	conn := libnet.DialWithTimeout(addr, dto, rto, wto)
+	const timeout = 100 * time.Millisecond
+	conn := libnet.DialWithTimeout(addr, timeout, timeout, timeout)
 	switch cc.CacheType {
-	case proto.CacheTypeMemcache:
+	case types.CacheTypeMemcache:
 		return memcache.NewPinger(conn)
-	case proto.CacheTypeMemcacheBinary:
+	case types.CacheTypeMemcacheBinary:
 		return mcbin.NewPinger(conn)
-	case proto.CacheTypeRedis:
+	case types.CacheTypeRedis:
 		return redis.NewPinger(conn)
 	default:
-		panic(proto.ErrNoSupportCacheType)
+		panic(types.ErrNoSupportCacheType)
 	}
 }
 

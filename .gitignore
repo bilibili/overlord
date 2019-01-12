@@ -3,6 +3,7 @@
 *.dll
 *.so
 *.dylib
+*.idea
 
 # Test binary, build with `go test -c`
 *.test
@@ -15,4 +16,9 @@
 .glide/
 
 cmd/proxy/proxy
+cmd/executor/executor
+cmd/apiserver/apiserver
+cmd/scheduler/scheduler
+cmd/balancer/balancer
+cmd/apicli/apicli
 coverage.txt
