@@ -149,6 +149,43 @@ func (f defaultForwarder) Close() error {
 	return nil
 }
 
+func (f defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
+	var addr string
+	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
+		return
+	}
+	if f.alias {
+		if addr, ok = f.aliasMap[addr]; !ok {
+			return
+		}
+	}
+	ncp, ok = f.nodePipe[addr]
+	return
+}
+
+func (f defaultForwarder) trimHashTag(key []byte) []byte {
+	if len(f.hashTag) != 2 {
+		return key
+	}
+	bidx := bytes.IndexByte(key, f.hashTag[0])
+	if bidx == -1 {
+		return key
+	}
+	eidx := bytes.IndexByte(key[bidx+1:], f.hashTag[1])
+	if eidx == -1 {
+		return key
+	}
+	return key[bidx+1 : bidx+1+eidx]
+}
+
+// pingSleepTime for unit test override!!!
+var pingSleepTime = func(t bool) time.Duration {
+	if t {
+		return 5 * time.Minute
+	}
+	return time.Second
+}
+
 func (f defaultForwarder) processPing(p *pinger) {
 	del := false
 	for {
@@ -185,40 +222,11 @@ func (f defaultForwarder) processPing(p *pinger) {
 			if log.V(2) {
 				log.Errorf("node ping node:%s fail times equals limit:%d then del", p.node, f.cc.PingFailLimit)
 			}
-			time.Sleep(5 * time.Minute)
+			time.Sleep(pingSleepTime(true))
 			continue
 		}
-		time.Sleep(time.Second)
+		time.Sleep(pingSleepTime(false))
 	}
-}
-
-func (f defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
-	var addr string
-	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
-		return
-	}
-	if f.alias {
-		if addr, ok = f.aliasMap[addr]; !ok {
-			return
-		}
-	}
-	ncp, ok = f.nodePipe[addr]
-	return
-}
-
-func (f defaultForwarder) trimHashTag(key []byte) []byte {
-	if len(f.hashTag) != 2 {
-		return key
-	}
-	bidx := bytes.IndexByte(key, f.hashTag[0])
-	if bidx == -1 {
-		return key
-	}
-	eidx := bytes.IndexByte(key[bidx+1:], f.hashTag[1])
-	if eidx == -1 {
-		return key
-	}
-	return key[bidx+1 : bidx+1+eidx]
 }
 
 type pinger struct {
