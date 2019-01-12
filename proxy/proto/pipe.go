@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +13,11 @@ const (
 	closed = int32(1)
 
 	pipeMaxCount = 128
+)
+
+var (
+	errInputChanFull   = errors.New("node pipe input chan is full")
+	errInputChanClosed = errors.New("node pipe input chan is closed")
 )
 
 // NodeConnPipe multi MsgPipe for node conns.
@@ -47,22 +53,36 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 // Push push message into input chan.
 func (ncp *NodeConnPipe) Push(m *Message) {
 	ncp.l.RLock()
-	if ncp.state == opened {
-		if ncp.conns == 1 {
-			m.Add()
-			ncp.inputs[0] <- m
+	defer ncp.l.RUnlock()
+	if ncp.state == closed {
+		m.WithError(errInputChanClosed)
+		return
+	}
+	var input chan *Message
+	if ncp.conns == 1 {
+		input = ncp.inputs[0]
+	} else {
+		req := m.Request()
+		if req != nil {
+			crc := int32(hashkit.Crc16(req.Key()))
+			input = ncp.inputs[crc%ncp.conns]
 		} else {
-			req := m.Request()
-			if req != nil {
-				crc := int32(hashkit.Crc16(req.Key()))
-				m.Add()
-				ncp.inputs[crc%ncp.conns] <- m
-			} else {
-				// NOTE: impossible!!!
-			}
+			// NOTE: impossible!!!
+			m.WithError(errInputChanFull)
+			return
 		}
 	}
-	ncp.l.RUnlock()
+	if input == nil {
+		m.WithError(errInputChanFull)
+		return
+	}
+	m.Add()
+	select {
+	case input <- m:
+	default:
+		m.WithError(errInputChanFull)
+		m.Done()
+	}
 }
 
 // ErrorEvent return error chan.
