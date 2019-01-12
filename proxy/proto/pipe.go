@@ -207,7 +207,7 @@ func (pc *pipeChan) push(m *Message) (ok bool) {
 		pc.cond.Signal()
 	}
 	// NOTE: discard if the buff is too large!!!
-	if len(pc.buff) <= 10*pipeMaxCount {
+	if len(pc.buff) <= pipeMaxCount*pipeMaxCount {
 		pc.buff = append(pc.buff, m)
 		pc.count++
 		ok = true
