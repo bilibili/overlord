@@ -149,6 +149,7 @@ func (mp *msgPipe) pipe() {
 		}
 		if err != nil {
 			nc = mp.renewNc(nc, err)
+			err = nil
 		}
 	}
 }

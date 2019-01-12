@@ -13,7 +13,9 @@ import (
 
 	libnet "overlord/pkg/net"
 	"overlord/pkg/types"
+	"overlord/proxy/proto"
 
+	"github.com/bouk/monkey"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -98,8 +100,6 @@ var (
 			PingAutoEject:    false,
 			Servers: []string{
 				"127.0.0.1:6379:10",
-				// "127.0.0.1:11212:10",
-				// "127.0.0.1:11213:10",
 			},
 		},
 		&ClusterConfig{
@@ -118,10 +118,8 @@ var (
 			PingFailLimit:    3,
 			PingAutoEject:    false,
 			Servers: []string{
-				"127.0.0.1:7010",
-				"127.0.0.1:7011",
-				// "127.0.0.1:11212:10",
-				// "127.0.0.1:11213:10",
+				"127.0.0.1:7000",
+				"127.0.0.1:7001",
 			},
 		},
 		&ClusterConfig{
@@ -565,7 +563,12 @@ func TestEject(t *testing.T) {
 	eject := ccs[0]
 	fer := p.forwarders["eject-cluster"].(*defaultForwarder)
 	mp := &mockPing{}
-	ping := &pinger{ping: mp, cc: eject, weight: 10, alias: "mc1"}
+
+	monkey.Patch(newPingConn, func(cc *ClusterConfig, addr string) proto.Pinger {
+		return mp
+	})
+
+	ping := &pinger{cc: eject, addr: "test-addr", alias: "mc1", weight: 10}
 	go fer.processPing(ping)
 
 	for _, tt := range ts {
