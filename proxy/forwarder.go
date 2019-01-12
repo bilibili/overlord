@@ -102,9 +102,7 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	}
 	if cc.PingAutoEject {
 		for idx, addr := range addrs {
-			w := ws[idx]
-			pc := newPingConn(cc, addr)
-			p := &pinger{ping: pc, cc: cc, node: addr, weight: w}
+			p := &pinger{cc: cc, addr: addr, alias: addr, weight: ws[idx]}
 			if f.alias {
 				p.alias = ans[idx]
 			}
@@ -187,53 +185,52 @@ var pingSleepTime = func(t bool) time.Duration {
 }
 
 func (f defaultForwarder) processPing(p *pinger) {
-	del := false
+	var (
+		err error
+		del bool
+	)
 	for {
-		if err := p.ping.Ping(); err != nil {
-			p.failure++
-			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				_ = p.ping.Close()
-				p.ping = newPingConn(p.cc, p.node)
-			}
-			if log.V(3) {
-				log.Warnf("node ping node:%s fail:%d times with err:%v", p.node, p.failure, err)
-			}
-		} else {
+		p.ping = newPingConn(p.cc, p.addr)
+		err = p.ping.Ping()
+		p.ping.Close()
+		if err == nil {
 			p.failure = 0
 			if del {
-				if p.alias != "" {
-					f.ring.AddNode(p.alias, p.weight)
-				} else {
-					f.ring.AddNode(p.node, p.weight)
-				}
 				del = false
+				f.ring.AddNode(p.alias, p.weight)
 				if log.V(4) {
-					log.Infof("node ping node:%s success and readd", p.node)
+					log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
 				}
 			}
-		}
-		if f.cc.PingAutoEject && p.failure >= f.cc.PingFailLimit {
-			if p.alias != "" {
-				f.ring.DelNode(p.alias)
-			} else {
-				f.ring.DelNode(p.node)
-			}
-			del = true
-			if log.V(2) {
-				log.Errorf("node ping node:%s fail times equals limit:%d then del", p.node, f.cc.PingFailLimit)
-			}
-			time.Sleep(pingSleepTime(true))
+			time.Sleep(pingSleepTime(false))
 			continue
 		}
-		time.Sleep(pingSleepTime(false))
+		p.failure++
+		if log.V(3) {
+			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
+		}
+		if p.failure < f.cc.PingFailLimit {
+			time.Sleep(pingSleepTime(false))
+			continue
+		}
+		if !del {
+			f.ring.DelNode(p.alias)
+			del = true
+			if log.V(2) {
+				log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d then del", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
+			}
+		} else if log.V(3) {
+			log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
+		}
+		time.Sleep(pingSleepTime(true))
 	}
 }
 
 type pinger struct {
 	cc     *ClusterConfig
 	ping   proto.Pinger
-	node   string
-	alias  string
+	addr   string
+	alias  string // NOTE: default is addr
 	weight int
 
 	failure int

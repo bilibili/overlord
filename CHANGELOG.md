@@ -12,6 +12,7 @@
 
 ## Version 1.5.4
 1. ping timeout 100ms.
+2. fix max connection limit.
 
 ## Version 1.5.3
 1. fix pipe read when one err.
