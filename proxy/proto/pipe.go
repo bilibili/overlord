@@ -221,9 +221,9 @@ func (pc *pipeChan) popAll() (ms []*Message, ok bool) {
 		pc.lock.Unlock()
 		return
 	}
-	if pc.count <= pipeMaxCount {
-		pc.data = pc.data[0:pc.count]
-		copy(pc.data, pc.buff[0:pc.count])
+	if pc.count <= cap(pc.data) {
+		pc.data = pc.data[:pc.count]
+		copy(pc.data, pc.buff[:pc.count])
 	} else {
 		pc.data = pc.data[:0]
 		for i := 0; i < pc.count; i++ {
