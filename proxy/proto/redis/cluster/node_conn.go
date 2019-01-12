@@ -69,7 +69,7 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	if reply.Type() != respRedirect {
 		return
 	}
-	if nc.redirects >= 5 { // NOTE: check max redirects
+	if nc.redirects >= maxRedirects { // NOTE: check max redirects
 		if log.V(4) {
 			log.Infof("Redis Cluster NodeConn key(%s) already max redirects", req.Key())
 		}

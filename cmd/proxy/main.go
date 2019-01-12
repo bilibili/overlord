@@ -23,7 +23,6 @@ const (
 var (
 	version  bool
 	check    bool
-	logStd   bool
 	logFile  string
 	logVl    int
 	debug    bool

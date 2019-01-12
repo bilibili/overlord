@@ -12,8 +12,8 @@ const (
 )
 
 var (
-	magicReqBytes  = []byte{0x80}
-	magicRespBytes = []byte{0x81}
+	magicReqBytes  = []byte{magicReq}
+	magicRespBytes = []byte{magicResp}
 	zeroBytes      = []byte{0x00}
 	zeroTwoBytes   = []byte{0x00, 0x00}
 	zeroFourBytes  = []byte{0x00, 0x00, 0x00, 0x00}
