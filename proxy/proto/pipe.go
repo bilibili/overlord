@@ -112,57 +112,48 @@ func newMsgPipe(input *pipeChan, newNc func() NodeConn, errCh chan<- error) (mp 
 
 func (mp *msgPipe) pipe() {
 	var (
-		nc = mp.nc.Load().(NodeConn)
+		nc  = mp.nc.Load().(NodeConn)
+		ms  []*Message
+		ok  bool
+		err error
 	)
 	for {
-		ms, ok := mp.input.popAll()
-		if !ok {
+		if ms, ok = mp.input.popAll(); !ok {
 			nc.Close()
 			return
 		}
 		if len(ms) == 0 {
 			continue
 		}
-		var werr error
-		for _, m := range ms {
-			if werr == nil {
-				werr = nc.Write(m)
-			} // NOTE: no else!!!
-			if werr != nil {
-				m.WithError(werr)
-				m.Done()
-			}
-		}
-		if werr != nil {
-			nc = mp.reNewNc(nc, werr)
-			continue
-		}
-		if ferr := nc.Flush(); ferr != nil {
-			for i := 0; i < len(ms); i++ {
-				ms[i].WithError(ferr)
-				ms[i].Done()
-			}
-			nc = mp.reNewNc(nc, ferr)
-			continue
-		}
-		var rerr error
 		for i := 0; i < len(ms); i++ {
-			if rerr == nil {
-				rerr = nc.Read(ms[i])
-			} // NOTE: no else!!!
-			if rerr != nil {
-				ms[i].WithError(rerr)
+			if err == nil {
+				err = nc.Write(ms[i])
+			} else {
+				goto NEXTMS
 			}
+		}
+		if err = nc.Flush(); err != nil {
+			goto NEXTMS
+		}
+		for i := 0; i < len(ms); i++ {
+			if err == nil {
+				err = nc.Read(ms[i])
+			} else {
+				goto NEXTMS
+			}
+		}
+	NEXTMS:
+		for i := 0; i < len(ms); i++ {
+			ms[i].WithError(err) // NOTE: err maybe nil!
 			ms[i].Done()
 		}
-		if rerr != nil {
-			nc = mp.reNewNc(nc, rerr)
-			continue
+		if err != nil {
+			nc = mp.renewNc(nc, err)
 		}
 	}
 }
 
-func (mp *msgPipe) reNewNc(nc NodeConn, err error) NodeConn {
+func (mp *msgPipe) renewNc(nc NodeConn, err error) NodeConn {
 	if err != nil {
 		select {
 		case mp.errCh <- err: // NOTE: action
