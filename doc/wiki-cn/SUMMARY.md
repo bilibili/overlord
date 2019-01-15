@@ -15,4 +15,4 @@
   * [高可用](platform/high-avaliable.md)
   * [节点恢复策略](platform/recovery-policy.md)
   * [部署时序图](platform/time-ordered-graph-deploy-cluster.md)
-  * [三种方式扩缩容](platform/scale.md)
+  * [集群伸缩](platform/scale.md)
