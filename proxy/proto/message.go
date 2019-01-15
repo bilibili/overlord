@@ -2,9 +2,10 @@ package proto
 
 import (
 	"fmt"
-	"overlord/pkg/types"
 	"sync"
 	"time"
+
+	"overlord/pkg/types"
 )
 
 var (
