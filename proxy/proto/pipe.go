@@ -1,11 +1,11 @@
 package proto
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 
 	"overlord/pkg/hashkit"
+	"overlord/pkg/log"
 )
 
 const (
@@ -15,16 +15,12 @@ const (
 	pipeMaxCount = 128
 )
 
-var (
-	errInputChanFull = errors.New("node pipe input chan is full")
-)
-
 // NodeConnPipe multi MsgPipe for node conns.
 type NodeConnPipe struct {
-	conns int32
-	mps   []*msgPipe
-	chans []*pipeChan
-	l     sync.RWMutex
+	conns  int32
+	inputs []chan *Message
+	mps    []*msgPipe
+	l      sync.RWMutex
 
 	errCh chan error
 
@@ -37,40 +33,46 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 		panic("the number of connections cannot be zero")
 	}
 	ncp = &NodeConnPipe{
-		conns: conns,
-		mps:   make([]*msgPipe, conns),
-		chans: make([]*pipeChan, conns),
-		errCh: make(chan error, 1),
+		conns:  conns,
+		inputs: make([]chan *Message, conns),
+		mps:    make([]*msgPipe, conns),
+		errCh:  make(chan error, 1),
 	}
 	for i := int32(0); i < ncp.conns; i++ {
-		ncp.chans[i] = newPipeChan()
-		ncp.mps[i] = newMsgPipe(ncp.chans[i], newNc, ncp.errCh)
+		ncp.inputs[i] = make(chan *Message, pipeMaxCount*pipeMaxCount)
+		ncp.mps[i] = newMsgPipe(ncp.inputs[i], newNc, ncp.errCh)
 	}
 	return
 }
 
 // Push push message into input chan.
 func (ncp *NodeConnPipe) Push(m *Message) {
-	m.Add()
-	var ok bool
+	var input chan *Message
 	ncp.l.RLock()
 	if ncp.state == opened {
 		if ncp.conns == 1 {
-			ok = ncp.chans[0].push(m)
+			input = ncp.inputs[0]
 		} else {
 			req := m.Request()
 			if req != nil {
 				crc := int32(hashkit.Crc16(req.Key()))
-				ok = ncp.chans[crc%ncp.conns].push(m)
+				input = ncp.inputs[crc%ncp.conns]
 			} else {
 				// NOTE: impossible!!!
 			}
 		}
 	}
 	ncp.l.RUnlock()
-	if !ok {
-		m.WithError(errInputChanFull)
-		m.Done()
+	if input != nil {
+		m.Add()
+		select {
+		case input <- m:
+		default:
+			m.Done()
+			if log.V(3) {
+				log.Warn("NodeConnPipe input chan is full")
+			}
+		}
 	}
 }
 
@@ -84,8 +86,8 @@ func (ncp *NodeConnPipe) Close() {
 	close(ncp.errCh)
 	ncp.l.Lock()
 	ncp.state = closed
-	for _, ch := range ncp.chans {
-		ch.close()
+	for _, input := range ncp.inputs {
+		close(input)
 	}
 	ncp.l.Unlock()
 }
@@ -94,12 +96,16 @@ func (ncp *NodeConnPipe) Close() {
 type msgPipe struct {
 	nc    atomic.Value
 	newNc func() NodeConn
-	input *pipeChan
+	input <-chan *Message
+
+	batch [pipeMaxCount]*Message
+	count int
 
 	errCh chan<- error
 }
 
-func newMsgPipe(input *pipeChan, newNc func() NodeConn, errCh chan<- error) (mp *msgPipe) {
+// newMsgPipe new msgPipe and return.
+func newMsgPipe(input <-chan *Message, newNc func() NodeConn, errCh chan<- error) (mp *msgPipe) {
 	mp = &msgPipe{
 		newNc: newNc,
 		input: input,
@@ -113,48 +119,67 @@ func newMsgPipe(input *pipeChan, newNc func() NodeConn, errCh chan<- error) (mp 
 func (mp *msgPipe) pipe() {
 	var (
 		nc  = mp.nc.Load().(NodeConn)
-		ms  []*Message
+		m   *Message
 		ok  bool
 		err error
 	)
 	for {
-		if ms, ok = mp.input.popAll(); !ok {
+		for {
+			if m == nil {
+				select {
+				case m, ok = <-mp.input:
+					if !ok {
+						nc.Close()
+						return
+					}
+				default:
+				}
+				if m == nil {
+					break
+				}
+			}
+			mp.batch[mp.count] = m
+			mp.count++
+			err = nc.Write(m)
+			m = nil
+			if err != nil {
+				goto MEND
+			}
+			if mp.count >= pipeMaxCount {
+				break
+			}
+		}
+		if err == nil && mp.count > 0 {
+			if err = nc.Flush(); err != nil {
+				goto MEND
+			}
+			for i := 0; i < mp.count; i++ {
+				if err == nil {
+					err = nc.Read(mp.batch[i])
+				} else {
+					goto MEND
+				}
+			}
+		}
+	MEND:
+		for i := 0; i < mp.count; i++ {
+			mp.batch[i].WithError(err) // NOTE: maybe err is nil
+			mp.batch[i].Done()
+		}
+		mp.count = 0
+		if err != nil {
+			nc = mp.reNewNc(nc, err)
+			err = nil
+		}
+		m, ok = <-mp.input // NOTE: avoid infinite loop
+		if !ok {
 			nc.Close()
 			return
-		}
-		if len(ms) == 0 {
-			continue
-		}
-		for i := 0; i < len(ms); i++ {
-			if err == nil {
-				err = nc.Write(ms[i])
-			} else {
-				goto NEXTMS
-			}
-		}
-		if err = nc.Flush(); err != nil {
-			goto NEXTMS
-		}
-		for i := 0; i < len(ms); i++ {
-			if err == nil {
-				err = nc.Read(ms[i])
-			} else {
-				goto NEXTMS
-			}
-		}
-	NEXTMS:
-		for i := 0; i < len(ms); i++ {
-			ms[i].WithError(err) // NOTE: err maybe nil!
-			ms[i].Done()
-		}
-		if err != nil {
-			nc = mp.renewNc(nc, err)
-			err = nil
 		}
 	}
 }
 
-func (mp *msgPipe) renewNc(nc NodeConn, err error) NodeConn {
+func (mp *msgPipe) reNewNc(nc NodeConn, err error) NodeConn {
 	if err != nil {
 		select {
 		case mp.errCh <- err: // NOTE: action
@@ -164,83 +189,4 @@ func (mp *msgPipe) renewNc(nc NodeConn, err error) NodeConn {
 	nc.Close()
 	mp.nc.Store(mp.newNc())
 	return mp.nc.Load().(NodeConn)
-}
-
-type pipeChan struct {
-	lock sync.Mutex
-	cond *sync.Cond
-
-	data  []*Message
-	buff  []*Message
-	count int
-
-	waits  int
-	closed bool
-}
-
-func newPipeChan() *pipeChan {
-	pc := &pipeChan{
-		data: make([]*Message, 0, pipeMaxCount),
-		buff: make([]*Message, 0, pipeMaxCount),
-	}
-	pc.cond = sync.NewCond(&pc.lock)
-	return pc
-}
-
-// push push message into slice.
-// NOTE: multi wirte!!!
-func (pc *pipeChan) push(m *Message) (ok bool) {
-	pc.lock.Lock()
-	if pc.closed {
-		pc.lock.Unlock()
-		return
-	}
-	if pc.waits != 0 {
-		pc.cond.Signal()
-	}
-	// NOTE: discard if the buff is too large!!!
-	if len(pc.buff) <= pipeMaxCount*pipeMaxCount {
-		pc.buff = append(pc.buff, m)
-		pc.count++
-		ok = true
-	}
-	pc.lock.Unlock()
-	return
-}
-
-// popAll pop all message from slice.
-// NOTE: only one read!!!
-func (pc *pipeChan) popAll() (ms []*Message, ok bool) {
-	pc.lock.Lock()
-	if !pc.closed && pc.count == 0 {
-		pc.waits++
-		pc.cond.Wait()
-		pc.waits--
-	}
-	if pc.closed {
-		pc.lock.Unlock()
-		return
-	}
-	if pc.count <= cap(pc.data) {
-		pc.data = pc.data[:pc.count]
-		copy(pc.data, pc.buff[:pc.count])
-	} else {
-		pc.data = pc.data[:0]
-		for i := 0; i < pc.count; i++ {
-			pc.data = append(pc.data, pc.buff[i])
-		}
-	}
-	ms = pc.data
-	pc.buff = pc.buff[:0]
-	pc.count = 0
-	pc.lock.Unlock()
-	ok = true
-	return
-}
-
-func (pc *pipeChan) close() {
-	pc.lock.Lock()
-	pc.closed = true
-	pc.cond.Broadcast()
-	pc.lock.Unlock()
 }
