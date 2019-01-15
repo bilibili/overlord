@@ -98,10 +98,10 @@ const (
 	// incrQString    = "incrq"
 	// decrQString    = "decrq"
 	// appendQString  = "appendq"
-	// prependQString = "prepend"
+	// prependQString = "prependq"
 	touchString = "touch"
 	gatString   = "gat"
-	// gatQString     = "gatQ"
+	// gatQString     = "gatq"
 	unknownString = "unknown"
 )
 
