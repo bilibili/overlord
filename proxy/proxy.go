@@ -88,7 +88,7 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwar
 			continue
 		}
 		if p.c.Proxy.MaxConnections > 0 {
-			if conns := atomic.AddInt32(&p.conns, 1); conns > p.c.Proxy.MaxConnections {
+			if conns := atomic.LoadInt32(&p.conns); conns > p.c.Proxy.MaxConnections {
 				// cache type
 				var encoder proto.ProxyConn
 				switch cc.CacheType {
@@ -106,12 +106,13 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwar
 					_ = encoder.Flush()
 				}
 				_ = conn.Close()
-				if log.V(5) {
+				if log.V(4) {
 					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
 				}
 				continue
 			}
 		}
+		atomic.AddInt32(&p.conns, 1)
 		NewHandler(p, cc, conn, forwarder).Handle()
 	}
 }

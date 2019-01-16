@@ -84,11 +84,7 @@ func TestPipe(t *testing.T) {
 	wg.Wait()
 	ncp3.Close()
 	time.Sleep(10 * time.Millisecond)
-	for i, msg := range msgs {
-		if i < whenErrNum {
-			assert.NoError(t, msg.Err())
-		} else {
-			assert.EqualError(t, msg.Err(), "some error")
-		}
+	for _, msg := range msgs {
+		assert.EqualError(t, msg.Err(), "some error")
 	}
 }

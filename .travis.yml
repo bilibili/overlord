@@ -27,11 +27,9 @@ before_script:
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $GOPATH/bin
 
 install:
-  - docker run -d --rm -e "IP=0.0.0.0" -p7010-7017:7000-7007 grokzen/redis-cluster:4.0.9
   - bash scripts/install-travis-etcd.sh
   - docker pull grokzen/redis-cluster:4.0.9
   - docker run -e "IP=0.0.0.0" -d -p 7000-7007:7000-7007 grokzen/redis-cluster:4.0.9
-
 
 script:
   - ./scripts/codecov.sh

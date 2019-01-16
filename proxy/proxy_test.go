@@ -13,7 +13,9 @@ import (
 
 	libnet "overlord/pkg/net"
 	"overlord/pkg/types"
+	"overlord/proxy/proto"
 
+	"github.com/bouk/monkey"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -98,8 +100,6 @@ var (
 			PingAutoEject:    false,
 			Servers: []string{
 				"127.0.0.1:6379:10",
-				// "127.0.0.1:11212:10",
-				// "127.0.0.1:11213:10",
 			},
 		},
 		&ClusterConfig{
@@ -118,10 +118,8 @@ var (
 			PingFailLimit:    3,
 			PingAutoEject:    false,
 			Servers: []string{
-				"127.0.0.1:7010",
-				"127.0.0.1:7011",
-				// "127.0.0.1:11212:10",
-				// "127.0.0.1:11213:10",
+				"127.0.0.1:7000",
+				"127.0.0.1:7001",
 			},
 		},
 		&ClusterConfig{
@@ -557,10 +555,20 @@ func TestEject(t *testing.T) {
 		{Name: "GetMultiCasMissOneOk", Line: 5, Cmd: "gets a_11 a_22 a_33\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "VALUE a_22 0 4", "\r\nhalo\r\n", "END\r\n"}},
 		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
+
+	pingSleepTime = func(t bool) time.Duration {
+		return 100 * time.Millisecond // NOTE: make sure test sleep duration more than ping duration
+	}
+
 	eject := ccs[0]
 	fer := p.forwarders["eject-cluster"].(*defaultForwarder)
 	mp := &mockPing{}
-	ping := &pinger{ping: mp, cc: eject, weight: 10, alias: "mc1"}
+
+	monkey.Patch(newPingConn, func(cc *ClusterConfig, addr string) proto.Pinger {
+		return mp
+	})
+
+	ping := &pinger{cc: eject, addr: "test-addr", alias: "mc1", weight: 10}
 	go fer.processPing(ping)
 
 	for _, tt := range ts {
@@ -572,7 +580,7 @@ func TestEject(t *testing.T) {
 		br := bufio.NewReader(nc)
 		if tt.eject {
 			mp.SetErr(&mockErr{})
-			time.Sleep(time.Second * 3)
+			time.Sleep(time.Second * 1)
 		} else {
 			mp.SetErr(nil)
 			time.Sleep(time.Second * 1)

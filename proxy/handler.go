@@ -149,10 +149,8 @@ func (h *Handler) closeWithError(err error) {
 		if prom.On {
 			prom.ConnDecr(h.cc.Name)
 		}
-		if log.V(2) {
-			if err != io.EOF {
-				log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
-			}
+		if log.V(2) && err != io.EOF {
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
 		}
 	}
 }

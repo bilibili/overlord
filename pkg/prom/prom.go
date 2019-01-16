@@ -22,7 +22,6 @@ var (
 	handlerTimer *prometheus.HistogramVec
 
 	clusterLabels        = []string{"cluster"}
-	clusterNodeLabels    = []string{"cluster", "node"}
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
 	clusterNodeCmdLabels = []string{"cluster", "node", "cmd"}

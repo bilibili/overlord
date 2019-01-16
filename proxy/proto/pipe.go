@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +13,10 @@ const (
 	closed = int32(1)
 
 	pipeMaxCount = 128
+)
+
+var (
+	errPipeChanFull = errors.New("pipe chan is full")
 )
 
 // NodeConnPipe multi MsgPipe for node conns.
@@ -38,7 +43,7 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 		errCh:  make(chan error, 1),
 	}
 	for i := int32(0); i < ncp.conns; i++ {
-		ncp.inputs[i] = make(chan *Message, pipeMaxCount*128)
+		ncp.inputs[i] = make(chan *Message, pipeMaxCount*pipeMaxCount)
 		ncp.mps[i] = newMsgPipe(ncp.inputs[i], newNc, ncp.errCh)
 	}
 	return
@@ -46,23 +51,32 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 
 // Push push message into input chan.
 func (ncp *NodeConnPipe) Push(m *Message) {
+	m.Add()
+	var input chan *Message
 	ncp.l.RLock()
 	if ncp.state == opened {
 		if ncp.conns == 1 {
-			m.Add()
-			ncp.inputs[0] <- m
+			input = ncp.inputs[0]
 		} else {
 			req := m.Request()
 			if req != nil {
 				crc := int32(hashkit.Crc16(req.Key()))
-				m.Add()
-				ncp.inputs[crc%ncp.conns] <- m
+				input = ncp.inputs[crc%ncp.conns]
 			} else {
 				// NOTE: impossible!!!
 			}
 		}
 	}
 	ncp.l.RUnlock()
+	if input != nil {
+		select {
+		case input <- m:
+			return
+		default:
+		}
+	}
+	m.WithError(errPipeChanFull)
+	m.Done()
 }
 
 // ErrorEvent return error chan.
@@ -107,9 +121,10 @@ func newMsgPipe(input <-chan *Message, newNc func() NodeConn, errCh chan<- error
 
 func (mp *msgPipe) pipe() {
 	var (
-		m  *Message
-		ok bool
-		nc = mp.nc.Load().(NodeConn)
+		nc  = mp.nc.Load().(NodeConn)
+		m   *Message
+		ok  bool
+		err error
 	)
 	for {
 		for {
@@ -128,39 +143,36 @@ func (mp *msgPipe) pipe() {
 			}
 			mp.batch[mp.count] = m
 			mp.count++
-			if werr := nc.Write(m); werr != nil {
-				m.WithError(werr)
-			}
+			err = nc.Write(m)
 			m = nil
+			if err != nil {
+				goto MEND
+			}
 			if mp.count >= pipeMaxCount {
 				break
 			}
 		}
-		if mp.count > 0 {
-			if ferr := nc.Flush(); ferr != nil {
-				for i := 0; i < mp.count; i++ {
-					mp.batch[i].WithError(ferr)
-					mp.batch[i].Done()
-				}
-				mp.count = 0
-				nc = mp.reNewNc(nc, ferr)
-				continue
+		if err == nil && mp.count > 0 {
+			if err = nc.Flush(); err != nil {
+				goto MEND
 			}
-			var rerr error
 			for i := 0; i < mp.count; i++ {
-				if rerr == nil {
-					rerr = nc.Read(mp.batch[i])
-				} // NOTE: no else!!!
-				if rerr != nil {
-					mp.batch[i].WithError(rerr)
+				if err == nil {
+					err = nc.Read(mp.batch[i])
+				} else {
+					goto MEND
 				}
-				mp.batch[i].Done()
 			}
-			mp.count = 0
-			if rerr != nil {
-				nc = mp.reNewNc(nc, rerr)
-			}
-			continue
+		}
+	MEND:
+		for i := 0; i < mp.count; i++ {
+			mp.batch[i].WithError(err) // NOTE: maybe err is nil
+			mp.batch[i].Done()
+		}
+		mp.count = 0
+		if err != nil {
+			nc = mp.reNewNc(nc, err)
+			err = nil
 		}
 		m, ok = <-mp.input // NOTE: avoid infinite loop
 		if !ok {
