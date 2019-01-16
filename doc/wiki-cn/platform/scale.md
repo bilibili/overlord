@@ -14,7 +14,7 @@
 
 ### 修改redis容量
 1. 通过修改配置文件的maxmemory并重启服务来修改最大内存限制。
-2. 通过config set maxmemory $bytes 来动态修改最大内存限制。无需对服务进行重启
+2. 通过config set maxmemory $bytes 来动态修改最大内存限制。无需对服务进行重启,同时也需要修改配置文件防止重启后失效
 ### 修改mesos分配的offer
 1. 当使用原地调整单节点容量时，需要提前判断当前机器是否有足够的容量进行原地扩容。缓存的资源是由mesos分配的，因此第一步需要先从mesos获取当前机器是否有剩余的资源。
 2. 获取到offer后，需要重新accept mesos offer。防止资源泄露。
@@ -25,7 +25,7 @@
 对于memcache和singleton的集群，通常是使用代理的模式（overlord-proxy）。对于这一类集群，修改节点数只需要新建节点，并将新节点加入代理服务的配置server list。通过一致性hash进行节点的负载均衡。**需要注意的是，如果新增的节点过多，需要注意新节点的加入速度，防止一次性加入太多新节点导致的缓存miss （proxy会自动选择合适的时机加入新节点防止大量的miss）**
 
 ### 修改redis-clusrer 节点
-对于修改redis sigleton节点数，修改cluster的节点数需要在原有的基础上把新节点通过cluster meet 加入cluster，然后通过[集群管理工具](https://github.com/bilibili/enri)进行key以及槽位的迁移
+相比于修改redis sigleton节点数，修改cluster的节点数需要在原有的基础上把新节点通过cluster meet 加入cluster，然后通过[集群管理工具](https://github.com/bilibili/enri)进行key以及槽位的迁移
 
 ## 大集群换小集群
 对于非cluster的集群，这是最推荐的一种方式。相比前二种方式通过大集群换小集群有以下优点：
@@ -33,4 +33,5 @@
 2. 对比第一种，无需对节点进行重启，造成节点访问的短暂失效。
 3. 不存在历史数据的增删操作，新建的集群内存碎片更小，  
 
-**注意**:使用大集群换小集群的前提是需要对数据进行迁移，对于redis 我们使用[数据迁移工具](https://github.com/bilibili/anzi)进行数据的同步迁移。很不幸，mc不支持数据的迁移，因此无法使用这种方式进行进群的伸缩。
+
+**注意**:使用大集群换小集群的前提是需要对数据进行迁移，且集群切换的过程中可能会有少量的脏数据。对于redis 我们使用[数据迁移工具](https://github.com/bilibili/anzi)进行数据的同步迁移。很不幸，mc不支持数据的迁移，因此无法使用这种方式进行进群的伸缩。
