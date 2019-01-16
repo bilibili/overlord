@@ -16,6 +16,8 @@ import (
 	mcbin "overlord/proxy/proto/memcache/binary"
 	"overlord/proxy/proto/redis"
 	rclstr "overlord/proxy/proto/redis/cluster"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -149,7 +151,7 @@ func (h *Handler) closeWithError(err error) {
 		if prom.On {
 			prom.ConnDecr(h.cc.Name)
 		}
-		if log.V(2) && err != io.EOF {
+		if log.V(2) && errors.Cause(err) != io.EOF {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
 		}
 	}
