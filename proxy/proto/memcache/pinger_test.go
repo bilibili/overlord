@@ -16,7 +16,7 @@ func TestPingerPingOk(t *testing.T) {
 }
 
 func TestPingerPingMore(t *testing.T) {
-	conn := _createConn(pongBytes)
+	conn := _createRepeatConn(pongBytes, 2)
 	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
@@ -36,7 +36,7 @@ func TestPingerPing100Ok(t *testing.T) {
 	}
 
 	err := pinger.Ping()
-	assert.NoError(t, err)
+	assert.EqualError(t, err, "EOF")
 }
 
 func TestPingerErr(t *testing.T) {
