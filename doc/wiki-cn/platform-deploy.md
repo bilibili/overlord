@@ -22,8 +22,8 @@ overlord-platform是一套完整的部署平台，它要求接管整个缓存机
 编译：
 
 ```bash
-root # make build
-root # fd . './cmd' -t x
+root: make build
+root: fd . './cmd' -t x
 cmd/apicli/apicli
 cmd/apiserver/apiserver
 cmd/executor/executor
