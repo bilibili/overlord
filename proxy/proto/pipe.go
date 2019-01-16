@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"overlord/pkg/hashkit"
-	"overlord/pkg/log"
 )
 
 const (
