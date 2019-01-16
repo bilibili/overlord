@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -13,6 +14,10 @@ const (
 	closed = int32(1)
 
 	pipeMaxCount = 128
+)
+
+var (
+	errPipeChanFull = errors.New("pipe chan is full")
 )
 
 // NodeConnPipe multi MsgPipe for node conns.
@@ -47,6 +52,7 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 
 // Push push message into input chan.
 func (ncp *NodeConnPipe) Push(m *Message) {
+	m.Add()
 	var input chan *Message
 	ncp.l.RLock()
 	if ncp.state == opened {
@@ -64,16 +70,14 @@ func (ncp *NodeConnPipe) Push(m *Message) {
 	}
 	ncp.l.RUnlock()
 	if input != nil {
-		m.Add()
 		select {
 		case input <- m:
+			return
 		default:
-			m.Done()
-			if log.V(3) {
-				log.Warn("NodeConnPipe input chan is full")
-			}
 		}
 	}
+	m.WithError(errPipeChanFull)
+	m.Done()
 }
 
 // ErrorEvent return error chan.

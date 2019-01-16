@@ -81,6 +81,9 @@ func (r *Reader) Read() error {
 
 // ReadLine will read until meet the first crlf bytes.
 func (r *Reader) ReadLine() (line []byte, err error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	idx := bytes.Index(r.b.buf[r.b.r:r.b.w], crlfBytes)
 	if idx == -1 {
 		line = nil
@@ -95,6 +98,9 @@ func (r *Reader) ReadLine() (line []byte, err error) {
 // ReadSlice will read until the delim or return ErrBufferFull.
 // It never contains any I/O operation
 func (r *Reader) ReadSlice(delim byte) (data []byte, err error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	idx := bytes.IndexByte(r.b.buf[r.b.r:r.b.w], delim)
 	if idx == -1 {
 		data = nil
@@ -109,6 +115,9 @@ func (r *Reader) ReadSlice(delim byte) (data []byte, err error) {
 // ReadExact will read n size bytes or return ErrBufferFull.
 // It never contains any I/O operation
 func (r *Reader) ReadExact(n int) (data []byte, err error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	if r.b.buffered() < n {
 		err = ErrBufferFull
 		return

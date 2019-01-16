@@ -9,3 +9,4 @@ build:
 	cd cmd/balancer && go build && cd -
 	cd cmd/executor && go build && cd -
 	cd cmd/proxy && go build && cd -
+	cd cmd/scheduler && go build && cd -
