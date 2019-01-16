@@ -189,9 +189,6 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 			}
 		} else {
 			delete(oncp, addr)
-			if log.V(5) {
-				log.Infof("Redis Cluster renew slot node addr:%s", addr)
-			}
 		}
 		sn.nodePipe[addr] = ncp
 	}
