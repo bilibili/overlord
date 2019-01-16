@@ -79,6 +79,10 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 
 func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwarder) {
 	for {
+		if p.closed {
+			log.Infof("overlord proxy cluster[%s] addr(%s) stop listen", cc.Name, cc.ListenAddr)
+			return
+		}
 		conn, err := l.Accept()
 		if err != nil {
 			if conn != nil {
@@ -127,5 +131,6 @@ func (p *Proxy) Close() error {
 	for _, forwarder := range p.forwarders {
 		forwarder.Close()
 	}
+	p.closed = true
 	return nil
 }
