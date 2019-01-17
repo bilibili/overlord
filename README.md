@@ -9,7 +9,8 @@ Overlord is a proxy based high performance Memcached and Redis solution written 
 It is fast and lightweight and used primarily to horizontally scale your distributed caching architecture.  
 It is inspired by Twemproxy,Codis.  
 
-see more [documents](doc/wiki-cn/SUMMARY.md)
+## Document
+[简体中文](doc/wiki-cn/SUMMARY.md)
 
 ## Overlord proxy Quick Start
 
