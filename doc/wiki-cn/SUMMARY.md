@@ -1,7 +1,7 @@
 # Summary
 
 * [Introduction](README.md)
-  * [overlord proxy 使用指南](usage.md)
+  * [overlord-proxy 使用指南](usage.md)
   * [overlord-platform 部署指南](platform-deploy.md)
 * [overlord-proxy](proxy.md)
   * [功能支持](proxy/features.md)
