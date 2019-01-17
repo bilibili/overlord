@@ -4,7 +4,7 @@
 
 鉴于[ruskit](https://github.com/eleme/ruskit) 已经不再维护，我们决定重写这个管理工具。并添加一些诸如监控、报告、分析等更加自动化的功能。
 
-## TODO Anzi: redis数据导入导出工具
+## TODO redis数据导入导出工具 - Anzi
 
 anzi 是一款使用 Go 编写的、快速的、同时支持多种目标的 redis-cluster 数据同步工具。原先，我们使用 [redis-migrate-tools](https://github.com/vipshop/redis-migrate-tool)。但是，这个工具本身不能快速简单的做服务化，也没有进度报告之类的可以反馈的，并且同一时间只支持同步一个集群的数据。更重要的是，它已经好久不维护了，甚至不支持最新的 redis rdb v9 协议。因此，我们决定使用 Go 去重写这个迁移工具。
 
