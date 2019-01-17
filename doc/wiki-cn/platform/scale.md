@@ -22,7 +22,7 @@
 ## 修改节点数
 相比原地修改单节点容量，修改节点数进行伸缩是更推荐的方式。修改节点数量只需在原有的集群上进行节点的增删，而且对于单节点qps过高的情况，增加节点数可以降低单节点的负载。
 ### 修改memcache和redis（singleton）节点数
-对于memcache和singleton的集群，通常是使用代理的模式（overlord-proxy）。对于这一类集群，修改节点数只需要新建节点，并将新节点加入代理服务的配置server list。通过一致性hash进行节点的负载均衡。**需要注意的是，如果新增的节点过多，需要注意新节点的加入速度，防止一次性加入太多新节点导致的缓存miss （proxy会自动选择合适的时机加入新节点防止大量的miss）**
+对于memcache和singleton的集群，通常是使用代理的模式（overlord-proxy）。对于这一类集群，修改节点数只需要新建节点，并将新节点加入代理服务的配置server list。通过一致性hash进行节点的负载均衡。**需要注意的是，如果新增的节点过多，需要注意新节点的加入速度，防止一次性加入太多新节点导致的缓存miss （proxy会自动选择合适的时机加入新节点防止大量的miss）**
 
 ### 修改redis-clusrer 节点
 相比于修改redis sigleton节点数，修改cluster的节点数需要在原有的基础上把新节点通过cluster meet 加入cluster，然后通过[集群管理工具](https://github.com/bilibili/enri)进行key以及槽位的迁移

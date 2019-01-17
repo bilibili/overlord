@@ -5,7 +5,7 @@ mesos framework 的高可用参考了[Designing Highly Available Mesos Framework
 包括:
 1. [mesos-master高可用](#mesos-master高可用)
 2. [framework高可用](#framework高可用)
-3. [mesos-agent高可用](#mesos-agent高可用)
+3. [mesos-agent高可用](#mesos-agent高可用)
 4. [元数据存储高可用](#etcd高可用)
 
 ### mesos-master高可用
