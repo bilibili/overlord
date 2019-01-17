@@ -20,5 +20,6 @@ framework的核心调度模块，基于[chunk](./doc/chunk.txt)算法实现redis
 ### executor
 缓存节点启动部署模块，由mesos-agent收到调度任务后拉起，executor会通过下发的taskid从etcd获取详细的节点部署信息，包括缓存类型（mc|redis...）启动配置等。通过fork command的方式启动缓存节点。节点启动完成后，更新task状态为running，当集群的所有状态全部更新为running时，则表明当前集群创建完成。节点启动完成后，executor会同时启动一个routine进行节点的health check，保证节点的可用性，同时更新节点任务状态。当节点启动失败或发生故障时，会通过事件通知scheduler进行故障恢复处理
 
+
 ## apiserver
 缓存资源运维管理后台，通过后台dashboard对缓存集群进行快捷的创建集群，增删节点，以及绑定业务appid等操作。
