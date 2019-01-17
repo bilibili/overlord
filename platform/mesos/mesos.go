@@ -17,7 +17,7 @@ type Config struct {
 	Name       string   `toml:"name"` // Supply a frameworkname
 	Checkpoint bool     `toml:"checkpoint"`
 	Master     string   `toml:"master"` //MesosMaster's endpoint zk://mesos.master/2181 or 10.11.12.13:5050
-	FailOver   Duration `toml:"fail_voer"`
+	FailOver   Duration `toml:"fail_over"`
 	Roles      []string `toml:"role"`
 	Hostname   string   `toml:"hostname"`
 	Principal  string   `toml:"principal"`

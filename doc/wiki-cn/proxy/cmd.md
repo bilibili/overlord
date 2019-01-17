@@ -1,0 +1,191 @@
+# 支持&不支持的命令列表
+
+## Memcache
+
+- [x] set
+- [x] add
+- [x] replace
+- [x] append
+- [x] prepend
+- [x] cas
+- [x] get
+- [x] gets
+- [x] delete
+- [x] incr
+- [x] decr
+- [x] touch
+- [x] gat
+- [x] gats
+- [ ] slabs
+- [ ] lru
+- [ ] lru_crawler
+- [ ] watch
+- [ ] stats
+- [ ] stat
+- [ ] flush_all
+- [ ] version
+- [ ] quit
+- [ ] misbehave
+
+## Memcache Binary
+
+- [x] get
+- [x] set
+- [x] add
+- [x] replace
+- [x] delete
+- [x] incr
+- [x] decr
+- [x] getq
+- [x] noop
+- [x] getk
+- [x] getkq
+- [x] append
+- [x] prepend
+- [x] touch
+- [x] gat
+- [ ] setq
+- [ ] addq
+- [ ] replaceq
+- [ ] incrq
+- [ ] decrq
+- [ ] appendq
+- [ ] prependq
+- [ ] gatq
+- [ ] quit
+- [ ] flush
+- [ ] version
+- [ ] stat
+
+
+## Redis&Redis Cluster
+
+- [x] DUMP
+- [x] EXISTS
+- [x] PTTL
+- [x] TTL
+- [x] TYPE
+- [x] BITCOUNT
+- [x] BITPOS
+- [x] GET
+- [x] GETBIT
+- [x] GETRANGE
+- [x] MGET
+- [x] STRLEN
+- [x] HEXISTS
+- [x] HGET
+- [x] HGETALL
+- [x] HKEYS
+- [x] HLEN
+- [x] HMGET
+- [x] HSTRLEN
+- [x] HVALS
+- [x] HSCAN
+- [x] SCARD
+- [x] SDIFF
+- [x] SINTER
+- [x] SISMEMBER
+- [x] SMEMBERS
+- [x] nSRANDMEMBER
+- [x] SUNION
+- [x] SSCAN
+- [x] ZCARD
+- [x] ZCOUNT
+- [x] ZLEXCOUNT
+- [x] ZRANGE
+- [x] nZRANGEBYLEX
+- [x] nZRANGEBYSCORE
+- [x] ZRANK
+- [x] ZREVRANGE
+- [x] nZREVRANGEBYLEX
+- [x] nZREVRANGEBYSCORE
+- [x] ZREVRANK
+- [x] ZSCORE
+- [x] ZSCAN
+- [x] LINDEX
+- [x] LLEN
+- [x] LRANGE
+- [x] PFCOUNT
+- [x] DEL
+- [x] EXPIRE
+- [x] EXPIREAT
+- [x] PERSIST
+- [x] PEXPIRE
+- [x] PEXPIREAT
+- [x] RESTORE
+- [x] SORT
+- [x] APPEND
+- [x] DECR
+- [x] DECRBY
+- [x] GETSET
+- [x] INCR
+- [x] INCRBY
+- [x] nINCRBYFLOAT
+- [x] MSET
+- [x] PSETEX
+- [x] SET
+- [x] SETBIT
+- [x] SETEX
+- [x] SETNX
+- [x] SETRANGE
+- [x] HDEL
+- [x] HINCRBY
+- [x] HINCRBYFLOAT
+- [x] HMSET
+- [x] HSET
+- [x] HSETNX
+- [x] LINSERT
+- [x] LPOP
+- [x] LPUSH
+- [x] LPUSHX
+- [x] LREM
+- [x] LSET
+- [x] LTRIM
+- [x] RPOP
+- [x] RPOPLPUSH
+- [x] RPUSH
+- [x] RPUSHX
+- [x] SADD
+- [x] SMOVE
+- [x] SPOP
+- [x] SREM
+- [x] ZADD
+- [x] ZINCRBY
+- [x] nZINTERSTORE
+- [x] ZREM
+- [x] ZREMRANGEBYLEX
+- [x] ZREMRANGEBYRANK
+- [x] ZREMRANGEBYSCORE
+- [x] PFADD
+- [x] PFMERGE
+- [x] EVAL
+- [x] QUIT
+- [x] PING
+- [ ] MSETNX
+- [ ] SDIFFSTORE
+- [ ] SINTERSTORE
+- [ ] SUNIONSTORE
+- [ ] ZUNIONSTORE
+- [ ] BLPOP
+- [ ] BRPOP
+- [ ] nBRPOPLPUSH
+- [ ] KEYS
+- [ ] MIGRATE
+- [ ] MOVE
+- [ ] OBJECT
+- [ ] RANDOMKEY
+- [ ] RENAME
+- [ ] RENAMENX
+- [ ] SCAN
+- [ ] WAIT
+- [ ] BITOP
+- [ ] EVALSHA
+- [ ] AUTH
+- [ ] ECHO
+- [ ] INFO
+- [ ] PROXY
+- [ ] SLOWLOG
+- [ ] SELECT
+- [ ] TIME
+- [ ] CONFIG
+- [ ] COMMANDS
