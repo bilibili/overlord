@@ -7,7 +7,7 @@ overlord 是 [bilibili](www.bilibili.com) 提出的一套完整的缓存解决�
 1. 一个轻量、快速、多功能的缓存代理组件：overlord-proxy。
 2. 一个迅速、自愈、管理，负责部署缓存的平台：overlord-platform。
 3. 一个简单的的命令行工具：enri。
-4. 一个快速简单的redis数据导入导出工具。
+4. 一个快速简单的redis数据导入导出工具: anzi。
 
 ## overlord-proxy 介绍
 
@@ -34,12 +34,12 @@ overlord-proxy 的灵感来源自著名的缓存代理组件 twemproxy 和 corvu
 
 为此，我们使用了一种，模拟集群恢复的方法进行创建集群。同样是创建600个主节点，使用新方法仅仅需要10s的时间，速度提升了百倍不止。
 
-## enri
+## redis cluster集群管理工具：enri
 
 enri 是我们自己开发拓展的 redis cluster 管理工具，它将在命令行为运维人员提供一种简单快速的检查和管理集群的方式。它受 [ruskit](https://github.com/eleme/ruskit) 的启发，并且加入了许多其没有的功能，同时在性能上进行了改进。可以让治理集群的工作变得简单轻松。
 
 TODO:剩下的得工具写完才能写
 
-## 数据迁移工具
+## 数据迁移工具: anzi
 
 受 [redis-migrate-tool](https://github.com/vipshop/redis-migrate-tool) 的启发，我们开发了自己的迁移工具。与原工具相比，新的迁移工具采用Go语言编写，同时将支持更加服务化的场景，可以同时创建和传输多个集群的数据。同时可以集成 platform,也就意味着用户可以更加方便的将集群数据在平台之间迁移。

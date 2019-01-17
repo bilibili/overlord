@@ -1,7 +1,7 @@
 export GO111MODULE=on
 
 test-create:
-	go test -v overlord/job/create
+	go test -v overlord/platform/job/create
 
 build:
 	cd cmd/apicli && go build && cd -
