@@ -1,6 +1,3 @@
-// import qs from 'qs'
-// import { AxiosResponse, AxiosRequestConfig } from 'axios'
-
 const axiosConfig = {
   baseURL: '/',
   // 请求后的数据处理

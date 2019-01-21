@@ -94,13 +94,17 @@ executor 需要放到一个 mesos 支持的存储服务器（http）里。我们
 
 ### front-end
 
-```编译打包
+#### 编译打包
+```bash
 cd web
 npm install
-npm run build
+yarn run build
 tar zcf dist.tar.gz dist
 ```
-打包好了之后上传到与 apiserver 同域名下的nginx即可。
+
+1. nodejs version 8.x。
+2. 前端项目使用了路由的 history 模式，请在服务器中配置 [vue router history-mode](https://router.vuejs.org/zh/guide/essentials/history-mode.html)。
+3. 打包好了之后上传到与 apiserver 同域名下的 nginx 即可。
 
 ## 错误处理
 
