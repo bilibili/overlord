@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"overlord/pkg/hashkit"
 )
@@ -16,6 +17,7 @@ const (
 )
 
 var (
+	errMsgTimeout   = errors.New("message timoeut")
 	errPipeChanFull = errors.New("pipe chan is full")
 )
 
@@ -143,6 +145,10 @@ func (mp *msgPipe) pipe() {
 			}
 			mp.batch[mp.count] = m
 			mp.count++
+			if m.Timeout(time.Second) {
+				err = errMsgTimeout
+				goto MEND
+			}
 			err = nc.Write(m)
 			m = nil
 			if err != nil {

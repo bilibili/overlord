@@ -227,6 +227,11 @@ func (m *Message) WithError(err error) {
 	m.err = err
 }
 
+// Timeout check if message had benn tiemout.
+func (m *Message) Timeout(duration time.Duration) bool {
+	return time.Since(m.st) > duration
+}
+
 // Err returns error.
 func (m *Message) Err() error {
 	if m.err != nil {
