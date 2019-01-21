@@ -8,7 +8,7 @@ nodejs 8.x
 
 ## 安装编译
 
-```base
+```bash
 cd web
 
 # 安装依赖
@@ -25,47 +25,47 @@ yarn run lint
 
 ```bash
     ├── README.md
-    ├── babel.config.js
+    ├── babel.config.js             // babel 配置
     ├── package.json
-    ├── postcss.config.js
+    ├── postcss.config.js           // postcss 配置
     ├── public
     │   ├── favicon.ico
     │   └── index.html
     ├── src
-    │   ├── App.vue
-    │   ├── assets
+    │   ├── App.vue                 // 页面入口文件
+    │   ├── assets                  // 资源文件
     │   │   ├── Starbounder-2.otf
-    │   ├── constants
+    │   ├── constants               // 常量文件
     │   │   ├── CREATE_TYPES.js
     │   │   └── GROUP.js
     │   ├── http
-    │   │   ├── api.js
-    │   │   ├── config.js
-    │   │   └── service.js
-    │   ├── layout
+    │   │   ├── api.js              // API 方法
+    │   │   ├── config.js           // axios 基本配置
+    │   │   └── service.js          // axios 拦截器
+    │   ├── layout                  // 页面布局组件
     │   │   ├── Header.vue
     │   │   └── SideBar.vue
-    │   ├── main.js
-    │   ├── router.js
-    │   ├── store
+    │   ├── main.js                 // 程序入口文件
+    │   ├── router.js               // 路由配置
+    │   ├── store                   // vuex 状态管理
     │   │   ├── index.js
     │   │   ├── modules
     │   │   │   ├── cluster.js
     │   │   │   └── job.js
     │   │   └── mutation-types.js
-    │   ├── style
+    │   ├── style                   // 全局样式
     │   │   ├── element-custom.scss
     │   │   ├── element-variables.scss
     │   │   ├── mixin.scss
     │   │   └── reset.scss
-    │   └── views
-    │       ├── AddCluster.vue
-    │       ├── AppId.vue
-    │       ├── Cluster.vue
-    │       ├── Home.vue
-    │       └── Job.vue
-    ├── vue.config.js
-    └── yarn.lock
+    │   └── views                   // 业务代码
+    │       ├── AddCluster.vue      // 创建集群
+    │       ├── AppId.vue           // AppId 管理
+    │       ├── Cluster.vue         // 集群详情
+    │       ├── Home.vue            // 首页（Cluster 搜索）
+    │       └── Job.vue             // Job 列表
+    ├── vue.config.js               // 全局 CLI 配置文件
+    └── yarn.lock                   // 依赖 lock 文件
 ```
 
 ## 文件配置
