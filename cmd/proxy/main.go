@@ -79,6 +79,7 @@ func main() {
 	}
 	defer p.Close()
 	p.Serve(ccs)
+	prom.VersionIncr(os.Getenv("APP_ID"), VERSION)
 	// pprof
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)

@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	statConns = "overlord_proxy_conns"
-	statErr   = "overlord_proxy_err"
+	statConns     = "overlord_proxy_conns"
+	versionCounts = "overlord_version"
+	statErr       = "overlord_proxy_err"
 
 	statProxyTimer   = "overlord_proxy_timer"
 	statHandlerTimer = "overlord_proxy_handler_timer"
@@ -17,10 +18,12 @@ const (
 
 var (
 	conns        *prometheus.GaugeVec
+	versions     *prometheus.GaugeVec
 	gerr         *prometheus.GaugeVec
 	proxyTimer   *prometheus.HistogramVec
 	handlerTimer *prometheus.HistogramVec
 
+	versionLabels        = []string{"appid", "version"}
 	clusterLabels        = []string{"cluster"}
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
@@ -37,6 +40,12 @@ func Init() {
 			Help: statConns,
 		}, clusterLabels)
 	prometheus.MustRegister(conns)
+	versions = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: versionCounts,
+			Help: versionCounts,
+		}, versionLabels)
+	prometheus.MustRegister(versions)
 	gerr = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: statErr,
@@ -106,4 +115,20 @@ func ConnDecr(cluster string) {
 		return
 	}
 	conns.WithLabelValues(cluster).Dec()
+}
+
+// VersionIncr incr version in use
+func VersionIncr(appid, version string) {
+	if versions == nil {
+		return
+	}
+	versions.WithLabelValues(appid, version).Inc()
+}
+
+// VersionDecr decr version in use
+func VersionDecr(appid, version string) {
+	if versions == nil {
+		return
+	}
+	versions.WithLabelValues(appid, version).Dec()
 }
