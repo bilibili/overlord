@@ -194,10 +194,6 @@ func (f defaultForwarder) processPing(p *pinger) {
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0
-			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {
-				_ = p.ping.Close()
-				p.ping = newPingConn(p.cc, p.addr)
-			}
 			if del {
 				del = false
 				f.ring.AddNode(p.alias, p.weight)
@@ -207,7 +203,11 @@ func (f defaultForwarder) processPing(p *pinger) {
 			}
 			time.Sleep(pingSleepTime(false))
 			continue
+		} else {
+			_ = p.ping.Close()
+			p.ping = newPingConn(p.cc, p.addr)
 		}
+
 		p.failure++
 		if log.V(3) {
 			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
