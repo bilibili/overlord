@@ -74,15 +74,14 @@
             {{ GROUP_MAP[row.group] }}
           </template>
         </el-table-column>
-        <el-table-column label="详情" width="200">
+        <el-table-column label="详情" width="230">
           <template slot-scope="{ row }">
             <el-button type="text" @click="addCorrelation(row)">关联到 {{ appid }}</el-button>
           </template>
         </el-table-column>
       </el-table>
       <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="dialogVisible = false">确 定</el-button>
+        <el-button @click="dialogVisible = false">关闭</el-button>
       </span>
     </el-dialog>
 
