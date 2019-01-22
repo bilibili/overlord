@@ -192,7 +192,6 @@ func (f defaultForwarder) processPing(p *pinger) {
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
 		err = p.ping.Ping()
-		p.ping.Close()
 		if err == nil {
 			p.failure = 0
 			if netE, ok := err.(net.Error); !ok || !netE.Temporary() {

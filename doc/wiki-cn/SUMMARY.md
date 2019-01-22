@@ -16,4 +16,5 @@
   * [集群部署](platform/deploy-cluster.md)
   * [集群伸缩](platform/scale.md)
   * [节点恢复策略](platform/recovery-policy.md)
+  * [前端开发指南](platform/front-end.md)
 * [工具支持 enri/anzi](tools.md)
