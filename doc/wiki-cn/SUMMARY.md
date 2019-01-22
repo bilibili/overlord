@@ -2,8 +2,8 @@
 
 * [Introduction](README.md)
   * [overlord-proxy 使用指南](usage.md)
-  * [overlord-platform 部署指南](platform-deploy.md)
   * [overlord-platform 使用指南](platform-usage.md)
+  * [overlord-platform 部署指南](platform-deploy.md)
 * [overlord-proxy](proxy.md)
   * [功能支持](proxy/features.md)
   * [性能测试](proxy/benchmark.md)
@@ -17,4 +17,5 @@
   * [集群部署](platform/deploy-cluster.md)
   * [集群伸缩](platform/scale.md)
   * [节点恢复策略](platform/recovery-policy.md)
+  * [前端开发指南](platform/front-end.md)
 * [工具支持 enri/anzi](tools.md)
