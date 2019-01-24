@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"overlord/platform/chunk"
 	"overlord/pkg/log"
+	"overlord/platform/chunk"
 	"strconv"
 	"strings"
 )
@@ -226,6 +226,16 @@ func (c *Conn) Ping() (err error) {
 		c.conn = newNode(c.addr)
 	}
 	return
+}
+
+func (c *Conn) Exec(cmd string) (resp *Resp, err error) {
+	cmdResp, err := c.conn.execute(cmd)
+	if err != nil {
+		c.conn.Close()
+		c.conn = newNode(c.addr)
+		return
+	}
+	return cmdResp.Reply, nil
 }
 
 // Close will close the given connection
