@@ -13,7 +13,7 @@ func Create(addrs []string, slave int) (c *Cluster, err error) {
 		err = errMasterCount
 		return
 	}
-	var nodes = make(map[string]*Node, len(addrs))
+	var nodes = make([]*Node, 0, len(addrs))
 	for _, addr := range addrs {
 		var node *Node
 		node, err = NewNode(addr)
@@ -21,14 +21,15 @@ func Create(addrs []string, slave int) (c *Cluster, err error) {
 			return
 		}
 		node.Init()
-		nodes[node.name] = node
+		nodes = append(nodes, node)
 	}
+
 	c = &Cluster{
 		nodes:       nodes,
 		masterCount: master,
 		slaveCount:  slave,
 	}
-
+	c.initSlot()
 	return
 }
 
@@ -42,7 +43,7 @@ func spread(hosts map[string][]*Node, num int) (nodes []*Node) {
 	}
 	for {
 		for host, n := range hosts {
-			if len(nodes) > num {
+			if len(nodes) >= num {
 				return
 			}
 			nodes = append(nodes, n[0])
@@ -63,6 +64,7 @@ func splitSlot(n, m int) (slots [][2]int) {
 
 func distributeSlave(masters, slaves []*Node) {
 	inuse := make(map[string]*Node)
+	var i int
 	for {
 		for _, master := range masters {
 			for _, slave := range slaves {
@@ -71,9 +73,13 @@ func distributeSlave(masters, slaves []*Node) {
 					continue
 				}
 				inuse[key] = slave
+				i++
 				slave.slaveof = master.name
 				break
 			}
+		}
+		if i >= len(slaves) {
+			return
 		}
 	}
 }

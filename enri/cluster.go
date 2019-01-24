@@ -3,7 +3,6 @@ package enri
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"log"
 	"strconv"
 
@@ -17,21 +16,6 @@ const (
 	master Role = iota
 	salve
 )
-
-// Node present node info.
-type Node struct {
-	name      string
-	ip        string
-	port      string
-	role      Role
-	self      bool
-	slaveof   string
-	nodes     map[string]*Node
-	slots     []int64
-	migrating map[int64]string
-	importing map[int64]string
-	conn      *myredis.Conn
-}
 
 // NewNode new node by addr.
 func NewNode(addr string) (n *Node, err error) {
@@ -70,15 +54,14 @@ func (n *Node) Nodes() (nodes []*Node) {
 		log.Printf("Nodes err %v", err)
 		return
 	}
-	n.parseNodes(resp.Data)
-	fmt.Printf("%v", n.nodes)
+	nodes = n.parseNodes(resp.Data)
 	return
 }
-func (n *Node) parseNodes(data []byte) {
+
+func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 	buf := bufio.NewReader(bytes.NewBuffer(data))
 	for {
 		line, _, err := buf.ReadLine()
-		println(string(line))
 		if err != nil {
 			return
 		}
@@ -97,6 +80,7 @@ func (n *Node) parseNodes(data []byte) {
 			node.role = master
 		} else {
 			node.role = salve
+
 		}
 		if bytes.Contains(fields[2], []byte("self")) {
 			node.self = true
@@ -126,6 +110,7 @@ func (n *Node) parseNodes(data []byte) {
 			}
 		}
 		n.nodes[node.name] = node
+		nodes = append(nodes, node)
 	}
 }
 
@@ -135,11 +120,12 @@ const (
 
 // Cluster present cluster info.
 type Cluster struct {
-	nodes       map[string]*Node
+	nodes       []*Node
 	masterCount int
 	slaveCount  int
 	master      []*Node
 	salve       []*Node
+	err         error
 }
 
 func (c *Cluster) initSlot() {
@@ -155,5 +141,31 @@ func (c *Cluster) initSlot() {
 		for j := slots[i][0]; j < slots[i][1]; j++ {
 			master.slots = append(master.slots, int64(j))
 		}
+	}
+}
+
+func (c *Cluster) setConfigEpoch() {
+	for _, node := range c.master {
+		err := node.setConfigEpoch()
+		if err != nil {
+			c.err = err
+			return
+		}
+	}
+}
+
+func (c *Cluster) join() {
+	if c.err != nil || len(c.nodes) == 0 {
+		return
+	}
+	var first = c.nodes[0]
+	for _, node := range c.nodes[1:] {
+		first.meet(node.ip + node.port)
+	}
+}
+
+func (c *Cluster) setSlaves() {
+	for _, slave := range c.salve {
+		slave.setSlave()
 	}
 }
