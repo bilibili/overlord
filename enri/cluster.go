@@ -1,27 +1,40 @@
 package enri
 
 import (
-	"bufio"
-	"bytes"
-	"log"
-	"strconv"
+	"errors"
+	"overlord/pkg/log"
+	"time"
 
 	"overlord/pkg/myredis"
+)
+
+var (
+	errNode = errors.New("can not add invalid node to cluster")
 )
 
 // Role cluster role
 type Role int8
 
 const (
-	master Role = iota
-	salve
+	roleSalve Role = iota
+	roleMaster
 )
+
+func (r Role) String() string {
+	switch r {
+	case roleMaster:
+		return "master"
+	case roleSalve:
+		return "slave"
+	}
+	return ""
+}
 
 // NewNode new node by addr.
 func NewNode(addr string) (n *Node, err error) {
 	ip, port, err := parseAddr(addr)
 	if err != nil {
-		log.Printf("NewNode err %v", err)
+		log.Infof("NewNode err %v", err)
 		return
 	}
 	conn := myredis.NewConn(addr)
@@ -34,84 +47,6 @@ func NewNode(addr string) (n *Node, err error) {
 		importing: make(map[int64]string),
 	}
 	return
-}
-
-// Init init node info.
-func (n *Node) Init() {
-	for _, node := range n.Nodes() {
-		if node.self {
-			n.name = node.name
-			n.slaveof = node.slaveof
-			n.slots = node.slots
-		}
-	}
-}
-
-// Nodes get nodes from node conn.
-func (n *Node) Nodes() (nodes []*Node) {
-	resp, err := n.conn.Exec("CLUSTER NODES")
-	if err != nil {
-		log.Printf("Nodes err %v", err)
-		return
-	}
-	nodes = n.parseNodes(resp.Data)
-	return
-}
-
-func (n *Node) parseNodes(data []byte) (nodes []*Node) {
-	buf := bufio.NewReader(bytes.NewBuffer(data))
-	for {
-		line, _, err := buf.ReadLine()
-		if err != nil {
-			return
-		}
-		fields := bytes.Split(line, []byte{' '})
-		if len(fields) < 8 {
-			return
-		}
-		addr := bytes.Split(fields[1], []byte{'@'})
-		node, err := NewNode(string(addr[0]))
-		node.name = string(fields[0])
-		if err != nil {
-			log.Printf("NewNode err %v", err)
-			return
-		}
-		if bytes.Contains(fields[2], []byte("master")) {
-			node.role = master
-		} else {
-			node.role = salve
-
-		}
-		if bytes.Contains(fields[2], []byte("self")) {
-			node.self = true
-		}
-		if !bytes.Equal(fields[3], []byte{'-'}) {
-			node.slaveof = string(fields[3])
-		}
-		for _, content := range fields[8:] {
-			if bytes.Contains(content, []byte("->-")) {
-				migrate := bytes.Split(content[1:len(content)-1], []byte("->-"))
-				slot, _ := strconv.ParseInt(string(migrate[0]), 10, 64)
-				node.migrating[slot] = string(migrate[1])
-			} else if bytes.Contains(content, []byte("-<-")) {
-				migrate := bytes.Split(content[1:len(content)-1], []byte("-<-"))
-				slot, _ := strconv.ParseInt(string(migrate[0]), 10, 64)
-				node.importing[slot] = string(migrate[1])
-			} else {
-				scope := bytes.Split(content[1:len(content)-1], []byte("-"))
-				start, _ := strconv.ParseInt(string(scope[0]), 10, 64)
-				node.slots = append(node.slots, start)
-				if len(scope) == 2 {
-					end, _ := strconv.ParseInt(string(scope[1]), 10, 64)
-					for i := start + 1; i <= end; i++ {
-						node.slots = append(node.slots, i)
-					}
-				}
-			}
-		}
-		n.nodes[node.name] = node
-		nodes = append(nodes, node)
-	}
 }
 
 const (
@@ -138,9 +73,17 @@ func (c *Cluster) initSlot() {
 	slaves := spread(hosts, len(c.nodes)-c.masterCount)
 	distributeSlave(masters, slaves)
 	for i, master := range masters {
+		var slot []int64
 		for j := slots[i][0]; j < slots[i][1]; j++ {
-			master.slots = append(master.slots, int64(j))
+			slot = append(slot, int64(j))
 		}
+		master.slots = slot
+		master.role = roleMaster
+	}
+	c.master = masters
+	c.salve = slaves
+	for _, node := range c.nodes {
+		log.Info(node)
 	}
 }
 
@@ -160,7 +103,8 @@ func (c *Cluster) join() {
 	}
 	var first = c.nodes[0]
 	for _, node := range c.nodes[1:] {
-		first.meet(node.ip + node.port)
+		err := first.meet(node.ip, node.port)
+		log.Infof("%s meet %s err %v", first.port, node.port, err)
 	}
 }
 
@@ -168,4 +112,76 @@ func (c *Cluster) setSlaves() {
 	for _, slave := range c.salve {
 		slave.setSlave()
 	}
+}
+
+func migrateSlot(src, dst *Node, slot int64) {
+}
+
+func (c *Cluster) check() (err error) {
+	if c.err != nil {
+		return
+	}
+	for _, node := range c.nodes {
+		info := node.Info()
+		known, ok := info["cluster_known_nodes"]
+		if !ok || known != "1" {
+			err = errNode
+			return
+		}
+		log.Infof("check node %s:%s success", node.ip, node.port)
+	}
+	return
+}
+
+func (c *Cluster) addSlots() {
+	if c.err != nil {
+		return
+	}
+	for _, node := range c.master {
+		log.Infof("add slots to %s %d", node.name, len(node.slots))
+		err := node.addSlots(node.slots)
+		if err != nil {
+			println("Add slot err")
+		}
+	}
+}
+
+func (c *Cluster) consistent() bool {
+	if c.err != nil {
+		return false
+	}
+	nodeSlot := make(map[int64]*Node)
+	for _, node := range c.nodes {
+		slotNum := 0
+		nodes := node.Nodes()
+		for _, node := range nodes {
+			for _, slot := range node.slots {
+				tmp, ok := nodeSlot[slot]
+				if !ok {
+					nodeSlot[slot] = node
+				} else if tmp.name != node.name {
+					return false
+				}
+				slotNum++
+			}
+		}
+		if slotNum != clusterCount {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Cluster) create() (err error) {
+	c.check()
+	c.initSlot()
+	c.addSlots()
+	c.setConfigEpoch()
+	c.join()
+	for !c.consistent() {
+		time.Sleep(time.Second)
+		log.Info("wait cluster to consistent")
+	}
+	c.setSlaves()
+	return c.err
 }

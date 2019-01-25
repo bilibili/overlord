@@ -1,6 +1,8 @@
 package enri
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	errMasterCount = errors.New("err num of master")
@@ -29,7 +31,6 @@ func Create(addrs []string, slave int) (c *Cluster, err error) {
 		masterCount: master,
 		slaveCount:  slave,
 	}
-	c.initSlot()
 	return
 }
 

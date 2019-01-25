@@ -3,6 +3,8 @@ package enri
 import (
 	"testing"
 
+	"overlord/pkg/log"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,6 +16,7 @@ func TestNode(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+	log.InitHandle(log.NewStdHandler())
 	addrs := []string{
 		"127.0.0.1:7000",
 		"127.0.0.1:7001",
@@ -25,4 +28,5 @@ func TestCreate(t *testing.T) {
 	cluster, err := Create(addrs, 1)
 	assert.NoError(t, err)
 	t.Logf("create cluster %v", cluster.nodes)
+	cluster.create()
 }
