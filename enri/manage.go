@@ -146,11 +146,12 @@ func Migrate(src, dst string, count int64, slot int64) (c *Cluster, err error) {
 	return
 }
 
-func otherMaster(nodes []*Node, node *Node) (om []*Node) {
-	for _, n := range nodes {
-		if n.isMaster() && n.name != node.name {
-			om = append(om, n)
-		}
+// Fix fix cluster if cluster in error.
+func Fix(node string) (c *Cluster, err error) {
+	if c, err = cluster(node); err != nil {
+		return
 	}
+	c.fixSlot()
+	c.fillSlot()
 	return
 }

@@ -102,3 +102,12 @@ func distributeSlave(masters, slaves []*Node) {
 		}
 	}
 }
+
+func otherMaster(nodes []*Node, node *Node) (om []*Node) {
+	for _, n := range nodes {
+		if n.isMaster() && n.name != node.name {
+			om = append(om, n)
+		}
+	}
+	return
+}

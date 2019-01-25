@@ -213,6 +213,39 @@ func (c *Cluster) deleteNode(addr string) (err error) {
 	return
 }
 
+func (c *Cluster) fixSlot() {
+	for _, m := range c.master {
+		m.fixNode()
+	}
+}
+
+func (c *Cluster) fillSlot() {
+	slots := make([]bool, 16384)
+	var count int
+	for _, m := range c.master {
+		for _, s := range m.slots {
+			slots[s] = true
+			count++
+		}
+	}
+	miss := clusterCount - count
+	dispatch := divide(miss, len(c.master))
+	var j int64
+	for i, m := range c.master {
+		var add []int64
+		for ; j < clusterCount; j++ {
+			if !slots[i] {
+				add = append(add, j)
+			}
+			if len(add) == dispatch[i] {
+				m.addSlots(add)
+				break
+			}
+		}
+	}
+	return
+}
+
 func delNode(nodes []*Node, del *Node) {
 	for _, n := range nodes {
 		if n.name == del.name || n.slaveof == del.name {

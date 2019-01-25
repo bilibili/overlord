@@ -106,8 +106,18 @@ func (n *Node) fixNode() {
 	for slot, node := range n.migrating {
 		target := n.nodes[node]
 		if _, ok := target.importing[slot]; ok {
-
+			migrateSlot(n, target, slot)
+			continue
 		}
+		n.setSlotStable(slot)
+	}
+	for slot, node := range n.importing {
+		src := n.nodes[node]
+		if _, ok := src.migrating[slot]; ok {
+			migrateSlot(src, n, slot)
+			continue
+		}
+		n.setSlotStable(slot)
 	}
 }
 
