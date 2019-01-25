@@ -81,5 +81,76 @@ func Delete(seed string, addrs []string) (c *Cluster, err error) {
 	if err != nil {
 		return
 	}
+	for _, addr := range addrs {
+		if err = c.deleteNode(addr); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// Migrate slot from src to dst.
+func Migrate(src, dst string, count int64, slot int64) (c *Cluster, err error) {
+	var (
+		srcNode, dstNode *Node
+	)
+	if src != "" {
+		if srcNode, err = NewNode(src); err != nil {
+			return
+		}
+		srcNode.Init()
+	}
+	if dst != "" {
+		if dstNode, err = NewNode(dst); err != nil {
+			return
+		}
+		srcNode.Init()
+	}
+	switch {
+	case slot >= 0:
+		migrateSlot(srcNode, dstNode, slot)
+	case count != 0:
+		if len(srcNode.slots) < int(count) {
+			log.Errorf("%s do not have enough slot to migrate", srcNode.addr())
+			return
+		}
+		for _, slot := range srcNode.slots[:count] {
+			migrateSlot(srcNode, dstNode, slot)
+		}
+	case dstNode == nil:
+		om := otherMaster(srcNode.Nodes(), srcNode)
+		start := 0
+		dispatch := divide(len(srcNode.slots), len(om))
+		for i, m := range om {
+			end := start + dispatch[i]
+			for _, slot := range srcNode.slots[start:end] {
+				migrateSlot(srcNode, m, slot)
+			}
+			start = end
+		}
+	case count == 0:
+		for _, slot := range srcNode.slots {
+			migrateSlot(srcNode, dstNode, slot)
+		}
+	case srcNode == nil:
+		om := otherMaster(dstNode.Nodes(), dstNode)
+		dispatch := divide(int(count), len(om))
+		for i, m := range om {
+			for _, slot := range m.slots[:dispatch[i]] {
+				migrateSlot(m, dstNode, slot)
+			}
+		}
+	default:
+		log.Error("migrate arg err")
+	}
+	return
+}
+
+func otherMaster(nodes []*Node, node *Node) (om []*Node) {
+	for _, n := range nodes {
+		if n.isMaster() && n.name != node.name {
+			om = append(om, n)
+		}
+	}
 	return
 }
