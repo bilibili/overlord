@@ -68,6 +68,7 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 	p.lock.Lock()
 	p.forwarders[cc.Name] = forwarder
 	p.lock.Unlock()
+
 	// listen
 	l, err := Listen(cc.ListenProto, cc.ListenAddr)
 	if err != nil {

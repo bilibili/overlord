@@ -67,6 +67,7 @@ type ClusterConfig struct {
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
 	Servers          []string        `toml:"servers"`
+	IsMigrate        bool
 }
 
 // Validate validate config field value.
