@@ -189,10 +189,9 @@ func (f defaultForwarder) processPing(p *pinger) {
 		err error
 		del bool
 	)
+	p.ping = newPingConn(p.cc, p.addr)
 	for {
-		p.ping = newPingConn(p.cc, p.addr)
 		err = p.ping.Ping()
-		p.ping.Close()
 		if err == nil {
 			p.failure = 0
 			if del {
@@ -204,7 +203,11 @@ func (f defaultForwarder) processPing(p *pinger) {
 			}
 			time.Sleep(pingSleepTime(false))
 			continue
+		} else {
+			_ = p.ping.Close()
+			p.ping = newPingConn(p.cc, p.addr)
 		}
+
 		p.failure++
 		if log.V(3) {
 			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
