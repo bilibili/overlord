@@ -28,5 +28,5 @@ func TestCreate(t *testing.T) {
 	cluster, err := Create(addrs, 1)
 	assert.NoError(t, err)
 	t.Logf("create cluster %v", cluster.nodes)
-	cluster.create()
+	cluster.Create()
 }

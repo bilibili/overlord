@@ -39,7 +39,6 @@ func (n *Node) meet(ip, port string) (err error) {
 }
 
 func (n *Node) setSlave() {
-
 	n.conn.Exec(fmt.Sprintf("CLUSTER REPLICATE %s", n.slaveof))
 	log.Infof("set %s slaveof %s", n.name, n.slaveof)
 }
@@ -193,4 +192,15 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 		n.nodes[node.name] = node
 		nodes = append(nodes, node)
 	}
+}
+
+// check if node is valid to add into cluster.
+func (n *Node) valid() bool {
+	info := n.Info()
+	known, ok := info["cluster_known_nodes"]
+	if !ok || known != "1" {
+
+		return false
+	}
+	return true
 }

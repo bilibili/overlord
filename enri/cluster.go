@@ -3,6 +3,7 @@ package enri
 import (
 	"errors"
 	"overlord/pkg/log"
+	"strings"
 	"time"
 
 	"overlord/pkg/myredis"
@@ -122,9 +123,7 @@ func (c *Cluster) check() (err error) {
 		return
 	}
 	for _, node := range c.nodes {
-		info := node.Info()
-		known, ok := info["cluster_known_nodes"]
-		if !ok || known != "1" {
+		if !node.valid() {
 			err = errNode
 			return
 		}
@@ -172,7 +171,8 @@ func (c *Cluster) consistent() bool {
 	return true
 }
 
-func (c *Cluster) create() (err error) {
+// Create create cluster.
+func (c *Cluster) Create() (err error) {
 	c.check()
 	c.initSlot()
 	c.addSlots()
@@ -184,4 +184,45 @@ func (c *Cluster) create() (err error) {
 	}
 	c.setSlaves()
 	return c.err
+}
+
+// Add add addrs into cluster
+func (c *Cluster) Add(addrs []string) (err error) {
+	for _, addr := range addrs {
+		couple := strings.Split(addr, ",")
+		var node *Node
+		node, err = NewNode(couple[0])
+		if err != nil {
+			return
+		}
+		node.Init()
+		if !node.valid() {
+			err = errNode
+			return
+		}
+
+		err = c.addNode(node.ip, node.port)
+		if err != nil {
+			return
+		}
+		if len(couple) == 2 {
+			var slave *Node
+			slave, err = NewNode(couple[1])
+			if err != nil {
+				return
+			}
+			slave.slaveof = node.name
+			slave.setSlave()
+		}
+	}
+	for !c.consistent() {
+		time.Sleep(time.Second)
+		log.Info("wait cluster to consistent")
+	}
+	return
+}
+
+func (c *Cluster) addNode(ip, port string) (err error) {
+	log.Infof("add node %s:%s into cluster", ip, port)
+	return c.nodes[0].meet(ip, port)
 }
