@@ -3,7 +3,6 @@ package enri
 import (
 	"errors"
 	"overlord/pkg/log"
-	"strings"
 	"time"
 
 	"overlord/pkg/myredis"
@@ -115,9 +114,6 @@ func (c *Cluster) setSlaves() {
 	}
 }
 
-func migrateSlot(src, dst *Node, slot int64) {
-}
-
 func (c *Cluster) check() (err error) {
 	if c.err != nil {
 		return
@@ -172,7 +168,7 @@ func (c *Cluster) consistent() bool {
 }
 
 // Create create cluster.
-func (c *Cluster) Create() (err error) {
+func (c *Cluster) create() (err error) {
 	c.check()
 	c.initSlot()
 	c.addSlots()
@@ -186,43 +182,59 @@ func (c *Cluster) Create() (err error) {
 	return c.err
 }
 
-// Add add addrs into cluster
-func (c *Cluster) Add(addrs []string) (err error) {
-	for _, addr := range addrs {
-		couple := strings.Split(addr, ",")
-		var node *Node
-		node, err = NewNode(couple[0])
-		if err != nil {
-			return
-		}
-		node.Init()
-		if !node.valid() {
-			err = errNode
-			return
-		}
-
-		err = c.addNode(node.ip, node.port)
-		if err != nil {
-			return
-		}
-		if len(couple) == 2 {
-			var slave *Node
-			slave, err = NewNode(couple[1])
-			if err != nil {
-				return
-			}
-			slave.slaveof = node.name
-			slave.setSlave()
-		}
-	}
-	for !c.consistent() {
-		time.Sleep(time.Second)
-		log.Info("wait cluster to consistent")
-	}
-	return
-}
-
 func (c *Cluster) addNode(ip, port string) (err error) {
 	log.Infof("add node %s:%s into cluster", ip, port)
 	return c.nodes[0].meet(ip, port)
+}
+
+func (c *Cluster) deleteNode(addr string) (err error) {
+	var otherMaster []*Node
+	var del *Node
+	for _, node := range c.nodes {
+		if node.isMaster() && node.addr() != addr {
+			otherMaster = append(otherMaster, node)
+		}
+		if node.addr() == addr {
+			del = node
+		}
+	}
+	//if master ,migrate slot to other master.
+	if del.isMaster() {
+		var start int
+		dispatch := divide(len(del.slots), len(otherMaster))
+		for i, node := range otherMaster {
+			for _, slot := range del.slots[start : start+dispatch[i]] {
+				migrateSlot(del, node, slot)
+			}
+			start += dispatch[i]
+		}
+	}
+	delNode(c.nodes, del)
+	return
+}
+
+func delNode(nodes []*Node, del *Node) {
+	for _, n := range nodes {
+		if n.name == del.name || n.slaveof == del.name {
+			continue
+		}
+		n.forget(del)
+	}
+}
+func cluster(cluster string) (c *Cluster, err error) {
+	node, err := NewNode(cluster)
+	if err != nil {
+		return
+	}
+	node.Init()
+	c = new(Cluster)
+	for _, n := range node.nodes {
+		c.nodes = append(c.nodes, n)
+		if n.role == roleMaster {
+			c.master = append(c.master, n)
+		} else {
+			c.salve = append(c.salve, n)
+		}
+	}
+	return
 }

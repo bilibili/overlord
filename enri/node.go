@@ -75,6 +75,12 @@ func (n *Node) setSlot(state string, nodeid string, slot int64) (err error) {
 	return
 }
 
+func (n *Node) addr() string {
+	return n.ip + n.port
+}
+func (n *Node) isMaster() bool {
+	return n.role == roleMaster
+}
 func (n *Node) setSlotStable(slot int64) (err error) {
 	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER SETSLOT %d STABLE", slot))
 	return
@@ -203,4 +209,21 @@ func (n *Node) valid() bool {
 		return false
 	}
 	return true
+}
+
+func migrateSlot(src, dst *Node, slot int64) {
+	dst.setSlot("IMPORTING", dst.name, slot)
+	src.setSlot("MIGRATING", src.name, slot)
+	for {
+		keys, err := src.keysInSlot(slot)
+		if err != nil {
+			return
+		}
+		if len(keys) == 0 {
+			break
+		}
+		src.migrate(dst.addr(), keys)
+	}
+	src.setSlot("NODE", dst.name, slot)
+	dst.setSlot("NODE", dst.name, slot)
 }
