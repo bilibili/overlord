@@ -3,6 +3,7 @@ package enri
 import (
 	"errors"
 	"overlord/pkg/log"
+	"sort"
 	"time"
 
 	"overlord/pkg/myredis"
@@ -219,6 +220,35 @@ func (c *Cluster) fixSlot() {
 	}
 }
 
+func (c *Cluster) reshard() {
+	dispatch := divide(clusterCount, len(c.master))
+	var dists [][2]int
+	for i, master := range c.master {
+		dists = append(dists, [2]int{len(master.slots), dispatch[i]})
+	}
+	type reshard struct {
+		src  *Node
+		slot int64
+	}
+	log.Infof("slots dist %v", dists)
+	var migrate []reshard
+	for i, dist := range dists {
+		delta := dist[0] - dist[1]
+		for j := 0; j < delta; j++ {
+			migrate = append(migrate, reshard{src: c.master[i], slot: c.master[i].slots[j]})
+		}
+	}
+	log.Infof("reshard plan %v", migrate)
+	var idx int
+	for i, dist := range dists {
+		delta := dist[1] - dist[0]
+		for ; delta > 0; delta-- {
+			migrateSlot(migrate[idx].src, c.master[i], migrate[idx].slot)
+			idx++
+		}
+	}
+}
+
 func (c *Cluster) fillSlot() {
 	slots := make([]bool, 16384)
 	var count int
@@ -244,6 +274,12 @@ func (c *Cluster) fillSlot() {
 		}
 	}
 	return
+}
+
+func (c *Cluster) sortNode() {
+	sort.Slice(c.master, func(i, j int) bool {
+		return len(c.master[i].slots) > len(c.master[j].slots)
+	})
 }
 
 func delNode(nodes []*Node, del *Node) {

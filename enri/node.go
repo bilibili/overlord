@@ -181,7 +181,7 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 		if !bytes.Equal(fields[3], []byte{'-'}) {
 			node.slaveof = string(fields[3])
 		}
-
+		var slot []int64
 		for _, content := range fields[8:] {
 			if bytes.Contains(content, []byte("->-")) {
 				migrate := bytes.Split(content[:len(content)], []byte("->-"))
@@ -192,7 +192,7 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 				slot, _ := strconv.ParseInt(string(migrate[0]), 10, 64)
 				node.importing[slot] = string(migrate[1])
 			} else {
-				var slot []int64
+
 				scope := bytes.Split(content[:len(content)], []byte("-"))
 				start, _ := strconv.ParseInt(string(scope[0]), 10, 64)
 				slot = append(slot, start)
@@ -201,10 +201,11 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 					for i := start + 1; i <= end; i++ {
 						slot = append(slot, i)
 					}
-					node.slots = slot
+
 				}
 			}
 		}
+		node.slots = slot
 		n.nodes[node.name] = node
 		nodes = append(nodes, node)
 	}

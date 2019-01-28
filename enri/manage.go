@@ -58,6 +58,7 @@ func Add(seed string, addrs []string) (c *Cluster, err error) {
 		if err != nil {
 			return
 		}
+		c.nodes = append(c.nodes, node)
 		if len(couple) == 2 {
 			var slave *Node
 			slave, err = NewNode(couple[1])
@@ -153,5 +154,15 @@ func Fix(node string) (c *Cluster, err error) {
 	}
 	c.fixSlot()
 	c.fillSlot()
+	return
+}
+
+// Reshard reshard cluster slot distribute.
+func Reshard(node string) (c *Cluster, err error) {
+	if c, err = cluster(node); err != nil {
+		return
+	}
+	c.sortNode()
+	c.reshard()
 	return
 }
