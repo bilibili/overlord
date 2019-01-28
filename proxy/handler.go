@@ -13,6 +13,7 @@ import (
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/memcache"
+	anzipc "overlord/anzi/pc"
 	mcbin "overlord/proxy/proto/memcache/binary"
 	"overlord/proxy/proto/redis"
 	rclstr "overlord/proxy/proto/redis/cluster"
@@ -44,6 +45,23 @@ type Handler struct {
 
 	closed int32
 	err    error
+}
+
+// NewMigrateHandler will create handler for proxy
+func NewMigrateHandler(p *Proxy, cc *ClusterConfig, forwarder proto.Forwarder) (h *Handler) {
+	h = &Handler {
+		p: p,
+		cc: cc,
+		forwarder: forwarder,
+	}
+
+	switch cc.CacheType {
+	case types.CacheTypeRedis, types.CacheTypeRedisCluster:
+		h.pc = anzipc.NewProxyConn()
+	default:
+		panic("not support cache type in migrate mode")
+	}
+	return
 }
 
 // NewHandler new a conn handler.
