@@ -69,6 +69,7 @@ func Add(seed string, addrs []string) (c *Cluster, err error) {
 			slave.setSlave()
 		}
 	}
+	c.updateNode("")
 	for !c.consistent() {
 		time.Sleep(time.Second)
 		log.Info("wait cluster to consistent")

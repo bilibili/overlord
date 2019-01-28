@@ -247,7 +247,6 @@ func (c *Cluster) reshard() {
 		src  *Node
 		slot int64
 	}
-	log.Infof("slots dist %v", dists)
 	var migrate []reshard
 	for i, dist := range dists {
 		delta := dist[0] - dist[1]
@@ -255,7 +254,6 @@ func (c *Cluster) reshard() {
 			migrate = append(migrate, reshard{src: c.master[i], slot: c.master[i].slots[j]})
 		}
 	}
-	log.Infof("reshard plan %v", migrate)
 	var idx int
 	for i, dist := range dists {
 		delta := dist[1] - dist[0]

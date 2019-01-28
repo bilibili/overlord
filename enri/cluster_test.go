@@ -12,6 +12,12 @@ func TestMain(m *testing.M) {
 	log.InitHandle(log.NewStdHandler())
 	m.Run()
 }
+func resetNode(addrs []string) {
+	for _, addr := range addrs {
+		node, _ := NewNode(addr)
+		node.conn.Exec("CLUSTER RESET")
+	}
+}
 func TestNode(t *testing.T) {
 	var addr = "127.0.0.1:7000"
 	n, err := NewNode(addr)
@@ -28,6 +34,7 @@ func TestCreate(t *testing.T) {
 		"127.0.0.1:7004",
 		"127.0.0.1:7005",
 	}
+	resetNode(addrs)
 	cluster, err := Create(addrs, 1)
 	assert.NoError(t, err)
 	t.Logf("create cluster %v", cluster.nodes)
@@ -39,6 +46,7 @@ func TestAddNode(t *testing.T) {
 		"127.0.0.1:7007",
 		"127.0.0.1:7006",
 	}
+	resetNode(addrs)
 	cluster, err := Add(seed, addrs)
 	assert.NoError(t, err)
 	for _, node := range cluster.nodes {
@@ -49,9 +57,9 @@ func TestReshard(t *testing.T) {
 	seed := "127.0.0.1:7000"
 	c, err := Reshard(seed)
 	assert.NoError(t, err)
-	dispatch := divide(16384, len(c.master))
 	c.updateNode("")
 	c.sortNode()
+	dispatch := divide(16384, len(c.master))
 	for i, node := range c.master {
 		assert.Equal(t, len(node.slots), dispatch[i])
 	}
