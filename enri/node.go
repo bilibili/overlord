@@ -76,7 +76,7 @@ func (n *Node) setSlot(state string, nodeid string, slot int64) (err error) {
 }
 
 func (n *Node) addr() string {
-	return n.ip + n.port
+	return n.ip + ":" + n.port
 }
 func (n *Node) isMaster() bool {
 	return n.role == roleMaster

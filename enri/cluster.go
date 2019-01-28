@@ -60,7 +60,7 @@ type Cluster struct {
 	masterCount int
 	slaveCount  int
 	master      []*Node
-	salve       []*Node
+	slave       []*Node
 	err         error
 }
 
@@ -82,7 +82,7 @@ func (c *Cluster) initSlot() {
 		master.role = roleMaster
 	}
 	c.master = masters
-	c.salve = slaves
+	c.slave = slaves
 	for _, node := range c.nodes {
 		log.Info(node)
 	}
@@ -110,7 +110,7 @@ func (c *Cluster) join() {
 }
 
 func (c *Cluster) setSlaves() {
-	for _, slave := range c.salve {
+	for _, slave := range c.slave {
 		slave.setSlave()
 	}
 }
@@ -199,6 +199,11 @@ func (c *Cluster) deleteNode(addr string) (err error) {
 			del = node
 		}
 	}
+	if del == nil {
+		log.Errorf("can not del %s no such node", addr)
+		return
+	}
+	log.Infof("del node %s", addr)
 	//if master ,migrate slot to other master.
 	if del.isMaster() {
 		var start int
@@ -211,9 +216,21 @@ func (c *Cluster) deleteNode(addr string) (err error) {
 		}
 	}
 	delNode(c.nodes, del)
+	c.updateNode(addr)
 	return
 }
 
+func (c *Cluster) updateNode(exclude string) {
+	for _, node := range c.nodes {
+		if node.addr() != exclude {
+			tmp, _ := cluster(node.addr())
+			c.nodes = tmp.nodes
+			c.master = tmp.master
+			c.slave = tmp.slave
+			return
+		}
+	}
+}
 func (c *Cluster) fixSlot() {
 	for _, m := range c.master {
 		m.fixNode()
@@ -259,16 +276,20 @@ func (c *Cluster) fillSlot() {
 		}
 	}
 	miss := clusterCount - count
+	log.Infof("miss slot %d", miss)
 	dispatch := divide(miss, len(c.master))
+	log.Infof("dispatch %v", dispatch)
 	var j int64
 	for i, m := range c.master {
 		var add []int64
 		for ; j < clusterCount; j++ {
-			if !slots[i] {
+			if !slots[j] {
 				add = append(add, j)
 			}
 			if len(add) == dispatch[i] {
+				log.Infof("add %v", add)
 				m.addSlots(add)
+				j++
 				break
 			}
 		}
@@ -290,6 +311,7 @@ func delNode(nodes []*Node, del *Node) {
 		n.forget(del)
 	}
 }
+
 func cluster(cluster string) (c *Cluster, err error) {
 	node, err := NewNode(cluster)
 	if err != nil {
@@ -302,7 +324,7 @@ func cluster(cluster string) (c *Cluster, err error) {
 		if n.role == roleMaster {
 			c.master = append(c.master, n)
 		} else {
-			c.salve = append(c.salve, n)
+			c.slave = append(c.slave, n)
 		}
 	}
 	return

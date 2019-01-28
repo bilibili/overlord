@@ -154,6 +154,10 @@ func Fix(node string) (c *Cluster, err error) {
 	}
 	c.fixSlot()
 	c.fillSlot()
+	for !c.consistent() {
+		time.Sleep(time.Second)
+		log.Info("wait cluster to consistent")
+	}
 	return
 }
 
