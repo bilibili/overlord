@@ -54,6 +54,8 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 		if err = pc.br.Read(); err != nil {
 			return nil, err
 		}
+
+		pc.rbytes = pc.br.GetReadedSize()
 		pc.completed = false
 	}
 	for i := range msgs {

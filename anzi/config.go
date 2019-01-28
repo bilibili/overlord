@@ -17,6 +17,3 @@ type MigrateConfig struct {
 	To                []*ServersConfig `toml:"to"`
 	MaxRDBConcurrency int             `toml:"max_rdb_concurrency"`
 }
-
-type ServersConfig struct {
-}
