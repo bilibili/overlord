@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/felixhao/overlord/branch/master/graph/badge.svg)](https://codecov.io/gh/felixhao/overlord)
 [![Go Report Card](https://goreportcard.com/badge/github.com/felixhao/overlord)](https://goreportcard.com/report/github.com/felixhao/overlord)
 
-Overlord是哔哩哔哩基于Go语言编写的memcache和redis&cluster的代理及集群管理功能，致力于提供自动化高可用的缓存服务解决方案。主要包括以下组件:  
+Overlord是[哔哩哔哩](https://www.bilibili.com)基于Go语言编写的memcache和redis&cluster的代理及集群管理功能，致力于提供自动化高可用的缓存服务解决方案。主要包括以下组件:  
 
 * [proxy](doc/wiki-cn/proxy-usage.md)：轻量高可用的缓存代理模块，支持memcache和redis的代理，相当于twemproxy，不同在于支持redis-cluster及能将自己伪装为cluster模式。
 * [platform](doc/wiki-cn/platform-deploy.md)：包含apiserver、mesos framework&executor、集群节点任务管理job等。
