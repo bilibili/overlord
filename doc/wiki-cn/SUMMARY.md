@@ -3,7 +3,7 @@
 * [Introduction](README.md)
   * [overlord-platform 部署指南](platform-deploy.md)
   * [overlord-platform 使用指南](platform-usage.md)
-  * [overlord-proxy 使用指南](usage.md)
+  * [overlord-proxy 使用指南](proxy-usage.md)
 * [overlord-proxy](proxy.md)
   * [功能支持](proxy/features.md)
   * [性能测试](proxy/benchmark.md)

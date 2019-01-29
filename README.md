@@ -4,73 +4,22 @@
 [![codecov](https://codecov.io/gh/felixhao/overlord/branch/master/graph/badge.svg)](https://codecov.io/gh/felixhao/overlord)
 [![Go Report Card](https://goreportcard.com/badge/github.com/felixhao/overlord)](https://goreportcard.com/report/github.com/felixhao/overlord)
 
+Overlord是哔哩哔哩基于Go语言编写的memcache和redis&cluster的代理及集群管理功能，致力于提供自动化高可用的缓存服务解决方案。主要包括以下组件:  
 
-Overlord is a proxy based high performance Memcached and Redis solution written in Go.  
-It is fast and lightweight and used primarily to horizontally scale your distributed caching architecture.  
-It is inspired by Twemproxy,Codis.  
+* [proxy](doc/wiki-cn/proxy-usage.md)：轻量高可用的缓存代理模块，支持memcache和redis的代理，相当于twemproxy，不同在于支持redis-cluster及能将自己伪装为cluster模式。
+* [platform](doc/wiki-cn/platform-deploy.md)：包含apiserver、mesos framework&executor、集群节点任务管理job等。
+* [GUI](doc/wiki-cn/platform-usage.md)：web管理界面，通过dashboard可视化方便用于集群管理，包括创建删除、扩缩容、加减节点等。
+* [anzi](doc/wiki-cn/tools.md)：redis-cluster的数据同步工具，可服务化与apiserver进行配合工作。
+* [enri](doc/wiki-cn/tools.md)：redis-cluster的集群管理工具，可灵活的创建集群、迁移slot等。
+
+Overlord已被哔哩哔哩用于生产环境。
 
 ## Document
 [简体中文](doc/wiki-cn/SUMMARY.md)
 
-## Overlord proxy Quick Start
-
-#### Download
-
-```go
-cd $GOPATH/src
-git clone https://github.com/felixhao/overlord.git
-```
-
-#### Build
-
-```shell
-make build
-```
-
-#### Run
-
-```shell
-cmd/proxy/proxy -cluster=cmd/proxy/proxy-cluster-example.toml
-```
-###### Please first run a memcache or redis server, which bind 11211 or 6379 port.
-
-#### Test
-
-```shell
-# test memcache
-echo -e "set a_11 0 0 5\r\nhello\r\n" | nc 127.0.0.1 21211
-# STORED
-echo -e "get a_11\r\n" | nc 127.0.0.1 21211
-# VALUE a_11 0 5
-# hello
-# END
-
-# test redis
-python ./scripts/validate_redis_features.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
-```
-
-Congratulations! You've just run the overlord proxy.
-
-## Features
-
-- [x] support memcache protocol
-- [x] support redis&cluster protocol
-- [x] connection pool for reduce number to backend caching servers
-- [x] keepalive & failover
-- [x] hash tag: specify the part of the key used for hashing
-- [x] promethues stat metrics support
-- [ ] cache backup
-- [ ] hot reload: add/remove cache node
-- [ ] QoS: limit/breaker
-- [ ] L1&L2 cache
-- [ ] hot|cold cache
-- [ ] broadcast
-- [ ] cache node scheduler
-
 ## Architecture
 
 ![architecture](doc/images/overlord_arch.png)
-
 
 ## Cache-Platform
 
