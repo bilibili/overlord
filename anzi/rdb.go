@@ -2,6 +2,7 @@ package anzi
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -74,6 +75,7 @@ type RDBCallback interface {
 
 	// Hash
 	CmdHSet(key, field, value []byte)
+	CmdHSetInt(key, field []byte, value int64)
 
 	// Expire
 	ExpireAt(key []byte, expiry uint64)
@@ -491,6 +493,84 @@ func (r *RDB) readObject(dtype byte) (err error) {
 
 // TODO: done to all this
 func (r *RDB) readZipMap() (err error) {
+	var (
+		data []byte
+		num  byte
+		free byte
+	)
+	data, err = r.readString()
+	if err != nil {
+		return
+	}
+	srd := bytes.NewReader(data)
+	num, err = srd.ReadByte()
+
+	var (
+		nlen uint64
+	)
+
+	for {
+		nlen, err = r.readZipMapNextLength(srd)
+		if err != nil {
+			return
+		}
+		if nlen == 0 {
+			break
+		}
+		key := make([]byte, nlen)
+		_, err = io.ReadFull(srd, key)
+		if err != nil {
+			return
+		}
+
+		nlen, err = r.readZipMapNextLength(srd)
+		if err != nil {
+			return
+		}
+		free, err = srd.ReadByte()
+		if err != nil {
+			return
+		}
+		val := make([]byte, nlen)
+		_, err = io.ReadFull(srd, val)
+		if err != nil {
+			return
+		}
+		_, err = srd.Seek(int64(free), io.SeekCurrent)
+		if err != nil {
+			return
+		}
+
+		var ival int64
+		ival, err = strconv.ParseInt(string(val), 10, 64)
+		if err == nil {
+			r.cb.CmdHSetInt(r.key, key, ival)
+		} else {
+			err = nil
+			r.cb.CmdHSet(r.key, key, val)
+		}
+
+	}
+
+	r.cb.ExpireAt(r.key, r.expiry)
+	return
+}
+
+func (r *RDB) readZipMapNextLength(srd *bytes.Reader) (nlen uint64, err error) {
+	var (
+		data byte
+	)
+	data, err = srd.ReadByte()
+	if err != nil {
+		return
+	}
+	if data < 254 {
+		nlen = uint64(data)
+	} else if data == 254 {
+		var value uint32
+		err = binary.Read(srd, binary.LittleEndian, &value)
+		nlen = uint64(value)
+	}
 	return
 }
 
