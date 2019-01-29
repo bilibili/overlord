@@ -124,7 +124,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			_, err := Migrate(src, dst, count, slot)
+			err := Migrate(src, dst, count, slot)
 			return err
 		},
 	}

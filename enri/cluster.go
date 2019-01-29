@@ -274,9 +274,7 @@ func (c *Cluster) fillSlot() {
 		}
 	}
 	miss := clusterCount - count
-	log.Infof("miss slot %d", miss)
 	dispatch := divide(miss, len(c.master))
-	log.Infof("dispatch %v", dispatch)
 	var j int64
 	for i, m := range c.master {
 		var add []int64

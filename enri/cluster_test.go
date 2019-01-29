@@ -2,6 +2,7 @@ package enri
 
 import (
 	"testing"
+	"time"
 
 	"overlord/pkg/log"
 
@@ -38,6 +39,11 @@ func TestCreate(t *testing.T) {
 	cluster, err := Create(addrs, 1)
 	assert.NoError(t, err)
 	t.Logf("create cluster %v", cluster.nodes)
+	cluster.updateNode("")
+	for !cluster.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
+	checkCluster(t, cluster)
 }
 
 func TestAddNode(t *testing.T) {
@@ -52,6 +58,11 @@ func TestAddNode(t *testing.T) {
 	for _, node := range cluster.nodes {
 		assert.Len(t, node.Nodes(), 8)
 	}
+	cluster.updateNode("")
+	for !cluster.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
+	checkCluster(t, cluster)
 }
 func TestReshard(t *testing.T) {
 	seed := "127.0.0.1:7000"
@@ -63,6 +74,10 @@ func TestReshard(t *testing.T) {
 	for i, node := range c.master {
 		assert.Equal(t, len(node.slots), dispatch[i])
 	}
+	for !c.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
+	checkCluster(t, c)
 }
 
 func TestDelete(t *testing.T) {
@@ -76,6 +91,7 @@ func TestDelete(t *testing.T) {
 	for _, node := range cluster.nodes {
 		assert.Len(t, node.Nodes(), 6)
 	}
+	checkCluster(t, cluster)
 }
 
 func TestFix(t *testing.T) {
@@ -83,8 +99,22 @@ func TestFix(t *testing.T) {
 	c, err := Fix(seed)
 	assert.NoError(t, err)
 	assert.True(t, c.consistent())
+	checkCluster(t, c)
 }
 
+func checkCluster(t *testing.T, c *Cluster) {
+	info := c.nodes[0].Info()
+	assert.Equal(t, "ok", info["cluster_state"])
+}
 func TestMigrate(t *testing.T) {
-
+	src := "127.0.0.1:7000"
+	dst := "127.0.0.1:7001"
+	var count int64 = 10
+	err := Migrate(src, dst, count, -1)
+	assert.NoError(t, err)
+	srcNode, err := NewNode(src)
+	assert.NoError(t, err)
+	srcNode.Init()
+	err = Migrate(src, dst, 0, srcNode.slots[0])
+	assert.NoError(t, err)
 }

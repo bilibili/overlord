@@ -92,7 +92,7 @@ func Delete(seed string, addrs []string) (c *Cluster, err error) {
 }
 
 // Migrate slot from src to dst.
-func Migrate(src, dst string, count int64, slot int64) (c *Cluster, err error) {
+func Migrate(src, dst string, count int64, slot int64) (err error) {
 	var (
 		srcNode, dstNode *Node
 	)
@@ -101,12 +101,13 @@ func Migrate(src, dst string, count int64, slot int64) (c *Cluster, err error) {
 			return
 		}
 		srcNode.Init()
+
 	}
 	if dst != "" {
 		if dstNode, err = NewNode(dst); err != nil {
 			return
 		}
-		srcNode.Init()
+		dstNode.Init()
 	}
 	switch {
 	case slot >= 0:
