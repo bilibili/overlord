@@ -17,3 +17,7 @@ type MigrateConfig struct {
 	To                []*ServersConfig `toml:"to"`
 	MaxRDBConcurrency int             `toml:"max_rdb_concurrency"`
 }
+
+// ServersConfig is the config struct used for config server.
+type ServersConfig struct {
+}

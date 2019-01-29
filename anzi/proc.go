@@ -30,7 +30,6 @@ func NewMigrateProc(cfg *MigrateConfig) *MigrateProc {
 		barrierC: make(chan struct{}, cfg.MaxRDBConcurrency),
 	}
 
-
 	return m
 }
 
@@ -41,7 +40,7 @@ type MigrateProc struct {
 }
 
 // NewInstance create instances by given config
-func NewInstance(bc chan struct{}, ) *Instnace {
+func NewInstance(bc chan struct{}) *Instance {
 	// TODO
 	return nil
 }
@@ -125,7 +124,7 @@ func (inst *Instance) cmdForward() error {
 		if err != nil {
 			return err
 		}
-		atomic.AddInt64(&inst.offset, int64(size))
+		atomic.AddInt64(&inst.offset, size)
 	}
 }
 
@@ -160,12 +159,8 @@ func (inst *Instance) replAck() {
 }
 
 func (inst *Instance) syncRDB() (err error) {
-	return
-}
 
-// Slot is the struct of slot
-type Slot struct {
-	Begin, End int
+	return
 }
 
 // Migrate start new migrate process
