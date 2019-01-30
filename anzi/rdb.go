@@ -10,6 +10,7 @@ import (
 	"overlord/pkg/log"
 	"strconv"
 	"time"
+	"math"
 )
 
 // RBD CONSTANTS
@@ -69,6 +70,8 @@ type RDBCallback interface {
 	CmdSet(key, val []byte, expire uint64)
 	// List Command
 	CmdRPush(key, val []byte)
+	// Set
+	CmdSAdd(key, val []byte)
 
 	// ZSet
 	CmdZAdd(key []byte, score float64, val []byte)
@@ -246,7 +249,43 @@ func (r *RDB) readIdleAndFreq(dtype byte) (ndtype byte, err error) {
 }
 
 func (r *RDB) readModule() (err error) {
-	// TODO: impl it
+	var (
+		opcode uint64
+	)
+	opcode, err = r.readLength()
+	for opcode != RDBModuleOpcodeEOF {
+		switch opcode {
+		case RDBModuleOpcodeSInt, RDBModuleOpcodeUInt:
+			_, err = r.readLength()
+			if err != nil {
+				return
+			}
+		case RDBModuleOpcodeFloat:
+			_, err = r.readBinaryFloat()
+			if err != nil {
+				return
+			}
+		case RDBModuleOpcodeDouble:
+			_, err = r.readBinaryDouble()
+			if err != nil {
+				return
+			}
+		case RDBModuleOpcodeString:
+			_, err = r.readString()
+			if err != nil {
+				return
+			}
+		default:
+			err = fmt.Errorf("unknown module opcode %d", opcode)
+			return
+		}
+
+		opcode, err = r.readLength()
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 
@@ -383,12 +422,37 @@ func (r *RDB) readExpire(dtype byte) (ndtype byte, err error) {
 	return
 }
 
-func (r *RDB) readBinaryDouble() (double float64, err error) {
-	// TODO impl it
+func (r *RDB) readBinaryDouble() (f float64, err error) {
+	err = binary.Read(r.rd, binary.LittleEndian, &f)
 	return
 }
+
+func (r *RDB) readBinaryFloat() (f float64, err error) {
+	var  f32 float32
+	err = binary.Read(r.rd, binary.LittleEndian, &f32)
+	f = float64(f32)
+	return
+}
+
 func (r *RDB) readFloat() (double float64, err error) {
-	// TODO impl it
+	var dbl byte
+	dbl, err = r.rd.ReadByte()
+	if err != nil {
+		return
+	}
+	if dbl == 253 {
+		double = math.NaN()
+	} else if dbl == 254 {
+		double = math.Inf(1)
+	} else if dbl == 255 {
+		double = math.Inf(-1)
+	}
+	buf := make([]byte, dbl)
+	_, err = io.ReadFull(r.rd, buf)
+	if err != nil {
+		return
+	}
+	double, err = strconv.ParseFloat(string(buf), 64)
 	return
 }
 
@@ -414,6 +478,19 @@ func (r *RDB) readObject(dtype byte) (err error) {
 				return
 			}
 			r.cb.CmdRPush(r.key, data)
+		}
+		r.cb.ExpireAt(r.key, r.expiry)
+	} else if dtype == RDBTypeSet {
+		length, err = r.readLength()
+		if err != nil {
+			return
+		}
+		for i := uint64(0); i < length; i++ {
+			data, err = r.readString()
+			if err != nil {
+				return
+			}
+			r.cb.CmdSAdd(r.key, data)
 		}
 		r.cb.ExpireAt(r.key, r.expiry)
 	} else if dtype == RDBTypeZSet || dtype == RDBTypeZset2 {
@@ -495,7 +572,6 @@ func (r *RDB) readObject(dtype byte) (err error) {
 func (r *RDB) readZipMap() (err error) {
 	var (
 		data []byte
-		num  byte
 		free byte
 	)
 	data, err = r.readString()
@@ -503,7 +579,10 @@ func (r *RDB) readZipMap() (err error) {
 		return
 	}
 	srd := bytes.NewReader(data)
-	num, err = srd.ReadByte()
+	_, err = srd.ReadByte()
+	if err != nil {
+		return
+	}
 
 	var (
 		nlen uint64
@@ -549,7 +628,6 @@ func (r *RDB) readZipMap() (err error) {
 			err = nil
 			r.cb.CmdHSet(r.key, key, val)
 		}
-
 	}
 
 	r.cb.ExpireAt(r.key, r.expiry)
@@ -575,21 +653,565 @@ func (r *RDB) readZipMapNextLength(srd *bytes.Reader) (nlen uint64, err error) {
 }
 
 func (r *RDB) readZipList() (err error) {
+	var (
+		// zl, tailOffset         uint32
+		numEntries uint16
+		srd        *bytes.Reader
+		zlentry    []byte
+	)
+	srd, _, _, numEntries, err = r.readZipListHeader()
+	if err != nil {
+		return
+	}
+
+	for i := uint16(0); i < numEntries; i++ {
+		zlentry, err = r.readZipListEntry(srd)
+		if err != nil {
+			return
+		}
+		r.cb.CmdRPush(r.key, zlentry)
+	}
+	err = r.readZipListEnd(srd)
+	if err != nil {
+		return
+	}
+	r.cb.ExpireAt(r.key, r.expiry)
 	return
 }
+
+func (r *RDB) readZipListEntry(srd *bytes.Reader) (zlentry []byte, err error) {
+	var (
+		length     uint32
+		preLenByte byte
+		preLen     uint32
+		header     byte
+	)
+	preLenByte, err = srd.ReadByte()
+	if err != nil {
+		return
+	}
+
+	if preLenByte == 254 {
+		err = binary.Read(srd, binary.LittleEndian, &preLen)
+		if err != nil {
+			return
+		}
+	} else {
+		preLen = uint32(preLenByte)
+	}
+
+	header, err = srd.ReadByte()
+	if err != nil {
+		return
+	}
+
+	if (header >> 6) == 0 {
+		zlentry = make([]byte, header&0x3f)
+		_, err = io.ReadFull(srd, zlentry)
+		if err != nil {
+			return
+		}
+	} else if (header >> 6) == 1 {
+		var nextByte byte
+		nextByte, err = srd.ReadByte()
+		if err != nil {
+			return
+		}
+		length = (uint32(header&0x3f) << 8) | uint32(nextByte)
+		zlentry = make([]byte, length)
+		_, err = io.ReadFull(srd, zlentry)
+		if err != nil {
+			return
+		}
+	} else if (header >> 6) == 2 {
+		err = binary.Read(srd, binary.BigEndian, &length)
+		if err != nil {
+			return
+		}
+		zlentry = make([]byte, length)
+		_, err = io.ReadFull(srd, zlentry)
+		if err != nil {
+			return
+		}
+	} else if (header >> 4) == 12 {
+		var vint int16
+		err = binary.Read(srd, binary.LittleEndian, &vint)
+		if err != nil {
+			return
+		}
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", vint))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else if (header >> 4) == 13 {
+		var vint int32
+		err = binary.Read(srd, binary.LittleEndian, &vint)
+		if err != nil {
+			return
+		}
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", vint))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else if (header >> 4) == 14 {
+		var vint int64
+		err = binary.Read(srd, binary.LittleEndian, &vint)
+		if err != nil {
+			return
+		}
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", vint))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else if header == 240 {
+		var ival int32
+		ival, err = read24ByteInt(srd)
+		if err != nil {
+			return
+		}
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", ival))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else if header == 254 {
+		var bv byte
+		bv, err = srd.ReadByte()
+		if err != nil {
+			return
+		}
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", int8(bv)))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else if header >= 241 && header <= 253 {
+		vint := header - 241
+		buf := bytes.NewBuffer(nil)
+		_, err = buf.WriteString(fmt.Sprintf("%d", vint))
+		if err != nil {
+			return
+		}
+		zlentry = buf.Bytes()
+	} else {
+		panic("read ziplist entry fail due to get invalid entry header")
+	}
+	return
+}
+
 func (r *RDB) readIntSet() (err error) {
+	var (
+		data     []byte
+		encoding uint32
+		num      uint32
+	)
+	data, err = r.readString()
+	if err != nil {
+		return
+	}
+	srd := bytes.NewReader(data)
+	err = binary.Read(srd, binary.LittleEndian, &encoding)
+	if err != nil {
+		return
+	}
+
+	err = binary.Read(srd, binary.LittleEndian, &num)
+	if err != nil {
+		return
+	}
+	buf := bytes.NewBuffer(nil)
+	for i := uint32(0); i < num; i++ {
+		buf.Reset()
+		if encoding == 8 {
+			var entry int64
+			err = binary.Read(srd, binary.LittleEndian, &entry)
+			if err != nil {
+				return
+			}
+			_, err = buf.WriteString(fmt.Sprintf("%d", entry))
+			if err != nil {
+				return
+			}
+		} else if encoding == 4 {
+			var entry int32
+			err = binary.Read(srd, binary.LittleEndian, &entry)
+			if err != nil {
+				return
+			}
+			_, err = buf.WriteString(fmt.Sprintf("%d", entry))
+			if err != nil {
+				return
+			}
+		} else if encoding == 2 {
+			var entry int16
+			err = binary.Read(srd, binary.LittleEndian, &entry)
+			if err != nil {
+				return
+			}
+			_, err = buf.WriteString(fmt.Sprintf("%d", entry))
+			if err != nil {
+				return
+			}
+		} else {
+			panic("read int set invalid encoding")
+		}
+		r.cb.CmdSAdd(r.key, buf.Bytes())
+	}
+	r.cb.ExpireAt(r.key, r.expiry)
 	return
 }
+
+func (r *RDB) readZipListHeader() (srd *bytes.Reader, zl uint32, tailOffset uint32, numEntries uint16, err error) {
+	var (
+		data []byte
+	)
+	data, err = r.readString()
+	if err != nil {
+		return
+	}
+	srd = bytes.NewReader(data)
+	err = binary.Read(srd, binary.LittleEndian, &zl)
+	if err != nil {
+		return
+	}
+	err = binary.Read(srd, binary.LittleEndian, &tailOffset)
+	if err != nil {
+		return
+	}
+	err = binary.Read(srd, binary.LittleEndian, &numEntries)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (r *RDB) readZipListEnd(srd *bytes.Reader) (err error) {
+	var zlEnd byte
+	zlEnd, err = srd.ReadByte()
+	if err != nil {
+		return
+	}
+	if zlEnd != 255 {
+		panic("read ziplist but get invalid zip end")
+	}
+	return
+}
+
 func (r *RDB) readZSetFromZiplist() (err error) {
+	var (
+		numEntries uint16
+		srd        *bytes.Reader
+	)
+	srd, _, _, numEntries, err = r.readZipListHeader()
+	if err != nil {
+		return
+	}
+
+	if numEntries%2 != 0 {
+		panic("read zset from ziplist but get odd number of element")
+	}
+	numEntries = numEntries / 2
+
+	var (
+		member, score []byte
+	)
+	for i := uint16(0); i < numEntries; i++ {
+		member, err = r.readZipListEntry(srd)
+		if err != nil {
+			return
+		}
+		score, err = r.readZipListEntry(srd)
+		if err != nil {
+			return
+		}
+		var sf float64
+		sf, err = strconv.ParseFloat(string(score), 64)
+		if err != nil {
+			return
+		}
+		r.cb.CmdZAdd(r.key, sf, member)
+	}
+	err = r.readZipListEnd(srd)
+	if err != nil {
+		return
+	}
+	r.cb.ExpireAt(r.key, r.expiry)
 	return
 }
 func (r *RDB) readHashFromZipList() (err error) {
+	var (
+		numEntries uint16
+		srd        *bytes.Reader
+	)
+
+	srd, _, _, numEntries, err = r.readZipListHeader()
+	if err != nil {
+		return
+	}
+
+	if numEntries%2 != 0 {
+		panic("read zset from ziplist but get odd number of element")
+	}
+	numEntries = numEntries / 2
+	var (
+		field, value []byte
+	)
+
+	for i := uint16(0); i < numEntries; i++ {
+		field, err = r.readZipListEntry(srd)
+		if err != nil {
+			return
+		}
+		value, err = r.readZipListEntry(srd)
+		if err != nil {
+			return
+		}
+		r.cb.CmdHSet(r.key, field, value)
+	}
+	err = r.readZipListEnd(srd)
+	if err != nil {
+		return
+	}
+
+	r.cb.ExpireAt(r.key, r.expiry)
 	return
 }
+
 func (r *RDB) readListFromQuickList() (err error) {
+	var (
+		count     uint64
+		totalSize int
+	)
+
+	count, err = r.readLength()
+	if err != nil {
+		return
+	}
+
+	for i := uint64(0); i < count; i++ {
+		var (
+			data       []byte
+			zl         uint32
+			tailOffset uint32
+			num        uint16
+		)
+
+		data, err = r.readString()
+		if err != nil {
+			return
+		}
+		totalSize += len(data)
+
+		srd := bytes.NewReader(data)
+		err = binary.Read(srd, binary.LittleEndian, &zl)
+		if err != nil {
+			return
+		}
+		err = binary.Read(srd, binary.LittleEndian, &tailOffset)
+		if err != nil {
+			return
+		}
+		err = binary.Read(srd, binary.LittleEndian, &num)
+		if err != nil {
+			return
+		}
+
+		for i := uint16(0); i < num; i++ {
+			var entry []byte
+			entry, err = r.readZipListEntry(srd)
+			if err != nil {
+				return
+			}
+			r.cb.CmdRPush(r.key, entry)
+		}
+
+		err = r.readZipListEnd(srd)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.cb.ExpireAt(r.key, r.expiry)
 	return
 }
 
 func (r *RDB) readStream() (err error) {
+	var (
+		entry1, entry2 uint64
+		cgroups        uint64
+	)
+	_, err = r.readLength()
+	if err != nil {
+		return
+	}
+	_, err = r.readLength()
+	if err != nil {
+		return
+	}
+	entry1, err = r.readLength()
+	if err != nil {
+		return
+	}
+
+	entry2, err = r.readLength()
+	if err != nil {
+		return
+	}
+	_ = fmt.Sprintf("%d-%d", entry1, entry2)
+
+	cgroups, err = r.readLength()
+	if err != nil {
+		return
+	}
+
+	consumerGroups := make([]*consumerGroup, cgroups)
+	for i := uint64(0); i < cgroups; i++ {
+		var (
+			cgname    []byte
+			consumers uint64
+			pending   uint64
+		)
+
+		cgname, err = r.readString()
+		if err != nil {
+			return
+		}
+
+		entry1, err = r.readLength()
+		if err != nil {
+			return
+		}
+
+		entry2, err = r.readLength()
+		if err != nil {
+			return
+		}
+
+		lasteCGEntryID := fmt.Sprintf("%d-%d", entry1, entry2)
+		pending, err = r.readLength()
+		if err != nil {
+			return
+		}
+
+		gpEntries := make([]*streamGroupPendingEntry, pending)
+		//  group_pending_entries
+		for j := uint64(0); j < pending; j++ {
+			eid := make([]byte, 16)
+			_, err = io.ReadFull(r.rd, eid)
+			if err != nil {
+				return
+			}
+			var (
+				dtime  uint64
+				dcount uint64
+			)
+
+			err = binary.Read(r.rd, binary.LittleEndian, &dtime)
+			if err != nil {
+				return
+			}
+
+			dcount, err = r.readLength()
+			if err != nil {
+				return
+			}
+			gpEntries[j] = &streamGroupPendingEntry{
+				ID:     eid,
+				DTime:  dtime,
+				DCount: dcount,
+			}
+		}
+
+		consumers, err = r.readLength()
+		if err != nil {
+			return
+		}
+
+		cEntries := make([]*streamConsumer, consumers)
+		for k := uint64(0); k < consumers; k++ {
+			var (
+				cname    []byte
+				stime    uint64
+				cpending uint64
+			)
+
+			cname, err = r.readString()
+			if err != nil {
+				return
+			}
+
+			err = binary.Read(r.rd, binary.LittleEndian, &stime)
+			if err != nil {
+				return
+			}
+
+			cpending, err = r.readLength()
+			if err != nil {
+				return
+			}
+
+			pendingIDs := make([][]byte, cpending)
+			for w := uint64(0); w < cpending; w++ {
+				eid := make([]byte, 16)
+				_, err = io.ReadFull(r.rd, eid)
+				if err != nil {
+					return
+				}
+				pendingIDs[w] = eid
+			}
+
+			cEntries[k] = &streamConsumer{
+				Name:     cname,
+				SeenTime: stime,
+				Pending:  pendingIDs,
+			}
+		}
+
+		consumerGroups[i] = &consumerGroup{
+			Name:        cgname,
+			Pending:     gpEntries,
+			Consumers:   cEntries,
+			LastEntryID: lasteCGEntryID,
+		}
+	}
+
+	return
+}
+
+type consumerGroup struct {
+	Name        []byte
+	LastEntryID string
+	Pending     []*streamGroupPendingEntry
+	Consumers   []*streamConsumer
+}
+
+type streamConsumer struct {
+	Name     []byte
+	SeenTime uint64
+	Pending  [][]byte
+}
+
+type streamGroupPendingEntry struct {
+	ID     []byte
+	DTime  uint64
+	DCount uint64
+}
+
+func read24ByteInt(srd *bytes.Reader) (ival int32, err error) {
+	buf := make([]byte, 3)
+	_, err = io.ReadFull(srd, buf)
+	ival |= int32(buf[2])
+	ival = ival << 8
+	ival |= int32(buf[1])
+	ival = ival << 8
+	ival |= int32(buf[0])
 	return
 }
