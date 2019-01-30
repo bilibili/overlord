@@ -15,16 +15,17 @@ var (
 	slot     int64
 )
 
-var app *cli.App
-
 // Run run enri cli.
 func Run() {
-	app = cli.NewApp()
+	app := cli.NewApp()
+	app.Usage = "redis cluster manager tool"
+	app.Version = "v0.1.0"
+	app.Authors = []cli.Author{{Name: "lintanghui", Email: "xmutanghui@gmail.com"}}
 	add := cli.Command{
 		Name:        "add",
 		ShortName:   "a",
 		Usage:       "add nodes to cluster",
-		Description: "add nodes to cluster",
+		Description: "add nodes into cluster",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:        "cluster,c",
@@ -38,6 +39,9 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if seed == "" || len(nodes) == 0 {
+				cli.ShowCommandHelpAndExit(c, "add", 1)
+			}
 			_, err := Add(seed, nodes)
 			return err
 		},
@@ -54,6 +58,9 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if seed == "" {
+				cli.ShowCommandHelpAndExit(c, "fix", 1)
+			}
 			_, err := Fix(seed)
 			return err
 		},
@@ -70,15 +77,17 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if seed == "" {
+				cli.ShowCommandHelpAndExit(c, "reshard", 1)
+			}
 			_, err := Reshard(seed)
 			return err
 		},
 	}
 	create := cli.Command{
-		Name:        "create",
-		ShortName:   "c",
-		Usage:       "enri create [nodes]",
-		Description: "add nodes to cluster",
+		Name:      "create",
+		ShortName: "c",
+		Usage:     "create cluster by nodes",
 		Flags: []cli.Flag{
 			cli.StringSliceFlag{
 				Name:  "node,n",
@@ -92,15 +101,17 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if len(nodes) == 0 || slave == 0 {
+				cli.ShowCommandHelpAndExit(c, "create", 1)
+			}
 			_, err := Create(nodes, slave)
 			return err
 		},
 	}
 	migrate := cli.Command{
-		Name:        "migrate",
-		ShortName:   "m",
-		Usage:       "enri migrate ",
-		Description: "migrate slot",
+		Name:      "migrate",
+		ShortName: "m",
+		Usage:     "migrate cluster slot of nodes",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:        "origin,o",
@@ -125,6 +136,9 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			err := Migrate(src, dst, count, slot)
+			if err != nil {
+				cli.ShowCommandHelpAndExit(c, "migrate", 1)
+			}
 			return err
 		},
 	}
@@ -146,6 +160,9 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if seed == "" || len(nodes) == 0 {
+				cli.ShowCommandHelpAndExit(c, "del", 1)
+			}
 			_, err := Delete(seed, nodes)
 			return err
 		},

@@ -39,10 +39,10 @@ func TestCreate(t *testing.T) {
 	cluster, err := Create(addrs, 1)
 	assert.NoError(t, err)
 	t.Logf("create cluster %v", cluster.nodes)
-	cluster.updateNode("")
 	for !cluster.consistent() {
 		time.Sleep(time.Millisecond * 10)
 	}
+	cluster.updateNode("")
 	checkCluster(t, cluster)
 }
 
@@ -58,24 +58,24 @@ func TestAddNode(t *testing.T) {
 	for _, node := range cluster.nodes {
 		assert.Len(t, node.Nodes(), 8)
 	}
-	cluster.updateNode("")
 	for !cluster.consistent() {
 		time.Sleep(time.Millisecond * 10)
 	}
+	cluster.updateNode("")
 	checkCluster(t, cluster)
 }
 func TestReshard(t *testing.T) {
 	seed := "127.0.0.1:7000"
 	c, err := Reshard(seed)
 	assert.NoError(t, err)
+	for !c.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
 	c.updateNode("")
 	c.sortNode()
 	dispatch := divide(16384, len(c.master))
 	for i, node := range c.master {
-		assert.Equal(t, len(node.slots), dispatch[i])
-	}
-	for !c.consistent() {
-		time.Sleep(time.Millisecond * 10)
+		assert.Equal(t, dispatch[i], len(node.slots), node.name)
 	}
 	checkCluster(t, c)
 }
@@ -91,6 +91,10 @@ func TestDelete(t *testing.T) {
 	for _, node := range cluster.nodes {
 		assert.Len(t, node.Nodes(), 6)
 	}
+	for !cluster.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
+	cluster.updateNode("")
 	checkCluster(t, cluster)
 }
 
