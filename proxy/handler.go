@@ -7,13 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	anzipc "overlord/anzi/pc"
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/pkg/prom"
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/memcache"
-	anzipc "overlord/anzi/pc"
 	mcbin "overlord/proxy/proto/memcache/binary"
 	"overlord/proxy/proto/redis"
 	rclstr "overlord/proxy/proto/redis/cluster"
@@ -49,9 +49,9 @@ type Handler struct {
 
 // NewMigrateHandler will create handler for proxy
 func NewMigrateHandler(p *Proxy, cc *ClusterConfig, forwarder proto.Forwarder) (h *Handler) {
-	h = &Handler {
-		p: p,
-		cc: cc,
+	h = &Handler{
+		p:         p,
+		cc:        cc,
 		forwarder: forwarder,
 	}
 
