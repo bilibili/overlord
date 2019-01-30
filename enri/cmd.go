@@ -1,12 +1,14 @@
 package enri
 
 import (
+	"errors"
 	"os"
 
 	"github.com/urfave/cli"
 )
 
 var (
+	errFlag  = errors.New("error flags")
 	nodes    cli.StringSlice
 	seed     string
 	slave    int
@@ -40,7 +42,8 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			if seed == "" || len(nodes) == 0 {
-				cli.ShowCommandHelpAndExit(c, "add", 1)
+				cli.ShowCommandHelp(c, "add")
+				return errFlag
 			}
 			_, err := Add(seed, nodes)
 			return err
@@ -59,7 +62,8 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			if seed == "" {
-				cli.ShowCommandHelpAndExit(c, "fix", 1)
+				cli.ShowCommandHelp(c, "fix")
+				return errFlag
 			}
 			_, err := Fix(seed)
 			return err
@@ -78,7 +82,8 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			if seed == "" {
-				cli.ShowCommandHelpAndExit(c, "reshard", 1)
+				cli.ShowCommandHelp(c, "reshard")
+				return errFlag
 			}
 			_, err := Reshard(seed)
 			return err
@@ -102,7 +107,8 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			if len(nodes) == 0 || slave == 0 {
-				cli.ShowCommandHelpAndExit(c, "create", 1)
+				cli.ShowCommandHelp(c, "create")
+				return errFlag
 			}
 			_, err := Create(nodes, slave)
 			return err
@@ -137,9 +143,10 @@ func Run() {
 		Action: func(c *cli.Context) error {
 			err := Migrate(src, dst, count, slot)
 			if err != nil {
-				cli.ShowCommandHelpAndExit(c, "migrate", 1)
+				cli.ShowCommandHelp(c, "migrate")
+				return err
 			}
-			return err
+			return nil
 		},
 	}
 	replicate := cli.Command{
@@ -161,7 +168,8 @@ func Run() {
 		Action: func(c *cli.Context) error {
 			_, err := Replicate(src, dst)
 			if err != nil {
-				cli.ShowCommandHelpAndExit(c, "replicate", 1)
+				cli.ShowCommandHelp(c, "replicate")
+				return errFlag
 			}
 			return err
 		},
@@ -185,7 +193,8 @@ func Run() {
 		},
 		Action: func(c *cli.Context) error {
 			if seed == "" || len(nodes) == 0 {
-				cli.ShowCommandHelpAndExit(c, "del", 1)
+				cli.ShowCommandHelp(c, "del")
+				return errFlag
 			}
 			_, err := Delete(seed, nodes)
 			return err
