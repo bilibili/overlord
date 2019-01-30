@@ -142,6 +142,30 @@ func Run() {
 			return err
 		},
 	}
+	replicate := cli.Command{
+		Name:      "replicate",
+		ShortName: "repl",
+		Usage:     "migrate cluster slot of nodes",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "master,m",
+				Usage:       "-s node",
+				Destination: &src,
+			},
+			cli.StringFlag{
+				Name:        "slave,s",
+				Usage:       "-d node",
+				Destination: &dst,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			_, err := Replicate(src, dst)
+			if err != nil {
+				cli.ShowCommandHelpAndExit(c, "replicate", 1)
+			}
+			return err
+		},
+	}
 	del := cli.Command{
 		Name:        "del",
 		ShortName:   "d",
@@ -167,6 +191,6 @@ func Run() {
 			return err
 		},
 	}
-	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard}
+	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate}
 	app.Run(os.Args)
 }

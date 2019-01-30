@@ -58,11 +58,23 @@ func TestAddNode(t *testing.T) {
 	for _, node := range cluster.nodes {
 		assert.Len(t, node.Nodes(), 8)
 	}
+	cluster.updateNode("")
 	for !cluster.consistent() {
 		time.Sleep(time.Millisecond * 10)
 	}
-	cluster.updateNode("")
 	checkCluster(t, cluster)
+}
+func TestReplicate(t *testing.T) {
+	master := "127.0.0.1:7007"
+	slave := "127.0.0.1:7006"
+	c, err := Replicate(master, slave)
+	c.updateNode("")
+	assert.NoError(t, err)
+	for !c.consistent() {
+		time.Sleep(time.Millisecond * 10)
+	}
+	c.updateNode("")
+	checkCluster(t, c)
 }
 func TestReshard(t *testing.T) {
 	seed := "127.0.0.1:7000"

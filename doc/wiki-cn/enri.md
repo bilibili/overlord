@@ -1,5 +1,10 @@
 # enri
 
+## Install
+```
+go get github.com/bilibili/overlord/cmd/enri
+```
+
 ## useage
 
 ### 创建集群

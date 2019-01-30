@@ -172,3 +172,33 @@ func Reshard(node string) (c *Cluster, err error) {
 	c.reshard()
 	return
 }
+
+// Replicate set replicate to node.
+func Replicate(master, slave string) (c *Cluster, err error) {
+	c, err = cluster(master)
+	masterNode, err := NewNode(master)
+	if err != nil {
+		return
+	}
+	masterNode.Init()
+	for _, n := range c.nodes {
+		if n.addr() == slave {
+			if n.isMaster() && len(n.slots) != 0 {
+				log.Errorf("can not set %s to be replicate,because it own slots", slave)
+				return
+			}
+			n.slaveof = masterNode.name
+			n.setSlave()
+			return
+		}
+	}
+
+	slaveNode, err := NewNode(slave)
+	if err != nil {
+		return
+	}
+	c.addNode(slaveNode.ip, slaveNode.port)
+	slaveNode.slaveof = masterNode.name
+	slaveNode.setSlave()
+	return
+}
