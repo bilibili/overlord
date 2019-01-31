@@ -17,6 +17,10 @@ Overlord已被哔哩哔哩用于生产环境。
 ## Document
 [简体中文](doc/wiki-cn/SUMMARY.md)
 
+## GUI
+
+![GUI](doc/images/create-ckyster.gif)
+
 ## Architecture
 
 ![architecture](doc/images/overlord_arch.png)
