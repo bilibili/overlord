@@ -1,6 +1,12 @@
 # overlord proxy 使用指南
 
-## 编译安装
+## 介绍
+
+轻量高可用的代理模块，支持memcache及redis协议，支持从twemproxy到overlord的无缝迁移。支持redis-cluster，屏蔽了cluster的实现细节，允许客户端像使用单例的redis一样使用redis-cluster，同时通过伪装自身为cluster，通过mock cluster nodes,cluster slots 等命令，也支持各种语言redis-cluster sdk的直接接入。
+
+## 使用
+
+#### 编译
 
 overlord 大部分组件都是采用 Go 语言编写，因此你需要一个 go 版本 > 1.11 的编译器，在项目根目录:
 
@@ -10,7 +16,26 @@ make build
 cmd/proxy/proxy -cluster cmd/proxy/proxy-cluster-example.conf -std -log-vl 5
 ```
 
-安装：仅仅需要拷贝一个二进制文件即可。
+###### Please first run a memcache or redis server, which bind 11211 or 6379 port.
+
+#### 测试
+
+```shell
+# test memcache
+echo -e "set a_11 0 0 5\r\nhello\r\n" | nc 127.0.0.1 21211
+# STORED
+echo -e "get a_11\r\n" | nc 127.0.0.1 21211
+# VALUE a_11 0 5
+# hello
+# END
+
+# test redis
+python ./scripts/validate_redis_features.py # require fakeredis==0.11.0 redis==2.10.6 gevent==1.3.5
+```
+
+#### 安装
+
+仅仅需要拷贝一个二进制文件即可。
 
 ## 配置指南
 
