@@ -7,10 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"overlord/pkg/log"
 	"strconv"
-	"time"
-	"math"
 )
 
 // RBD CONSTANTS
@@ -64,7 +63,7 @@ const (
 type RDBCallback interface {
 	SelectDB(dbnum uint64)
 	AuxField(key, data []byte)
-	ResizeDB(size uint64)
+	ResizeDB(size, esize uint64)
 	EndOfRDB()
 
 	CmdSet(key, val []byte, expire uint64)
@@ -183,12 +182,20 @@ func (r *RDB) bgSyncProc() (err error) {
 		}
 
 		if dtype == RDBOpcodeResizeDB {
-			var dbsize uint64
+			var (
+				dbsize uint64
+				esize  uint64
+			)
 			dbsize, err = r.readLength()
 			if err != nil {
 				return
 			}
-			r.cb.ResizeDB(dbsize)
+
+			esize, err = r.readLength()
+			if err != nil {
+				return
+			}
+			r.cb.ResizeDB(dbsize, esize)
 			continue
 		}
 
@@ -249,6 +256,15 @@ func (r *RDB) readIdleAndFreq(dtype byte) (ndtype byte, err error) {
 }
 
 func (r *RDB) readModule() (err error) {
+	_, err = r.readLength()
+	if err != nil && err != ErrEncVal {
+		return
+	}
+	err = r.skipModule()
+	return
+}
+
+func (r *RDB) skipModule() (err error) {
 	var (
 		opcode uint64
 	)
@@ -256,26 +272,31 @@ func (r *RDB) readModule() (err error) {
 	for opcode != RDBModuleOpcodeEOF {
 		switch opcode {
 		case RDBModuleOpcodeSInt, RDBModuleOpcodeUInt:
+			println("opcode ", opcode)
 			_, err = r.readLength()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeFloat:
+			println("opcode ", opcode)
 			_, err = r.readBinaryFloat()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeDouble:
+			println("opcode ", opcode)
 			_, err = r.readBinaryDouble()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeString:
+			println("opcode ", opcode)
 			_, err = r.readString()
 			if err != nil {
 				return
 			}
 		default:
+			println("opcode ", opcode)
 			err = fmt.Errorf("unknown module opcode %d", opcode)
 			return
 		}
@@ -386,16 +407,16 @@ func (r *RDB) readLength() (length uint64, err error) {
 	return
 }
 
-func (r *RDB) deferMakeExpireAt() {
-	if r.expiry == 0 {
-		return
-	}
-	now := uint64(time.Now().Unix()) * 1000
-	r.expiry += now
-}
+// func (r *RDB) deferMakeExpireAt() {
+// 	if r.expiry == 0 {
+// 		return
+// 	}
+// 	now := uint64(time.Now().Unix()) * 1000
+// 	r.expiry += now
+// }
 
 func (r *RDB) readExpire(dtype byte) (ndtype byte, err error) {
-	defer r.deferMakeExpireAt()
+	// defer r.deferMakeExpireAt()
 
 	ndtype = dtype
 	if ndtype == RDBOpcodeExpireTimeMS {
@@ -428,7 +449,7 @@ func (r *RDB) readBinaryDouble() (f float64, err error) {
 }
 
 func (r *RDB) readBinaryFloat() (f float64, err error) {
-	var  f32 float32
+	var f32 float32
 	err = binary.Read(r.rd, binary.LittleEndian, &f32)
 	f = float64(f32)
 	return
@@ -562,7 +583,7 @@ func (r *RDB) readObject(dtype byte) (err error) {
 	} else if dtype == RDBTypeStreamListPacks {
 		err = r.readStream()
 	} else {
-		panic("unreachable")
+		err = fmt.Errorf("unreacheable dtype(%d) for key %s", dtype, r.key)
 	}
 
 	return
@@ -1047,15 +1068,30 @@ func (r *RDB) readStream() (err error) {
 	var (
 		entry1, entry2 uint64
 		cgroups        uint64
+		listpacks uint64
 	)
+	listpacks, err = r.readLength()
+	if err != nil {
+		return
+	}
+
+	for i := uint64(0); i < listpacks; i ++ {
+		_, err = r.readString()
+		if err != nil {
+			return
+		}
+		_, err = r.readString()
+		if err != nil {
+			return
+		}
+	}
+
+	// items
 	_, err = r.readLength()
 	if err != nil {
 		return
 	}
-	_, err = r.readLength()
-	if err != nil {
-		return
-	}
+
 	entry1, err = r.readLength()
 	if err != nil {
 		return
@@ -1066,8 +1102,10 @@ func (r *RDB) readStream() (err error) {
 		return
 	}
 	_ = fmt.Sprintf("%d-%d", entry1, entry2)
+	fmt.Printf("read stream entry %d-%d\n", entry1, entry2)
 
 	cgroups, err = r.readLength()
+	fmt.Printf("read stream cgroups %d\n", cgroups)
 	if err != nil {
 		return
 	}
