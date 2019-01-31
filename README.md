@@ -27,13 +27,10 @@ Overlord已被哔哩哔哩用于生产环境。
 
 ## Cache-Platform
 
-we have made new automatic cache management platform based on mesos/etcd.
-
-### cache-platform Architecture
+基于mesos&etcd提供了自动化的缓存节点管理平台
 
 ![cache-platform Architecture](doc/images/cache-platform-arch.png)
 
-# Contributing
+-------------
 
-Overlord is probably not perfect, but you are welcome to use it in your dev/test/product and so please let me know if anything feels wrong or incomplete.  
-I'm trying very hard to keep it simple and fast. And I always happy to receive pull requests. It follow the gitflow, please send you pull request to `develop` branch.  
+*You are welcome to use Overlord in your product, and feel free to let us know~ :)*
