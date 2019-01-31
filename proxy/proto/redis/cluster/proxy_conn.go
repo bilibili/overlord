@@ -5,7 +5,6 @@ import (
 	errs "errors"
 
 	"overlord/pkg/conv"
-	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/redis"
@@ -53,13 +52,6 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		if !req.IsSupport() && !req.IsCtl() {
 			resp := req.RESP()
 			arr := resp.Array()
-
-			if len(arr) == 1 {
-				log.Info("Tommy Cluster command:(%s)", string(arr[0].Data()))
-			} else if len(arr) == 2 {
-				log.Info("Tommy Cluster command:(%s) (%s)", string(arr[0].Data()), string(arr[1].Data()))
-			}
-
 			if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
 				if len(arr) == 2 {
 					// CLUSTER COMMANDS
