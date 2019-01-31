@@ -19,7 +19,7 @@ Overlord已被哔哩哔哩用于生产环境。
 
 ## GUI
 
-![GUI](doc/images/create-ckyster.gif)
+![GUI](doc/images/create-cluster.gif)
 
 ## Architecture
 
