@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	anzipc "overlord/anzi/pc"
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/pkg/prom"
@@ -45,23 +44,6 @@ type Handler struct {
 
 	closed int32
 	err    error
-}
-
-// NewMigrateHandler will create handler for proxy
-func NewMigrateHandler(p *Proxy, cc *ClusterConfig, forwarder proto.Forwarder) (h *Handler) {
-	h = &Handler{
-		p:         p,
-		cc:        cc,
-		forwarder: forwarder,
-	}
-
-	switch cc.CacheType {
-	case types.CacheTypeRedis, types.CacheTypeRedisCluster:
-		h.pc = anzipc.NewProxyConn()
-	default:
-		panic("not support cache type in migrate mode")
-	}
-	return
 }
 
 // NewHandler new a conn handler.
