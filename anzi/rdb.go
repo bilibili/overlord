@@ -94,7 +94,6 @@ func NewRDB(rd *bufio.Reader, cb RDBCallback) *RDB {
 	r := &RDB{
 		rd: rd,
 		cb: cb,
-		version: 9,
 	}
 	return r
 }
@@ -119,6 +118,15 @@ func (r *RDB) Sync() (err error){
 	return r.bgSyncProc()
 }
 
+func (r *RDB) verifyHeader(hd []byte) error {
+	version, err := strconv.ParseInt(string(hd[5:]), 10, 64)
+	if err != nil {
+		return err
+	}
+	r.version = int(version)
+	return nil
+}
+
 func (r *RDB) bgSyncProc() (err error) {
 	var (
 		dbnum uint64
@@ -132,6 +140,8 @@ func (r *RDB) bgSyncProc() (err error) {
 	}
 	// 1. verify REDIS SPECIAL string
 	// 2. verify VERSION
+	r.verifyHeader(headbuf)
+
 	log.Infof("start syncing rdb with head %s", string(headbuf))
 	for {
 		r.expiry = 0
@@ -288,7 +298,6 @@ func (r *RDB) skipModule() (err error) {
 				return
 			}
 		default:
-			println("opcode ", opcode)
 			err = fmt.Errorf("unknown module opcode %d", opcode)
 			return
 		}
