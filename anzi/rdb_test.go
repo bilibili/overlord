@@ -156,9 +156,6 @@ func TestKeysWithExpire(t *testing.T) {
 }
 
 func TestInterKeys(t *testing.T) {
-	fmt.Println()
-	defer fmt.Println()
-
 	buf, err := _loadRDB("integer_keys.rdb")
 	assert.NoError(t, err, "should load db ok")
 	cb := _buildCB()
@@ -169,25 +166,29 @@ func TestInterKeys(t *testing.T) {
 }
 
 func TestStringKeysWithCompression(t *testing.T) {
-	fmt.Println()
-	defer fmt.Println()
-
 	buf, err := _loadRDB("integer_keys.rdb")
 	assert.NoError(t, err, "should load db ok")
 	cb := _buildCB()
 	rdb := NewRDB(bufio.NewReader(buf), cb)
 	err = rdb.bgSyncProc()
+	assert.NoError(t, err)
+}
+
+var allRdbs = []string{
+	"dictionary", "easily_compressible_string_key", "empty_database",
+	"hash_as_ziplist", "integer_keys", "intset_16", "intset_32", "intset_64",
+	"keys_with_expiry", "linkedlist", "multiple_databases", "non_ascii_values",
+	"parser_filters", "rdb_version_5_with_checksum", "rdb_version_8_with_64b_length_and_scores",
+	"redis_40_with_module", "redis_50_with_streams", "regular_set", "regular_sorted_set",
+	"sorted_set_as_ziplist", "uncompressible_string_keys", "ziplist_that_compresses_easily",
+	"ziplist_that_doesnt_compress", "ziplist_with_integers", "zipmap_that_compresses_easily",
+	"zipmap_that_doesnt_compress", "zipmap_with_big_values",
 }
 
 func TestAllParsingRDB(t *testing.T) {
-	allRdbs := []string{
-		"dictionary", "easily_compressible_string_key", "empty_database", "hash_as_ziplist", "integer_keys", "intset_16", "intset_32", "intset_64", "keys_with_expiry", "linkedlist", "multiple_databases", "non_ascii_values", "parser_filters", "rdb_version_5_with_checksum", "rdb_version_8_with_64b_length_and_scores", "redis_40_with_module", "redis_50_with_streams", "regular_set", "regular_sorted_set", "sorted_set_as_ziplist", "uncompressible_string_keys", "ziplist_that_compresses_easily", "ziplist_that_doesnt_compress", "ziplist_with_integers", "zipmap_that_compresses_easily", "zipmap_that_doesnt_compress", "zipmap_with_big_values"}
 
 	for _, rname := range allRdbs {
 		t.Run(rname, func(tt *testing.T) {
-			fmt.Println()
-			defer fmt.Println()
-
 			buf, err := _loadRDB(rname + ".rdb")
 			assert.NoError(tt, err, "should load db ok")
 			cb := _buildCB()

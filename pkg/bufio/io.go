@@ -23,9 +23,6 @@ type Reader struct {
 	rd  io.Reader
 	b   *Buffer
 	err error
-
-	// for usage counter
-	rbytes int
 }
 
 // NewReader returns a new Reader whose buffer has the default size.
@@ -35,7 +32,6 @@ func NewReader(rd io.Reader, b *Buffer) *Reader {
 
 func (r *Reader) fill() error {
 	n, err := r.rd.Read(r.b.buf[r.b.w:])
-	r.rbytes += n
 	r.b.w += n
 	if err != nil {
 		r.err = err
@@ -44,11 +40,6 @@ func (r *Reader) fill() error {
 		return io.ErrNoProgress
 	}
 	return nil
-}
-
-// GetReadedSize is the struct which for usage count
-func (r *Reader) GetReadedSize() int {
-	return r.rbytes
 }
 
 // Advance proxy to buffer advance

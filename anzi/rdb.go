@@ -94,6 +94,7 @@ func NewRDB(rd *bufio.Reader, cb RDBCallback) *RDB {
 	r := &RDB{
 		rd: rd,
 		cb: cb,
+		version: 9,
 	}
 	return r
 }
@@ -113,14 +114,9 @@ type RDB struct {
 	cb RDBCallback
 }
 
-// Start create new process in parse data from rdb
-func (r *RDB) Start() {
-	go func() {
-		err := r.bgSyncProc()
-		if err != nil {
-			log.Errorf("fail to sync rdb in background due %s", err)
-		}
-	}()
+// Sync create new process in parse data from rdb
+func (r *RDB) Sync() (err error){
+	return r.bgSyncProc()
 }
 
 func (r *RDB) bgSyncProc() (err error) {
@@ -272,25 +268,21 @@ func (r *RDB) skipModule() (err error) {
 	for opcode != RDBModuleOpcodeEOF {
 		switch opcode {
 		case RDBModuleOpcodeSInt, RDBModuleOpcodeUInt:
-			println("opcode ", opcode)
 			_, err = r.readLength()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeFloat:
-			println("opcode ", opcode)
 			_, err = r.readBinaryFloat()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeDouble:
-			println("opcode ", opcode)
 			_, err = r.readBinaryDouble()
 			if err != nil {
 				return
 			}
 		case RDBModuleOpcodeString:
-			println("opcode ", opcode)
 			_, err = r.readString()
 			if err != nil {
 				return
@@ -337,13 +329,21 @@ func (r *RDB) readStringEnc(flag byte) (data []byte, err error) {
 		if err != nil {
 			return
 		}
-		data = []byte{b}
+		data = []byte(fmt.Sprintf("%d", b))
 	} else if flag == RDBEncodeInt16 {
-		data = make([]byte, 2)
-		_, err = io.ReadFull(r.rd, data)
+		var ival int16
+		err = binary.Read(r.rd, binary.LittleEndian, &ival)
+		if err != nil {
+			return
+		}
+		data = []byte(fmt.Sprintf("%d", ival))
 	} else if flag == RDBEncodeInt32 {
-		data = make([]byte, 4)
-		_, err = io.ReadFull(r.rd, data)
+		var ival int32
+		err = binary.Read(r.rd, binary.LittleEndian, &ival)
+		if err != nil {
+			return
+		}
+		data = []byte(fmt.Sprintf("%d", ival))
 	} else if flag == RDBEncodeLZF {
 		var (
 			clen, ulen uint64
@@ -407,17 +407,7 @@ func (r *RDB) readLength() (length uint64, err error) {
 	return
 }
 
-// func (r *RDB) deferMakeExpireAt() {
-// 	if r.expiry == 0 {
-// 		return
-// 	}
-// 	now := uint64(time.Now().Unix()) * 1000
-// 	r.expiry += now
-// }
-
 func (r *RDB) readExpire(dtype byte) (ndtype byte, err error) {
-	// defer r.deferMakeExpireAt()
-
 	ndtype = dtype
 	if ndtype == RDBOpcodeExpireTimeMS {
 		err = binary.Read(r.rd, binary.LittleEndian, &r.expiry)
@@ -1102,10 +1092,8 @@ func (r *RDB) readStream() (err error) {
 		return
 	}
 	_ = fmt.Sprintf("%d-%d", entry1, entry2)
-	fmt.Printf("read stream entry %d-%d\n", entry1, entry2)
 
 	cgroups, err = r.readLength()
-	fmt.Printf("read stream cgroups %d\n", cgroups)
 	if err != nil {
 		return
 	}
