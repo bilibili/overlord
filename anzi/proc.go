@@ -30,6 +30,7 @@ var (
 	bytesSpace           = []byte(" ")
 	psyncFullSyncCmd     = []byte("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n")
 	bytesClusterNodesCmd = []byte("*2\r\n$7\r\nCLUSTER\r\n$5\r\nNODES\r\n")
+	pingInlineCMD        = []byte("PING\r\n")
 )
 
 // NewMigrateProc create new migrate proc in migrate data
@@ -177,10 +178,9 @@ func (m *MigrateProc) fetchClusterNodes(seed string) ([]string, error) {
 // CheckPing will check if remote is ready for listen
 func (m *MigrateProc) CheckPing() error {
 	ticker := time.NewTicker(time.Second)
-	pingInlineCMD := []byte("PING\r\n")
 	buf := make([]byte, 7)
 	for {
-		err := m.checkPing(pingInlineCMD, buf)
+		err := m.checkPing(buf)
 		if err != nil {
 			<-ticker.C
 			continue
@@ -190,7 +190,7 @@ func (m *MigrateProc) CheckPing() error {
 	return nil
 }
 
-func (m *MigrateProc) checkPing(pingInlineCMD, buf []byte) error {
+func (m *MigrateProc) checkPing(buf []byte) error {
 	conn, err := net.Dial("tcp", m.target)
 	if err != nil {
 		log.Errorf("fail to dial to target %s", err)
@@ -216,6 +216,8 @@ func (m *MigrateProc) checkPing(pingInlineCMD, buf []byte) error {
 type Instance struct {
 	Addr   string
 	Target string
+
+	tconn net.Conn
 
 	conn net.Conn
 	br   *bufio.Reader
@@ -309,6 +311,7 @@ func (inst *Instance) cmdForward() error {
 		return err
 	}
 	defer conn.Close()
+	inst.tconn = conn
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -353,7 +356,7 @@ func getStrLen(v int64) int {
 			return rv + 3
 		}
 
-		v = v / 10000
+		v = v / 1000
 		rv += 3
 	}
 }
@@ -376,5 +379,16 @@ func (inst *Instance) syncRDB(addr string) (err error) {
 	cb := NewProtocolCallbacker(addr)
 	rdb := NewRDB(inst.br, cb)
 	err = rdb.Sync()
+	return
+}
+
+// Close the up and down stream
+func (inst *Instance) Close() {
+	if inst.conn != nil {
+		inst.conn.Close()
+	}
+	if inst.tconn != nil {
+		inst.tconn.Close()
+	}
 	return
 }
