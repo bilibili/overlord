@@ -22,6 +22,8 @@ import (
 
 const (
 	byteLF                  = byte('\n')
+	byteBulkString          = byte('$')
+	byteArray               = byte('*')
 	byteSpace               = byte(' ')
 	replConfAckCmdFormatter = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$%d\r\n%d\r\n"
 )
@@ -316,17 +318,7 @@ func (inst *Instance) cmdForward() error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go func() {
-		defer wg.Done()
-		for {
-			size, err := io.Copy(conn, inst.br)
-			if err != nil {
-				log.Infof("closed by upstream due %s", err)
-				return
-			}
-			atomic.AddInt64(&inst.offset, size)
-		}
-	}()
+	go inst.downStream(&wg)
 
 	go func() {
 		defer wg.Done()
@@ -340,6 +332,87 @@ func (inst *Instance) cmdForward() error {
 	}()
 
 	wg.Wait()
+	return nil
+}
+
+func (inst *Instance) downStream(wg *sync.WaitGroup) {
+	defer wg.Done()
+	defer inst.Close()
+
+	var cmd = bytes.NewBuffer(nil)
+	for {
+		cmd.Reset()
+		line, err := inst.br.ReadBytes(byteLF)
+		if err != nil {
+			log.Infof("fail to read from upstream due %s", err)
+			return
+		}
+
+		count, err := conv.Btoi(line[1 : len(line)-2])
+		if err != nil {
+			continue
+		}
+
+		if line[0] == byteBulkString {
+			// log.Info(strconv.Quote(string(line)))
+			_, err := inst.br.Discard(int(count) + 2)
+			if err != nil {
+				return
+			}
+			atomic.AddInt64(&inst.offset, int64(len(line)+int(count)+2))
+			continue
+		}
+		writeAll(line, cmd)
+
+		for i := int64(0); i < count; i++ {
+			line, err = inst.br.ReadBytes(byteLF)
+			if err != nil {
+				log.Infof("fail to read from upstream in bulk due %s", err)
+				return
+			}
+			writeAll(line, cmd)
+
+			size, err := conv.Btoi(line[1 : len(line)-2])
+			if err != nil {
+				return
+			}
+			if size == -1 {
+				continue
+			}
+			body := make([]byte, size+2)
+			_, err = io.ReadFull(inst.br, body)
+			if err != nil {
+				return
+			}
+			writeAll(body, cmd)
+		}
+
+		atomic.AddInt64(&inst.offset, int64(cmd.Len()))
+		// log.Info("request is %s", strconv.Quote(string(cmd.Bytes())))
+		err = writeAll(cmd.Bytes(), inst.tconn)
+		if err != nil {
+			if inst.tconn != nil {
+				inst.tconn.Close()
+			}
+
+			inst.tconn, err = net.Dial("tcp", inst.Target)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func writeAll(buf []byte, w io.Writer) error {
+	left := len(buf)
+	for left != 0 {
+		size, err := w.Write(buf[len(buf)-left:])
+		if err != nil {
+			return err
+		}
+		left -= size
+	}
+
 	return nil
 }
 
@@ -363,10 +436,21 @@ func getStrLen(v int64) int {
 
 func (inst *Instance) replAck() {
 	log.Infof("repl ack for %s", inst.Addr)
+
+	// I don't know why but add 4 first make repl offset become right
+	atomic.AddInt64(&inst.offset, int64(4))
+
+	ticker := time.NewTicker(time.Millisecond * 100)
 	for {
+		<-ticker.C
 		offset := atomic.LoadInt64(&inst.offset)
 		cmd := fmt.Sprintf(replConfAckCmdFormatter, getStrLen(offset), offset)
 		_, err := inst.bw.WriteString(cmd)
+		if err != nil {
+			log.Errorf("fail to send repl ack command, connection maybe closed soon")
+			return
+		}
+		err = inst.bw.Flush()
 		if err != nil {
 			log.Errorf("fail to send repl ack command, connection maybe closed soon")
 			return
