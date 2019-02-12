@@ -135,7 +135,7 @@ func (c *cluster) fetchproc() {
 	for {
 		select {
 		case <-c.action:
-		case <-time.After(1 * time.Minute):
+		case <-time.After(30 * time.Minute):
 		}
 		c.tryFetch()
 	}

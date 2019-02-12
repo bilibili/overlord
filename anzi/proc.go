@@ -283,15 +283,11 @@ func (inst *Instance) Sync() (err error) {
 	if err != nil {
 		return err
 	}
+
 	// read full rdb
 	err = inst.syncRDB(inst.Target)
 	if err != nil {
 		return
-	}
-	// read Bulk String last \r\n
-	_, err = inst.br.ReadBytes(byteLF)
-	if err != nil {
-		return err
 	}
 
 	// 2. parsed rdb done then send notify to barier chan
@@ -353,12 +349,14 @@ func (inst *Instance) downStream(wg *sync.WaitGroup) {
 			continue
 		}
 
-		if line[0] == byteBulkString {
-			// log.Info(strconv.Quote(string(line)))
-			_, err := inst.br.Discard(int(count) + 2)
+		if line[0] != byteArray {
+			// _, err := inst.br.Discard(count+2)
+			data := make([]byte, count+2)
+			_, err := io.ReadFull(inst.br, data)
 			if err != nil {
 				return
 			}
+			log.Info(strconv.Quote(string(line) + string(data)))
 			atomic.AddInt64(&inst.offset, int64(len(line)+int(count)+2))
 			continue
 		}
@@ -436,9 +434,6 @@ func getStrLen(v int64) int {
 
 func (inst *Instance) replAck() {
 	log.Infof("repl ack for %s", inst.Addr)
-
-	// I don't know why but add 4 first make repl offset become right
-	atomic.AddInt64(&inst.offset, int64(4))
 
 	ticker := time.NewTicker(time.Millisecond * 100)
 	for {
