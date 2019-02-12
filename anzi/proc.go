@@ -386,7 +386,6 @@ func (inst *Instance) downStream(wg *sync.WaitGroup) {
 		}
 
 		atomic.AddInt64(&inst.offset, int64(cmd.Len()))
-		// log.Info("request is %s", strconv.Quote(string(cmd.Bytes())))
 		err = writeAll(cmd.Bytes(), inst.tconn)
 		if err != nil {
 			if inst.tconn != nil {
@@ -435,7 +434,7 @@ func getStrLen(v int64) int {
 func (inst *Instance) replAck() {
 	log.Infof("repl ack for %s", inst.Addr)
 
-	ticker := time.NewTicker(time.Millisecond * 100)
+	ticker := time.NewTicker(time.Second)
 	for {
 		<-ticker.C
 		offset := atomic.LoadInt64(&inst.offset)
