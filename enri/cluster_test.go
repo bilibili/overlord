@@ -22,14 +22,14 @@ func resetNode(t *testing.T, addrs []string) {
 	}
 }
 func TestNode(t *testing.T) {
-	var addr = "127.0.0.1:7000"
+	var addr = "127.0.0.1:8000"
 	n, err := NewNode(addr)
 	assert.NoError(t, err)
 	n.Init()
 	keys, err := n.keysInSlot(4310)
 	assert.NoError(t, err)
 	log.Infof("keys %s", keys)
-	dst, _ := NewNode("127.0.0.1:7002")
+	dst, _ := NewNode("127.0.0.1:8002")
 	dst.Init()
 	migrateSlot(n, dst, 4310)
 
@@ -37,12 +37,12 @@ func TestNode(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	addrs := []string{
-		"127.0.0.1:7000",
-		"127.0.0.1:7001",
-		"127.0.0.1:7002",
-		"127.0.0.1:7003",
-		"127.0.0.1:7004",
-		"127.0.0.1:7005",
+		"127.0.0.1:8000",
+		"127.0.0.1:8001",
+		"127.0.0.1:8002",
+		"127.0.0.1:8003",
+		"127.0.0.1:8004",
+		"127.0.0.1:8005",
 	}
 	resetNode(t, addrs)
 	cluster, err := Create(addrs, 1)
@@ -55,10 +55,10 @@ func TestCreate(t *testing.T) {
 }
 
 func TestAddNode(t *testing.T) {
-	seed := "127.0.0.1:7000"
+	seed := "127.0.0.1:8000"
 	addrs := []string{
-		"127.0.0.1:7007",
-		"127.0.0.1:7006",
+		"127.0.0.1:8007",
+		"127.0.0.1:8006",
 	}
 	resetNode(t, addrs)
 	cluster, err := Add(seed, addrs)
@@ -74,8 +74,8 @@ func TestAddNode(t *testing.T) {
 	}
 }
 func TestReplicate(t *testing.T) {
-	master := "127.0.0.1:7007"
-	slave := "127.0.0.1:7006"
+	master := "127.0.0.1:8007"
+	slave := "127.0.0.1:8006"
 	c, err := Replicate(master, slave)
 	c.updateNode("")
 	assert.NoError(t, err)
@@ -88,10 +88,10 @@ func TestReplicate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	seed := "127.0.0.1:7000"
+	seed := "127.0.0.1:8000"
 	addrs := []string{
-		"127.0.0.1:7007",
-		"127.0.0.1:7006",
+		"127.0.0.1:8007",
+		"127.0.0.1:8006",
 	}
 	cluster, err := Delete(seed, addrs)
 	assert.NoError(t, err)
@@ -104,15 +104,15 @@ func TestDelete(t *testing.T) {
 }
 
 func TestFix(t *testing.T) {
-	seed := "127.0.0.1:7001"
+	seed := "127.0.0.1:8001"
 	c, err := Fix(seed)
 	assert.NoError(t, err)
 	assert.True(t, c.consistent())
 }
 
 func TestMigrate(t *testing.T) {
-	src := "127.0.0.1:7000"
-	dst := "127.0.0.1:7001"
+	src := "127.0.0.1:8000"
+	dst := "127.0.0.1:8001"
 	var count int64 = 10
 	err := Migrate(src, dst, count, -1)
 	assert.NoError(t, err)
