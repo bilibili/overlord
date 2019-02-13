@@ -1,7 +1,6 @@
 package enri
 
 import (
-	"fmt"
 	"overlord/pkg/myredis"
 	"testing"
 	"time"
@@ -86,25 +85,6 @@ func TestReplicate(t *testing.T) {
 		t.Log(c.nodes)
 	}
 	c.updateNode("")
-}
-func TestReshard(t *testing.T) {
-	seed := "127.0.0.1:7000"
-	c, err := Reshard(seed)
-	fmt.Println("reshard")
-	assert.NoError(t, err)
-	c.updateNode("")
-	for !c.consistent() {
-		time.Sleep(time.Millisecond * 100)
-		c.updateNode("")
-		fmt.Println("wait consi")
-		t.Log(c.nodes)
-	}
-	c.updateNode("")
-	c.sortNode()
-	dispatch := divide(16384, len(c.master))
-	for i, node := range c.master {
-		assert.Equal(t, dispatch[i], len(node.slots), node.name)
-	}
 }
 
 func TestDelete(t *testing.T) {
