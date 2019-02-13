@@ -206,6 +206,26 @@ func Run() {
 			return err
 		},
 	}
-	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate}
+	info := cli.Command{
+		Name:        "info",
+		Usage:       "get cluster info",
+		Description: "get cluster info",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "cluster,c",
+				Usage:       "origin node of cluster",
+				Destination: &seed,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			if seed == "" {
+				cli.ShowCommandHelp(c, "info")
+				return errFlag
+			}
+			err := Info(seed)
+			return err
+		},
+	}
+	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate, info}
 	app.Run(os.Args)
 }

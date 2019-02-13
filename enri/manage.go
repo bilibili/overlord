@@ -2,6 +2,7 @@ package enri
 
 import (
 	"errors"
+	"fmt"
 	"overlord/pkg/log"
 	"strings"
 	"time"
@@ -207,5 +208,19 @@ func Replicate(master, slave string) (c *Cluster, err error) {
 	c.addNode(slaveNode.ip, slaveNode.port)
 	slaveNode.slaveof = masterNode.name
 	slaveNode.setSlave()
+	return
+}
+
+// Info print cluster info.
+func Info(node string) (err error) {
+	n, err := NewNode(node)
+	if err != nil {
+		log.Errorf("newnode err %v", err)
+		return
+	}
+	infos := n.Info()
+	for k, v := range infos {
+		fmt.Printf("%s:%s\r\n", k, v)
+	}
 	return
 }

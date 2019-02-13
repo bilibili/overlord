@@ -231,6 +231,7 @@ func (c *Cluster) updateNode(exclude string) {
 		}
 	}
 }
+
 func (c *Cluster) fixSlot() {
 	for _, m := range c.master {
 		m.fixNode()
