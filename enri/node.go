@@ -7,7 +7,6 @@ import (
 	"overlord/pkg/log"
 	"overlord/pkg/myredis"
 	"strconv"
-	"strings"
 )
 
 // Node present node info.
@@ -29,23 +28,23 @@ func (n *Node) String() string {
 	return fmt.Sprintf("name:%s ip:%s port:%s role %v slots %d", n.name, n.ip, n.port, n.role, len(n.slots))
 }
 func (n *Node) setConfigEpoch() (err error) {
-	_, err = n.conn.Exec("CLUSTER SET_CONFIG_EPOCH 1")
+	_, err = n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"SET_CONFIG_EPOCH", "1"}...))
 	return err
 }
 
 func (n *Node) meet(ip, port string) (err error) {
-	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER MEET %s %s", ip, port))
+	_, err = n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"MEET", ip, port}...))
 	return
 }
 
 func (n *Node) setSlave() {
-	n.conn.Exec(fmt.Sprintf("CLUSTER REPLICATE %s", n.slaveof))
+	n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"REPLICATE", n.slaveof}...))
 	log.Infof("set %s slaveof %s", n.name, n.slaveof)
 }
 
 // Info get node info by cluster info.
 func (n *Node) Info() (res map[string]string) {
-	resp, err := n.conn.Exec("CLUSTER INFO")
+	resp, err := n.conn.Exec(myredis.NewCmd("CLUSTER").Arg("INFO"))
 	if err != nil {
 		return
 	}
@@ -66,12 +65,16 @@ func (n *Node) Info() (res map[string]string) {
 }
 
 func (n *Node) addSlots(slots []int64) (err error) {
-	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER ADDSLOTS %s", joinInts(slots, ' ')))
+	cmd := myredis.NewCmd("CLUSTER").Arg("ADDSLOTS")
+	for _, slot := range slots {
+		cmd = cmd.Arg(strconv.FormatInt(slot, 10))
+	}
+	_, err = n.conn.Exec(cmd)
 	return
 }
 
 func (n *Node) setSlot(state string, nodeid string, slot int64) (err error) {
-	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER SETSLOT %d %s %s", slot, state, nodeid))
+	_, err = n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"SETSLOT", strconv.FormatInt(slot, 10), state, nodeid}...))
 	return
 }
 
@@ -82,23 +85,23 @@ func (n *Node) isMaster() bool {
 	return n.role == roleMaster
 }
 func (n *Node) setSlotStable(slot int64) (err error) {
-	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER SETSLOT %d STABLE", slot))
+	_, err = n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"SETSLOT", strconv.FormatInt(slot, 10), "STABLE"}...))
 	return
 }
 
 func (n *Node) keysInSlot(slot int64) (keys []string, err error) {
-	resp, err := n.conn.Exec(fmt.Sprintf("CLUSTER GETKEYSINSLOT %d %d", slot, 100))
+	resp, err := n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"GETKEYSINSLOT", strconv.FormatInt(slot, 10), "100"}...))
 	if err != nil {
 		return
 	}
 	for _, key := range resp.Array {
-		keys = append(keys, string(key.Data))
+		keys = append(keys, string(key.Data[:len(key.Data)-2]))
 	}
 	return
 }
 
 func (n *Node) forget(node *Node) (err error) {
-	_, err = n.conn.Exec(fmt.Sprintf("CLUSTER FORGET %s", node.name))
+	_, err = n.conn.Exec(myredis.NewCmd("CLUSTER").Arg("FORGET").Arg(node.name))
 	return
 }
 
@@ -121,11 +124,15 @@ func (n *Node) fixNode() {
 	}
 }
 
-func (n *Node) migrate(dst string, key []string) (err error) {
+func (n *Node) migrate(ip, port string, key []string) (err error) {
 	const (
 		timeout = 500
 	)
-	_, err = n.conn.Exec(fmt.Sprintf("MIGRATE %s  0 %d KEYS %s", dst, timeout, strings.Join(key, " ")))
+	cmd := myredis.NewCmd("MIGRATE").Arg(ip).Arg(port).Arg("").Arg("0").Arg("500").Arg("KEYS").Arg(key...)
+	resp, err := n.conn.Exec(cmd)
+	if string(resp.Data) != "OK" {
+		log.Errorf("migrate key err resp %v", string(resp.Data))
+	}
 	return
 }
 
@@ -142,7 +149,7 @@ func (n *Node) Init() {
 
 // Nodes get nodes from node conn.
 func (n *Node) Nodes() (nodes []*Node) {
-	resp, err := n.conn.Exec("CLUSTER NODES")
+	resp, err := n.conn.Exec(myredis.NewCmd("CLUSTER").Arg("NODES"))
 	if err != nil {
 		log.Infof("Nodes err %v", err)
 		return
@@ -233,8 +240,11 @@ func migrateSlot(src, dst *Node, slot int64) {
 		if len(keys) == 0 {
 			break
 		}
-		src.migrate(dst.addr(), keys)
+		err = src.migrate(dst.ip, dst.port, keys)
+		if err != nil {
+			log.Errorf("migrate key to %s fail %v", dst.addr(), err)
+		}
 	}
-	src.setSlot("NODE", dst.name, slot)
 	dst.setSlot("NODE", dst.name, slot)
+	src.setSlot("NODE", dst.name, slot)
 }

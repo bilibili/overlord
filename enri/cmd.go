@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 
+	"overlord/pkg/log"
+
 	"github.com/urfave/cli"
 )
 
@@ -19,6 +21,7 @@ var (
 
 // Run run enri cli.
 func Run() {
+	log.InitHandle(log.NewStdHandler())
 	app := cli.NewApp()
 	app.Usage = "redis cluster manager tool"
 	app.Version = "v0.1.0"
@@ -137,12 +140,15 @@ func Run() {
 			cli.Int64Flag{
 				Name:        "slot,s",
 				Usage:       "slot num",
+				Value:       -1,
 				Destination: &slot,
 			},
 		},
 		Action: func(c *cli.Context) error {
+
 			err := Migrate(src, dst, count, slot)
 			if err != nil {
+				log.Errorf("migrate slot err %v", err)
 				cli.ShowCommandHelp(c, "migrate")
 				return err
 			}

@@ -56,6 +56,7 @@ func Add(seed string, addrs []string) (c *Cluster, err error) {
 
 		err = c.addNode(node.ip, node.port)
 		if err != nil {
+			log.Errorf("add node to cluster err %v", err)
 			return
 		}
 		c.nodes = append(c.nodes, node)
@@ -96,6 +97,7 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 	var (
 		srcNode, dstNode *Node
 	)
+
 	if src != "" {
 		if srcNode, err = NewNode(src); err != nil {
 			return
@@ -111,8 +113,10 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 	}
 	switch {
 	case slot >= 0:
+		log.Infof("migrate slot %d from %s to %s", slot, src, dst)
 		migrateSlot(srcNode, dstNode, slot)
 	case count != 0:
+		log.Infof("migrate  %d slots  from %s to %s", slot, src, dst)
 		if len(srcNode.slots) < int(count) {
 			log.Errorf("%s do not have enough slot to migrate", srcNode.addr())
 			return
@@ -121,6 +125,7 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 			migrateSlot(srcNode, dstNode, slot)
 		}
 	case dstNode == nil:
+		log.Infof("migrate all slots  from %s to other nodes", src)
 		om := otherMaster(srcNode.Nodes(), srcNode)
 		start := 0
 		dispatch := divide(len(srcNode.slots), len(om))
@@ -132,10 +137,12 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 			start = end
 		}
 	case count == 0:
+		log.Infof("migrate all slots  from %s to %s", src, dst)
 		for _, slot := range srcNode.slots {
 			migrateSlot(srcNode, dstNode, slot)
 		}
 	case srcNode == nil:
+		log.Infof("migrate  slots  from other nodes to %s", dst)
 		om := otherMaster(dstNode.Nodes(), dstNode)
 		dispatch := divide(int(count), len(om))
 		for i, m := range om {
