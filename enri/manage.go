@@ -143,7 +143,8 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 			start = end
 		}
 	case count == 0:
-		log.Infof("migrate %d slots  from %s to %s", len(srcNode.slots), src, dst)
+		count := len(srcNode.slots)
+		log.Infof("migrate %d slots  from %s to %s", count, src, dst)
 		var finished = 1
 		for _, slot := range srcNode.slots {
 			migrateSlot(srcNode, dstNode, slot)
@@ -232,6 +233,7 @@ func Info(node string) (err error) {
 	infos := n.Info()
 	for k, v := range infos {
 		fmt.Printf("%s:%s\r\n", k, v)
+		log.Infof("%s:%s\r\n", k, v)
 	}
 	return
 }

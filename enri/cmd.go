@@ -17,15 +17,41 @@ var (
 	src, dst string
 	count    int64
 	slot     int64
+	std      bool
+	logFile  string
 )
 
 // Run run enri cli.
 func Run() {
-	log.InitHandle(log.NewStdHandler())
+
 	app := cli.NewApp()
 	app.Usage = "redis cluster manager tool"
 	app.Version = "v0.1.0"
 	app.Authors = []cli.Author{{Name: "lintanghui", Email: "xmutanghui@gmail.com"}}
+	logFlag := []cli.Flag{
+		cli.BoolFlag{
+			Name:        "std",
+			Usage:       "print log to std",
+			Destination: &std,
+		},
+		cli.StringFlag{
+			Name:        "log",
+			Usage:       "print log to file",
+			Destination: &logFile,
+		},
+	}
+	logActon := func() {
+		var handlers []log.Handler
+		if std {
+			handlers = append(handlers, log.NewStdHandler())
+		}
+		if logFile != "" {
+			handlers = append(handlers, log.NewFileHandler(logFile))
+		}
+		if len(handlers) != 0 {
+			log.InitHandle(handlers...)
+		}
+	}
 	add := cli.Command{
 		Name:        "add",
 		ShortName:   "a",
@@ -44,6 +70,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if seed == "" || len(nodes) == 0 {
 				cli.ShowCommandHelp(c, "add")
 				return errFlag
@@ -52,6 +79,7 @@ func Run() {
 			return err
 		},
 	}
+	add.Flags = append(add.Flags, logFlag...)
 	fix := cli.Command{
 		Name:      "fix",
 		ShortName: "f",
@@ -64,6 +92,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if seed == "" {
 				cli.ShowCommandHelp(c, "fix")
 				return errFlag
@@ -72,6 +101,7 @@ func Run() {
 			return err
 		},
 	}
+	fix.Flags = append(fix.Flags, logFlag...)
 	reshard := cli.Command{
 		Name:      "reshard",
 		ShortName: "r",
@@ -84,6 +114,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if seed == "" {
 				cli.ShowCommandHelp(c, "reshard")
 				return errFlag
@@ -92,6 +123,7 @@ func Run() {
 			return err
 		},
 	}
+	reshard.Flags = append(reshard.Flags, logFlag...)
 	create := cli.Command{
 		Name:      "create",
 		ShortName: "c",
@@ -109,6 +141,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if len(nodes) == 0 || slave == 0 {
 				cli.ShowCommandHelp(c, "create")
 				return errFlag
@@ -117,6 +150,7 @@ func Run() {
 			return err
 		},
 	}
+	create.Flags = append(create.Flags, logFlag...)
 	migrate := cli.Command{
 		Name:      "migrate",
 		ShortName: "m",
@@ -145,7 +179,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-
+			logActon()
 			err := Migrate(src, dst, count, slot)
 			if err != nil {
 				log.Errorf("migrate slot err %v", err)
@@ -155,6 +189,7 @@ func Run() {
 			return nil
 		},
 	}
+	migrate.Flags = append(migrate.Flags, logFlag...)
 	replicate := cli.Command{
 		Name:      "replicate",
 		ShortName: "repl",
@@ -172,6 +207,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			_, err := Replicate(src, dst)
 			if err != nil {
 				cli.ShowCommandHelp(c, "replicate")
@@ -180,6 +216,7 @@ func Run() {
 			return err
 		},
 	}
+	replicate.Flags = append(replicate.Flags, logFlag...)
 	del := cli.Command{
 		Name:        "del",
 		ShortName:   "d",
@@ -198,6 +235,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if seed == "" || len(nodes) == 0 {
 				cli.ShowCommandHelp(c, "del")
 				return errFlag
@@ -206,6 +244,7 @@ func Run() {
 			return err
 		},
 	}
+	del.Flags = append(del.Flags, logFlag...)
 	info := cli.Command{
 		Name:        "info",
 		Usage:       "get cluster info",
@@ -218,6 +257,7 @@ func Run() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			logActon()
 			if seed == "" {
 				cli.ShowCommandHelp(c, "info")
 				return errFlag
@@ -226,6 +266,7 @@ func Run() {
 			return err
 		},
 	}
+	info.Flags = append(info.Flags, logFlag...)
 	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate, info}
 	app.Run(os.Args)
 }
