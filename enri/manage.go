@@ -114,7 +114,6 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 	}
 	switch {
 	case slot >= 0:
-		log.Infof("migrate slot %d from %s to %s", slot, src, dst)
 		migrateSlot(srcNode, dstNode, slot)
 	case count != 0:
 		log.Infof("migrate  %d slots  from %s to %s", slot, src, dst)
@@ -122,8 +121,11 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 			log.Errorf("%s do not have enough slot to migrate", srcNode.addr())
 			return
 		}
+		var finished = 1
 		for _, slot := range srcNode.slots[:count] {
 			migrateSlot(srcNode, dstNode, slot)
+			log.Infof("migrate slot %d/%d", finished, count)
+			finished++
 		}
 	case dstNode == nil:
 		log.Infof("migrate all slots  from %s to other nodes", src)
@@ -132,23 +134,32 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 		dispatch := divide(len(srcNode.slots), len(om))
 		for i, m := range om {
 			end := start + dispatch[i]
+			var finished = 1
 			for _, slot := range srcNode.slots[start:end] {
 				migrateSlot(srcNode, m, slot)
+				log.Infof("migrate slot %d/%d", finished, count)
+				finished++
 			}
 			start = end
 		}
 	case count == 0:
-		log.Infof("migrate all slots  from %s to %s", src, dst)
+		log.Infof("migrate %d slots  from %s to %s", len(srcNode.slots), src, dst)
+		var finished = 1
 		for _, slot := range srcNode.slots {
 			migrateSlot(srcNode, dstNode, slot)
+			log.Infof("migrate slot %d/%d", finished, count)
+			finished++
 		}
 	case srcNode == nil:
-		log.Infof("migrate  slots  from other nodes to %s", dst)
+		log.Infof("migrate  %d slots  from other nodes to %s", count, dst)
 		om := otherMaster(dstNode.Nodes(), dstNode)
 		dispatch := divide(int(count), len(om))
+		var finished = 1
 		for i, m := range om {
 			for _, slot := range m.slots[:dispatch[i]] {
 				migrateSlot(m, dstNode, slot)
+				log.Infof("migrate slot %d/%d", finished, count)
+				finished++
 			}
 		}
 	default:

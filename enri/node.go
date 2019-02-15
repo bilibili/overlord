@@ -230,10 +230,13 @@ func (n *Node) valid() bool {
 }
 
 func migrateSlot(src, dst *Node, slot int64) {
+	log.Infof("start migrate slot(%d) from %s to %s", slot, src.addr(), dst.addr())
 	dst.setSlot("IMPORTING", dst.name, slot)
 	src.setSlot("MIGRATING", src.name, slot)
+	var total int
 	for {
 		keys, err := src.keysInSlot(slot)
+		total += len(keys)
 		if err != nil {
 			return
 		}
@@ -247,4 +250,5 @@ func migrateSlot(src, dst *Node, slot int64) {
 	}
 	dst.setSlot("NODE", dst.name, slot)
 	src.setSlot("NODE", dst.name, slot)
+	log.Infof("migrate slot(%d) from %s to %s finish,total keys num %d", slot, src.addr(), dst.addr(), total)
 }

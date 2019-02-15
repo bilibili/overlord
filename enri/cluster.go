@@ -134,10 +134,9 @@ func (c *Cluster) addSlots() {
 		return
 	}
 	for _, node := range c.master {
-		log.Infof("add slots to %s %d", node.name, len(node.slots))
 		err := node.addSlots(node.slots)
 		if err != nil {
-			println("Add slot err")
+			log.Errorf("Add slot to %s fail ", node.addr())
 		}
 	}
 }
