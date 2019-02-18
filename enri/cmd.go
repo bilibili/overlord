@@ -87,7 +87,7 @@ func Run() {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:        "node,n",
-				Usage:       " addr of cluster",
+				Usage:       "addr of cluster",
 				Destination: &seed,
 			},
 		},
@@ -109,7 +109,7 @@ func Run() {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:        "node,n",
-				Usage:       " addr of cluster",
+				Usage:       "addr of cluster",
 				Destination: &seed,
 			},
 		},

@@ -42,6 +42,7 @@ func Create(addrs []string, slave int) (c *Cluster, err error) {
 // Add get Cluster by cluster seed addr.
 func Add(seed string, addrs []string) (c *Cluster, err error) {
 	c, err = cluster(seed)
+	var slaves []*Node
 	for _, addr := range addrs {
 		couple := strings.Split(addr, ",")
 		var node *Node
@@ -65,16 +66,25 @@ func Add(seed string, addrs []string) (c *Cluster, err error) {
 			var slave *Node
 			slave, err = NewNode(couple[1])
 			if err != nil {
+				log.Errorf("create new node %s err %v", slave.addr(), err)
+				return
+			}
+			err = c.addNode(slave.ip, slave.port)
+			if err != nil {
+				log.Errorf("add slave err %v", err)
 				return
 			}
 			slave.slaveof = node.name
-			slave.setSlave()
+			slaves = append(slaves, slave)
 		}
 	}
 	c.updateNode("")
 	for !c.consistent() {
 		time.Sleep(time.Second)
 		log.Info("wait cluster to consistent")
+	}
+	for _, slave := range slaves {
+		slave.setSlave()
 	}
 	return
 }

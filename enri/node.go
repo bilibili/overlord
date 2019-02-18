@@ -38,8 +38,8 @@ func (n *Node) meet(ip, port string) (err error) {
 }
 
 func (n *Node) setSlave() {
-	n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"REPLICATE", n.slaveof}...))
-	log.Infof("set %s slaveof %s", n.name, n.slaveof)
+	resp, err := n.conn.Exec(myredis.NewCmd("CLUSTER").Arg([]string{"REPLICATE", n.slaveof}...))
+	log.Infof("set %s slaveof %s resp %s,err %v", n.name, n.slaveof, string(resp.Data), err)
 }
 
 // Info get node info by cluster info.
