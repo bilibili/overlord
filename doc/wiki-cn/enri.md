@@ -59,3 +59,13 @@ enri migrate -d 127.0.0.1:7001  -c 10
 enri migrate -o 127.0.0.1:7001  -c 10
 ```
 
+### 设置replicate
+```shell
+// 设置7006 为7007的从节点
+enri replicate -m 127.0.0.1:7007 -s 127.0.0.1:7006
+```
+
+### 集群信息info
+```shell
+enri info -c 127.0.0.1:7001
+```
