@@ -3,6 +3,7 @@ module overlord
 require (
 	bou.ke/monkey v1.0.1 // indirect
 	github.com/BurntSushi/toml v0.3.1
+	github.com/Pallinder/go-randomdata v1.1.0
 	github.com/bouk/monkey v1.0.1
 	github.com/cloudfoundry-community/go-cfenv v1.17.0
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect

@@ -3,6 +3,7 @@ package anzi
 import (
 	"overlord/pkg/log"
 	"overlord/proxy"
+	"runtime"
 )
 
 // Config is the struct which used by cmd/anzi
@@ -16,4 +17,13 @@ type MigrateConfig struct {
 	From              []*proxy.ClusterConfig `toml:"from"`
 	To                *proxy.ClusterConfig   `toml:"to"`
 	MaxRDBConcurrency int                    `toml:"max_rdb_concurrency"`
+}
+
+// SetDefault migrate config
+func (m *MigrateConfig) SetDefault() {
+	m.MaxRDBConcurrency = runtime.NumCPU()
+	for _, from := range m.From {
+		from.SetDefault()
+	}
+	m.To.SetDefault()
 }

@@ -12,7 +12,7 @@ import (
 var confPath string
 
 func main() {
-	flag.StringVar(&confPath, "conf", "anzi.toml", "anzi conf")
+	flag.StringVar(&confPath, "conf", "anzi.toml", "anzi config file")
 	flag.Parse()
 
 	conf := new(anzi.Config)
@@ -20,6 +20,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	conf.Migrate.SetDefault()
 	if log.Init(conf.Config) {
 		defer log.Close()
 	}

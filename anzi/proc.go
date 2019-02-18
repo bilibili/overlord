@@ -114,6 +114,7 @@ func (m *MigrateProc) fromServers(from []*proxy.ClusterConfig) ([]string, error)
 					continue
 				}
 				addrs = append(addrs, caddrs...)
+				break
 			}
 			continue
 		}
@@ -314,8 +315,7 @@ func (inst *Instance) cmdForward() error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go inst.downStream(&wg)
-
+	// go inst.downStream(&wg)
 	go func() {
 		defer wg.Done()
 		for {
@@ -327,77 +327,21 @@ func (inst *Instance) cmdForward() error {
 		}
 	}()
 
+	go func() {
+		defer wg.Done()
+		defer inst.Close()
+
+		for {
+			size, err := io.Copy(inst.tconn, inst.br)
+			if err != nil {
+				return
+			}
+			atomic.AddInt64(&inst.offset, size)
+		}
+	}()
+
 	wg.Wait()
 	return nil
-}
-
-func (inst *Instance) downStream(wg *sync.WaitGroup) {
-	defer wg.Done()
-	defer inst.Close()
-
-	var cmd = bytes.NewBuffer(nil)
-	for {
-		cmd.Reset()
-		line, err := inst.br.ReadBytes(byteLF)
-		if err != nil {
-			log.Infof("fail to read from upstream due %s", err)
-			return
-		}
-
-		count, err := conv.Btoi(line[1 : len(line)-2])
-		if err != nil {
-			continue
-		}
-
-		if line[0] != byteArray {
-			// _, err := inst.br.Discard(count+2)
-			data := make([]byte, count+2)
-			_, err := io.ReadFull(inst.br, data)
-			if err != nil {
-				return
-			}
-			log.Info(strconv.Quote(string(line) + string(data)))
-			atomic.AddInt64(&inst.offset, int64(len(line)+int(count)+2))
-			continue
-		}
-		writeAll(line, cmd)
-
-		for i := int64(0); i < count; i++ {
-			line, err = inst.br.ReadBytes(byteLF)
-			if err != nil {
-				log.Infof("fail to read from upstream in bulk due %s", err)
-				return
-			}
-			writeAll(line, cmd)
-
-			size, err := conv.Btoi(line[1 : len(line)-2])
-			if err != nil {
-				return
-			}
-			if size == -1 {
-				continue
-			}
-			body := make([]byte, size+2)
-			_, err = io.ReadFull(inst.br, body)
-			if err != nil {
-				return
-			}
-			writeAll(body, cmd)
-		}
-
-		atomic.AddInt64(&inst.offset, int64(cmd.Len()))
-		err = writeAll(cmd.Bytes(), inst.tconn)
-		if err != nil {
-			if inst.tconn != nil {
-				inst.tconn.Close()
-			}
-
-			inst.tconn, err = net.Dial("tcp", inst.Target)
-			if err != nil {
-				return
-			}
-		}
-	}
 }
 
 func writeAll(buf []byte, w io.Writer) error {
