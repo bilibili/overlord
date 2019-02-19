@@ -1,46 +1,49 @@
 package hashkit
 
-import (
-	"hash"
-)
-
-func fnv1a64(key []byte) (value uint) {
-	var s sum64a = offset64
-	_, _ = s.Write(key)
-	return uint(s.Sum64())
-}
-
-type (
-	sum64a uint64
-)
-
 const (
 	prime64  = 1099511628211
 	offset64 = 14695981039346656037
+
+	prime64tw  = 1099511628211 & 0x0000ffff
+	offset64tw = 14695981039346656037 & 0xffffffff
+
+	prime32  = 16777619
+	offset32 = 2166136261
 )
 
-// New64a new fnv1a64 same as twemproxy.
-func New64a() hash.Hash64 {
-	var s sum64a = offset64
-	return &s
-}
-
-func (s *sum64a) Reset()         { *s = offset64 }
-func (s *sum64a) Sum64() uint64  { return uint64(*s) }
-func (s *sum64a) Size() int      { return 8 }
-func (s *sum64a) BlockSize() int { return 1 }
-
-func (s *sum64a) Sum(in []byte) []byte {
-	v := uint64(*s)
-	return append(in, byte(v>>56), byte(v>>48), byte(v>>40), byte(v>>32), byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
-}
-
-func (s *sum64a) Write(data []byte) (int, error) {
-	hash := uint32(*s)
-	for _, c := range data {
+func hashFnv1a64(key []byte) uint {
+	hash := uint32(offset64tw)
+	for _, c := range key {
 		hash ^= uint32(c)
-		hash *= uint32(prime64 & 0x0000ffff)
+		hash *= uint32(prime64tw)
 	}
-	*s = sum64a(hash)
-	return len(data), nil
+
+	return uint(hash)
+}
+
+func hashFnv164(key []byte) uint {
+	var hash uint64 = offset64
+	for _, c := range key {
+		hash *= prime64
+		hash ^= uint64(c)
+	}
+	return uint(uint32(hash))
+}
+
+func hashFnv1a32(key []byte) uint {
+	var hash uint32 = offset32
+	for _, c := range key {
+		hash ^= uint32(c)
+		hash *= prime32
+	}
+	return uint(hash)
+}
+
+func hashFnv132(key []byte) (value uint) {
+	var hash uint32 = offset32
+	for _, c := range key {
+		hash *= prime32
+		hash ^= uint32(c)
+	}
+	return uint(hash)
 }

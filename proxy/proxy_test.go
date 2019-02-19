@@ -23,7 +23,7 @@ var (
 	ccs = []*ClusterConfig{
 		&ClusterConfig{
 			Name:             "eject-cluster",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("memcache"),
@@ -43,7 +43,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "mc-cluster",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("memcache"),
@@ -64,7 +64,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "mcbin-cluster",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("memcache_binary"),
@@ -85,7 +85,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "redis",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("redis"),
@@ -104,7 +104,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "redis-cluster",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("redis_cluster"),
@@ -124,7 +124,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "no avaliable node ",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("redis"),
@@ -145,7 +145,7 @@ var (
 		},
 		&ClusterConfig{
 			Name:             "reconn_test",
-			HashMethod:       "sha1",
+			HashMethod:       "fnv1a_64",
 			HashDistribution: "ketama",
 			HashTag:          "",
 			CacheType:        types.CacheType("memcache"),
