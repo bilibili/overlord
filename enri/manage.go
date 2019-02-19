@@ -181,16 +181,46 @@ func Migrate(src, dst string, count int64, slot int64) (err error) {
 }
 
 // Fix fix cluster if cluster in error.
-func Fix(node string) (c *Cluster, err error) {
-	if c, err = cluster(node); err != nil {
+func Fix(addr string) (c *Cluster, err error) {
+	if c, err = cluster(addr); err != nil {
 		return
 	}
 	c.fixSlot()
 	c.fillSlot()
+	node, err := NewNode(addr)
+	if err != nil {
+		log.Errorf("new node err %v", err)
+		return
+	}
+	node.Init()
+	if node.clusterState() {
+		log.Infof("node %s in state ok", node.name)
+		return
+	}
+	nodes := node.Nodes()
+	var newestNode = nodes[0]
+	for _, node := range nodes {
+		if newestNode.configEpoch < node.configEpoch {
+			newestNode = node
+		}
+	}
+	newestNode.Init()
+	if newestNode.clusterState() {
+		for _, n := range newestNode.Nodes() {
+			if n.addr() == node.addr() {
+				diff := diffrence(n.slots, node.slots)
+				if len(diff) > 0 {
+					log.Infof("add slots %v to node %s", diff, node.addr())
+					node.addSlots(diff)
+				}
+			}
+		}
+	}
 	for !c.consistent() {
 		time.Sleep(time.Second)
-		log.Info("wait cluster to consistent")
+		log.Error("wait cluster to consistent")
 	}
+	log.Info("fix cluster success,cluster in consistency")
 	return
 }
 
@@ -244,7 +274,21 @@ func Info(node string) (err error) {
 	infos := n.Info()
 	for k, v := range infos {
 		fmt.Printf("%s:%s\r\n", k, v)
-		log.Infof("%s:%s\r\n", k, v)
+	}
+	return
+}
+
+// Check cluster state.
+func Check(node string) (err error) {
+	c, err := cluster(node)
+	if err != nil {
+		return
+	}
+
+	var times = 5
+	if !c.consistent() && times > 0 {
+		time.Sleep(time.Second)
+		times--
 	}
 	return
 }

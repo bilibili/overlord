@@ -111,3 +111,17 @@ func otherMaster(nodes []*Node, node *Node) (om []*Node) {
 	}
 	return
 }
+
+// get elem in a but not in b.
+func diffrence(as, bs []int64) (diff []int64) {
+	m := make(map[int64]struct{}, len(bs))
+	for _, b := range bs {
+		m[b] = struct{}{}
+	}
+	for _, a := range as {
+		if _, ok := m[a]; !ok {
+			diff = append(diff, a)
+		}
+	}
+	return
+}

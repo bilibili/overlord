@@ -12,17 +12,18 @@ import (
 
 // Node present node info.
 type Node struct {
-	name      string
-	ip        string
-	port      string
-	role      Role
-	self      bool
-	slaveof   string
-	nodes     map[string]*Node
-	slots     []int64
-	migrating map[int64]string
-	importing map[int64]string
-	conn      *myredis.Conn
+	name        string
+	ip          string
+	port        string
+	role        Role
+	self        bool
+	slaveof     string
+	configEpoch int64
+	nodes       map[string]*Node
+	slots       []int64
+	migrating   map[int64]string
+	importing   map[int64]string
+	conn        *myredis.Conn
 }
 
 func (n *Node) String() string {
@@ -65,12 +66,20 @@ func (n *Node) Info() (res map[string]string) {
 	return
 }
 
+func (n *Node) clusterState() bool {
+	info := n.Info()
+	return info["cluster_state"] == "ok"
+}
+
 func (n *Node) addSlots(slots []int64) (err error) {
 	cmd := myredis.NewCmd("CLUSTER").Arg("ADDSLOTS")
 	for _, slot := range slots {
 		cmd = cmd.Arg(strconv.FormatInt(slot, 10))
 	}
-	_, err = n.conn.Exec(cmd)
+	resp, err := n.conn.Exec(cmd)
+	if err != nil || string(resp.Data) != "OK" {
+		log.Errorf("add slot (%v) fail err(%v),resp(%v), ", slots, err, string(resp.Data))
+	}
 	return
 }
 
@@ -189,6 +198,11 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 		if !bytes.Equal(fields[3], []byte{'-'}) {
 			node.slaveof = string(fields[3])
 		}
+		epoch, err := strconv.ParseInt(string(fields[6]), 10, 64)
+		if err != nil {
+			return
+		}
+		node.configEpoch = epoch
 		var slot []int64
 		for _, content := range fields[8:] {
 			if bytes.Contains(content, []byte("->-")) {

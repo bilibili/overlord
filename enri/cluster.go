@@ -155,12 +155,14 @@ func (c *Cluster) consistent() bool {
 				if !ok {
 					nodeSlot[slot] = node
 				} else if tmp.name != node.name {
+					log.Errorf("cluster not consistent, %s had same slot %d with %s", tmp.addr(), slot, node.addr())
 					return false
 				}
 				slotNum++
 			}
 		}
 		if slotNum != clusterCount {
+			log.Errorf("slot not all covered in node %s(%s) ,only %d in open state", node.name, node.addr(), slotNum)
 			return false
 		}
 	}
@@ -282,7 +284,7 @@ func (c *Cluster) fillSlot() {
 			if !slots[j] {
 				add = append(add, j)
 			}
-			if len(add) == dispatch[i] {
+			if len(add) == dispatch[i] && len(add) != 0 {
 				log.Infof("add %v", add)
 				m.addSlots(add)
 				j++

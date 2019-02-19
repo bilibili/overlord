@@ -267,6 +267,28 @@ func Run() {
 		},
 	}
 	info.Flags = append(info.Flags, logFlag...)
-	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate, info}
+	check := cli.Command{
+		Name:        "check",
+		Usage:       "check cluster state",
+		Description: "check cluster state",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:        "cluster,c",
+				Usage:       "origin node of cluster",
+				Destination: &seed,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			logActon()
+			if seed == "" {
+				cli.ShowCommandHelp(c, "check")
+				return errFlag
+			}
+			err := Check(seed)
+			return err
+		},
+	}
+	check.Flags = append(check.Flags, logFlag...)
+	app.Commands = []cli.Command{add, create, del, migrate, fix, reshard, replicate, info, check}
 	app.Run(os.Args)
 }
