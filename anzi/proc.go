@@ -222,6 +222,7 @@ type Instance struct {
 
 	tconn net.Conn
 
+	lock sync.RWMutex
 	conn net.Conn
 	br   *bufio.Reader
 	bw   *bufio.Writer
@@ -250,12 +251,26 @@ func (inst *Instance) parsePSyncReply(data []byte) error {
 }
 
 // Sync is the process of sync data
-func (inst *Instance) Sync() (err error) {
+func (inst *Instance) Sync() {
 	defer inst.wg.Done()
 	log.Infof("tring to sync with remote instance %s", inst.Addr)
-
 	<-inst.barrierC
+
+	for {
+		err := inst.sync()
+		if err != nil {
+			log.Errorf("fail to syncing redis data due %s", err)
+		}
+		time.Sleep(time.Second * 30)
+	}
+}
+
+func (inst *Instance) sync() (err error) {
 	log.Infof("starting to sync with remote instance %s", inst.Addr)
+	defer inst.Close()
+
+	atomic.StoreInt64(&inst.offset, 0)
+
 	conn, err := net.Dial("tcp", inst.Addr)
 	if err != nil {
 		return err
@@ -263,7 +278,6 @@ func (inst *Instance) Sync() (err error) {
 	inst.conn = conn
 	inst.bw = bufio.NewWriter(conn)
 	inst.br = bufio.NewReader(conn)
-	defer inst.conn.Close()
 
 	// 1. barrier run syncRDB
 	// 1.1 send psync ? -1
@@ -305,21 +319,16 @@ func (inst *Instance) Sync() (err error) {
 
 func (inst *Instance) cmdForward() error {
 	log.Infof("start forwarding command from %s to %s", inst.Addr, inst.Target)
-	conn, err := net.Dial("tcp", inst.Target)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	inst.tconn = conn
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// go inst.downStream(&wg)
 	go func() {
 		defer wg.Done()
 		for {
-			_, err := io.Copy(ioutil.Discard, conn)
+			inst.lock.RLock()
+			_, err := io.Copy(ioutil.Discard, inst.tconn)
+			inst.lock.RUnlock()
 			if err != nil {
 				log.Infof("closed by upstream due %s", err)
 				return
@@ -329,11 +338,14 @@ func (inst *Instance) cmdForward() error {
 
 	go func() {
 		defer wg.Done()
-		defer inst.Close()
 
 		for {
+			inst.lock.RLock()
 			size, err := io.Copy(inst.tconn, inst.br)
+			inst.lock.RUnlock()
 			if err != nil {
+				time.Sleep(time.Millisecond * 500)
+				_ = inst.reconnectInstance()
 				return
 			}
 			atomic.AddInt64(&inst.offset, size)
@@ -341,6 +353,23 @@ func (inst *Instance) cmdForward() error {
 	}()
 
 	wg.Wait()
+	return nil
+}
+
+func (inst *Instance) reconnectInstance() error {
+	conn, err := net.Dial("tcp", inst.Addr)
+	if err != nil {
+		return err
+	}
+
+	inst.lock.Lock()
+	defer inst.lock.Unlock()
+	if inst.conn != nil {
+		inst.conn.Close()
+	}
+	inst.conn = conn
+	inst.br = bufio.NewReader(conn)
+	inst.bw = bufio.NewWriter(conn)
 	return nil
 }
 
@@ -377,18 +406,15 @@ func getStrLen(v int64) int {
 
 func (inst *Instance) replAck() {
 	log.Infof("repl ack for %s", inst.Addr)
-
 	ticker := time.NewTicker(time.Second)
 	for {
 		<-ticker.C
 		offset := atomic.LoadInt64(&inst.offset)
 		cmd := fmt.Sprintf(replConfAckCmdFormatter, getStrLen(offset), offset)
-		_, err := inst.bw.WriteString(cmd)
-		if err != nil {
-			log.Errorf("fail to send repl ack command, connection maybe closed soon")
-			return
-		}
-		err = inst.bw.Flush()
+		inst.lock.RLock()
+		_, _ = inst.bw.WriteString(cmd)
+		err := inst.bw.Flush()
+		inst.lock.RUnlock()
 		if err != nil {
 			log.Errorf("fail to send repl ack command, connection maybe closed soon")
 			return
@@ -400,7 +426,7 @@ func (inst *Instance) syncRDB(addr string) (err error) {
 	log.Infof("start syning rdb for %s", inst.Addr)
 	cb := NewProtocolCallbacker(addr)
 	rdb := NewRDB(inst.br, cb)
-	err = rdb.Sync()
+	inst.tconn, err = rdb.Sync()
 	return
 }
 

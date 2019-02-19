@@ -21,6 +21,32 @@ var (
 	BytesExpireAt = []byte("EXPIREAT")
 )
 
+// RDBCallback is the callback interface defined to call
+type RDBCallback interface {
+	SelectDB(dbnum uint64)
+	AuxField(key, data []byte)
+	ResizeDB(size, esize uint64)
+	EndOfRDB()
+
+	CmdSet(key, val []byte, expire uint64)
+	// List Command
+	CmdRPush(key, val []byte)
+	// Set
+	CmdSAdd(key, val []byte)
+
+	// ZSet
+	CmdZAdd(key []byte, score float64, val []byte)
+
+	// Hash
+	CmdHSet(key, field, value []byte)
+	CmdHSetInt(key, field []byte, value int64)
+
+	// Expire
+	ExpireAt(key []byte, expiry uint64)
+
+	GetConn() net.Conn
+}
+
 // NewProtocolCallbacker convert them as callback
 func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 	p := &ProtocolCallbacker{
@@ -50,6 +76,12 @@ func (r *ProtocolCallbacker) SelectDB(dbnum uint64) {
 	log.Infof("call [SELECT %d]", dbnum)
 }
 
+
+// GetConn returns connection for protocolcallbacker only
+func (r *ProtocolCallbacker) GetConn() net.Conn {
+	return r.conn
+}
+
 // AuxField impl Callback
 func (r *ProtocolCallbacker) AuxField(key, data []byte) {
 	log.Infof("get aux field %s = %s", strconv.Quote(string(key)), strconv.Quote(string(data)))
@@ -64,9 +96,6 @@ func (r *ProtocolCallbacker) ResizeDB(size, esize uint64) {
 func (r *ProtocolCallbacker) EndOfRDB() {
 	log.Infof("EndOfRDB...")
 	_ = r.bw.Flush()
-	if r.conn != nil {
-		_ = r.conn.Close()
-	}
 }
 
 // CmdSet impl Callback

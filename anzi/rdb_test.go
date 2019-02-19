@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -72,6 +73,10 @@ func (r *mockRDBCallback) EndOfRDB() {
 }
 func (r *mockRDBCallback) CmdSet(key, val []byte, expire uint64) {
 	r.Record(key, val, fmt.Sprintf("%d", expire))
+}
+
+func (r *mockRDBCallback) GetConn() net.Conn {
+	return nil
 }
 
 // List Command

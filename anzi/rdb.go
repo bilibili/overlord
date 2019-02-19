@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"overlord/pkg/log"
 	"strconv"
 )
@@ -59,36 +60,6 @@ const (
 	RDBModuleOpcodeString = 5
 )
 
-// RDBCallback is the callback interface defined to call
-type RDBCallback interface {
-	SelectDB(dbnum uint64)
-	AuxField(key, data []byte)
-	ResizeDB(size, esize uint64)
-	EndOfRDB()
-
-	CmdSet(key, val []byte, expire uint64)
-	// List Command
-	CmdRPush(key, val []byte)
-	// Set
-	CmdSAdd(key, val []byte)
-
-	// ZSet
-	CmdZAdd(key []byte, score float64, val []byte)
-
-	// Hash
-	CmdHSet(key, field, value []byte)
-	CmdHSetInt(key, field []byte, value int64)
-
-	// Expire
-	ExpireAt(key []byte, expiry uint64)
-}
-
-// CmdInfo is the struct for idle and freq info
-// type CmdInfo struct {
-// 	Idle uint64
-// 	Freq byte
-// }
-
 // NewRDB build new rdb from reader
 func NewRDB(rd *bufio.Reader, cb RDBCallback) *RDB {
 	r := &RDB{
@@ -114,8 +85,13 @@ type RDB struct {
 }
 
 // Sync create new process in parse data from rdb
-func (r *RDB) Sync() (err error){
-	return r.bgSyncProc()
+func (r *RDB) Sync() (conn net.Conn, err error) {
+	err = r.bgSyncProc()
+	if err != nil {
+		return
+	}
+	conn = r.cb.GetConn()
+	return
 }
 
 func (r *RDB) verifyHeader(hd []byte) error {
@@ -1067,14 +1043,14 @@ func (r *RDB) readStream() (err error) {
 	var (
 		entry1, entry2 uint64
 		cgroups        uint64
-		listpacks uint64
+		listpacks      uint64
 	)
 	listpacks, err = r.readLength()
 	if err != nil {
 		return
 	}
 
-	for i := uint64(0); i < listpacks; i ++ {
+	for i := uint64(0); i < listpacks; i++ {
 		_, err = r.readString()
 		if err != nil {
 			return
