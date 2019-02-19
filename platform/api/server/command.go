@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,8 +14,8 @@ func executeCommand(c *gin.Context) {
 	port := c.Param("port")
 
 	cmd := c.PostForm("command")
-
-	rcmd, err := svc.Execute(fmt.Sprintf("%s:%s", ip, port), cmd)
+	args := strings.Split(cmd, " ")
+	rcmd, err := svc.Execute(fmt.Sprintf("%s:%s", ip, port), args[0], args[1:]...)
 	if err != nil {
 		eJSON(c, err)
 		return

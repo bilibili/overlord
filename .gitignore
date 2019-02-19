@@ -22,4 +22,5 @@ cmd/scheduler/scheduler
 cmd/balancer/balancer
 cmd/apicli/apicli
 cmd/anzi/anzi
+cmd/enri/enri
 coverage.txt

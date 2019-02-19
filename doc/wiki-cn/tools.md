@@ -1,8 +1,9 @@
 # 工具列表
 
-## TODO 集群管理工具 - enri
+## 集群管理工具 - enri
 
 鉴于[ruskit](https://github.com/eleme/ruskit) 已经不再维护，我们决定重写这个管理工具。并添加一些诸如监控、报告、分析等更加自动化的功能。
+[enri使用](enri.md)
 
 ## redis数据导入导出工具 - Anzi
 
