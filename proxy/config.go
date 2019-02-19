@@ -2,12 +2,11 @@ package proxy
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"overlord/pkg/log"
 	"overlord/pkg/types"
-
-	"os"
 
 	"github.com/BurntSushi/toml"
 	"github.com/Pallinder/go-randomdata"
