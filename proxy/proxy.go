@@ -38,7 +38,6 @@ type Proxy struct {
 	closed bool
 }
 
-
 // New new a proxy by config.
 func New(c *Config) (p *Proxy, err error) {
 	if err = c.Validate(); err != nil {
