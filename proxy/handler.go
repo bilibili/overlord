@@ -37,7 +37,8 @@ type Handler struct {
 	p  *Proxy
 	cc *ClusterConfig
 
-	forwarder proto.Forwarder
+	// forwarder proto.Forwarder
+    cid int32
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -47,11 +48,11 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forwarder proto.Forwarder) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, id int32 ) (h *Handler) {
 	h = &Handler{
 		p:         p,
 		cc:        cc,
-		forwarder: forwarder,
+		cid: id,
 	}
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
@@ -83,7 +84,9 @@ func (h *Handler) handle() {
 		msgs     []*proto.Message
 		wg       = &sync.WaitGroup{}
 		err      error
+        prev_f* proto.Forwarder;
 	)
+    prev_f = nil
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
 	for {
 		// 1. read until limit or error
@@ -92,7 +95,13 @@ func (h *Handler) handle() {
 			return
 		}
 		// 2. send to cluster
-		h.forwarder.Forward(msgs)
+        forwarder = p.GetForwarder(cid);
+        if (forwarder != prev_f && close_when_change) {
+            // TODO, close front connection when conf changed
+            h.deferHandle(messages, err)
+            return
+        }
+		forwarder.Forward(msgs)
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {

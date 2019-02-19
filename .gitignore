@@ -22,3 +22,4 @@ cmd/scheduler/scheduler
 cmd/balancer/balancer
 cmd/apicli/apicli
 coverage.txt
+go.sum

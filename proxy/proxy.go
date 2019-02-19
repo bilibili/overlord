@@ -30,6 +30,9 @@ type Proxy struct {
 	ccs []*ClusterConfig
 
 	forwarders map[string]proto.Forwarder
+	forwarders [1024]proto.Forwarder
+    id2index [100]int32
+    cur_id int32
 	once       sync.Once
 
 	conns int32
@@ -57,27 +60,36 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
+        cur_id = 0
+        for _, conf := range ccs {
+            forwarder := NewForwarder(conf)
+            p.forwarders[cur_id] = forwarder
+            p.id2cluster[cur_id] = cur_id
+            ++cur_id
+		}
 		for _, cc := range ccs {
 			p.serve(cc)
 		}
+        // Here, start a go routine to change content of a forwarder
+        // Also, we need to rember current conf for each forwarder
 	})
 }
 
-func (p *Proxy) serve(cc *ClusterConfig) {
-	forwarder := NewForwarder(cc)
-	p.lock.Lock()
-	p.forwarders[cc.Name] = forwarder
-	p.lock.Unlock()
+func (p *Proxy) serve(cc *ClusterConfig, id int32) {
+	// forwarder := NewForwarder(cc)
+	// p.lock.Lock()
+	// p.forwarders[cc.Name] = forwarder
+	// p.lock.Unlock()
 	// listen
 	l, err := Listen(cc.ListenProto, cc.ListenAddr)
 	if err != nil {
 		panic(err)
 	}
 	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", cc.Name, cc.ListenAddr)
-	go p.accept(cc, l, forwarder)
+	go p.accept(cc, l, id)
 }
 
-func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwarder) {
+func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, cid int32) {
 	for {
 		if p.closed {
 			log.Infof("overlord proxy cluster[%s] addr(%s) stop listen", cc.Name, cc.ListenAddr)
@@ -117,7 +129,7 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwar
 			}
 		}
 		atomic.AddInt32(&p.conns, 1)
-		NewHandler(p, cc, conn, forwarder).Handle()
+		NewHandler(p, cc, conn, cid).Handle()
 	}
 }
 
@@ -133,4 +145,18 @@ func (p *Proxy) Close() error {
 	}
 	p.closed = true
 	return nil
+}
+
+// Close close proxy resource.
+func (p *Proxy) GetForwarder(cid int32) (proto.Forwarder) {
+    index = p.id2index[cid]
+    f = p.forwarders[index]
+    return f
+}
+
+func (p* Proxy) processConfChange(confs []*ClusterConfig) {
+    for _, conf := range confs {
+        // identify which cluser has changed 
+        forwarder := NewForwarder(conf)
+    }
 }
