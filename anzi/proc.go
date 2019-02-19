@@ -4,20 +4,20 @@ package anzi
 import (
 	"bufio"
 	"bytes"
-	"sync"
-	"sync/atomic"
-	"time"
-
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"overlord/pkg/conv"
 	"overlord/pkg/log"
 	"overlord/pkg/types"
 	"overlord/proxy"
-	"strconv"
-	"strings"
 )
 
 const (

@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"overlord/pkg/log"
 	"strconv"
+
+	"overlord/pkg/log"
 )
 
 // define useful command
@@ -75,7 +76,6 @@ type ProtocolCallbacker struct {
 func (r *ProtocolCallbacker) SelectDB(dbnum uint64) {
 	log.Infof("call [SELECT %d]", dbnum)
 }
-
 
 // GetConn returns connection for protocolcallbacker only
 func (r *ProtocolCallbacker) GetConn() net.Conn {

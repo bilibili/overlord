@@ -1,6 +1,6 @@
-// COPY from https://github.com/vrischmann/rdbtools/blob/master/lzf.go
 package anzi
 
+// COPY from https://github.com/vrischmann/rdbtools/blob/master/lzf.go
 func lzfDecompress(data []byte, ulen int64) []byte {
 	output := make([]byte, ulen)
 

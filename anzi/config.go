@@ -1,9 +1,10 @@
 package anzi
 
 import (
+	"runtime"
+
 	"overlord/pkg/log"
 	"overlord/proxy"
-	"runtime"
 )
 
 // Config is the struct which used by cmd/anzi
