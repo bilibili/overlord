@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"overlord/platform/chunk"
 	"overlord/pkg/log"
+	"overlord/platform/chunk"
 	"strconv"
 	"strings"
 )
@@ -54,7 +54,7 @@ func (c *Client) Close() error {
 // Info get the info of client
 func (c *Client) Info(node string) (map[string]string, error) {
 	n := c.cluster.getNode(node)
-	cmd, err := n.execute("INFO ALL")
+	cmd, err := n.execute(NewCmd("INFO").Arg("ALL"))
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (c *Client) Info(node string) (map[string]string, error) {
 }
 
 // Execute will trying to execute command to the given node.
-func (c *Client) Execute(node, command string) (*Command, error) {
+func (c *Client) Execute(node string, command *Command) (*Command, error) {
 	n := c.cluster.getNode(node)
 	if n == nil {
 		return nil, ErrNoNode
@@ -95,7 +95,7 @@ func (c *Client) IsConsistent() (bool, error) {
 	for _, cc := range c.chunks {
 		for _, n := range cc.Nodes {
 			node := c.cluster.getNode(n.Addr())
-			command, err := node.execute("CLUSTER NODES")
+			command, err := node.execute(NewCmd("CLUSTER").Arg("NODES"))
 			if err != nil {
 				return false, err
 			}
@@ -129,7 +129,7 @@ func (c *Client) BumpEpoch() error {
 	for _, cc := range c.chunks {
 		for _, node := range cc.Nodes {
 			role := chunk.RoleMaster
-			cmd, err := c.Execute(node.Addr(), "INFO REPLICATION")
+			cmd, err := c.Execute(node.Addr(), NewCmd("INFO").Arg("REPLICATION"))
 			if err != nil {
 				return err
 			}
@@ -143,9 +143,8 @@ func (c *Client) BumpEpoch() error {
 					break
 				}
 			}
-
 			if role == chunk.RoleMaster {
-				_, err := c.Execute(node.Addr(), "CLUSTER BUMPEPOCH")
+				_, err := c.Execute(node.Addr(), NewCmd("CLUSTER").Arg("BUMPEPOCH"))
 				if err != nil {
 					return err
 				}
@@ -163,7 +162,7 @@ func (c *Client) IsBalanced() (bool, error) {
 				continue
 			}
 
-			cmd, err := c.Execute(node.Addr(), "INFO REPLICATION")
+			cmd, err := c.Execute(node.Addr(), NewCmd("INFO").Arg("REPLICATION"))
 			if err != nil {
 				return false, err
 			}
@@ -188,7 +187,7 @@ func (c *Client) TryBalance() error {
 				continue
 			}
 
-			cmd, err := c.Execute(node.Addr(), "CLUSTER FAILOVER FORCE")
+			cmd, err := c.Execute(node.Addr(), NewCmd("CLUSTER").Arg("FAILOVER").Arg("force"))
 			if err != nil {
 				return err
 			}
@@ -220,12 +219,22 @@ func NewConn(addr string) *Conn {
 
 // Ping will execute ping command
 func (c *Conn) Ping() (err error) {
-	_, err = c.conn.execute("ping")
+	_, err = c.conn.execute(NewCmd("PING"))
 	if err != nil {
 		c.conn.Close()
 		c.conn = newNode(c.addr)
 	}
 	return
+}
+
+func (c *Conn) Exec(cmd *Command) (resp *Resp, err error) {
+	cmdResp, err := c.conn.execute(cmd)
+	if err != nil {
+		c.conn.Close()
+		c.conn = newNode(c.addr)
+		return
+	}
+	return cmdResp.Reply, nil
 }
 
 // Close will close the given connection
@@ -275,12 +284,10 @@ func (n *node) Close() error {
 	return n.conn.Close()
 }
 
-func (n *node) execute(command string) (*Command, error) {
+func (n *node) execute(cmd *Command) (*Command, error) {
 	if n.err != nil {
 		return nil, n.err
 	}
-
-	cmd := NewCmd(command)
 	n.err = cmd.execute(n)
 	return cmd, n.err
 }
