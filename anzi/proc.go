@@ -1,6 +1,5 @@
 package anzi
 
-// import "overlord/proxy/proto"
 import (
 	"bufio"
 	"bytes"
@@ -305,7 +304,7 @@ func (inst *Instance) sync() (err error) {
 		return
 	}
 
-	// 2. parsed rdb done then send notify to barier chan
+	// 2. parsed rdb done then send notify to barrier chan
 	select {
 	case inst.barrierC <- struct{}{}:
 	default:
@@ -372,6 +371,46 @@ func (inst *Instance) reconnectInstance() error {
 	inst.bw = bufio.NewWriter(conn)
 	return nil
 }
+func (inst *Instance) replAck() {
+	log.Infof("repl ack for %s", inst.Addr)
+	ticker := time.NewTicker(time.Second)
+	for {
+		inst.replAckConf()
+		<-ticker.C
+	}
+}
+
+func (inst *Instance) replAckConf() {
+	offset := atomic.LoadInt64(&inst.offset)
+	cmd := fmt.Sprintf(replConfAckCmdFormatter, getStrLen(offset), offset)
+	inst.lock.RLock()
+	_, _ = inst.bw.WriteString(cmd)
+	err := inst.bw.Flush()
+	inst.lock.RUnlock()
+	if err != nil {
+		log.Errorf("fail to send repl ack command, connection maybe closed soon")
+		return
+	}
+}
+
+func (inst *Instance) syncRDB(addr string) (err error) {
+	log.Infof("start syning rdb for %s", inst.Addr)
+	cb := NewProtocolCallbacker(addr)
+	rdb := NewRDB(inst.br, cb)
+	inst.tconn, err = rdb.Sync()
+	return
+}
+
+// Close the up and down stream
+func (inst *Instance) Close() {
+	if inst.conn != nil {
+		inst.conn.Close()
+	}
+	if inst.tconn != nil {
+		inst.tconn.Close()
+	}
+	return
+}
 
 func writeAll(buf []byte, w io.Writer) error {
 	left := len(buf)
@@ -402,41 +441,4 @@ func getStrLen(v int64) int {
 		v = v / 1000
 		rv += 3
 	}
-}
-
-func (inst *Instance) replAck() {
-	log.Infof("repl ack for %s", inst.Addr)
-	ticker := time.NewTicker(time.Second)
-	for {
-		<-ticker.C
-		offset := atomic.LoadInt64(&inst.offset)
-		cmd := fmt.Sprintf(replConfAckCmdFormatter, getStrLen(offset), offset)
-		inst.lock.RLock()
-		_, _ = inst.bw.WriteString(cmd)
-		err := inst.bw.Flush()
-		inst.lock.RUnlock()
-		if err != nil {
-			log.Errorf("fail to send repl ack command, connection maybe closed soon")
-			return
-		}
-	}
-}
-
-func (inst *Instance) syncRDB(addr string) (err error) {
-	log.Infof("start syning rdb for %s", inst.Addr)
-	cb := NewProtocolCallbacker(addr)
-	rdb := NewRDB(inst.br, cb)
-	inst.tconn, err = rdb.Sync()
-	return
-}
-
-// Close the up and down stream
-func (inst *Instance) Close() {
-	if inst.conn != nil {
-		inst.conn.Close()
-	}
-	if inst.tconn != nil {
-		inst.tconn.Close()
-	}
-	return
 }
