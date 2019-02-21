@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"sort"
 
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
@@ -23,16 +24,18 @@ import (
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
 )
+const MaxClusterCnt int32 = 128
+const MonitorCfgIntervalSecs int32 = 50  // Time interval to monitor config change
 
 // Proxy is proxy.
 type Proxy struct {
 	c   *Config
-	ccs []*ClusterConfig
+    ClusterConfFile string  // cluster configure file name
+	ccs [MaxClusterCnt]*ClusterConfig
 
-	forwarders map[string]proto.Forwarder
-	forwarders [1024]proto.Forwarder
-    id2index [100]int32
-    cur_id int32
+	forwarders [MaxClusterCnt]proto.Forwarder
+    // current cluster count
+    curClusterCnt int32
 	once       sync.Once
 
 	conns int32
@@ -55,44 +58,40 @@ func New(c *Config) (p *Proxy, err error) {
 // Serve is the main accept() loop of a server.
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
-		p.ccs = ccs
-		p.forwarders = map[string]proto.Forwarder{}
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
-        cur_id = 0
+        p.curClusterCnt = 0
         for _, conf := range ccs {
+            var clusterID = p.curClusterCnt
             forwarder := NewForwarder(conf)
-            p.forwarders[cur_id] = forwarder
-            p.id2cluster[cur_id] = cur_id
-            ++cur_id
-		}
-		for _, cc := range ccs {
-			p.serve(cc)
+            conf.ID = clusterID
+            p.forwarders[clusterID] = forwarder
+            p.ccs[clusterID] = conf
+			p.serve(clusterID)
+            p.curClusterCnt++
 		}
         // Here, start a go routine to change content of a forwarder
-        // Also, we need to rember current conf for each forwarder
+        go p.monitorConfChange()
 	})
 }
 
-func (p *Proxy) serve(cc *ClusterConfig, id int32) {
-	// forwarder := NewForwarder(cc)
-	// p.lock.Lock()
-	// p.forwarders[cc.Name] = forwarder
-	// p.lock.Unlock()
+func (p *Proxy) serve(cid int32) {
 	// listen
-	l, err := Listen(cc.ListenProto, cc.ListenAddr)
+    var conf = p.getClusterConf(cid)
+	l, err := Listen(conf.ListenProto, conf.ListenAddr)
 	if err != nil {
 		panic(err)
 	}
-	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", cc.Name, cc.ListenAddr)
-	go p.accept(cc, l, id)
+	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", conf.Name, conf.ListenAddr)
+	go p.accept(cid, l)
 }
 
-func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, cid int32) {
+func (p *Proxy) accept(cid int32, l net.Listener) {
 	for {
+        var conf = p.getClusterConf(cid)
 		if p.closed {
-			log.Infof("overlord proxy cluster[%s] addr(%s) stop listen", cc.Name, cc.ListenAddr)
+			log.Infof("overlord proxy cluster[%s] addr(%s) stop listen", conf.Name, conf.ListenAddr)
 			return
 		}
 		conn, err := l.Accept()
@@ -100,14 +99,14 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, cid int32) {
 			if conn != nil {
 				_ = conn.Close()
 			}
-			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", cc.Name, cc.ListenAddr, err)
+			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", conf.Name, conf.ListenAddr, err)
 			continue
 		}
 		if p.c.Proxy.MaxConnections > 0 {
 			if conns := atomic.LoadInt32(&p.conns); conns > p.c.Proxy.MaxConnections {
 				// cache type
 				var encoder proto.ProxyConn
-				switch cc.CacheType {
+				switch conf.CacheType {
 				case types.CacheTypeMemcache:
 					encoder = memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case types.CacheTypeMemcacheBinary:
@@ -115,10 +114,11 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, cid int32) {
 				case types.CacheTypeRedis:
 					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case types.CacheTypeRedisCluster:
-					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), nil)
+					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				}
 				if encoder != nil {
-					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns))
+                    var f = p.GetForwarder(cid)
+					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns), f)
 					_ = encoder.Flush()
 				}
 				_ = conn.Close()
@@ -129,7 +129,7 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, cid int32) {
 			}
 		}
 		atomic.AddInt32(&p.conns, 1)
-		NewHandler(p, cc, conn, cid).Handle()
+		NewHandler(p, conf, conn).Handle()
 	}
 }
 
@@ -147,16 +147,128 @@ func (p *Proxy) Close() error {
 	return nil
 }
 
-// Close close proxy resource.
+// Get forwarder from proxy, thread safe
 func (p *Proxy) GetForwarder(cid int32) (proto.Forwarder) {
-    index = p.id2index[cid]
-    f = p.forwarders[index]
+    var f = p.forwarders[cid]
     return f
 }
 
-func (p* Proxy) processConfChange(confs []*ClusterConfig) {
-    for _, conf := range confs {
-        // identify which cluser has changed 
-        forwarder := NewForwarder(conf)
+// Get forwarder from proxy, thread safe
+func (p *Proxy) getClusterConf(cid int32) (*ClusterConfig) {
+    var c = p.ccs[cid]
+    return c
+}
+
+func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newAdd []*ClusterConfig) {
+    for _, newConf := range newConfs {
+        var find = false
+        var diff = false
+        var oldConf *ClusterConfig = nil;
+        var valid = true
+        for _, conf := range oldConfs {
+            if (newConf.Name != conf.Name) {
+                continue
+            }
+            find = true
+            diff, valid = compareConf(conf, newConf)
+            if !valid {
+                log.Errorf("configure change of cluster(%s) is invalid", newConf.Name)
+                break
+            }
+            if diff {
+                oldConf = conf
+            }
+            break
+        }
+        if !find {
+            newAdd = append(newAdd, newConf)
+            continue
+        }
+        if (!valid) || (find && !diff) {
+            continue
+        }
+        newConf.ID = oldConf.ID
+        changed = append(changed, newConf)
+        continue
     }
+    return changed, newAdd
+}
+
+func (p* Proxy) monitorConfChange() {
+    for {
+        time.Sleep(5 * time.Second)
+        var succ, _, newConfs = LoadClusterConf(p.ClusterConfFile)
+        if (!succ) {
+            continue
+        }
+        var oldConfs []*ClusterConfig;
+        for i := int32(0); i < p.curClusterCnt; i++ {
+            var conf = p.ccs[i]
+            oldConfs = append(oldConfs, conf)
+        }
+        var newAdd []*ClusterConfig;
+        var changedConf []*ClusterConfig;
+        changedConf, newAdd = p.parseChanged(newConfs, oldConfs)
+
+        var clusterCnt = p.curClusterCnt + int32(len(newAdd))
+
+        if (clusterCnt >= MaxClusterCnt) {
+            log.Errorf("failed to reload conf as too much cluster will be added, new cluster count(%d) and max count(%d)",
+                clusterCnt, MaxClusterCnt)
+            continue
+        }
+        for _, conf := range changedConf {
+            // use new forwarder now
+            var forwarder = NewForwarder(conf)
+            var prevForwarder = p.forwarders[conf.ID]
+            p.forwarders[conf.ID] = forwarder
+            prevForwarder.Close()
+            p.ccs[conf.ID] = conf
+            log.Infof("conf of cluster(%s:%d) is changed", conf.Name, conf.ID)
+        }
+        for _, conf := range newAdd {
+            var forwarder = NewForwarder(conf)
+            conf.ID = p.curClusterCnt
+            p.forwarders[conf.ID] = forwarder
+            p.ccs[conf.ID] = conf
+            p.serve(p.curClusterCnt)
+            p.curClusterCnt++
+            log.Infof("Add new cluster(%s:%d)", conf.Name, conf.ID)
+        }
+    }
+}
+
+func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
+    valid = (oldConf.ListenAddr == newConf.ListenAddr)
+    if ((oldConf.HashMethod != newConf.HashMethod) ||
+            (oldConf.HashDistribution != newConf.HashDistribution) ||
+            (oldConf.HashTag != newConf.HashTag) ||
+            (oldConf.CacheType != newConf.CacheType) ||
+            (oldConf.ListenProto != newConf.ListenProto) ||
+            (oldConf.RedisAuth != newConf.RedisAuth) ||
+            (oldConf.DialTimeout != newConf.DialTimeout) ||
+            (oldConf.ReadTimeout != newConf.ReadTimeout) ||
+            (oldConf.WriteTimeout != newConf.WriteTimeout) ||
+            (oldConf.NodeConnections != newConf.NodeConnections) ||
+            (oldConf.PingFailLimit != newConf.PingFailLimit) ||
+            (oldConf.PingAutoEject != newConf.PingAutoEject)) {
+        changed = true
+        return
+    }
+    if (len(oldConf.Servers) != len(newConf.Servers)) {
+        changed = true
+        return
+    }
+    var server1 = oldConf.Servers
+    var server2 = newConf.Servers
+    sort.Strings(server1)
+    sort.Strings(server2)
+    for i := 0; i < len(server1); i++ {
+        if (server1[i] != server2[i]) {
+            changed = true
+            return
+        }
+    }
+    changed = false
+    return
 }

@@ -23,13 +23,10 @@ const (
 var (
 	version  bool
 	check    bool
-	logFile  string
-	logVl    int
-	debug    bool
 	pprof    string
 	metrics  bool
-	config   string
-	clusters clustersFlag
+	confFile string
+	clusterConfFile string
 )
 
 type clustersFlag []string
@@ -54,8 +51,8 @@ func init() {
 	flag.BoolVar(&version, "v", false, "print version.")
 	flag.StringVar(&pprof, "pprof", "", "pprof listen addr. high priority than conf.pprof.")
 	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
-	flag.StringVar(&config, "conf", "", "run with the specific configuration.")
-	flag.Var(&clusters, "cluster", "specify cache cluster configuration.")
+	flag.StringVar(&confFile, "conf", "", "conf file of proxy itself.")
+	flag.StringVar(&clusterConfFile, "cluster", "", "conf file of backend cluster.")
 }
 
 func main() {
@@ -77,6 +74,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+    p.ClusterConfFile = clusterConfFile
 	defer p.Close()
 	p.Serve(ccs)
 	// pprof
@@ -93,9 +91,9 @@ func main() {
 }
 
 func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
-	if config != "" {
+	if confFile != "" {
 		c = &proxy.Config{}
-		if err := c.LoadFromFile(config); err != nil {
+		if err := c.LoadFromFile(confFile); err != nil {
 			panic(err)
 		}
 	} else {
@@ -108,30 +106,13 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 	if metrics {
 		c.Proxy.UseMetrics = metrics
 	}
-	if debug {
-		c.Debug = debug
-	}
-	if logFile != "" {
-		c.Log = logFile
-	}
-	if logVl > 0 {
-		c.LogVL = logVl
-	}
 	// high priority end
-	checks := map[string]struct{}{}
-	for _, cluster := range clusters {
-		cs := &proxy.ClusterConfigs{}
-		if err := cs.LoadFromFile(cluster); err != nil {
-			panic(err)
-		}
-		for _, cc := range cs.Clusters {
-			if _, ok := checks[cc.Name]; ok {
-				panic("the same cluster name cannot be repeated")
-			}
-			checks[cc.Name] = struct{}{}
-		}
-		ccs = append(ccs, cs.Clusters...)
-	}
+    var succ bool = false
+    var msg string
+    succ, msg, ccs = proxy.LoadClusterConf(clusterConfFile)
+    if (!succ) {
+        panic(msg)
+    }
 	return
 }
 

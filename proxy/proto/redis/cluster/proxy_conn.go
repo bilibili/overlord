@@ -25,18 +25,12 @@ var (
 )
 
 type proxyConn struct {
-	c  *cluster
 	pc proto.ProxyConn
 }
 
 // NewProxyConn creates new redis cluster Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn, fer proto.Forwarder) proto.ProxyConn {
-	var c *cluster
-	if fer != nil {
-		c = fer.(*cluster)
-	}
+func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
 	r := &proxyConn{
-		c:  c,
 		pc: redis.NewProxyConn(conn),
 	}
 	return r
@@ -46,24 +40,27 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	return pc.pc.Decode(msgs)
 }
 
-func (pc *proxyConn) Encode(m *proto.Message) (err error) {
+func (pc *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err error) {
 	if !m.IsBatch() {
 		req := m.Request().(*redis.Request)
 		if !req.IsSupport() && !req.IsCtl() {
 			resp := req.RESP()
 			arr := resp.Array()
 			if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
-				if len(arr) == 2 {
+				if len(arr) == 2 && forwarder != nil {
+                    var cls *cluster
+                    cls = forwarder.(*cluster)
+
 					// CLUSTER COMMANDS
 					conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
 					pcc := pc.pc.(*redis.ProxyConn)
 					if bytes.Equal(arr[1].Data(), cmdNodesBytes) {
 						// CLUSTER NODES
-						err = pcc.Bw().Write(pc.c.fakeNodesBytes)
+						err = pcc.Bw().Write(cls.fakeNodesBytes)
 						return
 					} else if bytes.Equal(arr[1].Data(), cmdSlotsBytes) {
 						// CLUSTER SLOTS
-						err = pcc.Bw().Write(pc.c.fakeSlotsBytes)
+						err = pcc.Bw().Write(cls.fakeSlotsBytes)
 						return
 					}
 					err = pcc.Bw().Write(notSupportBytes)
@@ -74,7 +71,7 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 			}
 		}
 	}
-	return pc.pc.Encode(m)
+	return pc.pc.Encode(m, forwarder)
 }
 
 func (pc *proxyConn) Flush() (err error) {

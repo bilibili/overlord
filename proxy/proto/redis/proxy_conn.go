@@ -158,7 +158,7 @@ func nextReq(m *proto.Message) *Request {
 	return r
 }
 
-func (pc *proxyConn) Encode(m *proto.Message) (err error) {
+func (pc *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err error) {
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
 		pc.bw.Write(respErrorBytes)

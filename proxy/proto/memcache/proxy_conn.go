@@ -340,7 +340,7 @@ func revSpacIdx(bs []byte) int {
 }
 
 // Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
+func (p *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err error) {
 	if me := m.Err(); me != nil {
 		se := errors.Cause(me).Error()
 		_ = p.bw.Write(serverErrorBytes)

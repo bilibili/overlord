@@ -142,7 +142,7 @@ func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 }
 
 // Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
+func (p *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err error) {
 	reqs := m.Requests()
 	for _, req := range reqs {
 		mcr, ok := req.(*MCRequest)

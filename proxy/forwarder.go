@@ -177,11 +177,20 @@ func (f defaultForwarder) trimHashTag(key []byte) []byte {
 }
 
 // pingSleepTime for unit test override!!!
-var pingSleepTime = func(t bool) time.Duration {
+var pingSleepTime = func(t bool) int32 {
 	if t {
-		return 5 * time.Minute
+		return 5 * 60
 	}
-	return time.Second
+	return 1
+}
+
+func (f defaultForwarder) sleep(timeInSec int32) {
+    for i := int32(0); i < timeInSec; i++ {
+        if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+            return
+        }
+        time.Sleep(time.Second)
+    }
 }
 
 func (f defaultForwarder) processPing(p *pinger) {
@@ -191,6 +200,10 @@ func (f defaultForwarder) processPing(p *pinger) {
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
+        if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+            log.Info("forwarder is close, no need to ping anymore")
+            return
+        }
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0
@@ -201,7 +214,7 @@ func (f defaultForwarder) processPing(p *pinger) {
 					log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
 				}
 			}
-			time.Sleep(pingSleepTime(false))
+			f.sleep(pingSleepTime(false))
 			continue
 		} else {
 			_ = p.ping.Close()
@@ -213,7 +226,7 @@ func (f defaultForwarder) processPing(p *pinger) {
 			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
 		}
 		if p.failure < f.cc.PingFailLimit {
-			time.Sleep(pingSleepTime(false))
+			f.sleep(pingSleepTime(false))
 			continue
 		}
 		if !del {
@@ -225,7 +238,7 @@ func (f defaultForwarder) processPing(p *pinger) {
 		} else if log.V(3) {
 			log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
 		}
-		time.Sleep(pingSleepTime(true))
+		f.sleep(pingSleepTime(true))
 	}
 }
 

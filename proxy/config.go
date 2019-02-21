@@ -53,6 +53,7 @@ func (c *Config) Validate() error {
 // ClusterConfig cluster config.
 type ClusterConfig struct {
 	Name             string
+    ID               int32           // ID is set in memory, not from conf file
 	HashMethod       string          `toml:"hash_method"`
 	HashDistribution string          `toml:"hash_distribution"`
 	HashTag          string          `toml:"hash_tag"`
@@ -66,6 +67,7 @@ type ClusterConfig struct {
 	NodeConnections  int32           `toml:"node_connections"`
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
+	CloseWhenChange  bool            `toml:"close_front_conn_when_conf_change"`
 	Servers          []string        `toml:"servers"`
 }
 
@@ -105,6 +107,29 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 	}
 	return nil
 }
+
+func LoadClusterConf(path string) (succ bool, msg string, ccs []*ClusterConfig) {
+	checks := map[string]struct{}{}
+    cs := &ClusterConfigs{}
+    if err := cs.LoadFromFile(path); err != nil {
+        succ = false
+        msg = "failed to load cluster conf file:" + path
+        return
+    }
+    for _, cc := range cs.Clusters {
+        if _, ok := checks[cc.Name]; ok {
+            succ = false
+            msg = "duplicate cluster name in cluster conf file:" + path
+            return
+        }
+        checks[cc.Name] = struct{}{}
+    }
+    succ = true
+    msg = ""
+    ccs = append(ccs, cs.Clusters...)
+    return
+}
+
 
 const defaultConfig = `
 ##################################################

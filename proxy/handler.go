@@ -35,10 +35,11 @@ var (
 // Handler handle conn.
 type Handler struct {
 	p  *Proxy
-	cc *ClusterConfig
-
-	// forwarder proto.Forwarder
-    cid int32
+    ClusterID int32
+    Name string
+	CacheType types.CacheType
+	ListenAddr string
+    closeWhenChange bool
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -48,15 +49,18 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, id int32 ) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn) (h *Handler) {
 	h = &Handler{
 		p:         p,
-		cc:        cc,
-		cid: id,
+		ClusterID: cc.ID,
+        Name:      cc.Name,
+        CacheType: cc.CacheType,
+        ListenAddr: cc.ListenAddr,
+        closeWhenChange: cc.CloseWhenChange,
 	}
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
-	switch cc.CacheType {
+	switch h.CacheType {
 	case types.CacheTypeMemcache:
 		h.pc = memcache.NewProxyConn(h.conn)
 	case types.CacheTypeMemcacheBinary:
@@ -64,11 +68,11 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, id int32 ) (h *Handl
 	case types.CacheTypeRedis:
 		h.pc = redis.NewProxyConn(h.conn)
 	case types.CacheTypeRedisCluster:
-		h.pc = rclstr.NewProxyConn(h.conn, forwarder)
+		h.pc = rclstr.NewProxyConn(h.conn)
 	default:
 		panic(types.ErrNoSupportCacheType)
 	}
-	prom.ConnIncr(cc.Name)
+	prom.ConnIncr(h.Name)
 	return
 }
 
@@ -84,9 +88,8 @@ func (h *Handler) handle() {
 		msgs     []*proto.Message
 		wg       = &sync.WaitGroup{}
 		err      error
-        prev_f* proto.Forwarder;
+        prevForwarder proto.Forwarder;
 	)
-    prev_f = nil
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
 	for {
 		// 1. read until limit or error
@@ -95,17 +98,20 @@ func (h *Handler) handle() {
 			return
 		}
 		// 2. send to cluster
-        forwarder = p.GetForwarder(cid);
-        if (forwarder != prev_f && close_when_change) {
+        var forwarder = h.p.GetForwarder(h.ClusterID);
+        if (prevForwarder != nil && forwarder != prevForwarder && h.closeWhenChange) {
             // TODO, close front connection when conf changed
             h.deferHandle(messages, err)
             return
         }
+        // TODO
+        // here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
 		forwarder.Forward(msgs)
+        prevForwarder = forwarder
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
-			if err = h.pc.Encode(msg); err != nil {
+			if err = h.pc.Encode(msg, forwarder); err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)
 				return
@@ -113,7 +119,7 @@ func (h *Handler) handle() {
 			msg.MarkEnd()
 			msg.ResetSubs()
 			if prom.On {
-				prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+				prom.ProxyTime(h.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
@@ -158,10 +164,10 @@ func (h *Handler) closeWithError(err error) {
 		_ = h.conn.Close()
 		atomic.AddInt32(&h.p.conns, -1) // NOTE: decr!!!
 		if prom.On {
-			prom.ConnDecr(h.cc.Name)
+			prom.ConnDecr(h.Name)
 		}
 		if log.V(2) && errors.Cause(err) != io.EOF {
-			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.cc.Name, h.cc.ListenAddr, h.conn.RemoteAddr(), err)
+			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.Name, h.ListenAddr, h.conn.RemoteAddr(), err)
 		}
 	}
 }
