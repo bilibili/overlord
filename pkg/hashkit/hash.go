@@ -50,6 +50,8 @@ func NewRing(des, method string) *HashRing {
 		hash = hashMurmur
 	case HashMethodJenkins:
 		hash = hashJenkins
+	default:
+		hash = hashFnv1a64
 	}
 	return newRingWithHash(hash)
 }
