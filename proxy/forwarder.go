@@ -201,7 +201,6 @@ func (f defaultForwarder) processPing(p *pinger) {
 			return
 		}
 
-		p.ping = newPingConn(p.cc, p.addr)
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0
