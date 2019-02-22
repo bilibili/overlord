@@ -12,14 +12,14 @@ import (
 )
 
 func TestPingerPingOk(t *testing.T) {
-	conn := libnet.NewConn(mockconn.CreateConn(pingBytes, 1), time.Second, time.Second)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 1), time.Second, time.Second)
 	p := NewPinger(conn)
 	err := p.Ping()
 	assert.NoError(t, err)
 }
 
 func TestPingerClosed(t *testing.T) {
-	conn := libnet.NewConn(mockconn.CreateConn(pingBytes, 10), time.Second, time.Second)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 10), time.Second, time.Second)
 	p := NewPinger(conn)
 	assert.NoError(t, p.Close())
 	err := p.Ping()

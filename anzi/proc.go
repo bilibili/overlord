@@ -136,17 +136,7 @@ func (m *MigrateProc) fetchClusterNodes(seed string) ([]string, error) {
 		return nil, err
 	}
 	defer conn.Close()
-
-	left := len(bytesClusterNodesCmd)
-	for left != 0 {
-		size, err := conn.Write(bytesClusterNodesCmd[len(bytesClusterNodesCmd)-left:])
-		if err != nil {
-			log.Errorf("fail to dial with target %s", err)
-			return nil, err
-		}
-		left -= size
-	}
-
+	writeAll(bytesClusterNodesCmd, conn)
 	br := bufio.NewReader(conn)
 	buf, err := br.ReadBytes(byteLF)
 	if err != nil {
@@ -199,16 +189,7 @@ func (m *MigrateProc) checkPing(buf []byte) error {
 		return err
 	}
 	defer conn.Close()
-
-	left := len(pingInlineCMD)
-	for left != 0 {
-		size, err := conn.Write(pingInlineCMD[len(pingInlineCMD)-left:])
-		if err != nil {
-			log.Errorf("fail to dial with target %s", err)
-			return err
-		}
-		left -= size
-	}
+	writeAll(pingInlineCMD, conn)
 
 	_, err = io.ReadFull(conn, buf)
 	return err
