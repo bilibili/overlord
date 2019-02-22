@@ -11,7 +11,7 @@ import (
 )
 
 func TestPingerPingOk(t *testing.T) {
-	conn := libnet.NewConn(mockconn.CreateConn(pingBytes, 1), time.Second, time.Second)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 1), time.Second, time.Second)
 	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
