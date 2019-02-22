@@ -23,7 +23,7 @@ anzi 支持的功能要点如下：
   * md5
   * crc16
   * crc32 (crc32 implementation compatible with libmemcached)
-  * crc32a (correct crc32 implementation as per the spec**
+  * crc32a (correct crc32 implementation as per the spec)
   * fnv1_64
   * fnv1a_64
   * fnv1_32
