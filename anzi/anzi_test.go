@@ -1,11 +1,16 @@
-package binary
+package anzi
 
 import (
 	"bytes"
+	"io"
 	"net"
+	"sync/atomic"
 	"time"
+)
 
-	libnet "overlord/pkg/net"
+const (
+	stateClosed  = 1
+	stateOpening = 0
 )
 
 type mockAddr string
@@ -24,9 +29,13 @@ type mockConn struct {
 	data   []byte
 	repeat int
 	err    error
+	closed int32
 }
 
 func (m *mockConn) Read(b []byte) (n int, err error) {
+	if atomic.LoadInt32(&m.closed) == stateClosed {
+		return 0, io.EOF
+	}
 	if m.err != nil {
 		err = m.err
 		return
@@ -37,7 +46,12 @@ func (m *mockConn) Read(b []byte) (n int, err error) {
 	}
 	return m.rbuf.Read(b)
 }
+
 func (m *mockConn) Write(b []byte) (n int, err error) {
+	if atomic.LoadInt32(&m.closed) == stateClosed {
+		return 0, io.EOF
+	}
+
 	if m.err != nil {
 		err = m.err
 		return
@@ -53,7 +67,10 @@ func (m *mockConn) writeBuffers(buf *net.Buffers) (int64, error) {
 	return buf.WriteTo(m.wbuf)
 }
 
-func (m *mockConn) Close() error         { return nil }
+func (m *mockConn) Close() error {
+	atomic.StoreInt32(&m.closed, stateClosed)
+	return nil
+}
 func (m *mockConn) LocalAddr() net.Addr  { return m.addr }
 func (m *mockConn) RemoteAddr() net.Addr { return m.addr }
 
@@ -62,11 +79,11 @@ func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
 func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // _createConn is useful tools for handler test
-func _createConn(data []byte) *libnet.Conn {
+func _createConn(data []byte) net.Conn {
 	return _createRepeatConn(data, 1)
 }
 
-func _createRepeatConn(data []byte, r int) *libnet.Conn {
+func _createRepeatConn(data []byte, r int) net.Conn {
 	mconn := &mockConn{
 		addr:   "127.0.0.1:12345",
 		rbuf:   bytes.NewBuffer(nil),
@@ -74,6 +91,14 @@ func _createRepeatConn(data []byte, r int) *libnet.Conn {
 		data:   data,
 		repeat: r,
 	}
-	conn := libnet.NewConn(mconn, time.Second, time.Second)
-	return conn
+	return mconn
+}
+
+func _createDownStreamConn() (net.Conn, *bytes.Buffer) {
+	buf := new(bytes.Buffer)
+	mconn := &mockConn{
+		addr: "127.0.0.1:12345",
+		wbuf: buf,
+	}
+	return mconn, buf
 }

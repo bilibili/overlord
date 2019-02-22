@@ -3,7 +3,10 @@ package redis
 import (
 	"errors"
 	"testing"
+	"time"
 
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +14,7 @@ import (
 
 func TestDecodeBasicOk(t *testing.T) {
 	data := "*2\r\n$3\r\nGET\r\n$4\r\nbaka\r\n"
-	conn := _createConn([]byte(data))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
 	pc := NewProxyConn(conn)
 
 	msgs := proto.GetMsgs(1)
@@ -32,7 +35,7 @@ func TestDecodeBasicOk(t *testing.T) {
 
 func TestDecodeComplexOk(t *testing.T) {
 	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
-	conn := _createConn([]byte(data))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
 	pc := NewProxyConn(conn)
 	// test reuse command
 	msgs := proto.GetMsgs(16)
@@ -150,7 +153,7 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 		arrayn: 2,
 	}
 	msg.WithRequest(req)
-	conn := _createConn([]byte(nil))
+	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 	pc := NewProxyConn(conn)
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
@@ -248,8 +251,8 @@ func TestEncodeMergeOk(t *testing.T) {
 			if msg.IsBatch() {
 				msg.Batch()
 			}
-			conn, buf := _createDownStreamConn()
-			pc := NewProxyConn(conn)
+			conn, buf := mockconn.CreateDownStreamConn()
+			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 			err := pc.Encode(msg)
 			if !assert.NoError(t, err) {
 				return
@@ -277,8 +280,8 @@ func TestEncodeWithError(t *testing.T) {
 	msg.WithError(mockErr)
 	msg.Done()
 
-	conn, buf := _createDownStreamConn()
-	pc := NewProxyConn(conn)
+	conn, buf := mockconn.CreateDownStreamConn()
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 	err := pc.Encode(msg)
 	assert.Error(t, err)
 	assert.Equal(t, mockErr, err)
@@ -309,8 +312,8 @@ func TestEncodeWithPing(t *testing.T) {
 	req.reply = &resp{}
 	msg.WithRequest(req)
 
-	conn, buf := _createDownStreamConn()
-	pc := NewProxyConn(conn)
+	conn, buf := mockconn.CreateDownStreamConn()
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
 	err = pc.Flush()

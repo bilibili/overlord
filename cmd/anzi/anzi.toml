@@ -1,0 +1,26 @@
+log_vl = 10
+log = ""
+debug = true
+stdout = true
+
+[migrate]
+max_rdb_concurrency = 10
+
+[[migrate.from]]
+cache_type = "redis_cluster"
+listen_addr = "0.0.0.0:27000"
+dial_timeout = 1000
+servers = [
+    "127.0.0.1:7000",
+    "127.0.0.1:7001",
+]
+
+[migrate.to]
+name = "simple-redis"
+hash_method = "fnv1a_64"
+hash_distribution = "ketama"
+hash_tag = "{}"
+cache_type = "redis"
+listen_proto = "tcp"
+listen_addr = "0.0.0.0:27001"
+servers = ["127.0.0.1:6379:1 redis-1"]
