@@ -2,8 +2,11 @@ package redis
 
 import (
 	"testing"
+	"time"
 
 	"overlord/pkg/bufio"
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -82,7 +85,7 @@ func TestRespDecode(t *testing.T) {
 	}
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn(tt.Bytes)
+			conn := libnet.NewConn(mockconn.CreateConn(tt.Bytes, 1), time.Second, time.Second)
 			r := &resp{}
 			r.reset()
 			br := bufio.NewReader(conn, bufio.Get(1024))
@@ -230,7 +233,7 @@ func TestRespEncode(t *testing.T) {
 	}
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn(nil)
+			conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 			bw := bufio.NewWriter(conn)
 
 			err := tt.Resp.encode(bw)
@@ -238,7 +241,7 @@ func TestRespEncode(t *testing.T) {
 			assert.Nil(t, err)
 
 			buf := make([]byte, 1024)
-			n, err := conn.Conn.(*mockConn).wbuf.Read(buf)
+			n, err := conn.Conn.(*mockconn.MockConn).Wbuf.Read(buf)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.Expect, buf[:n])
 		})
@@ -253,13 +256,13 @@ func TestRESPExportFunc(t *testing.T) {
 	assert.Equal(t, "abcde", string(r.Data()))
 	assert.Equal(t, respString, r.Type())
 	assert.Len(t, r.Array(), 0)
-
-	br := bufio.NewReader(_createConn([]byte("get a\r\n")), bufio.Get(1024))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte("get a\r\n"), 1), time.Second, time.Second)
+	br := bufio.NewReader(conn, bufio.Get(1024))
 	br.Read()
 	err := r.Decode(br)
 	assert.NoError(t, err)
-
-	bw := bufio.NewWriter(_createConn(nil))
+	conn = libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	bw := bufio.NewWriter(conn)
 	err = r.encode(bw)
 	assert.NoError(t, err)
 }

@@ -9,12 +9,16 @@ import (
 	"overlord/pkg/bufio"
 	"overlord/proxy/proto"
 
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
+
 	"github.com/pkg/errors"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func _createNodeConn(data []byte) *nodeConn {
-	conn := _createConn(data)
+	conn := libnet.NewConn(mockconn.CreateConn(data, 1), time.Second, time.Second)
 	nc := &nodeConn{
 		cluster: "clusterA",
 		addr:    "127.0.0.1:5000",
@@ -96,11 +100,11 @@ func TestNodeConnWriteOk(t *testing.T) {
 			err = nc.Flush()
 			assert.NoError(t, err)
 
-			m, ok := nc.conn.Conn.(*mockConn)
+			m, ok := nc.conn.Conn.(*mockconn.MockConn)
 			assert.True(t, ok)
 
 			buf := make([]byte, 1024)
-			size, err := m.wbuf.Read(buf)
+			size, err := m.Wbuf.Read(buf)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.except, buf[:size])
 		})

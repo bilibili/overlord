@@ -3,7 +3,10 @@ package binary
 import (
 	"errors"
 	"testing"
+	"time"
 
+	"overlord/pkg/mockconn"
+	libcon "overlord/pkg/net"
 	"overlord/proxy/proto"
 
 	"github.com/stretchr/testify/assert"
@@ -259,7 +262,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn(tt.Data)
+			conn := libcon.NewConn(mockconn.CreateConn(tt.Data, 1), time.Second, time.Second)
 			p := NewProxyConn(conn)
 			mlist := proto.GetMsgs(2)
 
@@ -282,7 +285,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 }
 
 func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
-	conn := _createConn([]byte(req))
+	conn := libcon.NewConn(mockconn.CreateConn([]byte(req), 1), time.Second, time.Second)
 	p := NewProxyConn(conn)
 	mlist := proto.GetMsgs(2)
 
@@ -339,15 +342,15 @@ func TestProxyConnEncodeOk(t *testing.T) {
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn(nil)
+			conn := libcon.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 			p := NewProxyConn(conn)
 			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
 			err := p.Encode(msg)
 			assert.NoError(t, err)
 			assert.NoError(t, p.Flush())
-			c := conn.Conn.(*mockConn)
+			c := conn.Conn.(*mockconn.MockConn)
 			buf := make([]byte, 1024)
-			size, err := c.wbuf.Read(buf)
+			size, err := c.Wbuf.Read(buf)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.Except, buf[:size])
 		})
@@ -355,7 +358,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 }
 
 func TestProxyConnEncodeErr(t *testing.T) {
-	conn := _createConn(nil)
+	conn := libcon.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 	p := NewProxyConn(conn)
 	msg := proto.NewMessage()
 	msg.WithRequest(&mockReq{})
@@ -368,8 +371,8 @@ func TestProxyConnEncodeErr(t *testing.T) {
 	err = p.Encode(msg)
 	assert.NoError(t, err)
 	p.Flush()
-	c := conn.Conn.(*mockConn)
+	c := conn.Conn.(*mockconn.MockConn)
 	buf := make([]byte, 1024)
-	c.wbuf.Read(buf)
+	c.Wbuf.Read(buf)
 	assert.Equal(t, resopnseStatusInternalErrBytes, buf[6:8])
 }

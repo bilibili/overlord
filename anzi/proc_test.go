@@ -8,6 +8,8 @@ import (
 	"bufio"
 	"bytes"
 
+	"overlord/pkg/mockconn"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,8 +54,8 @@ func TestWriteAllOk(t *testing.T) {
 }
 
 func TestCmdForwrad(t *testing.T) {
-	tconn := _createConn([]byte(longData))
-	conn := _createRepeatConn([]byte(longData), 10)
+	tconn := mockconn.CreateConn([]byte(longData), 1)
+	conn := mockconn.CreateConn([]byte(longData), 10)
 	inst := &Instance{
 		tconn: tconn,
 

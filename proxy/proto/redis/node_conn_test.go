@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"overlord/pkg/bufio"
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
 
 	"github.com/pkg/errors"
@@ -42,7 +44,8 @@ func TestNodeConnNewNodeConn(t *testing.T) {
 }
 
 func TestNodeConnClose(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 
 	err := nc.Close()
 	assert.NoError(t, err)
@@ -51,7 +54,8 @@ func TestNodeConnClose(t *testing.T) {
 }
 
 func TestNodeConnWriteOk(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte("iam test bytes 24 length"), 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 	msg := proto.NewMessage()
 	req := newRequest("GET", "AA")
 	msg.WithRequest(req)
@@ -76,7 +80,8 @@ func TestNodeConnWriteOk(t *testing.T) {
 }
 
 func TestNodeConnWriteBadAssert(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 	msg := proto.NewMessage()
 	msg.WithRequest(&mockCmd{})
 
@@ -86,10 +91,11 @@ func TestNodeConnWriteBadAssert(t *testing.T) {
 }
 
 func TestNodeConnWriteHasErr(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 	ncc := nc.(*nodeConn)
-	ec := _createConn(nil)
-	ec.Conn.(*mockConn).err = errors.New("write error")
+	ec := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	ec.Conn.(*mockconn.MockConn).Err = errors.New("write error")
 	ncc.bw = bufio.NewWriter(ec)
 	ncc.bw.Write([]byte("err"))
 	ncc.bw.Flush() // action err
@@ -106,7 +112,8 @@ func TestNodeConnWriteHasErr(t *testing.T) {
 
 func TestReadOk(t *testing.T) {
 	data := ":1\r\n"
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(data)))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 	msg := proto.NewMessage()
 	req := newRequest("GET", "a")
 	msg.WithRequest(req)
@@ -121,7 +128,7 @@ func TestReadOk(t *testing.T) {
 }
 
 func TestReadWithBadAssert(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
+	nc := newNodeConn("baka", "127.0.0.1:12345", libnet.NewConn(mockconn.CreateConn([]byte(":123\r\n"), 1), time.Second, time.Second))
 	msg := proto.NewMessage()
 	msg.WithRequest(&mockCmd{})
 	err := nc.Read(msg)
@@ -130,10 +137,10 @@ func TestReadWithBadAssert(t *testing.T) {
 }
 
 func TestReadHasErr(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn([]byte(":123\r\n")))
+	nc := newNodeConn("baka", "127.0.0.1:12345", libnet.NewConn(mockconn.CreateConn([]byte(":123\r\n"), 1), time.Second, time.Second))
 	ncc := nc.(*nodeConn)
-	ec := _createConn(nil)
-	ec.Conn.(*mockConn).err = errors.New("read error")
+	ec := libnet.NewConn(mockconn.CreateConn([]byte(":123\r\n"), 1), time.Second, time.Second)
+	ec.Conn.(*mockconn.MockConn).Err = errors.New("read error")
 	ncc.br = bufio.NewReader(ec, bufio.Get(128))
 	ncc.br.Read() // action err
 
@@ -147,7 +154,8 @@ func TestReadHasErr(t *testing.T) {
 }
 
 func TestReadWithEofError(t *testing.T) {
-	nc := newNodeConn("baka", "127.0.0.1:12345", _createConn(nil))
+	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	nc := newNodeConn("baka", "127.0.0.1:12345", conn)
 	msg := proto.NewMessage()
 	req := getReq()
 	req.mType = mergeTypeJoin
