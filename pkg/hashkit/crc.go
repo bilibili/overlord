@@ -54,7 +54,13 @@ func Crc16(key []byte) (crc uint16) {
 }
 
 func hashCrc16(key []byte) uint {
-	return uint(Crc16(key))
+	var crc uint32
+
+	for i := 0; i < len(key); i++ {
+		crc = (crc << 8) ^ uint32(crc16tab[(byte(crc>>8)^key[i])&0x00ff])
+	}
+
+	return uint(crc)
 }
 
 // ============================= CRC32 && CRC32a implementation ===========================================

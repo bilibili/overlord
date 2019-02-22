@@ -30,7 +30,6 @@ anzi 支持的功能要点如下：
   ** fnv1a_32
   ** hsieh
   ** murmur
-  ** jenkins
 * hash distribution 列表：ketama
 * 后端多连接支持
 * RDB不落盘，流式解析RDB

@@ -15,7 +15,6 @@ const (
 	HashMethodOneOnTime = "one_on_time"
 	HashMethodHsieh     = "hsieh"
 	HashMethodMurmur    = "murmur"
-	HashMethodJenkins   = "jenkins"
 )
 
 // NewRing will create new and need init method.
@@ -48,8 +47,6 @@ func NewRing(des, method string) *HashRing {
 		hash = hashHsieh
 	case HashMethodMurmur:
 		hash = hashMurmur
-	case HashMethodJenkins:
-		hash = hashJenkins
 	default:
 		hash = hashFnv1a64
 	}

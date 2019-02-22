@@ -27,7 +27,7 @@ func hashFnv164(key []byte) uint {
 		hash *= prime64
 		hash ^= uint64(c)
 	}
-	return uint(hash & 0x0000ffff)
+	return uint(uint32(hash))
 }
 
 func hashFnv1a32(key []byte) uint {
