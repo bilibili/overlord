@@ -17,8 +17,20 @@ anzi 支持的功能要点如下：
 
 * redis 高版本支持(^redis 5.0, RDB v9)
 * 多数据源支持: 多数据源中的 key 覆盖规则为随机覆盖
-* 多后端协议支持：目前支持后端为 `redis`(twemproxy模式)和 `redis_cluster`(redis_cluster) 模式。
-* hash method 支持列表: fnv1a64
+* 多后端协议支持：目前支持后端为 `redis`(twemproxy模式)和 `redis_cluster**(redis_cluster** 模式。
+* hash method 支持列表:
+  ** one_at_a_time
+  ** md5
+  ** crc16
+  ** crc32 (crc32 implementation compatible with libmemcached)
+  ** crc32a (correct crc32 implementation as per the spec**
+  ** fnv1_64
+  ** fnv1a_64
+  ** fnv1_32
+  ** fnv1a_32
+  ** hsieh
+  ** murmur
+  ** jenkins
 * hash distribution 列表：ketama
 * 后端多连接支持
 * RDB不落盘，流式解析RDB
