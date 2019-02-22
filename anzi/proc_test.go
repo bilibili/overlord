@@ -63,6 +63,7 @@ func TestCmdForwrad(t *testing.T) {
 		br:   bufio.NewReader(conn),
 		bw:   bufio.NewWriter(conn),
 	}
+
 	go inst.cmdForward()
 	time.Sleep(time.Millisecond * 10)
 	inst.Close()
