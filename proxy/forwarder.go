@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"runtime"
 
 	"overlord/pkg/conv"
 	"overlord/pkg/hashkit"
@@ -72,9 +73,18 @@ type defaultForwarder struct {
 	state int32
 }
 
+func deleteForwarder(f *defaultForwarder) {
+    log.Infof("start to delete default forwarder:%p for cluster:%d now", f, f.cc.ID)
+    for name, conn := range(f.nodePipe) {
+        log.Infof("close connection to node:%s for forwarder:%p when delete forwarder", name, f)
+        conn.Close()
+    }
+}
+
 // newDefaultForwarder must combinf.
 func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	f := &defaultForwarder{cc: cc}
+    log.Infof("create default forwarder:%p for cluster:%d", f, f.cc.ID)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
@@ -92,15 +102,18 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	} else {
 		f.ring.Init(addrs, ws)
 	}
+    log.Infof("try to create connection for cluster:%s now, node count:%d", cc.Name, len(addrs))
 	// start nbc
 	f.nodePipe = make(map[string]*proto.NodeConnPipe)
 	for _, addr := range addrs {
+        log.Infof("try to new connection to addr:%s", addr)
 		toAddr := addr // NOTE: avoid closure
 		f.nodePipe[toAddr] = proto.NewNodeConnPipe(cc.NodeConnections, func() proto.NodeConn {
 			return newNodeConn(cc, toAddr)
 		})
 	}
 	if cc.PingAutoEject {
+        log.Infof("try to create pinger for cluster:%s", cc.Name)
 		for idx, addr := range addrs {
 			p := &pinger{cc: cc, addr: addr, alias: addr, weight: ws[idx]}
 			if f.alias {
@@ -109,14 +122,15 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 			go f.processPing(p)
 		}
 	}
+    runtime.SetFinalizer(f, deleteForwarder)
 	return f
 }
 
 // Forward impl proto.Forwarder
 func (f defaultForwarder) Forward(msgs []*proto.Message) error {
-	if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
-		return ErrForwarderClosed
-	}
+	// if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+	//	return ErrForwarderClosed
+	// }
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
@@ -179,14 +193,15 @@ func (f defaultForwarder) trimHashTag(key []byte) []byte {
 // pingSleepTime for unit test override!!!
 var pingSleepTime = func(t bool) int32 {
 	if t {
-		return 5 * 60
+		return 10
 	}
 	return 1
 }
 
 func (f defaultForwarder) sleep(timeInSec int32) {
     for i := int32(0); i < timeInSec; i++ {
-        if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+        var closed = atomic.LoadInt32(&f.state)
+        if closed == forwarderStateClosed {
             return
         }
         time.Sleep(time.Second)
@@ -201,9 +216,11 @@ func (f defaultForwarder) processPing(p *pinger) {
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
         if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
-            log.Info("forwarder is close, no need to ping anymore")
+            _ = p.ping.Close()
+            log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
             return
         }
+        log.Infof("pinger of forwarder:%p try to ping backend", f)
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0

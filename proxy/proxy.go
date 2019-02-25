@@ -140,9 +140,9 @@ func (p *Proxy) Close() error {
 	if p.closed {
 		return nil
 	}
-	for _, forwarder := range p.forwarders {
-		forwarder.Close()
-	}
+    for i := 0; i < int(p.curClusterCnt); i++ {
+		p.forwarders[i].Close()
+    }
 	p.closed = true
 	return nil
 }
@@ -219,12 +219,13 @@ func (p* Proxy) monitorConfChange() {
         }
         for _, conf := range changedConf {
             // use new forwarder now
+            log.Infof("conf of cluster(%s:%d) is changed, start to process", conf.Name, conf.ID)
             var forwarder = NewForwarder(conf)
             var prevForwarder = p.forwarders[conf.ID]
             p.forwarders[conf.ID] = forwarder
+            log.Infof("start to close forwarder:%p", prevForwarder)
             prevForwarder.Close()
             p.ccs[conf.ID] = conf
-            log.Infof("conf of cluster(%s:%d) is changed", conf.Name, conf.ID)
         }
         for _, conf := range newAdd {
             var forwarder = NewForwarder(conf)

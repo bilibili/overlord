@@ -101,12 +101,20 @@ func (h *Handler) handle() {
         var forwarder = h.p.GetForwarder(h.ClusterID);
         if (prevForwarder != nil && forwarder != prevForwarder && h.closeWhenChange) {
             // TODO, close front connection when conf changed
+            log.Infof("cluster:%d is changed, need to close connection with client", h.ClusterID)
             h.deferHandle(messages, err)
             return
+        } else if (prevForwarder != nil && prevForwarder != forwarder) {
+            log.Infof("cluster:%d is changed, just use new cluster", h.ClusterID)
         }
         // TODO
         // here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
-		forwarder.Forward(msgs)
+		var err = forwarder.Forward(msgs)
+        if (err != nil) {
+            log.Warnf("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
+            h.deferHandle(messages, err)
+            return
+        }
         prevForwarder = forwarder
 		wg.Wait()
 		// 3. encode
