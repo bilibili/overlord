@@ -74,6 +74,18 @@ type ClusterConfig struct {
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
+    if (cc.HashMethod != "fnv1a_64") {
+        return errors.New("hash method:" + cc.HashMethod + " is not support")
+    }
+    if (cc.HashDistribution  != "ketama") {
+        return errors.New("hash distribution:" + cc.HashDistribution + " is not support")
+    }
+    if (cc.CacheType != types.CacheTypeMemcache && cc.CacheType != types.CacheTypeMemcacheBinary && cc.CacheType != types.CacheTypeRedis && cc.CacheType != types.CacheTypeRedisCluster) {
+        return errors.New("back end cache type is not support")
+    }
+    if (cc.ListenProto != "tcp" && cc.ListenProto != "unix") {
+        return errors.New("listen proto:" + cc.ListenProto + " is not support")
+    }
 	return nil
 }
 
@@ -92,6 +104,7 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		if err = cc.Validate(); err != nil {
 			return err
 		}
+        cc.CloseWhenChange = false
 		if cc.CacheType == types.CacheTypeRedisCluster {
 			servers := make([]string, len(cc.Servers))
 			for i, server := range cc.Servers {
@@ -119,10 +132,23 @@ func LoadClusterConf(path string) (succ bool, msg string, ccs []*ClusterConfig) 
     for _, cc := range cs.Clusters {
         if _, ok := checks[cc.Name]; ok {
             succ = false
-            msg = "duplicate cluster name in cluster conf file:" + path
+            msg = "duplicate cluster name:" + cc.Name + " in cluster conf file."
             return
         }
         checks[cc.Name] = struct{}{}
+        var ipPort = strings.Split(cc.ListenAddr, ":")
+        if len(ipPort) != 2 {
+            succ = false
+            msg = "invalid listen address:" + cc.ListenAddr + " in cluster conf file."
+            return
+        }
+        var port = ipPort[1]
+        if _, ok := checks[port]; ok {
+            succ = false
+            msg = "duplicate listen address:" + cc.ListenAddr + " in cluster conf file."
+            return
+        }
+        checks[port] = struct{}{}
     }
     succ = true
     msg = ""
