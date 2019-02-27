@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"io"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,7 +48,7 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn) (h *Handler) {
+func NewHandler(p *Proxy, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
 	h = &Handler{
 		p:         p,
 		ClusterID: cc.ID,
@@ -57,8 +56,8 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn) (h *Handler) {
         CacheType: cc.CacheType,
         ListenAddr: cc.ListenAddr,
         closeWhenChange: cc.CloseWhenChange,
+        conn: client,
 	}
-	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
 	// cache type
 	switch h.CacheType {
 	case types.CacheTypeMemcache:
@@ -88,40 +87,46 @@ func (h *Handler) handle() {
 		msgs     []*proto.Message
 		wg       = &sync.WaitGroup{}
 		err      error
-        prevForwarder proto.Forwarder;
+        forwarder proto.Forwarder;
 	)
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
+    log.Infof("handler try to get forwarder for cluster:%d\n", h.ClusterID)
+    forwarder = h.p.GetForwarder(h.ClusterID);
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
+            log.Warnf("conn:%d failed to decode message", h.conn.ID)
 			h.deferHandle(messages, err)
+            forwarder.Release()
 			return
 		}
-		// 2. send to cluster
-        var forwarder = h.p.GetForwarder(h.ClusterID);
-        if (prevForwarder != nil && forwarder != prevForwarder && h.closeWhenChange) {
-            // TODO, close front connection when conf changed
-            log.Infof("cluster:%d is changed, need to close connection with client", h.ClusterID)
-            h.deferHandle(messages, err)
-            return
-        } else if (prevForwarder != nil && prevForwarder != forwarder) {
+        var fState = forwarder.State()
+        if (ForwarderStateClosed == fState) {
+            forwarder.Release()
+            if (h.closeWhenChange) {
+                log.Infof("cluster:%d is changed, need to close connection with client", h.ClusterID)
+                h.deferHandle(messages, err)
+                return
+            }
             log.Infof("cluster:%d is changed, just use new cluster", h.ClusterID)
+            forwarder = h.p.GetForwarder(h.ClusterID)
         }
-        // TODO
         // here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
 		var err = forwarder.Forward(msgs)
         if (err != nil) {
             log.Warnf("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
             h.deferHandle(messages, err)
+            forwarder.Release()
             return
         }
-        prevForwarder = forwarder
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
 			if err = h.pc.Encode(msg, forwarder); err != nil {
 				h.pc.Flush()
+                log.Warnf("failed to encode message, close front connection now")
 				h.deferHandle(messages, err)
+                forwarder.Release()
 				return
 			}
 			msg.MarkEnd()
@@ -131,7 +136,9 @@ func (h *Handler) handle() {
 			}
 		}
 		if err = h.pc.Flush(); err != nil {
+            log.Warnf("failed to flush message, close front connection now")
 			h.deferHandle(messages, err)
+            forwarder.Release()
 			return
 		}
 		// 4. release resource
@@ -161,6 +168,7 @@ func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, 
 }
 
 func (h *Handler) deferHandle(msgs []*proto.Message, err error) {
+    h.p.RemoveConnection(h.ClusterID, h.conn.ID)
 	proto.PutMsgs(msgs)
 	h.closeWithError(err)
 	return

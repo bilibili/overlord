@@ -33,4 +33,8 @@ type Pinger interface {
 type Forwarder interface {
 	Forward([]*Message) error
 	Close() error
+    AddRef() int32
+    Release()
+    State() int32
+    ID() int32
 }

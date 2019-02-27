@@ -54,6 +54,7 @@ func (c *Config) Validate() error {
 type ClusterConfig struct {
 	Name             string
     ID               int32           // ID is set in memory, not from conf file
+    SN               int32           // SN is set in memory, not from conf file
 	HashMethod       string          `toml:"hash_method"`
 	HashDistribution string          `toml:"hash_distribution"`
 	HashTag          string          `toml:"hash_tag"`

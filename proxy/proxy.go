@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"runtime"
 	"sort"
 
 	"overlord/pkg/log"
@@ -23,18 +24,24 @@ import (
 // proxy errors
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
+    gClusterSn int32 = 0
 )
 const MaxClusterCnt int32 = 128
 const MonitorCfgIntervalSecs int32 = 50  // Time interval to monitor config change
+
+type Cluster struct {
+    conf *ClusterConfig
+    mutex sync.Mutex
+    clientConns map[int64]*libnet.Conn
+    forwarder proto.Forwarder
+}
 
 // Proxy is proxy.
 type Proxy struct {
 	c   *Config
     ClusterConfFile string  // cluster configure file name
-	ccs [MaxClusterCnt]*ClusterConfig
 
-	forwarders [MaxClusterCnt]proto.Forwarder
-    // current cluster count
+    clusters [MaxClusterCnt]*Cluster
     curClusterCnt int32
 	once       sync.Once
 
@@ -55,6 +62,11 @@ func New(c *Config) (p *Proxy, err error) {
 	return
 }
 
+func genClusterSn() int32 {
+    var id = atomic.AddInt32(&gClusterSn, 1)
+    return id
+}
+
 // Serve is the main accept() loop of a server.
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.once.Do(func() {
@@ -63,17 +75,28 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		}
         p.curClusterCnt = 0
         for _, conf := range ccs {
-            var clusterID = p.curClusterCnt
-            forwarder := NewForwarder(conf)
-            conf.ID = clusterID
-            p.forwarders[clusterID] = forwarder
-            p.ccs[clusterID] = conf
-			p.serve(clusterID)
-            p.curClusterCnt++
+            p.addCluster(conf)
 		}
         // Here, start a go routine to change content of a forwarder
         go p.monitorConfChange()
 	})
+}
+
+func (p *Proxy) addCluster(newConf *ClusterConfig) {
+    newConf.SN = genClusterSn()
+    log.Infof("try to add cluster:%s#%d\n", newConf.Name, newConf.SN)
+	p.lock.Lock()
+    var clusterID = p.curClusterCnt
+    newConf.ID = clusterID
+    var newForwarder = NewForwarder(newConf)
+    var cnt = newForwarder.AddRef()
+    log.Infof("add cluster:%d with forwarder:%d refs cnt:%d\n", clusterID, newForwarder.ID(), cnt)
+    var cluster = &Cluster{conf: newConf, forwarder: newForwarder}
+    cluster.clientConns = make(map[int64]*libnet.Conn)
+    p.clusters[clusterID] = cluster
+    p.lock.Unlock()
+    p.curClusterCnt++
+    p.serve(clusterID)
 }
 
 func (p *Proxy) serve(cid int32) {
@@ -120,6 +143,7 @@ func (p *Proxy) accept(cid int32, l net.Listener) {
                     var f = p.GetForwarder(cid)
 					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns), f)
 					_ = encoder.Flush()
+                    f.Release()
 				}
 				_ = conn.Close()
 				if log.V(4) {
@@ -129,8 +153,22 @@ func (p *Proxy) accept(cid int32, l net.Listener) {
 			}
 		}
 		atomic.AddInt32(&p.conns, 1)
-		NewHandler(p, conf, conn).Handle()
+        var advConn = libnet.NewConn(conn, time.Second*time.Duration(p.c.Proxy.ReadTimeout), time.Second*time.Duration(p.c.Proxy.WriteTimeout))
+        log.Infof("cluster:%d accept new connection:%d\n", cid, advConn.ID)
+        runtime.SetFinalizer(advConn, deleteConn)
+        var ret = p.addConnection(cid, conf.SN, advConn)
+        if ret != 0 {
+            // corner case, configure changed when we try to keep this connection
+            log.Errorf("corner case, configure just changed when after accept a connection")
+            advConn.Close()
+            continue
+        }
+		NewHandler(p, conf, advConn).Handle()
 	}
+}
+
+func deleteConn(conn *libnet.Conn) {
+    log.Errorf("delete front connection:%d\n", conn.ID)
 }
 
 // Close close proxy resource.
@@ -141,22 +179,38 @@ func (p *Proxy) Close() error {
 		return nil
 	}
     for i := 0; i < int(p.curClusterCnt); i++ {
-		p.forwarders[i].Close()
+		p.clusters[i].Close()
     }
 	p.closed = true
 	return nil
 }
 
 // Get forwarder from proxy, thread safe
+func (p *Proxy) addConnection(cid int32, sn int32, conn *libnet.Conn) int {
+    var ret = p.clusters[cid].addConnection(sn, conn)
+    return ret
+}
+
+func (p *Proxy) RemoveConnection(cid int32, connID int64) {
+    p.clusters[cid].removeConnection(connID)
+}
+
+func (p *Proxy) CloseAndRemoveConnection(cid int32, connID int64) {
+    p.clusters[cid].closeAndRemoveConnection(connID)
+}
+
+func (p *Proxy) CloseAllConnections(cid int32) {
+    p.clusters[cid].closeAllConnections()
+}
+
+// Get forwarder from proxy, thread safe
 func (p *Proxy) GetForwarder(cid int32) (proto.Forwarder) {
-    var f = p.forwarders[cid]
-    return f
+    return p.clusters[cid].getForwarder()
 }
 
 // Get forwarder from proxy, thread safe
 func (p *Proxy) getClusterConf(cid int32) (*ClusterConfig) {
-    var c = p.ccs[cid]
-    return c
+    return p.clusters[cid].getConf()
 }
 
 func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newAdd []*ClusterConfig) {
@@ -203,7 +257,7 @@ func (p* Proxy) monitorConfChange() {
         }
         var oldConfs []*ClusterConfig;
         for i := int32(0); i < p.curClusterCnt; i++ {
-            var conf = p.ccs[i]
+            var conf = p.clusters[i].getConf()
             oldConfs = append(oldConfs, conf)
         }
         var newAdd []*ClusterConfig;
@@ -220,23 +274,101 @@ func (p* Proxy) monitorConfChange() {
         for _, conf := range changedConf {
             // use new forwarder now
             log.Infof("conf of cluster(%s:%d) is changed, start to process", conf.Name, conf.ID)
-            var forwarder = NewForwarder(conf)
-            var prevForwarder = p.forwarders[conf.ID]
-            p.forwarders[conf.ID] = forwarder
-            log.Infof("start to close forwarder:%p", prevForwarder)
-            prevForwarder.Close()
-            p.ccs[conf.ID] = conf
+            p.clusters[conf.ID].processConfChange(conf)
         }
         for _, conf := range newAdd {
-            var forwarder = NewForwarder(conf)
-            conf.ID = p.curClusterCnt
-            p.forwarders[conf.ID] = forwarder
-            p.ccs[conf.ID] = conf
-            p.serve(p.curClusterCnt)
-            p.curClusterCnt++
+            p.addCluster(conf)
             log.Infof("Add new cluster(%s:%d)", conf.Name, conf.ID)
         }
     }
+}
+
+func (c *Cluster) Close() {
+    c.forwarder.Close()
+    c.closeAllConnections()
+}
+
+func (c *Cluster) addConnection(sn int32, conn* libnet.Conn) int {
+    c.mutex.Lock()
+    defer c.mutex.Unlock()
+    if sn != c.conf.SN {
+        return -1
+    }
+    c.clientConns[conn.ID] = conn
+    log.Infof("cluster:%d:%d add front connection:%d", c.conf.ID, c.conf.SN, conn.ID)
+    return 0
+}
+
+func (c *Cluster) removeConnection(id int64) {
+    c.mutex.Lock()
+    defer c.mutex.Unlock()
+    delete(c.clientConns, id)
+    log.Infof("cluster:%d:%d remove front connection:%d", c.conf.ID, c.conf.SN, id)
+}
+
+func (c *Cluster) closeAndRemoveConnection(id int64) {
+    c.mutex.Lock()
+    var conn, ok = c.clientConns[id]
+    if !ok {
+        c.mutex.Unlock()
+        return
+    }
+    delete(c.clientConns, id)
+    c.mutex.Unlock()
+    conn.Close()
+    log.Infof("cluster:%d:%d close front connection:%d", c.conf.ID, c.conf.SN, id)
+}
+
+func (c *Cluster) closeAllConnections() {
+    c.mutex.Lock()
+    var curConns = c.clientConns
+    c.clientConns = make(map[int64]*libnet.Conn)
+    c.mutex.Unlock()
+    for _, conn := range(curConns) {
+        conn.Close()
+    }
+    log.Infof("cluster:%d:%d close all front connections", c.conf.ID, c.conf.SN)
+}
+
+func (c *Cluster) processConfChange(newConf *ClusterConfig) {
+    newConf.ID = c.conf.ID
+    newConf.SN = genClusterSn()
+    var newForwarder = NewForwarder(newConf)
+    var cnt = newForwarder.AddRef()
+    c.mutex.Lock()
+    var oldConns = c.clientConns
+    var oldForwarder = c.forwarder
+    c.forwarder = newForwarder
+    if (newConf.CloseWhenChange) {
+        c.clientConns = make(map[int64]*libnet.Conn)
+    }
+    c.conf = newConf
+    c.mutex.Unlock()
+    log.Infof("start to close forwarder of cluster:%d\n", c.conf.ID)
+    oldForwarder.Close()
+    oldForwarder.Release()
+    if (newConf.CloseWhenChange) {
+        for _, conn := range(oldConns) {
+            conn.Close()
+        }
+    }
+    log.Infof("replace cluster:%d with forwarder:%d use cnt:%d\n", newConf.ID, newForwarder.ID(), cnt)
+}
+
+func (c *Cluster) getForwarder() (proto.Forwarder) {
+    c.mutex.Lock()
+    var f = c.forwarder
+    c.mutex.Unlock()
+    var cnt = f.AddRef()
+    log.Infof("get forwarder:%d for cluster:%s#%d use cnt:%d\n", f.ID(), c.conf.Name, c.conf.ID, cnt)
+    return f
+}
+
+func (c *Cluster) getConf() (*ClusterConfig) {
+    c.mutex.Lock()
+    var conf = c.conf
+    c.mutex.Unlock()
+    return conf
 }
 
 func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {

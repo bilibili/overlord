@@ -4,11 +4,13 @@ import (
 	"errors"
 	"net"
 	"time"
+    "sync/atomic"
 )
 
 var (
 	// ErrConnClosed error connection closed.
 	ErrConnClosed = errors.New("connection is closed")
+    gConnectionCnt int64 = 0
 )
 
 // Conn is a net.Conn self implement
@@ -20,6 +22,7 @@ type Conn struct {
 	dialTimeout  time.Duration
 	readTimeout  time.Duration
 	writeTimeout time.Duration
+    ID int64
 
 	closed bool
 }
@@ -33,7 +36,8 @@ func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Du
 
 // NewConn will create new Connection with given socket
 func NewConn(sock net.Conn, readTimeout, writeTimeout time.Duration) (c *Conn) {
-	c = &Conn{Conn: sock, readTimeout: readTimeout, writeTimeout: writeTimeout}
+    var id = atomic.AddInt64(&gConnectionCnt, 1)
+    c = &Conn{Conn: sock, readTimeout: readTimeout, writeTimeout: writeTimeout, ID: id}
 	return
 }
 

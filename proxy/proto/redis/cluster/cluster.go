@@ -27,6 +27,7 @@ const (
 var (
 	ErrClusterClosed = errs.New("cluster executor already closed")
 )
+var gClusterStartID int32 = 20000
 
 const (
 	fakeClusterNodes = "" +
@@ -56,6 +57,8 @@ type cluster struct {
 	once           sync.Once
 
 	state int32
+    useCount int32
+    id int32
 }
 
 // NewForwarder new proto Forwarder.
@@ -70,6 +73,7 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		hashTag: hashTag,
 		action:  make(chan struct{}),
 	}
+    c.id = atomic.AddInt32(&gClusterStartID, 1)
 	if !c.tryFetch() {
 		panic("redis cluster all seed nodes fail to fetch")
 	}
@@ -101,6 +105,27 @@ func (c *cluster) Close() error {
 		return nil
 	}
 	return nil
+}
+
+func (c *cluster) State() int32 {
+	var s = atomic.LoadInt32(&c.state)
+	return s
+}
+
+func (c *cluster) AddRef() int32 {
+	var cnt = atomic.AddInt32(&c.useCount, 1)
+    return cnt
+}
+
+func (c *cluster) ID() int32{
+    return c.id
+}
+
+func (c *cluster) Release() {
+	var cnt = atomic.AddInt32(&c.useCount, -1)
+    if (cnt == 0) {
+        log.Infof("TODO close connection to for backend redis cluster")
+    }
 }
 
 func (c *cluster) getPipe(key []byte) (ncp *proto.NodeConnPipe) {
