@@ -127,7 +127,7 @@ func LoadClusterConf(path string) (succ bool, msg string, ccs []*ClusterConfig) 
     cs := &ClusterConfigs{}
     if err := cs.LoadFromFile(path); err != nil {
         succ = false
-        msg = "failed to load cluster conf file:" + path
+        msg = "failed to load cluster conf file:" + path + ", error:" + err.Error()
         return
     }
     for _, cc := range cs.Clusters {

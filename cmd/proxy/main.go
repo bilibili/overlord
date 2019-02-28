@@ -70,7 +70,7 @@ func main() {
 		defer log.Close()
 	}
 	// new proxy
-	p, err := proxy.New(c)
+	p, err := proxy.NewProxy(c)
 	if err != nil {
 		panic(err)
 	}

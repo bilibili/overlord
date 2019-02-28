@@ -8,6 +8,7 @@ import (
 	"time"
 	"runtime"
 	"sort"
+	// "strings"
 
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
@@ -24,10 +25,12 @@ import (
 // proxy errors
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
-    gClusterSn int32 = 0
+    GClusterSn int32 = 0
+    MonitorCfgIntervalSecs int = 1  // Time interval to monitor config change
+    GClusterChangeCount int32 = 0
+    GClusterCount int32 = 0
 )
 const MaxClusterCnt int32 = 128
-const MonitorCfgIntervalSecs int32 = 50  // Time interval to monitor config change
 
 type Cluster struct {
     conf *ClusterConfig
@@ -52,7 +55,7 @@ type Proxy struct {
 }
 
 // New new a proxy by config.
-func New(c *Config) (p *Proxy, err error) {
+func NewProxy(c *Config) (p *Proxy, err error) {
 	if err = c.Validate(); err != nil {
 		err = errors.Wrap(err, "Proxy New config validate error")
 		return
@@ -63,7 +66,7 @@ func New(c *Config) (p *Proxy, err error) {
 }
 
 func genClusterSn() int32 {
-    var id = atomic.AddInt32(&gClusterSn, 1)
+    var id = atomic.AddInt32(&GClusterSn, 1)
     return id
 }
 
@@ -97,6 +100,7 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) {
     p.lock.Unlock()
     p.curClusterCnt++
     p.serve(clusterID)
+    atomic.AddInt32(&GClusterCount, 1)
 }
 
 func (p *Proxy) serve(cid int32) {
@@ -221,6 +225,7 @@ func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
         var valid = true
         for _, conf := range oldConfs {
             if (newConf.Name != conf.Name) {
+                // log.Infof("confname is different, %s VS %s\n", newConf.Name, conf.Name)
                 continue
             }
             find = true
@@ -245,14 +250,17 @@ func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
         changed = append(changed, newConf)
         continue
     }
+    // log.Infof("new conf len:%d old conf len:%d\n", len(newConfs), len(oldConfs))
     return changed, newAdd
 }
 
 func (p* Proxy) monitorConfChange() {
+    log.Infof("start to check whether cluster conf file is changed or not from:%s\n", p.ClusterConfFile)
     for {
-        time.Sleep(5 * time.Second)
+        time.Sleep(time.Duration(MonitorCfgIntervalSecs) * time.Second)
         var succ, _, newConfs = LoadClusterConf(p.ClusterConfFile)
         if (!succ) {
+            log.Errorf("failed to load conf file:%s\n", p.ClusterConfFile)
             continue
         }
         var oldConfs []*ClusterConfig;
@@ -263,6 +271,7 @@ func (p* Proxy) monitorConfChange() {
         var newAdd []*ClusterConfig;
         var changedConf []*ClusterConfig;
         changedConf, newAdd = p.parseChanged(newConfs, oldConfs)
+        // log.Infof("check conf, change cnt:%d added cnt:%d\n", len(changedConf), len(newAdd))
 
         var clusterCnt = p.curClusterCnt + int32(len(newAdd))
 
@@ -275,6 +284,7 @@ func (p* Proxy) monitorConfChange() {
             // use new forwarder now
             log.Infof("conf of cluster(%s:%d) is changed, start to process", conf.Name, conf.ID)
             p.clusters[conf.ID].processConfChange(conf)
+            atomic.AddInt32(&GClusterChangeCount, 1)
         }
         for _, conf := range newAdd {
             p.addCluster(conf)
@@ -396,6 +406,9 @@ func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
     var server2 = newConf.Servers
     sort.Strings(server1)
     sort.Strings(server2)
+    // var str1 = strings.Join(server1, "_")
+    // var str2 = strings.Join(server2, "_")
+    // log.Infof("server1:%s server2:%s\n", str1, str2)
     for i := 0; i < len(server1); i++ {
         if (server1[i] != server2[i]) {
             changed = true
