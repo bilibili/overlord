@@ -215,11 +215,12 @@ type Instance struct {
 }
 
 func (inst *Instance) parsePSyncReply(data []byte) error {
+	log.Infof("receive psycnc data %s reply as %s", inst.Addr, strconv.Quote(string(data)))
 	splited := bytes.Split(data, bytesSpace)
 	runidBs := string(splited[1])
 	offsetBs := string(splited[2][:len(splited[2])-2])
-	log.Infof("sync from %s by %s %s %s",
-		inst.Addr, strconv.Quote(string(splited[0])), strconv.Quote(runidBs), offsetBs)
+	// log.Infof("sync from %s by %s %s %s",
+	// 	inst.Addr, strconv.Quote(string(splited[0])), strconv.Quote(runidBs), offsetBs)
 
 	offset, err := strconv.ParseInt(offsetBs, 10, 64)
 	if err != nil {
@@ -261,8 +262,7 @@ func (inst *Instance) sync() (err error) {
 
 	// 1. barrier run syncRDB
 	// 1.1 send psync ? -1
-	_, _ = inst.bw.Write(psyncFullSyncCmd)
-	_ = inst.bw.Flush()
+	_ = writeAll(psyncFullSyncCmd, inst.bw)
 	data, err := inst.br.ReadBytes(byteLF)
 	if err != nil {
 		return
@@ -274,9 +274,15 @@ func (inst *Instance) sync() (err error) {
 	}
 
 	// because rdb was transformed by RESP Bulk String, we need ignore first line
-	_, err = inst.br.ReadBytes(byteLF)
-	if err != nil {
-		return err
+	for {
+		data, err = inst.br.ReadBytes(byteLF)
+		if err != nil {
+			return err
+		}
+		// log.Infof("read new line addr %s with %s", inst.Addr, strconv.Quote(string(data)))
+		if len(data) > 0 && data[0] == byte('$') {
+			break
+		}
 	}
 
 	// read full rdb
@@ -318,15 +324,17 @@ func (inst *Instance) cmdForward() error {
 
 	go func() {
 		defer wg.Done()
-
 		for {
 			inst.lock.RLock()
 			size, err := io.Copy(inst.tconn, inst.br)
 			inst.lock.RUnlock()
 			if err != nil {
 				time.Sleep(time.Millisecond * 500)
-				_ = inst.reconnectInstance()
-				return
+				err = inst.reconnectInstance()
+				if err != nil {
+					continue
+				}
+				_ = inst.skipUntilNewCmd()
 			}
 			atomic.AddInt64(&inst.offset, size)
 		}
@@ -334,6 +342,18 @@ func (inst *Instance) cmdForward() error {
 
 	wg.Wait()
 	return nil
+}
+
+func (inst *Instance) skipUntilNewCmd() error {
+	for {
+		line, err := inst.br.ReadBytes(byte('\n'))
+		if err != nil {
+			return err
+		}
+		if line[0] == byte('*') {
+			return writeAll(line, inst.tconn)
+		}
+	}
 }
 
 func (inst *Instance) reconnectInstance() error {
@@ -379,6 +399,7 @@ func (inst *Instance) syncRDB(addr string) (err error) {
 	cb := NewProtocolCallbacker(addr)
 	rdb := NewRDB(inst.br, cb)
 	inst.tconn, err = rdb.Sync()
+	// log.Infof("receive target connection %v from rdb callback with error %s", inst.tconn, err)
 	return
 }
 

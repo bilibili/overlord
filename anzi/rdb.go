@@ -88,14 +88,14 @@ type RDB struct {
 // Sync create new process in parse data from rdb
 func (r *RDB) Sync() (conn net.Conn, err error) {
 	err = r.bgSyncProc()
-	if err != nil {
-		return
-	}
 	conn = r.cb.GetConn()
 	return
 }
 
 func (r *RDB) verifyHeader(hd []byte) error {
+	if !bytes.HasPrefix(hd, []byte("REDIS")) {
+		return fmt.Errorf("bad RESP HEADER %s", strconv.Quote(string(hd)))
+	}
 	version, err := strconv.ParseInt(string(hd[5:]), 10, 64)
 	if err != nil {
 		return err
@@ -117,7 +117,10 @@ func (r *RDB) bgSyncProc() (err error) {
 	}
 	// 1. verify REDIS SPECIAL string
 	// 2. verify VERSION
-	r.verifyHeader(headbuf)
+	err = r.verifyHeader(headbuf)
+	if err != nil {
+		return err
+	}
 
 	log.Infof("start syncing rdb with head %s", string(headbuf))
 	for {
