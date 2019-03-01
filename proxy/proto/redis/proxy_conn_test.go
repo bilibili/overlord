@@ -12,17 +12,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDecodeInline(t *testing.T) {
-	data := "set a b\r\n"
+func _decodeMessage(t *testing.T, data string) []*proto.Message {
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
 	pc := NewProxyConn(conn)
-
-	msgs := proto.GetMsgs(1)
+	msgs := proto.GetMsgs(16)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
+	return nmsgs
+}
+
+func TestDecodeInlineSet(t *testing.T) {
+	data := "set a b\r\n"
+	nmsgs := _decodeMessage(t, data)
 	assert.Len(t, nmsgs, 1)
 
-	req := msgs[0].Request().(*Request)
+	req := nmsgs[0].Request().(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
 	assert.Equal(t, 3, req.resp.arrayn)
 	assert.Equal(t, []byte("3\r\nSET"), req.resp.array[0].data)
@@ -30,17 +34,24 @@ func TestDecodeInline(t *testing.T) {
 	assert.Equal(t, []byte("1\r\nb"), req.resp.array[2].data)
 }
 
-func TestDecodeBasicOk(t *testing.T) {
-	data := "*2\r\n$3\r\nGET\r\n$4\r\nbaka\r\n"
-	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
-
-	msgs := proto.GetMsgs(1)
-	nmsgs, err := pc.Decode(msgs)
-	assert.NoError(t, err)
+func TestDecodeInlineGet(t *testing.T) {
+	data := "get a\r\n"
+	nmsgs := _decodeMessage(t, data)
 	assert.Len(t, nmsgs, 1)
 
-	req := msgs[0].Request().(*Request)
+	req := nmsgs[0].Request().(*Request)
+	assert.Equal(t, mergeTypeNo, req.mType)
+	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
+	assert.Equal(t, []byte("1\r\na"), req.resp.array[1].data)
+}
+
+func TestDecodeBasicOk(t *testing.T) {
+	data := "*2\r\n$3\r\nGET\r\n$4\r\nbaka\r\n"
+	nmsgs := _decodeMessage(t, data)
+	assert.Len(t, nmsgs, 1)
+
+	req := nmsgs[0].Request().(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
 	assert.Equal(t, 2, req.resp.arrayn)
 	assert.Equal(t, "GET", req.CmdString())
