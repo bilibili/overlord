@@ -15,18 +15,44 @@ import (
 	"overlord/pkg/log"
 )
 
+var (
+    ErrWriteFail = "write failed"
+    ErrReadFail = "read failed"
+    ErrNotFound = "key_not_found"
+)
+
 type RedisConn struct {
     ServerAddr string
     TimeoutInSeconds int
     conn net.Conn
     readBuf []byte
+    hasConn bool
+    autoReconn bool
 }
 
 func NewRedisConn(addr string) *RedisConn {
-    var conn = &RedisConn{}
-    conn.ServerAddr = addr
+    var conn = &RedisConn{ServerAddr:addr, hasConn:false, autoReconn: false}
     conn.readBuf = make([]byte, 10240, 20480)
     return conn
+}
+
+func notFound(e error) bool {
+    var msg = e.Error()
+    if strings.Contains(msg, ErrNotFound) {
+        return true
+    }
+    return false
+}
+
+func readWriteFail(e error) bool {
+    var msg = e.Error()
+    if strings.Contains(msg, ErrWriteFail) {
+        return true
+    }
+    if strings.Contains(msg, ErrReadFail) {
+        return true
+    }
+    return false
 }
 
 func (r *RedisConn) Connect() error {
@@ -35,20 +61,29 @@ func (r *RedisConn) Connect() error {
     if (err != nil) {
         return err
     }
+    r.hasConn = true
     return nil
 }
 
 func (r *RedisConn) Put(key, value string) error {
     // SET key redis\r\n
+    if (!r.hasConn && r.autoReconn) {
+        var err = r.Connect()
+        if err != nil {
+            return err
+        }
+    }
     var req = "SET " + key + " " + value + "\r\n"
     var err = r.write(req)
     if (err != nil) {
+        r.hasConn = false
         return err
     }
     var readLen = 0
     readLen, err = r.conn.Read(r.readBuf)
     if err != nil {
-        return err
+        r.hasConn = false
+        return errors.New(ErrReadFail)
     }
     if readLen == 0 {
         return  errors.New("put operation return value len:0")
@@ -65,15 +100,23 @@ func (r *RedisConn) Put(key, value string) error {
 }
 
 func (r *RedisConn) Get(key string) (string, error) {
+    if (!r.hasConn && r.autoReconn) {
+        var err = r.Connect()
+        if err != nil {
+            return "", err
+        }
+    }
     var req = "GET " + key + "\r\n"
     var err = r.write(req)
     if (err != nil) {
-        return "", err
+        r.hasConn = false
+        return "", errors.New(ErrWriteFail)
     }
     var readLen = 0
     readLen, err = r.conn.Read(r.readBuf)
     if err != nil {
-        return "", err
+        r.hasConn = false
+        return "", errors.New(ErrReadFail)
     }
     if readLen == 0 {
         var err = errors.New("get operation return value len:0")
@@ -83,6 +126,10 @@ func (r *RedisConn) Get(key string) (string, error) {
     var msg = r.readBuf[1:readLen - 2]
     if respType != '$' {
         var err = fmt.Errorf("get operation redis return msg:%s", msg)
+        return "", err
+    }
+    if msg[0] == '-' && msg[1] == '1' {
+        var err = errors.New(ErrNotFound)
         return "", err
     }
     var msgLenStr = ""
@@ -101,7 +148,7 @@ func (r *RedisConn) Get(key string) (string, error) {
         var err = fmt.Errorf("get operation redis return msg:%s", msg)
         return "", err
     }
-    return string(msg[len(msgLenStr) + 2 :]),  nil
+    return string(msg[len(msgLenStr) + 2 :]), nil
 }
 
 func ParseClientCnt(msg string) int {
@@ -142,7 +189,7 @@ func (r *RedisConn) write(req string) (error) {
         var byteArray = []byte(req)
         var writeLen, err = r.conn.Write(byteArray)
         if (err != nil) {
-            return err
+            return errors.New(ErrWriteFail)
         }
         if writeLen == len(byteArray) {
             break
@@ -153,7 +200,7 @@ func (r *RedisConn) write(req string) (error) {
 }
 
 func ExecCmd(cmdStr string) (string, error){
-    fmt.Printf("try to exec cmd:%s\n", cmdStr)
+    // fmt.Printf("try to exec cmd:%s\n", cmdStr)
     cmd := exec.Command("/bin/bash", "-c", cmdStr)
 
     var out bytes.Buffer
@@ -161,7 +208,7 @@ func ExecCmd(cmdStr string) (string, error){
 
     err := cmd.Run()
     var msg = out.String()
-    fmt.Printf("exec cmd get ret:%s\n", msg)
+    // fmt.Printf("exec cmd get ret:%s\n", msg)
     return msg, err
 }
 
@@ -246,7 +293,7 @@ func StartStandAloneRedis(confName, port, logPath string) error {
 }
 
 func KillAllRedis() error {
-    var cmd = "ps aux |grep redis-server  | grep -v grep  | awk '{print $2}' | xargs -n 1 kill"
+    var cmd = "ps aux |grep redis-server  | grep -v grep  | awk '{print $2}' | xargs -n 1 kill -9"
     var _, err = ExecCmd(cmd)
     return err
 }

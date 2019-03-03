@@ -142,7 +142,7 @@ func (f *defaultForwarder) Release() {
     log.Infof("change default forwarder:%p#id:%d refs from:%d to:%d", &f, f.id, prev, cnt)
     if (cnt == 0) {
         for name, conn := range(f.nodePipe) {
-            log.Infof("close connection to node:%s for forwarder:%p when delete forwarder", name, f)
+            log.Infof("close connection to node:%s for forwarder:%d when delete forwarder", name, f.id)
             conn.Close()
         }
     }
@@ -241,7 +241,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
             log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
             return
         }
-        log.Infof("pinger of forwarder:%p try to ping backend", f)
+        // log.Infof("pinger of forwarder:%p try to ping backend", f)
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0

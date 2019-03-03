@@ -105,7 +105,6 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		if err = cc.Validate(); err != nil {
 			return err
 		}
-        cc.CloseWhenChange = false
 		if cc.CacheType == types.CacheTypeRedisCluster {
 			servers := make([]string, len(cc.Servers))
 			for i, server := range cc.Servers {

@@ -137,7 +137,7 @@ func (r *resp) decodeInline(line []byte) (err error) {
 	for i, field := range fields {
 		r.array[i] = &resp{
 			rTp:    respBulk,
-			data:   []byte(fmt.Sprintf("%d\r\n%c", len(field), field)),
+			data:   []byte(fmt.Sprintf("%d\r\n%s", len(field), field)),
 			array:  nil,
 			arrayn: 0,
 		}

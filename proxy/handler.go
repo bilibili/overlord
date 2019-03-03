@@ -95,7 +95,7 @@ func (h *Handler) handle() {
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-            log.Warnf("conn:%d failed to decode message", h.conn.ID)
+            log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
 			h.deferHandle(messages, err)
             forwarder.Release()
 			return

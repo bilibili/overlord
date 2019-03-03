@@ -26,7 +26,7 @@ import (
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
     GClusterSn int32 = 0
-    MonitorCfgIntervalSecs int = 1  // Time interval to monitor config change
+    MonitorCfgIntervalSecs int = 10  // Time interval to monitor config change
     GClusterChangeCount int32 = 0
     GClusterCount int32 = 0
 )
@@ -358,6 +358,7 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) {
     oldForwarder.Close()
     oldForwarder.Release()
     if (newConf.CloseWhenChange) {
+        log.Infof("start to close front connections:%d\n", len(oldConns))
         for _, conn := range(oldConns) {
             conn.Close()
         }
@@ -394,7 +395,8 @@ func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
             (oldConf.WriteTimeout != newConf.WriteTimeout) ||
             (oldConf.NodeConnections != newConf.NodeConnections) ||
             (oldConf.PingFailLimit != newConf.PingFailLimit) ||
-            (oldConf.PingAutoEject != newConf.PingAutoEject)) {
+            (oldConf.PingAutoEject != newConf.PingAutoEject)) ||
+            (oldConf.CloseWhenChange != newConf.CloseWhenChange) {
         changed = true
         return
     }
