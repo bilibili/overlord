@@ -58,6 +58,7 @@ func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 	if err != nil {
 		log.Error("fail to dial with remote")
 	} else {
+		p.conn = conn
 		p.bw = bufio.NewWriter(conn)
 	}
 

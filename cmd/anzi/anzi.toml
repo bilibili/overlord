@@ -8,11 +8,19 @@ max_rdb_concurrency = 10
 
 [[migrate.from]]
 cache_type = "redis_cluster"
-listen_addr = "0.0.0.0:27000"
 dial_timeout = 1000
 servers = [
     "127.0.0.1:7000",
     "127.0.0.1:7001",
+]
+
+
+[[migrate.from]]
+cache_type = "redis_cluster"
+dial_timeout = 1000
+servers = [
+    "127.0.0.1:7002",
+    "127.0.0.1:7003",
 ]
 
 [migrate.to]
