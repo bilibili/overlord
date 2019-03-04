@@ -26,7 +26,7 @@ import (
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
     GClusterSn int32 = 0
-    MonitorCfgIntervalSecs int = 10  // Time interval to monitor config change
+    MonitorCfgIntervalMilliSecs int = 10 * 100  // Time interval to monitor config change
     GClusterChangeCount int32 = 0
     GClusterCount int32 = 0
 )
@@ -78,40 +78,58 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		}
         p.curClusterCnt = 0
         for _, conf := range ccs {
-            p.addCluster(conf)
+            var err = p.addCluster(conf)
+            if err != nil {
+                // it is safety to panic here as it in start up logic
+                panic(err)
+            }
 		}
         // Here, start a go routine to change content of a forwarder
         go p.monitorConfChange()
 	})
 }
 
-func (p *Proxy) addCluster(newConf *ClusterConfig) {
+func (p *Proxy) addCluster(newConf *ClusterConfig) error {
     newConf.SN = genClusterSn()
     log.Infof("try to add cluster:%s#%d\n", newConf.Name, newConf.SN)
 	p.lock.Lock()
     var clusterID = p.curClusterCnt
     newConf.ID = clusterID
-    var newForwarder = NewForwarder(newConf)
+    var newForwarder, err = NewForwarder(newConf)
+    if err != nil {
+        p.lock.Unlock()
+        return err
+    }
     var cnt = newForwarder.AddRef()
     log.Infof("add cluster:%d with forwarder:%d refs cnt:%d\n", clusterID, newForwarder.ID(), cnt)
     var cluster = &Cluster{conf: newConf, forwarder: newForwarder}
     cluster.clientConns = make(map[int64]*libnet.Conn)
     p.clusters[clusterID] = cluster
-    p.lock.Unlock()
+    var servErr = p.serve(clusterID)
+    if servErr != nil {
+        p.clusters[clusterID] = nil
+        p.lock.Unlock()
+        cluster.Close()
+        return servErr
+    }
     p.curClusterCnt++
-    p.serve(clusterID)
+    p.lock.Unlock()
     atomic.AddInt32(&GClusterCount, 1)
+    log.Infof("succeed to add cluster:%d with addr:%s\n", clusterID, newConf.ListenAddr)
+    return nil
 }
 
-func (p *Proxy) serve(cid int32) {
+func (p *Proxy) serve(cid int32) error {
 	// listen
     var conf = p.getClusterConf(cid)
 	l, err := Listen(conf.ListenProto, conf.ListenAddr)
 	if err != nil {
-		panic(err)
+        log.Errorf("failed to listen on address:%s, got error:%s\n", conf.ListenAddr, err.Error())
+		return err
 	}
 	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", conf.Name, conf.ListenAddr)
 	go p.accept(cid, l)
+    return nil
 }
 
 func (p *Proxy) accept(cid int32, l net.Listener) {
@@ -257,10 +275,10 @@ func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 func (p* Proxy) monitorConfChange() {
     log.Infof("start to check whether cluster conf file is changed or not from:%s\n", p.ClusterConfFile)
     for {
-        time.Sleep(time.Duration(MonitorCfgIntervalSecs) * time.Second)
-        var succ, _, newConfs = LoadClusterConf(p.ClusterConfFile)
+        time.Sleep(time.Duration(MonitorCfgIntervalMilliSecs) * time.Millisecond)
+        var succ, msg, newConfs = LoadClusterConf(p.ClusterConfFile)
         if (!succ) {
-            log.Errorf("failed to load conf file:%s\n", p.ClusterConfFile)
+            log.Errorf("failed to load conf file:%s, got error:%s\n", p.ClusterConfFile, msg)
             continue
         }
         var oldConfs []*ClusterConfig;
@@ -282,13 +300,17 @@ func (p* Proxy) monitorConfChange() {
         }
         for _, conf := range changedConf {
             // use new forwarder now
-            log.Infof("conf of cluster(%s:%d) is changed, start to process", conf.Name, conf.ID)
-            p.clusters[conf.ID].processConfChange(conf)
-            atomic.AddInt32(&GClusterChangeCount, 1)
+            var err = p.clusters[conf.ID].processConfChange(conf)
+            if (err == nil ) {
+                atomic.AddInt32(&GClusterChangeCount, 1)
+                log.Infof("succeed to change conf of cluster(%s:%d)\n", conf.Name, conf.ID)
+            } else {
+                log.Errorf("failed to change conf of cluster(%s), got error:%s\n", conf.Name, err.Error())
+            }
         }
         for _, conf := range newAdd {
+            log.Infof("try to add new cluster(%s:%d)", conf.Name, conf.ID)
             p.addCluster(conf)
-            log.Infof("Add new cluster(%s:%d)", conf.Name, conf.ID)
         }
     }
 }
@@ -340,10 +362,13 @@ func (c *Cluster) closeAllConnections() {
     log.Infof("cluster:%d:%d close all front connections", c.conf.ID, c.conf.SN)
 }
 
-func (c *Cluster) processConfChange(newConf *ClusterConfig) {
+func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
     newConf.ID = c.conf.ID
     newConf.SN = genClusterSn()
-    var newForwarder = NewForwarder(newConf)
+    var newForwarder, err = NewForwarder(newConf)
+    if  err != nil {
+        return err
+    }
     var cnt = newForwarder.AddRef()
     c.mutex.Lock()
     var oldConns = c.clientConns
@@ -364,6 +389,7 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) {
         }
     }
     log.Infof("replace cluster:%d with forwarder:%d use cnt:%d\n", newConf.ID, newForwarder.ID(), cnt)
+    return nil
 }
 
 func (c *Cluster) getForwarder() (proto.Forwarder) {
@@ -384,6 +410,7 @@ func (c *Cluster) getConf() (*ClusterConfig) {
 
 func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
     valid = (oldConf.ListenAddr == newConf.ListenAddr)
+    log.Infof("old listen addr:%s new listen addr:%s\n", oldConf.ListenAddr, newConf.ListenAddr)
     if ((oldConf.HashMethod != newConf.HashMethod) ||
             (oldConf.HashDistribution != newConf.HashDistribution) ||
             (oldConf.HashTag != newConf.HashTag) ||

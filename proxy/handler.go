@@ -69,6 +69,7 @@ func NewHandler(p *Proxy, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
 	case types.CacheTypeRedisCluster:
 		h.pc = rclstr.NewProxyConn(h.conn)
 	default:
+        // it is safety to panic here, as ClusterConfig must pass CacheType check
 		panic(types.ErrNoSupportCacheType)
 	}
 	prom.ConnIncr(h.Name)

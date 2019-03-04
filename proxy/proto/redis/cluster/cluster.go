@@ -62,7 +62,7 @@ type cluster struct {
 }
 
 // NewForwarder new proto Forwarder.
-func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) proto.Forwarder {
+func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) (proto.Forwarder, error) {
 	c := &cluster{
 		name:    name,
 		servers: servers,
@@ -75,11 +75,15 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 	}
     c.id = atomic.AddInt32(&gClusterStartID, 1)
 	if !c.tryFetch() {
-		panic("redis cluster all seed nodes fail to fetch")
+		var err = errs.New("fail to any redis cluster seed nodes")
+        return nil, err
 	}
-	c.fake(listen)
+	var err = c.fake(listen)
+    if (err != nil) {
+        return nil, err
+    }
 	go c.fetchproc()
-	return c
+	return c, nil
 }
 
 func (c *cluster) Forward(msgs []*proto.Message) error {
@@ -240,42 +244,41 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 	}
 }
 
-func (c *cluster) fake(listen string) {
-	c.once.Do(func() {
-		_, port, err := net.SplitHostPort(listen)
-		if err != nil {
-			panic(err)
-		}
-		inters, err := net.Interfaces()
-		if err != nil {
-			panic(err)
-		}
-		for _, inter := range inters {
-			if strings.HasPrefix(inter.Name, "lo") {
-				continue
-			}
-			addrs, err := inter.Addrs()
-			if err != nil {
-				continue
-			}
-			for _, addr := range addrs {
-				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-					ipStr := ipnet.IP.String()
+func (c *cluster) fake(listen string) error {
+    _, port, err := net.SplitHostPort(listen)
+    if err != nil {
+        return err
+    }
+    inters, err := net.Interfaces()
+    if err != nil {
+        return err
+    }
+    for _, inter := range inters {
+        if strings.HasPrefix(inter.Name, "lo") {
+            continue
+        }
+        addrs, err := inter.Addrs()
+        if err != nil {
+            continue
+        }
+        for _, addr := range addrs {
+            if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+                ipStr := ipnet.IP.String()
 
-					ipStrLen := len(ipStr)
-					slotsStr := strings.Replace(fakeClusterSlots, "{IPLEN}", strconv.Itoa(ipStrLen), -1)
-					slotsStr = strings.Replace(slotsStr, "{IP}", ipStr, -1)
-					slotsStr = strings.Replace(slotsStr, "{PORT}", port, -1)
-					c.fakeSlotsBytes = []byte(slotsStr)
+                ipStrLen := len(ipStr)
+                slotsStr := strings.Replace(fakeClusterSlots, "{IPLEN}", strconv.Itoa(ipStrLen), -1)
+                slotsStr = strings.Replace(slotsStr, "{IP}", ipStr, -1)
+                slotsStr = strings.Replace(slotsStr, "{PORT}", port, -1)
+                c.fakeSlotsBytes = []byte(slotsStr)
 
-					nodesStr := strings.Replace(fakeClusterNodes, "{ADDR}", net.JoinHostPort(ipStr, port), -1)
-					nodesLen := len(nodesStr)
-					c.fakeNodesBytes = []byte("$" + strconv.Itoa(nodesLen) + "\r\n" + nodesStr + "\r\n")
-					return
-				}
-			}
-		}
-	})
+                nodesStr := strings.Replace(fakeClusterNodes, "{ADDR}", net.JoinHostPort(ipStr, port), -1)
+                nodesLen := len(nodesStr)
+                c.fakeNodesBytes = []byte("$" + strconv.Itoa(nodesLen) + "\r\n" + nodesStr + "\r\n")
+                return nil
+            }
+        }
+    }
+    return nil
 }
 
 type slotNode struct {

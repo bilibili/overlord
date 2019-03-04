@@ -44,7 +44,7 @@ var (
 var gForwardID int32 = 10000
 
 // NewForwarder new a Forwarder by cluster config.
-func NewForwarder(cc *ClusterConfig) proto.Forwarder {
+func NewForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
 	// new Forwarder
 	if _, ok := defaultForwardCacheTypes[cc.CacheType]; ok {
 		return newDefaultForwarder(cc)
@@ -55,6 +55,7 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 		return rclstr.NewForwarder(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, dto, rto, wto, []byte(cc.HashTag))
 	}
+    // it is safety to panic here, as ClusterConfig must pass config validation
 	panic("unsupported protocol")
 }
 
@@ -76,14 +77,14 @@ type defaultForwarder struct {
 }
 
 // newDefaultForwarder must combinf.
-func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
+func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
     f := &defaultForwarder{cc: cc, state:ForwarderStateOpening, useCount: 0 }
     f.id = atomic.AddInt32(&gForwardID, 1)
     log.Infof("create default forwarder:%d for cluster:%d with useCount:%d", f.id, f.cc.ID, f.useCount)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	f.alias = alias
 	f.hashTag = []byte(cc.HashTag)
@@ -117,7 +118,7 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 			go f.processPing(p)
 		}
 	}
-	return f
+	return f, nil
 }
 
 func (f *defaultForwarder) State() int32 {
@@ -302,6 +303,7 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case types.CacheTypeRedis:
 		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
+        // It is safety to panic here
 		panic(types.ErrNoSupportCacheType)
 	}
 }
@@ -317,6 +319,7 @@ func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
 	case types.CacheTypeRedis:
 		return redis.NewPinger(conn)
 	default:
+        // It is safety to panic here
 		panic(types.ErrNoSupportCacheType)
 	}
 }

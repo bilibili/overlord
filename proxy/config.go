@@ -27,9 +27,11 @@ type Config struct {
 func DefaultConfig() *Config {
 	c := &Config{}
 	if _, err := toml.Decode(defaultConfig, c); err != nil {
+        // it is safety to panic here
 		panic(err)
 	}
 	if err := c.Validate(); err != nil {
+        // it is safety to panic here
 		panic(err)
 	}
 	return c
@@ -75,6 +77,9 @@ type ClusterConfig struct {
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
+    if cc.Name == "" {
+        return errors.New("cluster name is not provided")
+    }
     if (cc.HashMethod != "fnv1a_64") {
         return errors.New("hash method:" + cc.HashMethod + " is not support")
     }
@@ -86,6 +91,12 @@ func (cc *ClusterConfig) Validate() error {
     }
     if (cc.ListenProto != "tcp" && cc.ListenProto != "unix") {
         return errors.New("listen proto:" + cc.ListenProto + " is not support")
+    }
+    if (cc.DialTimeout < 0 || cc.ReadTimeout < 0 || cc.WriteTimeout < 0 || cc.NodeConnections <= 0 || cc.PingFailLimit < 0) {
+        return errors.New("cannot meet condition: dial_timeout >= 0 and read_timeout >= 0 write_timeout >= 0 && node_connections > 0 && ping_fail_limit > 0")
+    }
+    if (len(cc.Servers) == 0) {
+        return errors.New("back end cluster is empty")
     }
 	return nil
 }
