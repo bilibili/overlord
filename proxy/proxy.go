@@ -410,7 +410,6 @@ func (c *Cluster) getConf() (*ClusterConfig) {
 
 func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
     valid = (oldConf.ListenAddr == newConf.ListenAddr)
-    log.Infof("old listen addr:%s new listen addr:%s\n", oldConf.ListenAddr, newConf.ListenAddr)
     if ((oldConf.HashMethod != newConf.HashMethod) ||
             (oldConf.HashDistribution != newConf.HashDistribution) ||
             (oldConf.HashTag != newConf.HashTag) ||

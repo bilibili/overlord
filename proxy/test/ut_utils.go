@@ -65,6 +65,14 @@ func (r *RedisConn) Connect() error {
     return nil
 }
 
+func (r *RedisConn) Close() {
+    if !r.hasConn {
+        return
+    }
+    r.conn.Close()
+    r.hasConn = false
+}
+
 func (r *RedisConn) Put(key, value string) error {
     // SET key redis\r\n
     if (!r.hasConn && r.autoReconn) {
@@ -293,7 +301,7 @@ func StartStandAloneRedis(confName, port, logPath string) error {
 }
 
 func KillAllRedis() error {
-    var cmd = "ps aux |grep redis-server  | grep -v grep  | awk '{print $2}' | xargs -n 1 kill -9"
+    var cmd = "ps aux |grep redis-server |grep -v 6379 | grep -v grep  | awk '{print $2}' | xargs -n 1 kill -9"
     var _, err = ExecCmd(cmd)
     return err
 }

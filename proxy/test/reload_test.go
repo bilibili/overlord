@@ -127,8 +127,30 @@ func connentCnt(addr string) int {
         return int(-1)
     }
     var connCnt = ParseClientCnt(msg)
+    cli.Close()
     return int(connCnt)
 }
+
+func nofreeConn(addr string, ch chan int) {
+    var cli = NewRedisConn(addr)
+    var err = cli.Connect()
+    if err != nil {
+        log.Errorf("failed to connect to redis, get error:%s\n", err.Error())
+        return
+    }
+    log.Info("connected to redis, no operation, just wait")
+    for {
+        select {
+        case <- ch:
+            log.Info("recv message from channel, exit now")
+            cli.Close()
+            time.Sleep(time.Duration(100) * time.Millisecond)
+            ch <- 1
+            return
+        }
+    }
+}
+
 
 func loopCheck(addr string, ch chan int) {
     var cli = NewRedisConn(addr)
@@ -137,6 +159,7 @@ func loopCheck(addr string, ch chan int) {
         log.Errorf("failed to connect to redis, get error:%s\n", err.Error())
         return
     }
+    defer cli.Close()
     var cnt int = 0
     log.Info("start to check redis conn cnt")
     for {
@@ -166,6 +189,7 @@ func loopCheck(addr string, ch chan int) {
 func loopGetToSucc(addr string, key, val string, ch chan int) {
     log.Infof("try to loop get from addr:%s\n", addr)
     var cli = NewRedisConn(addr)
+    defer cli.Close()
     var hasConn = false
     for {
         select {
@@ -198,7 +222,7 @@ func loopGetToSucc(addr string, key, val string, ch chan int) {
 // changeCnt: configure load count 
 // expRcnt: the number that read behaviour is changed, eg: (ok, fail, ok, fail) = 3
 // connFailCnt: the number that connection is changed, eg: (ok, fail, ok) = 2
-func LoopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
+func loopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
     log.Infof("try to loop put and get to addr:%s\n", addr)
     var cli = NewRedisConn(addr)
     var err = cli.Connect()
@@ -206,6 +230,7 @@ func LoopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, wri
         log.Errorf("failed to connect to redis, get error:%s\n", err.Error())
         return
     }
+    defer cli.Close()
     if (writeFirst) {
         err = cli.Put(key, val)
         if err != nil {
@@ -264,15 +289,16 @@ func LoopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, wri
                 }
                 prevRdSucc = true
                 prevConnSucc = true
-                log.Infof("succeed to get from:%s\n", addr)
-            }
-            if cnnCloseCnt == connFailCnt && rChange == expRCnt {
-                log.Infof("detect cluster changed, work as expect")
-                ch <- 1
-                return
+                log.Infof("succeed to get from:%s, cur changed cnt:%d expect changed cnt:%d\n", addr, int(changed), int(changeCnt))
             }
             if changed >= int32(changeCnt) {
                 log.Infof("detect cluster changed, but read change and conn change not expect, changed:%d connection close:%d rChange:%d\n", changed, cnnCloseCnt, rChange)
+
+                if cnnCloseCnt == connFailCnt && rChange == expRCnt {
+                    log.Infof("detect cluster changed, work as expect")
+                    ch <- 1
+                    return
+                }
                 ch <- -1
                 return
             }
@@ -377,7 +403,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8102"
     var key = "key_loop_get1"
     var val = "val_loop_get1"
-    go LoopGet(frontAddr1, key, val, 3, 2, 0, true, chGet1)
+    go loopGet(frontAddr1, key, val, 3, 2, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
     go updateConf(3, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
@@ -399,7 +425,6 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var cnt2 = connentCnt("127.0.0.1:8202")
     assert.Equal(t, 3, cnt1)
     assert.Equal(t, 1, cnt2)
-    log.Info("no close front connection case done1")
     server.Close()
     log.Info("no close front connection case done")
     tearDown()
@@ -439,7 +464,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8104"
     var key = "key_loop_get2"
     var val = "val_loop_get2"
-    go LoopGet(frontAddr1, key, val, 3, 2, 2, true, chGet1)
+    go loopGet(frontAddr1, key, val, 3, 2, 2, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
     go updateConf(3, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
@@ -480,7 +505,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 		defer log.Close()
 	}
     log.Info("start reload case on nopanic when conf is invalid")
-    var confCnt = 22
+    var confCnt = 23
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
         var name = "conf/nopanic/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
@@ -502,7 +527,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8106"
     var key = "key_loop_get2"
     var val = "val_loop_get2"
-    go LoopGet(frontAddr1, key, val, 2, 0, 0, true, chGet1)
+    go loopGet(frontAddr1, key, val, 2, 0, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
     go updateConf(2, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
@@ -528,6 +553,72 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
     assert.Equal(t, 0, int(clusterChangeCnt))
     assert.Equal(t, 2, int(clusterCnt))
-    log.Info("close front connection case done")
+    log.Info("no panic case done")
+    tearDown()
+}
+
+func TestClusterConfigFrontConnectionLeak(t *testing.T) {
+    setup("8207", "8208")
+    var firstConfName = "conf/frontleak/redis_standalone_0.conf"
+    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+    log.Info("start reload case on front connection leak")
+    var confCnt = 3
+    var confList = make([]string, confCnt, confCnt)
+    for i := 0; i < confCnt; i++ {
+        var name = "conf/frontleak/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
+        confList[i] = name
+    }
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = gClusterConfFile
+	assert.NoError(t, err)
+    var name = "conf/frontleak/redis_standalone_0.conf"
+    succ, msg, initConf := proxy.LoadClusterConf(name)
+    require.True(t, succ, msg)
+
+    server.Serve(initConf)
+    var chGet1 = make(chan int, 1)
+    var chUpdate = make(chan int, 1)
+    var chFrontLeak = make(chan int, 1)
+    var frontAddr1 = "127.0.0.1:8107"
+    var key = "key_loop_get5"
+    var val = "val_loop_get5"
+    go loopGet(frontAddr1, key, val, 2, 2, 0, true, chGet1)
+    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go nofreeConn(frontAddr1, chFrontLeak)
+    var retCnt = 0
+    for {
+        select {
+        case getChanged := <-chGet1:
+            log.Infof("loop get on cluster 1 has returned:%d\n", getChanged)
+            assert.Equal(t, 1, getChanged)
+            retCnt++
+        }
+        if retCnt >= 1 {
+            log.Info("loop get channel just return")
+            break
+        }
+    }
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    assert.Equal(t, 2, int(clusterChangeCnt))
+    assert.Equal(t, 1, int(clusterCnt))
+    log.Info("start to connection to check")
+    var cnt1 = connentCnt("127.0.0.1:8207")
+    assert.Equal(t, 3, int(cnt1))  // self, forwarder0, forwarder2
+    chFrontLeak <- 1
+    <-chFrontLeak  // just make sure front connection is closed
+    cnt1 = connentCnt("127.0.0.1:8207")
+    assert.Equal(t, 2, int(cnt1))  // self, forwarder2
+    log.Info("front leak case done")
+    server.Close()
     tearDown()
 }
