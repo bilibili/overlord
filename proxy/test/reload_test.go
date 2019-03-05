@@ -17,7 +17,7 @@ import (
 
 var gSN int = 0
 
-func setup(port1, port2 string) {
+func setupRedis(port1, port2 string) {
     proxy.GClusterSn = 0
     proxy.MonitorCfgIntervalMilliSecs = 500
     proxy.GClusterChangeCount = 0
@@ -36,8 +36,33 @@ func setup(port1, port2 string) {
     }
     gSN++
 }
-func tearDown() {
+func tearDownRedis() {
     KillAllRedis()
+}
+func tearDownMecache() {
+}
+
+func checkAndKillStandalone(expectCnt int) {
+    for {
+        var changed = atomic.LoadInt32(&proxy.GClusterChangeCount)
+        if changed >= int32(expectCnt) {
+            log.Infof("cluster changed:%d larger than expect:%d, go kill standalone\n", int(changed), expectCnt)
+            KillAllRedis()
+            return
+        }
+        time.Sleep(time.Duration(50) * time.Millisecond)
+    }
+}
+
+func setupMC(port1, port2 string) {
+    proxy.GClusterSn = 0
+    proxy.MonitorCfgIntervalMilliSecs = 500
+    proxy.GClusterChangeCount = 0
+    proxy.GClusterCount = 0
+    KillAllMC()
+    StartStandAloneMC(port1)
+    StartStandAloneMC(port2)
+    gSN++
 }
 
 func writeToFile(name, content string) error {
@@ -111,7 +136,7 @@ func dumpClusterConf(fileName string, confs proxy.ClusterConfigs) error {
     */
 }
 
-func connentCnt(addr string) int {
+func getRedisConnCnt(addr string) int {
     var cli = NewRedisConn(addr)
     var err = cli.Connect()
     if err != nil {
@@ -126,7 +151,7 @@ func connentCnt(addr string) int {
         log.Errorf("failed to get info from redis, get error:%s\n", err.Error())
         return int(-1)
     }
-    var connCnt = ParseClientCnt(msg)
+    var connCnt = ParseRedisClientCnt(msg)
     cli.Close()
     return int(connCnt)
 }
@@ -174,7 +199,7 @@ func loopCheck(addr string, ch chan int) {
                 log.Errorf("failed to get info from redis, get error:%s\n", err.Error())
                 return
             }
-            var connCnt = ParseClientCnt(msg)
+            var connCnt = ParseRedisClientCnt(msg)
             if (connCnt != 1) {
                 if (cnt % 20 == 19) {
                     log.Infof("get redis:%s connect count:%d\n", addr, connCnt)
@@ -185,10 +210,24 @@ func loopCheck(addr string, ch chan int) {
         }
     }
 }
-
 func loopGetToSucc(addr string, key, val string, ch chan int) {
+    loopGetToSuccImpl(addr, key, val, 0, ch)
+}
+func loopGetToSuccMc(addr string, key, val string, ch chan int) {
+    loopGetToSuccImpl(addr, key, val, 1, ch)
+}
+
+func loopGetToSuccImpl(addr string, key, val string, servType int, ch chan int) {
     log.Infof("try to loop get from addr:%s\n", addr)
-    var cli = NewRedisConn(addr)
+    var cli CliConn
+    if servType == 0 {
+        cli = NewRedisConn(addr)
+    } else if servType == 1 {
+        cli = NewMemcacheConn(addr)
+    } else if servType == 2 {
+        cli = NewMemcacheConn(addr)
+    }
+
     defer cli.Close()
     var hasConn = false
     for {
@@ -222,9 +261,24 @@ func loopGetToSucc(addr string, key, val string, ch chan int) {
 // changeCnt: configure load count 
 // expRcnt: the number that read behaviour is changed, eg: (ok, fail, ok, fail) = 3
 // connFailCnt: the number that connection is changed, eg: (ok, fail, ok) = 2
-func loopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
+func loopGet(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
+    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, connFailCnt, writeFirst, 0, ch)
+}
+func loopGetMc(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
+    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, connFailCnt, writeFirst, 1, ch)
+}
+
+func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int,
+        writeFirst bool, servType int, ch chan int) {
     log.Infof("try to loop put and get to addr:%s\n", addr)
-    var cli = NewRedisConn(addr)
+    var cli CliConn
+    if servType == 0 {
+        cli = NewRedisConn(addr)
+    } else if servType == 1 {
+        cli = NewMemcacheConn(addr)
+    } else if servType == 2 {
+        cli = NewMemcacheConn(addr)
+    }
     var err = cli.Connect()
     if err != nil {
         log.Errorf("failed to connect to redis, get error:%s\n", err.Error())
@@ -253,16 +307,16 @@ func loopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, wri
             // log.Info("loop get now")
             // var msg = ""
             var gotChange = false
-            var changed = atomic.LoadInt32(&proxy.GClusterChangeCount)
-            if changed != prevChangeCnt {
-                prevChangeCnt = changed;
+            var changeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+            if changeCnt != prevChangeCnt {
+                prevChangeCnt = changeCnt;
                 gotChange = true
             }
             var _, err = cli.Get(key)
             if err != nil {
                 log.Infof("in loop get client get error:%s", err.Error())
                 if gotChange {
-                    log.Infof("changed, client get error:%s when cur changed cnt:%d\n", err.Error(), int(changed))
+                    log.Infof("changed, client get error:%s when cur change cnt:%d\n", err.Error(), int(changeCnt))
                 }
                 if readWriteFail(err) {
                     if prevConnSucc {
@@ -289,10 +343,10 @@ func loopGet(addr, key, val string, changeCnt int, expRCnt, connFailCnt int, wri
                 }
                 prevRdSucc = true
                 prevConnSucc = true
-                log.Infof("succeed to get from:%s, cur changed cnt:%d expect changed cnt:%d\n", addr, int(changed), int(changeCnt))
+                log.Infof("succeed to get from:%s, cur changed cnt:%d expect change cnt:%d\n", addr, int(changeCnt), int(expChangeCnt))
             }
-            if changed >= int32(changeCnt) {
-                log.Infof("detect cluster changed, but read change and conn change not expect, changed:%d connection close:%d rChange:%d\n", changed, cnnCloseCnt, rChange)
+            if changeCnt >= int32(expChangeCnt) {
+                log.Infof("detect cluster changed, but read change and conn change not expect, change:%d connection close:%d rChange:%d\n", changeCnt, cnnCloseCnt, rChange)
 
                 if cnnCloseCnt == connFailCnt && rChange == expRCnt {
                     log.Infof("detect cluster changed, work as expect")
@@ -371,7 +425,7 @@ var gProxyConfFile = "./conf/proxy.conf"
 var gClusterConfFile = "./conf/cluster.conf"
 
 func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
-    setup("8201", "8202")
+    setupRedis("8201", "8202")
     var firstConfName = "conf/noclose/redis_standalone_0.conf"
     var cmd = "cp " + firstConfName + " " + gClusterConfFile
     ExecCmd(cmd)
@@ -421,17 +475,17 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
             break
         }
     }
-    var cnt1 = connentCnt("127.0.0.1:8201")
-    var cnt2 = connentCnt("127.0.0.1:8202")
+    var cnt1 = getRedisConnCnt("127.0.0.1:8201")
+    var cnt2 = getRedisConnCnt("127.0.0.1:8202")
     assert.Equal(t, 3, cnt1)
     assert.Equal(t, 1, cnt2)
     server.Close()
     log.Info("no close front connection case done")
-    tearDown()
+    tearDownRedis()
 }
 
 func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
-    setup("8203", "8204")
+    setupRedis("8203", "8204")
     var firstConfName = "conf/close/redis_standalone_0.conf"
     var cmd = "cp " + firstConfName + " " + gClusterConfFile
     ExecCmd(cmd)
@@ -484,17 +538,17 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
             break
         }
     }
-    var cnt1 = connentCnt("127.0.0.1:8203")
-    var cnt2 = connentCnt("127.0.0.1:8204")
+    var cnt1 = getRedisConnCnt("127.0.0.1:8203")
+    var cnt2 = getRedisConnCnt("127.0.0.1:8204")
     assert.Equal(t, 3, cnt1) // self, cluster1, cluster2
     assert.Equal(t, 1, cnt2)
     server.Close()
     log.Info("close front connection case done")
-    tearDown()
+    tearDownRedis()
 }
 
 func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
-    setup("8205", "8206")
+    setupRedis("8205", "8206")
     var firstConfName = "conf/nopanic/redis_standalone_0.conf"
     var cmd = "cp " + firstConfName + " " + gClusterConfFile
     ExecCmd(cmd)
@@ -505,7 +559,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 		defer log.Close()
 	}
     log.Info("start reload case on nopanic when conf is invalid")
-    var confCnt = 23
+    var confCnt = 24
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
         var name = "conf/nopanic/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
@@ -527,7 +581,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8106"
     var key = "key_loop_get2"
     var val = "val_loop_get2"
-    go loopGet(frontAddr1, key, val, 2, 0, 0, true, chGet1)
+    go loopGet(frontAddr1, key, val, 1, 0, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
     go updateConf(2, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
@@ -551,14 +605,14 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 
     var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
     var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
-    assert.Equal(t, 0, int(clusterChangeCnt))
+    assert.Equal(t, 1, int(clusterChangeCnt))
     assert.Equal(t, 2, int(clusterCnt))
     log.Info("no panic case done")
-    tearDown()
+    tearDownRedis()
 }
 
 func TestClusterConfigFrontConnectionLeak(t *testing.T) {
-    setup("8207", "8208")
+    setupRedis("8207", "8208")
     var firstConfName = "conf/frontleak/redis_standalone_0.conf"
     var cmd = "cp " + firstConfName + " " + gClusterConfFile
     ExecCmd(cmd)
@@ -612,13 +666,148 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     assert.Equal(t, 2, int(clusterChangeCnt))
     assert.Equal(t, 1, int(clusterCnt))
     log.Info("start to connection to check")
-    var cnt1 = connentCnt("127.0.0.1:8207")
+    var cnt1 = getRedisConnCnt("127.0.0.1:8207")
     assert.Equal(t, 3, int(cnt1))  // self, forwarder0, forwarder2
     chFrontLeak <- 1
     <-chFrontLeak  // just make sure front connection is closed
-    cnt1 = connentCnt("127.0.0.1:8207")
+    cnt1 = getRedisConnCnt("127.0.0.1:8207")
     assert.Equal(t, 2, int(cnt1))  // self, forwarder2
     log.Info("front leak case done")
     server.Close()
-    tearDown()
+    tearDownRedis()
+}
+
+func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
+    setupMC("8209", "8210")
+    var firstConfName = "conf/memcache/standalone_0.conf"
+    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+    log.Info("start reload case of memcache")
+    var confCnt = 3
+    var confList = make([]string, confCnt, confCnt)
+    for i := 0; i < confCnt; i++ {
+        var name = "conf/memcache/standalone_" + strconv.Itoa(int(i)) + ".conf"
+        confList[i] = name
+    }
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = gClusterConfFile
+	assert.NoError(t, err)
+    var name = "conf/memcache/standalone_0.conf"
+    succ, msg, initConf := proxy.LoadClusterConf(name)
+    require.True(t, succ, msg)
+
+    server.Serve(initConf)
+    var chGet1 = make(chan int, 1)
+    var chUpdate = make(chan int, 1)
+    var frontAddr1 = "127.0.0.1:8109"
+    var key = "mckey_loop_get1"
+    var val = "mcval_loop_get1"
+    go loopGetMc(frontAddr1, key, val, 2, 0, 0, true, chGet1)
+    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    var retCnt = 0
+    for {
+        select {
+        case getChanged := <-chGet1:
+            log.Infof("loop get on cluster 1 has returned:%d\n", getChanged)
+            assert.Equal(t, 1, getChanged)
+            retCnt++
+        }
+        if retCnt >= 1 {
+            log.Info("two check channel has return")
+            break
+        }
+    }
+    server.Close()
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    assert.Equal(t, 2, int(clusterChangeCnt))
+    assert.Equal(t, 1, int(clusterCnt))
+    log.Info("memcache reload done")
+    tearDownMecache()
+}
+
+func TestClusterConfigReloadRedisCluster(t *testing.T) {
+    setupRedis("8211", "8212")
+    log.Info("start reload case of redis cluster")
+
+    var cluster1 = "127.0.0.1:7000"
+    var cluster2 = "127.0.0.1:9000"
+    var cli1 = NewRedisConn(cluster1)
+    var cli2 = NewRedisConn(cluster2)
+    cli1.autoReconn = true
+    cli2.autoReconn = true
+    var key = "cluster_key1"
+    var val = "cluster_value1"
+    var err0 = cli1.Put(key, val)
+	require.NoError(t, err0)
+    err0 = cli2.Put(key, val)
+	require.NoError(t, err0)
+    cli1.Close()
+    cli2.Close()
+
+    var firstConfName = "conf/rediscluster/0.conf"
+    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+    var confCnt = 4
+    var confList = make([]string, confCnt, confCnt)
+    for i := 0; i < confCnt; i++ {
+        var name = "conf/rediscluster/" + strconv.Itoa(int(i)) + ".conf"
+        confList[i] = name
+    }
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = gClusterConfFile
+	assert.NoError(t, err)
+    var name = "conf/rediscluster/0.conf"
+    succ, msg, initConf := proxy.LoadClusterConf(name)
+    require.True(t, succ, msg)
+
+    server.Serve(initConf)
+    var chGet1 = make(chan int, 1)
+    var chGet2 = make(chan int, 1)
+    var chUpdate = make(chan int, 1)
+    var frontAddr1 = "127.0.0.1:8111"
+    var frontAddr2 = "127.0.0.1:8112"
+    go loopGet(frontAddr1, key, val, 3, 0, 1, true, chGet1)
+    go loopGetToSucc(frontAddr2, key, val, chGet2)
+    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go checkAndKillStandalone(1)
+    var retCnt = 0
+    for {
+        select {
+        case getChanged := <-chGet1:
+            log.Infof("loop get on cluster 1 has returned:%d\n", getChanged)
+            assert.Equal(t, 1, getChanged)
+            retCnt++
+        case cluster2 := <-chGet2:
+            assert.Equal(t, 0, cluster2)
+            retCnt++
+        }
+        if retCnt >= 2 {
+            log.Info("two check channel has return")
+            break
+        }
+    }
+    server.Close()
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    assert.Equal(t, 3, int(clusterChangeCnt))
+    assert.Equal(t, 2, int(clusterCnt))
+    log.Info("redis cluster reload done")
+    tearDownRedis()
 }
