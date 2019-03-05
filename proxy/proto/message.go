@@ -208,6 +208,11 @@ func (m *Message) WithWaitGroup(wg *sync.WaitGroup) {
 	m.wg = wg
 }
 
+// Slowlog impl Slowloger
+func (m *Message) Slowlog() *SlowlogEntry {
+	return nil
+}
+
 // Add add wait group.
 func (m *Message) Add() {
 	if m.wg != nil {

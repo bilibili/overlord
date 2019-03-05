@@ -1,11 +1,18 @@
 package proto
 
+// Slowloger is the type which can convert self into slowlog entry
+type Slowloger interface {
+	Slowlog() *SlowlogEntry
+}
+
 // Request request interface.
 type Request interface {
 	CmdString() string
 	Cmd() []byte
 	Key() []byte
 	Put()
+
+	Slowloger
 }
 
 // ProxyConn decode bytes from client and encode write to conn.
