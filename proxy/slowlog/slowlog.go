@@ -24,7 +24,8 @@ type Store struct {
 	msgs   []atomic.Value
 }
 
-func (s *Store) push(msg *proto.Message) {
+// Record impl the Handler
+func (s *Store) Record(msg *proto.Message) {
 	if msg == nil {
 		return
 	}
@@ -58,47 +59,31 @@ func (s *Store) Reply() *proto.SlowlogEntries {
 
 var storeMap = map[string]*Store{}
 
-// Replyer will reply the given store
-type Replyer interface {
+// Handler is the handler which contains the store instance with async call
+type Handler interface {
+	Record(msg *proto.Message)
 	Reply() *proto.SlowlogEntries
 }
 
-// NewReplyer create or get current Replyer
-func NewReplyer(name string) Replyer {
+// New create the message Handler or get the exists one
+func New(name string) Handler {
 	if s, ok := storeMap[name]; ok {
-		return &storeReplyer{store: s}
-	}
-	panic("replyer must be create after recorder")
-}
-
-type storeReplyer struct {
-	store *Store
-}
-
-func (sr *storeReplyer) Reply() *proto.SlowlogEntries {
-	return sr.store.Reply()
-}
-
-// Recorder is the handler which contains the store instance with async call
-type Recorder interface {
-	Record(msg *proto.Message)
-}
-
-// NewRecorder create the message Recorder or get the exists one
-func NewRecorder(name string) Recorder {
-	if s, ok := storeMap[name]; ok {
-		return &storeRecorder{store: s}
+		return &storeHandler{store: s}
 	}
 
 	s := newStore(name)
 	storeMap[name] = s
-	return NewRecorder(name)
+	return New(name)
 }
 
-type storeRecorder struct {
+type storeHandler struct {
 	store *Store
 }
 
-func (sr *storeRecorder) Record(msg *proto.Message) {
-	sr.store.push(msg)
+func (sr *storeHandler) Record(msg *proto.Message) {
+	sr.store.Record(msg)
+}
+
+func (sr *storeHandler) Reply() *proto.SlowlogEntries {
+	return sr.store.Reply()
 }
