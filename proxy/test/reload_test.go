@@ -23,6 +23,8 @@ func setupRedis(port1, port2 string) {
     proxy.MonitorCfgIntervalMilliSecs = 500
     proxy.GClusterChangeCount = 0
     proxy.GClusterCount = 0
+    proxy.GAddClusterFailCnt = 0
+    proxy.GClusterConfChangeFailCnt = 0
     KillAllRedis()
     var sn = strconv.Itoa(gSN)
     var redisConf1 = "/tmp/redis_s_" + port1 + "_" + sn + ".conf";
@@ -41,6 +43,7 @@ func tearDownRedis() {
     KillAllRedis()
 }
 func tearDownMecache() {
+    KillAllMC()
 }
 
 func checkAndKillStandalone(expectCnt int) {
@@ -60,6 +63,8 @@ func setupMC(port1, port2 string) {
     proxy.MonitorCfgIntervalMilliSecs = 500
     proxy.GClusterChangeCount = 0
     proxy.GClusterCount = 0
+    proxy.GAddClusterFailCnt = 0
+    proxy.GClusterConfChangeFailCnt = 0
     KillAllMC()
     StartStandAloneMC(port1)
     StartStandAloneMC(port2)
@@ -463,12 +468,12 @@ func updateConfFromList(intervalInSec int, fileName string, confs []proxy.Cluste
 }
 
 var gProxyConfFile = "./conf/proxy.conf"
-var gClusterConfFile = "./conf/cluster.conf"
 
 func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
+    var ClusterConfFile = "./conf/noclose_cluster.conf"
     setupRedis("8201", "8202")
     var firstConfName = "conf/noclose/redis_standalone_0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -484,7 +489,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
 
     succ, msg, initConf := proxy.LoadClusterConf(firstConfName)
@@ -500,7 +505,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var val = "val_loop_get1"
     go loopGet(frontAddr1, key, val, 3, 2, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(3000, gClusterConfFile, confList, chUpdate)
+    go updateConf(3000, ClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -526,9 +531,10 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 }
 
 func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
+    var ClusterConfFile = "./conf/close_cluster.conf"
     setupRedis("8203", "8204")
     var firstConfName = "conf/close/redis_standalone_0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -545,7 +551,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
 
     succ, msg, initConf := proxy.LoadClusterConf(firstConfName)
@@ -561,7 +567,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     var val = "val_loop_get2"
     go loopGet(frontAddr1, key, val, 3, 2, 2, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(3000, gClusterConfFile, confList, chUpdate)
+    go updateConf(3000, ClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -589,9 +595,11 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
 }
 
 func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
+    log.Infof("start reload case on nopanic when conf is invalid\n")
+    var ClusterConfFile = "./conf/nopanic_cluster.conf"
     setupRedis("8205", "8206")
     var firstConfName = "conf/nopanic/redis_standalone_0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -599,8 +607,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     if log.Init(proxyConf.Config) {
 		defer log.Close()
 	}
-    log.Info("start reload case on nopanic when conf is invalid")
-    var confCnt = 24
+    var confCnt = 25
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
         var name = "conf/nopanic/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
@@ -608,7 +615,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/nopanic/redis_standalone_0.conf"
     succ, msg, initConf := proxy.LoadClusterConf(name)
@@ -624,7 +631,10 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var val = "val_loop_get2"
     go loopGet(frontAddr1, key, val, 1, 0, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(2000, gClusterConfFile, confList, chUpdate)
+    go updateConf(1000, ClusterConfFile, confList, chUpdate)
+    var updateConfRet = <-chUpdate
+    log.Infof("update configure routine return ret:%d\n", updateConfRet)
+
     var retCnt = 0
     for {
         select {
@@ -653,9 +663,10 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 }
 
 func TestClusterConfigFrontConnectionLeak(t *testing.T) {
+    var ClusterConfFile = "./conf/cnnleak_cluster.conf"
     setupRedis("8207", "8208")
     var firstConfName = "conf/frontleak/redis_standalone_0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -672,7 +683,7 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/frontleak/redis_standalone_0.conf"
     succ, msg, initConf := proxy.LoadClusterConf(name)
@@ -686,7 +697,7 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     var key = "key_loop_get5"
     var val = "val_loop_get5"
     go loopGet(frontAddr1, key, val, 2, 2, 0, true, chGet1)
-    go updateConf(2000, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, ClusterConfFile, confList, chUpdate)
     go nofreeConn(frontAddr1, chFrontLeak)
     var retCnt = 0
     for {
@@ -719,9 +730,10 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
 }
 
 func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
+    var ClusterConfFile = "./conf/mc_cluster.conf"
     setupMC("8209", "8210")
     var firstConfName = "conf/memcache/standalone_0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -738,7 +750,7 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/memcache/standalone_0.conf"
     succ, msg, initConf := proxy.LoadClusterConf(name)
@@ -751,7 +763,7 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     var key = "mckey_loop_get1"
     var val = "mcval_loop_get1"
     go loopGetMc(frontAddr1, key, val, 2, 0, 0, true, chGet1)
-    go updateConf(2000, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, ClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -776,8 +788,9 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
 }
 
 func TestClusterConfigReloadRedisCluster(t *testing.T) {
+    var ClusterConfFile = "./conf/rediscluster_cluster.conf"
     setupRedis("8211", "8212")
-    log.Info("start reload case of redis cluster")
+    log.Infof("start reload case of redis cluster\n")
 
     var cluster1 = "127.0.0.1:7000"
     var cluster2 = "127.0.0.1:9000"
@@ -795,7 +808,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     cli2.Close()
 
     var firstConfName = "conf/rediscluster/0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -811,7 +824,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     }
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/rediscluster/0.conf"
     succ, msg, initConf := proxy.LoadClusterConf(name)
@@ -825,7 +838,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8112"
     go loopGet(frontAddr1, key, val, 3, 0, 1, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(2000, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, ClusterConfFile, confList, chUpdate)
     go checkAndKillStandalone(1)
     var retCnt = 0
     for {
@@ -854,10 +867,11 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 }
 
 func TestClusterConfigLoadLotsofCluster(t *testing.T) {
+    var ClusterConfFile = "./conf/lotsof_cluster.conf"
     setupRedis("8213", "8214")
     proxy.MonitorCfgIntervalMilliSecs = 100
     var firstConfName = "conf/lotsof/0.conf"
-    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
     var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
@@ -893,7 +907,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
     confNameList[confCnt - 1] =  "conf/lotsof/127.conf"
 
     var server, err = proxy.NewProxy(proxyConf)
-    server.ClusterConfFile = gClusterConfFile
+    server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
 
     server.Serve(initConf)
@@ -903,7 +917,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
     var key = "key_lots_get2"
     var val = "val_lots_get2"
     go loopGet(frontAddr1, key, val, 0, 0, 0, true, chGet1)
-    go updateConf(400, gClusterConfFile, confNameList, chUpdate)
+    go updateConf(400, ClusterConfFile, confNameList, chUpdate)
     var updateConfRet = <-chUpdate
     log.Infof("update configure routine return ret:%d\n", updateConfRet)
     for {
@@ -941,5 +955,63 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
     var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
     assert.Equal(t, 0, int(clusterChangeCnt))
     log.Info("lots of case done")
+    tearDownRedis()
+}
+
+func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
+    var ClusterConfFile = "./conf/rediscluster_seed_cluster.conf"
+    setupRedis("8215", "8216")
+    log.Infof("start reload case of get seed fail\n")
+
+    var cluster1 = "127.0.0.1:7000"
+    var cluster2 = "127.0.0.1:9000"
+    var cli1 = NewRedisConn(cluster1)
+    var cli2 = NewRedisConn(cluster2)
+    cli1.autoReconn = true
+    cli2.autoReconn = true
+    var key = "cluster_key2"
+    var val = "cluster_value2"
+    var err0 = cli1.Put(key, val)
+	require.NoError(t, err0)
+    cli1.Close()
+
+    var firstConfName = "conf/getseedfail/0.conf"
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+    var confCnt = 2
+    var confList = make([]string, confCnt, confCnt)
+    for i := 0; i < confCnt; i++ {
+        var name = "conf/getseedfail/" + strconv.Itoa(int(i)) + ".conf"
+        confList[i] = name
+    }
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = ClusterConfFile
+	assert.NoError(t, err)
+    var name = "conf/getseedfail/0.conf"
+    succ, msg, initConf := proxy.LoadClusterConf(name)
+    require.True(t, succ, msg)
+
+    server.Serve(initConf)
+    var chUpdate = make(chan int, 1)
+    go updateConf(1000, ClusterConfFile, confList, chUpdate)
+    var updateConfRet = <-chUpdate
+    log.Infof("update configure routine return ret:%d\n", updateConfRet)
+    time.Sleep(time.Duration(2 * proxy.MonitorCfgIntervalMilliSecs) * time.Millisecond)
+    server.Close()
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    assert.Equal(t, 0, int(clusterChangeCnt))
+    assert.Equal(t, 1, int(clusterCnt))
+    var faildCnt = atomic.LoadInt32(&proxy.GAddClusterFailCnt)
+    assert.True(t, faildCnt > 0)
+    log.Info("redis cluster get seek fail case done")
     tearDownRedis()
 }

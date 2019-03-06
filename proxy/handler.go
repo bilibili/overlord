@@ -91,12 +91,11 @@ func (h *Handler) handle() {
         forwarder proto.Forwarder;
 	)
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
-    log.Infof("handler try to get forwarder for cluster:%d\n", h.ClusterID)
     forwarder = h.p.GetForwarder(h.ClusterID);
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-            log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
+            // log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
 			h.deferHandle(messages, err)
             forwarder.Release()
 			return
@@ -105,17 +104,15 @@ func (h *Handler) handle() {
         if (ForwarderStateClosed == fState) {
             forwarder.Release()
             if (h.closeWhenChange) {
-                log.Infof("cluster:%d is changed, need to close connection with client", h.ClusterID)
                 h.deferHandle(messages, err)
                 return
             }
-            log.Infof("cluster:%d is changed, just use new cluster", h.ClusterID)
             forwarder = h.p.GetForwarder(h.ClusterID)
         }
         // here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
 		var err = forwarder.Forward(msgs)
         if (err != nil) {
-            log.Warnf("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
+            log.Infof("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
             h.deferHandle(messages, err)
             forwarder.Release()
             return

@@ -40,8 +40,9 @@ var (
 		types.CacheTypeMemcacheBinary: struct{}{},
 		types.CacheTypeRedis:          struct{}{},
 	}
+    PingSleepTimeSec int32 = 300
+    gForwardID int32 = 10000
 )
-var gForwardID int32 = 10000
 
 // NewForwarder new a Forwarder by cluster config.
 func NewForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
@@ -80,7 +81,6 @@ type defaultForwarder struct {
 func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
     f := &defaultForwarder{cc: cc, state:ForwarderStateOpening, useCount: 0 }
     f.id = atomic.AddInt32(&gForwardID, 1)
-    log.Infof("create default forwarder:%d for cluster:%d with useCount:%d", f.id, f.cc.ID, f.useCount)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
@@ -98,18 +98,15 @@ func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
 	} else {
 		f.ring.Init(addrs, ws)
 	}
-    log.Infof("try to create connection for cluster:%s now, node count:%d", cc.Name, len(addrs))
 	// start nbc
 	f.nodePipe = make(map[string]*proto.NodeConnPipe)
 	for _, addr := range addrs {
-        log.Infof("try to new connection to addr:%s", addr)
 		toAddr := addr // NOTE: avoid closure
 		f.nodePipe[toAddr] = proto.NewNodeConnPipe(cc.NodeConnections, func() proto.NodeConn {
 			return newNodeConn(cc, toAddr)
 		})
 	}
 	if cc.PingAutoEject {
-        log.Infof("try to create pinger for cluster:%s", cc.Name)
 		for idx, addr := range addrs {
 			p := &pinger{cc: cc, addr: addr, alias: addr, weight: ws[idx]}
 			if f.alias {
@@ -131,19 +128,14 @@ func (f *defaultForwarder) ID() int32 {
 }
 
 func (f *defaultForwarder) AddRef() int32 {
-    var prev = atomic.LoadInt32(&(f.useCount))
 	var cnt = atomic.AddInt32(&(f.useCount), 1)
-    log.Infof("increase forwarder:%p#id:%d refs from:%d to:%d\n", &f, f.id, prev, cnt)
     return cnt
 }
 
 func (f *defaultForwarder) Release() {
-    var prev = atomic.LoadInt32(&(f.useCount))
 	var cnt = atomic.AddInt32(&(f.useCount), -1)
-    log.Infof("change default forwarder:%p#id:%d refs from:%d to:%d", &f, f.id, prev, cnt)
     if (cnt == 0) {
-        for name, conn := range(f.nodePipe) {
-            log.Infof("close connection to node:%s for forwarder:%d when delete forwarder", name, f.id)
+        for _, conn := range(f.nodePipe) {
             conn.Close()
         }
     }
@@ -215,7 +207,7 @@ func (f *defaultForwarder) trimHashTag(key []byte) []byte {
 // pingSleepTime for unit test override!!!
 var pingSleepTime = func(t bool) int32 {
 	if t {
-		return 10
+		return PingSleepTimeSec
 	}
 	return 1
 }

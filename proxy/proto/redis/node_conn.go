@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"overlord/pkg/bufio"
-	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
 
@@ -49,10 +48,6 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 	return newNodeConn(cluster, addr, conn)
 }
 
-func deleteForwarder(n *nodeConn) {
-    log.Infof("delete redis node connection:%p to addr:%s", n, n.addr)
-}
-
 func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	var n = &nodeConn{
 		cluster: cluster,
@@ -61,7 +56,6 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 		br:      bufio.NewReader(conn, bufio.Get(nodeReadBufSize)),
 		bw:      bufio.NewWriter(conn),
 	}
-    log.Infof("create redis node connection:%p to addr:%s for cluster:%s", n, n.addr, cluster)
     return n
 }
 
@@ -122,7 +116,6 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 }
 
 func (nc *nodeConn) Close() (err error) {
-    log.Infof("try to close connection:%p redis node", nc)
 	if atomic.CompareAndSwapInt32(&nc.state, opened, closed) {
 		return nc.conn.Close()
 	}

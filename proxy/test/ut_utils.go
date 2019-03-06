@@ -448,11 +448,11 @@ func (m *MemcacheConn) Get(key string) (string, error) {
         if msgList[0] == "END" {
             return "", nil
         }
-        var err = fmt.Errorf("get operation redis return unknown msg:%s", msgList[0])
+        var err = fmt.Errorf("get operation memcache return unknown msg:%s", msgList[0])
         return "", err
     }
     if len(msgList) != 3 {
-        var err = fmt.Errorf("get operation redis return unexpected msg:%s, msglen:%d\n", respMsg, len(msgList))
+        var err = fmt.Errorf("get operation memcache return unexpected msg:%s, msglen:%d\n", respMsg, len(msgList))
         return "", err
     }
     return msgList[1], nil
@@ -622,7 +622,7 @@ func StartStandAloneMC(port string) error {
     gStartSn++
     // var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(gStartSn) + " logfile " + logPath + " &"
     var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(gStartSn) + " &"
-    fmt.Printf("try to exec cmd:%s\n", cmd)
+    // fmt.Printf("try to exec cmd:%s\n", cmd)
     var _, err2 = ExecCmd(cmd)
     return err2
 }
