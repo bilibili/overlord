@@ -21,5 +21,7 @@ cmd/apiserver/apiserver
 cmd/scheduler/scheduler
 cmd/balancer/balancer
 cmd/apicli/apicli
+proxy/test/conf/lotsof/*.conf
+proxy/test/proxy.log.*
 coverage.txt
 go.sum

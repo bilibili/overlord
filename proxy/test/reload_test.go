@@ -7,6 +7,7 @@ import (
 	"time"
 	"fmt"
     "strconv"
+    "errors"
 
     "overlord/proxy"
 	"overlord/pkg/log"
@@ -80,11 +81,13 @@ func writeToFile(name, content string) error {
 }
 
 var fileSn = 0
-// func dumpClusterConf(fileName string, confs []*proxy.ClusterConfig) error {
 func dumpClusterConf(fileName string, confs proxy.ClusterConfigs) error {
     var fullContent = ""
     for index := 0; index < len(confs.Clusters); index++ {
         var conf = confs.Clusters[index]
+        if conf == nil {
+            continue
+        }
         var content = "[[clusters]]\n"
         content += "name = \"" + conf.Name + "\"\n"
         content += "hash_method = \"" + conf.HashMethod + "\"\n"
@@ -258,17 +261,43 @@ func loopGetToSuccImpl(addr string, key, val string, servType int, ch chan int) 
     }
 }
 
-// changeCnt: configure load count 
-// expRcnt: the number that read behaviour is changed, eg: (ok, fail, ok, fail) = 3
-// connFailCnt: the number that connection is changed, eg: (ok, fail, ok) = 2
-func loopGet(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
-    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, connFailCnt, writeFirst, 0, ch)
-}
-func loopGetMc(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int, writeFirst bool, ch chan int) {
-    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, connFailCnt, writeFirst, 1, ch)
+func get(addr string, key, val string, servType int) error {
+    log.Infof("try to loop get from addr:%s\n", addr)
+    var cli CliConn
+    if servType == 0 {
+        cli = NewRedisConn(addr)
+    } else if servType == 1 {
+        cli = NewMemcacheConn(addr)
+    } else if servType == 2 {
+        cli = NewMemcacheConn(addr)
+    }
+
+    defer cli.Close()
+    var err = cli.Connect()
+    if err != nil {
+        return err
+    }
+    var newVal, err2 = cli.Get(key)
+    if err2 != nil {
+        return err2
+    }
+    if newVal != val {
+        return errors.New("expectValue:" + val + " not equal with real:" + newVal)
+    }
+    return nil
 }
 
-func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int,
+// changeCnt: configure load count 
+// expRcnt: the number that read behaviour is changed, eg: (ok, fail, ok, fail) = 3
+// expCnnFailCnt: the number that connection is changed, eg: (ok, fail, ok) = 2
+func loopGet(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int, writeFirst bool, ch chan int) {
+    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, expCnnFailCnt, writeFirst, 0, ch)
+}
+func loopGetMc(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int, writeFirst bool, ch chan int) {
+    loopGetImpl(addr, key, val, expChangeCnt, expRCnt, expCnnFailCnt, writeFirst, 1, ch)
+}
+
+func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int,
         writeFirst bool, servType int, ch chan int) {
     log.Infof("try to loop put and get to addr:%s\n", addr)
     var cli CliConn
@@ -345,10 +374,22 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, connFailCnt int,
                 prevConnSucc = true
                 log.Infof("succeed to get from:%s, cur changed cnt:%d expect change cnt:%d\n", addr, int(changeCnt), int(expChangeCnt))
             }
-            if changeCnt >= int32(expChangeCnt) {
+            if expRCnt == 0 && rChange > 0 {
+                ch <- -1
+                return
+            }
+            if  expCnnFailCnt == 0 && cnnCloseCnt > 0 {
+                ch <- -1
+                return
+            }
+            if expChangeCnt == 0 && changeCnt > 0 {
+                ch <- -1
+                return
+            }
+            if expChangeCnt > 0 && changeCnt >= int32(expChangeCnt) {
                 log.Infof("detect cluster changed, but read change and conn change not expect, change:%d connection close:%d rChange:%d\n", changeCnt, cnnCloseCnt, rChange)
 
-                if cnnCloseCnt == connFailCnt && rChange == expRCnt {
+                if cnnCloseCnt == expCnnFailCnt && rChange == expRCnt {
                     log.Infof("detect cluster changed, work as expect")
                     ch <- 1
                     return
@@ -387,7 +428,7 @@ func updateConf(intervalInSec int, fileName string, srcNames []string, ch chan i
                 ch <- 1
                 return
             }
-            time.Sleep(time.Duration(intervalInSec) * time.Second)
+            time.Sleep(time.Duration(intervalInSec) * time.Millisecond)
         }
     }
 }
@@ -459,7 +500,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var val = "val_loop_get1"
     go loopGet(frontAddr1, key, val, 3, 2, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(3, gClusterConfFile, confList, chUpdate)
+    go updateConf(3000, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -520,7 +561,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     var val = "val_loop_get2"
     go loopGet(frontAddr1, key, val, 3, 2, 2, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(3, gClusterConfFile, confList, chUpdate)
+    go updateConf(3000, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -583,7 +624,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var val = "val_loop_get2"
     go loopGet(frontAddr1, key, val, 1, 0, 0, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -645,7 +686,7 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     var key = "key_loop_get5"
     var val = "val_loop_get5"
     go loopGet(frontAddr1, key, val, 2, 2, 0, true, chGet1)
-    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, gClusterConfFile, confList, chUpdate)
     go nofreeConn(frontAddr1, chFrontLeak)
     var retCnt = 0
     for {
@@ -710,7 +751,7 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     var key = "mckey_loop_get1"
     var val = "mcval_loop_get1"
     go loopGetMc(frontAddr1, key, val, 2, 0, 0, true, chGet1)
-    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, gClusterConfFile, confList, chUpdate)
     var retCnt = 0
     for {
         select {
@@ -784,7 +825,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     var frontAddr2 = "127.0.0.1:8112"
     go loopGet(frontAddr1, key, val, 3, 0, 1, true, chGet1)
     go loopGetToSucc(frontAddr2, key, val, chGet2)
-    go updateConf(2, gClusterConfFile, confList, chUpdate)
+    go updateConf(2000, gClusterConfFile, confList, chUpdate)
     go checkAndKillStandalone(1)
     var retCnt = 0
     for {
@@ -809,5 +850,96 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     assert.Equal(t, 3, int(clusterChangeCnt))
     assert.Equal(t, 2, int(clusterCnt))
     log.Info("redis cluster reload done")
+    tearDownRedis()
+}
+
+func TestClusterConfigLoadLotsofCluster(t *testing.T) {
+    setupRedis("8213", "8214")
+    proxy.MonitorCfgIntervalMilliSecs = 100
+    var firstConfName = "conf/lotsof/0.conf"
+    var cmd = "cp " + firstConfName + " " + gClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+
+    var name = "conf/lotsof/0.conf"
+    succ, msg, initConf := proxy.LoadClusterConf(name)
+    require.True(t, succ, msg)
+
+    log.Info("start reload case on lots of when conf is invalid")
+    var confCnt = int(proxy.MaxClusterCnt) + 3
+    var confNameList = make([]string, confCnt, confCnt)
+    confNameList[0] = name
+
+    var baseConfig proxy.ClusterConfig;
+    baseConfig = *(initConf[0])
+    var confList proxy.ClusterConfigs;
+    confList.Clusters = make([]*proxy.ClusterConfig, confCnt, confCnt)
+    confList.Clusters[0] = &baseConfig;
+    for i := 1; i < confCnt - 1; i++ {
+        var fileName = "conf/lotsof/" + strconv.Itoa(int(i)) + ".conf"
+        var newConf = baseConfig;
+        newConf.Name = baseConfig.Name + "_" + strconv.Itoa(int(i))
+        newConf.ListenAddr = "127.0.0.1:" + strconv.Itoa(8513 + int(i))
+        confList.Clusters[i] = &newConf;
+        dumpClusterConf(fileName, confList)
+        confNameList[i] = fileName
+        // fmt.Printf("add conf file:%s\n", confNameList[i])
+    }
+    confNameList[confCnt - 1] =  "conf/lotsof/127.conf"
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = gClusterConfFile
+	assert.NoError(t, err)
+
+    server.Serve(initConf)
+    var chGet1 = make(chan int, 1)
+    var chUpdate = make(chan int, 1)
+    var frontAddr1 = "127.0.0.1:8513"
+    var key = "key_lots_get2"
+    var val = "val_lots_get2"
+    go loopGet(frontAddr1, key, val, 0, 0, 0, true, chGet1)
+    go updateConf(400, gClusterConfFile, confNameList, chUpdate)
+    var updateConfRet = <-chUpdate
+    log.Infof("update configure routine return ret:%d\n", updateConfRet)
+    for {
+        var breakNow = false
+        select {
+        case getChanged := <-chGet1:
+            log.Infof("loop get on cluster 1 has returned:%d\n", getChanged)
+            assert.Equal(t, 1, getChanged)
+            breakNow = true
+        default:
+            var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+            if int(clusterCnt) == int(proxy.MaxClusterCnt) {
+                breakNow = true
+            }
+
+        }
+        if breakNow {
+            chGet1 <- 1
+            log.Info("main routine break now")
+            break
+        }
+    }
+    for i := 0; i < confCnt; i++ {
+        var addr = "127.0.0.1:" + strconv.Itoa(8513 + int(i))
+        var err = get(addr, key, val, 0);
+        if i < int(proxy.MaxClusterCnt) {
+            assert.NoError(t, err)
+        } else {
+            require.True(t, err != nil)
+        }
+    }
+
+    server.Close()
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    assert.Equal(t, 0, int(clusterChangeCnt))
+    log.Info("lots of case done")
     tearDownRedis()
 }

@@ -293,7 +293,7 @@ func (p* Proxy) monitorConfChange() {
 
         var clusterCnt = p.curClusterCnt + int32(len(newAdd))
 
-        if (clusterCnt >= MaxClusterCnt) {
+        if (clusterCnt > MaxClusterCnt) {
             log.Errorf("failed to reload conf as too much cluster will be added, new cluster count(%d) and max count(%d)",
                 clusterCnt, MaxClusterCnt)
             continue
