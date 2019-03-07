@@ -15,11 +15,12 @@ import (
 
 func TestProxyConn(t *testing.T) {
 	pc := &proxyConn{
-		c:  &cluster{},
+		// c:  &cluster{},
 		pc: &redis.ProxyConn{},
 	}
-	pc.c.fakeNodesBytes = []byte("fake nodes bytes")
-	pc.c.fakeSlotsBytes = []byte("fake slots bytes")
+    cls := &cluster{}
+	cls.fakeNodesBytes = []byte("fake nodes bytes")
+	cls.fakeSlotsBytes = []byte("fake slots bytes")
 	bw := &bufio.Writer{}
 	msgs := proto.GetMsgs(1)
 	msg := msgs[0]
@@ -64,10 +65,10 @@ func TestProxyConn(t *testing.T) {
 	})
 	// bw stub
 	monkey.PatchInstanceMethod(reflect.TypeOf(bw), "Write", func(_ *bufio.Writer, bs []byte) error {
-		assert.Equal(t, pc.c.fakeNodesBytes, bs)
+		assert.Equal(t, cls.fakeNodesBytes, bs)
 		return nil
 	})
-	err := pc.Encode(msg)
+	err := pc.Encode(msg, cls)
 	assert.NoError(t, err)
 
 	// case cmdSlotsBytes
@@ -81,10 +82,10 @@ func TestProxyConn(t *testing.T) {
 	})
 	// bw stub
 	monkey.PatchInstanceMethod(reflect.TypeOf(bw), "Write", func(_ *bufio.Writer, bs []byte) error {
-		assert.Equal(t, pc.c.fakeSlotsBytes, bs)
+		assert.Equal(t, cls.fakeSlotsBytes, bs)
 		return nil
 	})
-	err = pc.Encode(msg)
+	err = pc.Encode(msg, cls)
 	assert.NoError(t, err)
 
 	// case not support
@@ -101,7 +102,7 @@ func TestProxyConn(t *testing.T) {
 		assert.Equal(t, notSupportBytes, bs)
 		return nil
 	})
-	err = pc.Encode(msg)
+	err = pc.Encode(msg, cls)
 	assert.NoError(t, err)
 
 	// resp stub
@@ -111,6 +112,6 @@ func TestProxyConn(t *testing.T) {
 	monkey.PatchInstanceMethod(reflect.TypeOf(resp), "Array", func(_ *redis.RESP) []*redis.RESP {
 		return []*redis.RESP{resp}
 	})
-	err = pc.Encode(msg)
+	err = pc.Encode(msg, cls)
 	assert.EqualError(t, errors.Cause(err), ErrInvalidArgument.Error())
 }

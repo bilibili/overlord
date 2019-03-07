@@ -205,7 +205,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 			conn := _createConn(nil)
 			p := NewProxyConn(conn)
 			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
-			err := p.Encode(msg)
+			err := p.Encode(msg, nil)
 			assert.NoError(t, err)
 			err = p.Flush()
 			assert.NoError(t, err)
@@ -224,13 +224,13 @@ func TestEncodeErr(t *testing.T) {
 
 	msg := proto.NewMessage()
 	msg.WithError(fmt.Errorf("SERVER_ERR"))
-	err := p.Encode(msg)
+	err := p.Encode(msg, nil)
 	assert.NoError(t, err)
 
 	msg = proto.NewMessage()
 	msg.Type = types.CacheTypeMemcache
 	msg.WithRequest(&mockReq{})
-	err = p.Encode(msg)
+	err = p.Encode(msg, nil)
 	assert.NoError(t, err)
 
 	msg = proto.NewMessage()
@@ -238,7 +238,7 @@ func TestEncodeErr(t *testing.T) {
 	msg.WithRequest(&mockReq{})
 	msg.WithRequest(&mockReq{}) // NOTE: batch
 	msg.Batch()
-	err = p.Encode(msg)
+	err = p.Encode(msg, nil)
 	assert.NoError(t, err)
 
 	p.Flush()

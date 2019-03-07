@@ -3,11 +3,11 @@ package proxy
 import (
 	errs "errors"
 	"net"
+	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
-	"sort"
-	// "strings"
 
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
@@ -176,15 +176,15 @@ func (p *Proxy) accept(cid int32, l net.Listener) {
 			}
 		}
 		atomic.AddInt32(&p.conns, 1)
-        var advConn = libnet.NewConn(conn, time.Second*time.Duration(p.c.Proxy.ReadTimeout), time.Second*time.Duration(p.c.Proxy.WriteTimeout))
-        var ret = p.addConnection(cid, conf.SN, advConn)
-        if ret != 0 {
+        var frontConn = libnet.NewConn(conn, time.Second*time.Duration(p.c.Proxy.ReadTimeout), time.Second*time.Duration(p.c.Proxy.WriteTimeout))
+        err = p.addConnection(cid, conf.SN, frontConn)
+        if err != nil {
             // corner case, configure changed when we try to keep this connection
-            log.Errorf("corner case, configure just changed when after accept a connection")
-            advConn.Close()
+            log.Errorf("corner case, configure just changed when after accept a connection, got error:%s\n", err.Error())
+            frontConn.Close()
             continue
         }
-		NewHandler(p, conf, advConn).Handle()
+		NewHandler(p, conf, frontConn).Handle()
 	}
 }
 
@@ -203,7 +203,7 @@ func (p *Proxy) Close() error {
 }
 
 // Get forwarder from proxy, thread safe
-func (p *Proxy) addConnection(cid int32, sn int32, conn *libnet.Conn) int {
+func (p *Proxy) addConnection(cid int32, sn int32, conn *libnet.Conn) error {
     var ret = p.clusters[cid].addConnection(sn, conn)
     return ret
 }
@@ -319,14 +319,14 @@ func (c *Cluster) Close() {
     c.closeAllConnections()
 }
 
-func (c *Cluster) addConnection(sn int32, conn* libnet.Conn) int {
+func (c *Cluster) addConnection(sn int32, conn* libnet.Conn) error {
     c.mutex.Lock()
     defer c.mutex.Unlock()
     if sn != c.conf.SN {
-        return -1
+        return errors.New("config is change, try again from:" + strconv.Itoa(int(sn)) + " to:" + strconv.Itoa(int(c.conf.SN)))
     }
     c.clientConns[conn.ID] = conn
-    return 0
+    return nil
 }
 
 func (c *Cluster) removeConnection(id int64) {

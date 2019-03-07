@@ -56,8 +56,8 @@ func (c *Config) Validate() error {
 // ClusterConfig cluster config.
 type ClusterConfig struct {
 	Name             string
-    ID               int32           // ID is set in memory, not from conf file
-    SN               int32           // SN is set in memory, not from conf file
+    ID               int32           // ID is set in memory, not from conf file, used to access a config from a array
+    SN               int32           // SN is set in memory, not from conf file, it is used to identify the version of a config since name & ID is not changed
 	HashMethod       string          `toml:"hash_method"`
 	HashDistribution string          `toml:"hash_distribution"`
 	HashTag          string          `toml:"hash_tag"`

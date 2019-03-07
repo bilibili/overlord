@@ -107,12 +107,11 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 		c.Proxy.UseMetrics = metrics
 	}
 	// high priority end
-    var succ bool = false
-    var msg string
-    succ, msg, ccs = proxy.LoadClusterConf(clusterConfFile)
-    if (!succ) {
-        panic(msg)
+    var tmpCCS, err = proxy.LoadClusterConf(clusterConfFile)
+    if (err != nil) {
+        panic(err)
     }
+    ccs = tmpCCS
 	return
 }
 

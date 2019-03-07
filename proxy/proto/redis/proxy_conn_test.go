@@ -152,18 +152,18 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 	msg.WithRequest(req)
 	conn := _createConn([]byte(nil))
 	pc := NewProxyConn(conn)
-	err := pc.Encode(msg)
+	err := pc.Encode(msg, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, req.reply.data, notSupportDataBytes)
 
 	req.resp.next()
 	req.resp.array[0].data = cmdPingBytes
-	err = pc.Encode(msg)
+	err = pc.Encode(msg, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, req.reply.data, pongDataBytes)
 
 	req.resp.array[0].data = cmdQuitBytes
-	err = pc.Encode(msg)
+	err = pc.Encode(msg, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, req.reply.data, justOkBytes)
 }
@@ -250,7 +250,7 @@ func TestEncodeMergeOk(t *testing.T) {
 			}
 			conn, buf := _createDownStreamConn()
 			pc := NewProxyConn(conn)
-			err := pc.Encode(msg)
+			err := pc.Encode(msg, nil)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -279,7 +279,7 @@ func TestEncodeWithError(t *testing.T) {
 
 	conn, buf := _createDownStreamConn()
 	pc := NewProxyConn(conn)
-	err := pc.Encode(msg)
+	err := pc.Encode(msg, nil)
 	assert.Error(t, err)
 	assert.Equal(t, mockErr, err)
 
@@ -311,7 +311,7 @@ func TestEncodeWithPing(t *testing.T) {
 
 	conn, buf := _createDownStreamConn()
 	pc := NewProxyConn(conn)
-	err := pc.Encode(msg)
+	err := pc.Encode(msg, nil)
 	assert.NoError(t, err)
 	err = pc.Flush()
 	assert.NoError(t, err)
