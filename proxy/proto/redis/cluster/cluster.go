@@ -71,7 +71,9 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		action:  make(chan struct{}),
 	}
 	if !c.tryFetch() {
-		panic("redis cluster all seed nodes fail to fetch")
+		_ = c.Close()
+		log.Warnf("fail to init fetch cluster all seeds nodes cluster down but continue")
+		return c
 	}
 	c.fake(listen)
 	go c.fetchproc()
@@ -98,7 +100,11 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 
 func (c *cluster) Close() error {
 	if !atomic.CompareAndSwapInt32(&c.state, opening, closed) {
-		np := c.slotNode.Load().(*slotNode)
+		sn := c.slotNode.Load()
+		if sn == nil {
+			return nil
+		}
+		np := sn.(*slotNode)
 		for _, npc := range np.nodePipe {
 			npc.Close()
 		}
