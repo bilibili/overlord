@@ -30,6 +30,8 @@ var (
     ClusterCount int32 = 0
     ClusterConfChangeFailCnt int32 = 0
     AddClusterFailCnt int32 = 0
+    LoadFailCnt int32 = 0
+    FailedDueToRemovedCnt int32 = 0
 )
 const MaxClusterCnt int32 = 128
 
@@ -230,6 +232,26 @@ func (p *Proxy) getClusterConf(cid int32) (*ClusterConfig) {
     return p.clusters[cid].getConf()
 }
 
+func (p* Proxy) anyClusterRemoved(newConfs, oldConfs []*ClusterConfig) bool {
+	var (
+        newNames = make (map[string]int)
+        oldNames = make (map[string]int)
+    )
+    for _, conf := range newConfs {
+        newNames[conf.Name] = 1
+    }
+    for _, conf := range oldConfs {
+        oldNames[conf.Name] = 1
+    }
+    for name, _ := range oldNames {
+        _, find := newNames[name];
+        if !find {
+            return true
+        }
+    }
+    return false
+}
+
 func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newAdd []*ClusterConfig) {
     for _, newConf := range newConfs {
         var find = false
@@ -273,6 +295,7 @@ func (p* Proxy) monitorConfChange() {
         var newConfs, err = LoadClusterConf(p.ClusterConfFile)
         if (err != nil) {
             log.Errorf("failed to load conf file:%s, got error:%s\n", p.ClusterConfFile, err.Error())
+            atomic.AddInt32(&LoadFailCnt, 1)
             continue
         }
         var oldConfs []*ClusterConfig;
@@ -280,6 +303,13 @@ func (p* Proxy) monitorConfChange() {
             var conf = p.clusters[i].getConf()
             oldConfs = append(oldConfs, conf)
         }
+        var removed = p.anyClusterRemoved(newConfs, oldConfs)
+        if removed {
+            log.Errorf("some cluster is removed from conf file, ignore this change")
+            atomic.AddInt32(&FailedDueToRemovedCnt, 1)
+            continue
+        }
+
         var newAdd []*ClusterConfig;
         var changedConf []*ClusterConfig;
         changedConf, newAdd = p.parseChanged(newConfs, oldConfs)
@@ -297,10 +327,10 @@ func (p* Proxy) monitorConfChange() {
             if (err == nil ) {
                 atomic.AddInt32(&ClusterChangeCount, 1)
                 log.Infof("succeed to change conf of cluster(%s:%d)\n", conf.Name, conf.ID)
-            } else {
-                atomic.AddInt32(&ClusterConfChangeFailCnt, 1)
-                log.Errorf("failed to change conf of cluster(%s), got error:%s\n", conf.Name, err.Error())
+                continue
             }
+            atomic.AddInt32(&ClusterConfChangeFailCnt, 1)
+            log.Errorf("failed to change conf of cluster(%s), got error:%s\n", conf.Name, err.Error())
         }
         for _, conf := range newAdd {
             var err = p.addCluster(conf)

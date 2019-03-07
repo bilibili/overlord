@@ -151,8 +151,16 @@ func (cc *ClusterConfig) Validate() error {
     if intPort <= 0 {
         return errors.New("invalid port in listen address:" + cc.ListenAddr)
     }
-    if (len(cc.Servers) == 0) {
-        return errors.New("back end cluster is empty")
+    if (cc.CacheType == types.CacheTypeRedisCluster) {
+        err = ValidateRedisCluster(cc.Servers)
+        if err != nil {
+            return err
+        }
+    } else {
+        err = ValidateStandalone(cc.Servers)
+        if err != nil {
+            return err
+        }
     }
 	return nil
 }

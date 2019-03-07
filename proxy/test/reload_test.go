@@ -1059,3 +1059,49 @@ func TestClusterConfigReloadValidateAddress(t *testing.T) {
     stCluster1[0] = "0.0.0.0:0:-1 name"
 	require.Error(t, proxy.ValidateStandalone(stCluster1))
 }
+
+func TestClusterConfigReloadClusterRemoved(t *testing.T) {
+    var ClusterConfFile = "./conf/some_cluster_removed.conf"
+    setupRedis("8217", "8218")
+    log.Infof("start reload case of cluster removed\n")
+
+    var firstConfName = "conf/cluster_removed/0.conf"
+    var cmd = "cp " + firstConfName + " " + ClusterConfFile
+    ExecCmd(cmd)
+    var proxyConf = &proxy.Config{}
+    var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	assert.NoError(t, loadConfError)
+    if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+    var confCnt = 2
+    var confList = make([]string, confCnt, confCnt)
+    for i := 0; i < confCnt; i++ {
+        var name = "conf/cluster_removed/" + strconv.Itoa(int(i)) + ".conf"
+        confList[i] = name
+    }
+
+    var server, err = proxy.NewProxy(proxyConf)
+    server.ClusterConfFile = ClusterConfFile
+	assert.NoError(t, err)
+    var name = "conf/cluster_removed/0.conf"
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
+
+    server.Serve(initConf)
+    var chUpdate = make(chan int, 1)
+    go updateConf(1000, ClusterConfFile, confList, chUpdate)
+    var updateConfRet = <-chUpdate
+    log.Infof("update configure routine return ret:%d\n", updateConfRet)
+    time.Sleep(time.Duration(2 * proxy.MonitorCfgIntervalMilliSecs) * time.Millisecond)
+    server.Close()
+
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
+    assert.Equal(t, 0, int(clusterChangeCnt))
+    assert.Equal(t, 2, int(clusterCnt))
+    var faildCnt = atomic.LoadInt32(&proxy.FailedDueToRemovedCnt)
+    assert.True(t, faildCnt > 0)
+    log.Info("redis cluster removed case done")
+    tearDownRedis()
+}
