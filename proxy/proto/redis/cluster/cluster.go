@@ -27,7 +27,7 @@ const (
 var (
 	ErrClusterClosed = errs.New("cluster executor already closed")
 )
-var gClusterStartID int32 = 20000
+var ClusterStartID int32 = 20000
 
 const (
 	fakeClusterNodes = "" +
@@ -73,9 +73,9 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		hashTag: hashTag,
 		action:  make(chan struct{}),
 	}
-    c.id = atomic.AddInt32(&gClusterStartID, 1)
+    c.id = atomic.AddInt32(&ClusterStartID, 1)
 	if !c.tryFetch() {
-		var err = errs.New("fail to any redis cluster seed nodes")
+		var err = errs.New("fail to get any redis cluster seed nodes")
         return nil, err
 	}
 	var err = c.fake(listen)

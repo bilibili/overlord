@@ -19,12 +19,12 @@ import (
 var gSN int = 0
 
 func setupRedis(port1, port2 string) {
-    proxy.GClusterSn = 0
+    proxy.ClusterSn = 0
     proxy.MonitorCfgIntervalMilliSecs = 500
-    proxy.GClusterChangeCount = 0
-    proxy.GClusterCount = 0
-    proxy.GAddClusterFailCnt = 0
-    proxy.GClusterConfChangeFailCnt = 0
+    proxy.ClusterChangeCount = 0
+    proxy.ClusterCount = 0
+    proxy.AddClusterFailCnt = 0
+    proxy.ClusterConfChangeFailCnt = 0
     KillAllRedis()
     var sn = strconv.Itoa(gSN)
     var redisConf1 = "/tmp/redis_s_" + port1 + "_" + sn + ".conf";
@@ -48,7 +48,7 @@ func tearDownMecache() {
 
 func checkAndKillStandalone(expectCnt int) {
     for {
-        var changed = atomic.LoadInt32(&proxy.GClusterChangeCount)
+        var changed = atomic.LoadInt32(&proxy.ClusterChangeCount)
         if changed >= int32(expectCnt) {
             log.Infof("cluster changed:%d larger than expect:%d, go kill standalone\n", int(changed), expectCnt)
             KillAllRedis()
@@ -59,12 +59,12 @@ func checkAndKillStandalone(expectCnt int) {
 }
 
 func setupMC(port1, port2 string) {
-    proxy.GClusterSn = 0
+    proxy.ClusterSn = 0
     proxy.MonitorCfgIntervalMilliSecs = 500
-    proxy.GClusterChangeCount = 0
-    proxy.GClusterCount = 0
-    proxy.GAddClusterFailCnt = 0
-    proxy.GClusterConfChangeFailCnt = 0
+    proxy.ClusterChangeCount = 0
+    proxy.ClusterCount = 0
+    proxy.AddClusterFailCnt = 0
+    proxy.ClusterConfChangeFailCnt = 0
     KillAllMC()
     StartStandAloneMC(port1)
     StartStandAloneMC(port2)
@@ -341,7 +341,7 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
             // log.Info("loop get now")
             // var msg = ""
             var gotChange = false
-            var changeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+            var changeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
             if changeCnt != prevChangeCnt {
                 prevChangeCnt = changeCnt;
                 gotChange = true
@@ -492,8 +492,8 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
 
-    succ, msg, initConf := proxy.LoadClusterConf(firstConfName)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -554,8 +554,8 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
 
-    succ, msg, initConf := proxy.LoadClusterConf(firstConfName)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -607,7 +607,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     if log.Init(proxyConf.Config) {
 		defer log.Close()
 	}
-    var confCnt = 25
+    var confCnt = 26
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
         var name = "conf/nopanic/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
@@ -618,8 +618,8 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/nopanic/redis_standalone_0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -654,8 +654,8 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     }
     server.Close()
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
-    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
     assert.Equal(t, 1, int(clusterChangeCnt))
     assert.Equal(t, 2, int(clusterCnt))
     log.Info("no panic case done")
@@ -686,8 +686,8 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/frontleak/redis_standalone_0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -713,8 +713,8 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
         }
     }
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
-    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
     assert.Equal(t, 2, int(clusterChangeCnt))
     assert.Equal(t, 1, int(clusterCnt))
     log.Info("start to connection to check")
@@ -753,8 +753,8 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/memcache/standalone_0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -779,8 +779,8 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     }
     server.Close()
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
-    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
     assert.Equal(t, 2, int(clusterChangeCnt))
     assert.Equal(t, 1, int(clusterCnt))
     log.Info("memcache reload done")
@@ -827,8 +827,8 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/rediscluster/0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chGet1 = make(chan int, 1)
@@ -858,8 +858,8 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
     }
     server.Close()
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
-    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
     assert.Equal(t, 3, int(clusterChangeCnt))
     assert.Equal(t, 2, int(clusterCnt))
     log.Info("redis cluster reload done")
@@ -881,8 +881,8 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	}
 
     var name = "conf/lotsof/0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     log.Info("start reload case on lots of when conf is invalid")
     var confCnt = int(proxy.MaxClusterCnt) + 3
@@ -928,7 +928,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
             assert.Equal(t, 1, getChanged)
             breakNow = true
         default:
-            var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+            var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
             if int(clusterCnt) == int(proxy.MaxClusterCnt) {
                 breakNow = true
             }
@@ -952,7 +952,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 
     server.Close()
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
     assert.Equal(t, 0, int(clusterChangeCnt))
     log.Info("lots of case done")
     tearDownRedis()
@@ -962,18 +962,6 @@ func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
     var ClusterConfFile = "./conf/rediscluster_seed_cluster.conf"
     setupRedis("8215", "8216")
     log.Infof("start reload case of get seed fail\n")
-
-    var cluster1 = "127.0.0.1:7000"
-    var cluster2 = "127.0.0.1:9000"
-    var cli1 = NewRedisConn(cluster1)
-    var cli2 = NewRedisConn(cluster2)
-    cli1.autoReconn = true
-    cli2.autoReconn = true
-    var key = "cluster_key2"
-    var val = "cluster_value2"
-    var err0 = cli1.Put(key, val)
-	require.NoError(t, err0)
-    cli1.Close()
 
     var firstConfName = "conf/getseedfail/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
@@ -995,8 +983,8 @@ func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
     var name = "conf/getseedfail/0.conf"
-    succ, msg, initConf := proxy.LoadClusterConf(name)
-    require.True(t, succ, msg)
+    initConf, initErr := proxy.LoadClusterConf(name)
+	require.NoError(t, initErr)
 
     server.Serve(initConf)
     var chUpdate = make(chan int, 1)
@@ -1006,12 +994,68 @@ func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
     time.Sleep(time.Duration(2 * proxy.MonitorCfgIntervalMilliSecs) * time.Millisecond)
     server.Close()
 
-    var clusterChangeCnt = atomic.LoadInt32(&proxy.GClusterChangeCount)
-    var clusterCnt = atomic.LoadInt32(&proxy.GClusterCount)
+    var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
+    var clusterCnt = atomic.LoadInt32(&proxy.ClusterCount)
     assert.Equal(t, 0, int(clusterChangeCnt))
     assert.Equal(t, 1, int(clusterCnt))
-    var faildCnt = atomic.LoadInt32(&proxy.GAddClusterFailCnt)
+    var faildCnt = atomic.LoadInt32(&proxy.AddClusterFailCnt)
     assert.True(t, faildCnt > 0)
     log.Info("redis cluster get seek fail case done")
     tearDownRedis()
+}
+
+func TestClusterConfigReloadValidateAddress(t *testing.T) {
+    var redisCluster1 = make ([]string, 0, 10)
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1 = append(redisCluster1, ":")
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1[0] = " : "
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1[0] = "0.0.0.0: "
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1[0] = "0.0.0.0: "
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1[0] = "0.0.0.0:0"
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    redisCluster1[0] = "0.0.0.0: 1"
+	require.Error(t, proxy.ValidateRedisCluster(redisCluster1))
+
+    var stCluster1 = make ([]string, 0, 10)
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1 = append(stCluster1, "")
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = " "
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0 name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0 name name2"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0:1 name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0:0:2 name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0:X:2 name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0:0:Y name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
+
+    stCluster1[0] = "0.0.0.0:0:-1 name"
+	require.Error(t, proxy.ValidateStandalone(stCluster1))
 }

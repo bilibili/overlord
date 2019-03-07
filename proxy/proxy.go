@@ -24,12 +24,12 @@ import (
 // proxy errors
 var (
 	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
-    GClusterSn int32 = 0
+    ClusterSn int32 = 0
     MonitorCfgIntervalMilliSecs int = 10 * 100  // Time interval to monitor config change
-    GClusterChangeCount int32 = 0
-    GClusterCount int32 = 0
-    GClusterConfChangeFailCnt int32 = 0
-    GAddClusterFailCnt int32 = 0
+    ClusterChangeCount int32 = 0
+    ClusterCount int32 = 0
+    ClusterConfChangeFailCnt int32 = 0
+    AddClusterFailCnt int32 = 0
 )
 const MaxClusterCnt int32 = 128
 
@@ -67,7 +67,7 @@ func NewProxy(c *Config) (p *Proxy, err error) {
 }
 
 func genClusterSn() int32 {
-    var id = atomic.AddInt32(&GClusterSn, 1)
+    var id = atomic.AddInt32(&ClusterSn, 1)
     return id
 }
 
@@ -98,7 +98,6 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
     var newForwarder, err = NewForwarder(newConf)
     if err != nil {
         p.lock.Unlock()
-        atomic.AddInt32(&GAddClusterFailCnt, 1)
         return err
     }
     newForwarder.AddRef()
@@ -112,12 +111,11 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
         cluster.Close()
         cluster.forwarder = nil
         newForwarder.Release()
-        atomic.AddInt32(&GAddClusterFailCnt, 1)
         return servErr
     }
     p.curClusterCnt++
     p.lock.Unlock()
-    atomic.AddInt32(&GClusterCount, 1)
+    atomic.AddInt32(&ClusterCount, 1)
     log.Infof("succeed to add cluster:%s with addr:%s\n", newConf.Name, newConf.ListenAddr)
     return nil
 }
@@ -272,9 +270,9 @@ func (p* Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 func (p* Proxy) monitorConfChange() {
     for {
         time.Sleep(time.Duration(MonitorCfgIntervalMilliSecs) * time.Millisecond)
-        var succ, msg, newConfs = LoadClusterConf(p.ClusterConfFile)
-        if (!succ) {
-            log.Errorf("failed to load conf file:%s, got error:%s\n", p.ClusterConfFile, msg)
+        var newConfs, err = LoadClusterConf(p.ClusterConfFile)
+        if (err != nil) {
+            log.Errorf("failed to load conf file:%s, got error:%s\n", p.ClusterConfFile, err.Error())
             continue
         }
         var oldConfs []*ClusterConfig;
@@ -297,16 +295,21 @@ func (p* Proxy) monitorConfChange() {
             // use new forwarder now
             var err = p.clusters[conf.ID].processConfChange(conf)
             if (err == nil ) {
-                atomic.AddInt32(&GClusterChangeCount, 1)
+                atomic.AddInt32(&ClusterChangeCount, 1)
                 log.Infof("succeed to change conf of cluster(%s:%d)\n", conf.Name, conf.ID)
             } else {
-                atomic.AddInt32(&GClusterConfChangeFailCnt, 1)
+                atomic.AddInt32(&ClusterConfChangeFailCnt, 1)
                 log.Errorf("failed to change conf of cluster(%s), got error:%s\n", conf.Name, err.Error())
             }
         }
         for _, conf := range newAdd {
-            log.Infof("try to add new cluster(%s:%d)", conf.Name, conf.ID)
-            p.addCluster(conf)
+            var err = p.addCluster(conf)
+            if err != nil {
+                atomic.AddInt32(&AddClusterFailCnt, 1)
+                log.Errorf("failed to add new cluster:%s, got error:%s\n", conf.Name, err.Error())
+                continue
+            }
+            log.Infof("succeed to add new cluster:%s", conf.Name)
         }
     }
 }

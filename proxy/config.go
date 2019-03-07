@@ -3,6 +3,7 @@ package proxy
 import (
 	"fmt"
 	"strings"
+	"strconv"
 
 	"overlord/pkg/log"
 	"overlord/pkg/types"
@@ -74,6 +75,49 @@ type ClusterConfig struct {
 	Servers          []string        `toml:"servers"`
 }
 
+func ValidateRedisCluster(servers []string) error {
+    if len(servers) == 0 {
+        return errors.New("empty redis cluster list")
+    }
+    for _, one := range(servers) {
+        var ipPort = strings.Split(one, ":")
+        if len(ipPort) != 2 {
+            return errors.New("invalid backend redis address format:" + one)
+        }
+        var intPort, err = strconv.Atoi(ipPort[1])
+        if err != nil || intPort <= 0 {
+            return errors.New("invalid backend redis address format:" + one)
+        }
+
+    }
+    return nil
+}
+
+func ValidateStandalone(servers []string) error {
+    if len(servers) == 0 {
+        return errors.New("empty backend server list")
+    }
+    for _, one := range(servers) {
+        var ipAlise = strings.Split(one, " ")
+        if len(ipAlise) != 1 && len(ipAlise) != 2 {
+            return errors.New("invalid backend address format:" + one)
+        }
+        var ipPort = strings.Split(ipAlise[0], ":")
+        if len(ipPort) != 3 {
+            return errors.New("invalid backend redis address format:" + one)
+        }
+        var intPort, err1 = strconv.Atoi(ipPort[1])
+        if err1 != nil || intPort <= 0 {
+            return errors.New("invalid backend redis address format:" + one)
+        }
+        var weight, err2 = strconv.Atoi(ipPort[2])
+        if err2 != nil || weight < 0 {
+            return errors.New("invalid backend redis address format:" + one)
+        }
+    }
+    return nil
+}
+
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
@@ -94,6 +138,18 @@ func (cc *ClusterConfig) Validate() error {
     }
     if (cc.DialTimeout < 0 || cc.ReadTimeout < 0 || cc.WriteTimeout < 0 || cc.NodeConnections <= 0 || cc.PingFailLimit < 0) {
         return errors.New("cannot meet condition: dial_timeout >= 0 and read_timeout >= 0 write_timeout >= 0 && node_connections > 0 && ping_fail_limit > 0")
+    }
+
+    var ipPort = strings.Split(cc.ListenAddr, ":")
+    if len(ipPort) != 2 {
+        return errors.New("invalid listen address:" + cc.ListenAddr)
+    }
+    var intPort, err = strconv.Atoi(ipPort[1])
+    if err != nil {
+        return errors.New("invalid listen address:" + cc.ListenAddr)
+    }
+    if intPort <= 0 {
+        return errors.New("invalid port in listen address:" + cc.ListenAddr)
     }
     if (len(cc.Servers) == 0) {
         return errors.New("back end cluster is empty")
@@ -132,37 +188,33 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 	return nil
 }
 
-func LoadClusterConf(path string) (succ bool, msg string, ccs []*ClusterConfig) {
+func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
+    err = nil
+    ccs = nil
 	checks := map[string]struct{}{}
     cs := &ClusterConfigs{}
-    if err := cs.LoadFromFile(path); err != nil {
-        succ = false
-        msg = "failed to load cluster conf file:" + path + ", error:" + err.Error()
+    if err = cs.LoadFromFile(path); err != nil {
         return
     }
     for _, cc := range cs.Clusters {
         if _, ok := checks[cc.Name]; ok {
-            succ = false
-            msg = "duplicate cluster name:" + cc.Name + " in cluster conf file."
+            err = errors.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
             return
         }
         checks[cc.Name] = struct{}{}
         var ipPort = strings.Split(cc.ListenAddr, ":")
         if len(ipPort) != 2 {
-            succ = false
-            msg = "invalid listen address:" + cc.ListenAddr + " in cluster conf file."
+            err = errors.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
             return
         }
         var port = ipPort[1]
         if _, ok := checks[port]; ok {
-            succ = false
-            msg = "duplicate listen address:" + cc.ListenAddr + " in cluster conf file."
+            err = errors.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
             return
         }
+
         checks[port] = struct{}{}
     }
-    succ = true
-    msg = ""
     ccs = append(ccs, cs.Clusters...)
     return
 }
