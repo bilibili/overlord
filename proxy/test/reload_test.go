@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var gSN int = 0
+var SeqNO int = 0
 
 func setupRedis(port1, port2 string) {
     proxy.ClusterSn = 0
@@ -26,7 +26,7 @@ func setupRedis(port1, port2 string) {
     proxy.AddClusterFailCnt = 0
     proxy.ClusterConfChangeFailCnt = 0
     KillAllRedis()
-    var sn = strconv.Itoa(gSN)
+    var sn = strconv.Itoa(SeqNO)
     var redisConf1 = "/tmp/redis_s_" + port1 + "_" + sn + ".conf";
     var redisConf2 = "/tmp/redis_s_" + port2 + "_" + sn + ".conf";
     var err1 = StartStandAloneRedis(redisConf1, port1, redisConf1 + ".log")
@@ -37,7 +37,7 @@ func setupRedis(port1, port2 string) {
     if err2 != nil {
         fmt.Printf("failed to start redis1, get error:%s\n", err2.Error())
     }
-    gSN++
+    SeqNO++
 }
 func tearDownRedis() {
     KillAllRedis()
@@ -68,7 +68,7 @@ func setupMC(port1, port2 string) {
     KillAllMC()
     StartStandAloneMC(port1)
     StartStandAloneMC(port2)
-    gSN++
+    SeqNO++
 }
 
 func writeToFile(name, content string) error {

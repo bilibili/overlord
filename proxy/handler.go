@@ -95,13 +95,13 @@ func (h *Handler) handle() {
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-            // log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
+            log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
 			h.deferHandle(messages, err)
             forwarder.Release()
 			return
 		}
         var fState = forwarder.State()
-        if (ForwarderStateClosed == fState) {
+        if (forwarderStateClosed == fState) {
             forwarder.Release()
             if (h.closeWhenChange) {
                 h.deferHandle(messages, err)
@@ -110,17 +110,20 @@ func (h *Handler) handle() {
             forwarder = h.p.GetForwarder(h.ClusterID)
         }
         // here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
-		var err = forwarder.Forward(msgs)
+		forwarder.Forward(msgs)
+        /*
         if (err != nil) {
             log.Infof("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
+            fmt.Printf("forwarder of cluster:%d is close, client need to reconn, get err:%s\n", h.ClusterID, err.Error())
             h.deferHandle(messages, err)
             forwarder.Release()
             return
         }
+        */
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
-			if err = h.pc.Encode(msg, forwarder); err != nil {
+            if err := h.pc.Encode(msg, forwarder); err != nil {
 				h.pc.Flush()
                 log.Warnf("failed to encode message, close front connection now")
 				h.deferHandle(messages, err)
@@ -133,7 +136,7 @@ func (h *Handler) handle() {
 				prom.ProxyTime(h.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 			}
 		}
-		if err = h.pc.Flush(); err != nil {
+        if err := h.pc.Flush(); err != nil {
             log.Warnf("failed to flush message, close front connection now")
 			h.deferHandle(messages, err)
             forwarder.Release()

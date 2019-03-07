@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	ForwarderStateOpening = int32(0)
-	ForwarderStateClosed  = int32(1)
+	forwarderStateOpening = int32(0)
+	forwarderStateClosed  = int32(1)
 )
 
 // errors
@@ -41,7 +41,7 @@ var (
 		types.CacheTypeRedis:          struct{}{},
 	}
     PingSleepTimeSec int32 = 300
-    gForwardID int32 = 10000
+    ForwardID int32 = 10000
 )
 
 // NewForwarder new a Forwarder by cluster config.
@@ -79,8 +79,8 @@ type defaultForwarder struct {
 
 // newDefaultForwarder must combinf.
 func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
-    f := &defaultForwarder{cc: cc, state:ForwarderStateOpening, useCount: 0 }
-    f.id = atomic.AddInt32(&gForwardID, 1)
+    f := &defaultForwarder{cc: cc, state:forwarderStateOpening, useCount: 0 }
+    f.id = atomic.AddInt32(&ForwardID, 1)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
@@ -142,9 +142,6 @@ func (f *defaultForwarder) Release() {
 }
 // Forward impl proto.Forwarder
 func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
-	if closed := atomic.LoadInt32(&f.state); closed == ForwarderStateClosed {
-	    return ErrForwarderClosed
-	}
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
@@ -169,7 +166,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 
 // Close close forwarder.
 func (f *defaultForwarder) Close() error {
-	if !atomic.CompareAndSwapInt32(&f.state, ForwarderStateOpening, ForwarderStateClosed) {
+	if !atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
 		return nil
 	}
 	return nil
@@ -205,17 +202,10 @@ func (f *defaultForwarder) trimHashTag(key []byte) []byte {
 }
 
 // pingSleepTime for unit test override!!!
-var pingSleepTime = func(t bool) int32 {
-	if t {
-		return PingSleepTimeSec
-	}
-	return 1
-}
-
-func (f *defaultForwarder) sleep(timeInSec int32) {
+var pingSleep = func(f *defaultForwarder, timeInSec int32) {
     for i := int32(0); i < timeInSec; i++ {
-        var closed = atomic.LoadInt32(&f.state)
-        if closed == ForwarderStateClosed {
+        var state = atomic.LoadInt32(&f.state)
+        if state == forwarderStateClosed {
             return
         }
         time.Sleep(time.Second)
@@ -229,7 +219,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
-        if closed := atomic.LoadInt32(&f.state); closed == ForwarderStateClosed {
+        if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
             _ = p.ping.Close()
             log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
             return
@@ -245,7 +235,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 					log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
 				}
 			}
-			f.sleep(pingSleepTime(false))
+			pingSleep(f, 1)
 			continue
 		} else {
 			_ = p.ping.Close()
@@ -257,7 +247,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
 		}
 		if p.failure < f.cc.PingFailLimit {
-			f.sleep(pingSleepTime(false))
+			pingSleep(f, 1)
 			continue
 		}
 		if !del {
@@ -269,7 +259,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 		} else if log.V(3) {
 			log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
 		}
-		f.sleep(pingSleepTime(true))
+        pingSleep(f, PingSleepTimeSec)
 	}
 }
 

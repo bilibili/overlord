@@ -556,8 +556,8 @@ func TestEject(t *testing.T) {
 		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
 
-	pingSleepTime = func(t bool) int32 {
-		return 1 // NOTE: make sure test sleep duration more than ping duration
+    pingSleep = func(f *defaultForwarder, t int32) {
+		time.Sleep(100 * time.Millisecond) // NOTE: make sure test sleep duration more than ping duration
 	}
 
 	eject := ccs[0]

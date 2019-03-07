@@ -21,7 +21,7 @@ var (
     ErrWriteFail = "write failed"
     ErrReadFail = "read failed"
     ErrNotFound = "key_not_found"
-    gStartSn = 0
+    StartSeqNO = 0
 )
 
 type CliConn interface {
@@ -619,9 +619,9 @@ func StartStandAloneRedis(confName, port, logPath string) error {
 }
 
 func StartStandAloneMC(port string) error {
-    gStartSn++
-    // var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(gStartSn) + " logfile " + logPath + " &"
-    var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(gStartSn) + " &"
+    StartSeqNO++
+    // var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(StartSeqNO) + " logfile " + logPath + " &"
+    var cmd = "/usr/bin/memcached -d -m 64 -p " +  port + " -l 127.0.0.1  -P /tmp/memcached1." + port + "." + strconv.Itoa(StartSeqNO) + " &"
     // fmt.Printf("try to exec cmd:%s\n", cmd)
     var _, err2 = ExecCmd(cmd)
     return err2
