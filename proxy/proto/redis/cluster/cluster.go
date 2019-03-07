@@ -63,6 +63,10 @@ type cluster struct {
 
 // NewForwarder new proto Forwarder.
 func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) (proto.Forwarder, error) {
+    if conns <= 0 {
+        var err = errs.New("failed to create redis cluster as conns count <= 0")
+        return nil, err
+    }
 	c := &cluster{
 		name:    name,
 		servers: servers,
@@ -75,7 +79,7 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 	}
     c.id = atomic.AddInt32(&ClusterStartID, 1)
 	if !c.tryFetch() {
-		var err = errs.New("fail to get any redis cluster seed nodes")
+		var err = errs.New("failed to get any redis cluster seed nodes")
         return nil, err
 	}
 	var err = c.fake(listen)

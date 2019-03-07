@@ -266,6 +266,7 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 // 			sb.WriteString(r.array[i].String())
 // 		}
 // 	default:
+//      It is safe to panic here
 // 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
 // 	}
 // 	return sb.String()

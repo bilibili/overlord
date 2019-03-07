@@ -34,6 +34,7 @@ type NodeConnPipe struct {
 // NewNodeConnPipe new NodeConnPipe.
 func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 	if conns <= 0 {
+        // It is safety to panic here, as this number is checked when create redis cluster
 		panic("the number of connections cannot be zero")
 	}
 	ncp = &NodeConnPipe{
