@@ -81,7 +81,7 @@ func ValidateRedisCluster(servers []string) error {
     }
     for _, one := range(servers) {
         var ipPort = strings.Split(one, ":")
-        if len(ipPort) != 2 {
+        if len(ipPort) != 2 && len(ipPort) != 3 {
             return errors.New("invalid backend redis address format:" + one)
         }
         var intPort, err = strconv.Atoi(ipPort[1])

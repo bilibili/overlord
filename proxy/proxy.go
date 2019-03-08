@@ -48,7 +48,7 @@ type Proxy struct {
     ClusterConfFile string  // cluster configure file name
 
     clusters [MaxClusterCnt]*Cluster
-    curClusterCnt int32
+    CurClusterCnt int32
 	once       sync.Once
 
 	conns int32
@@ -79,7 +79,7 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 		if len(ccs) == 0 {
 			log.Warnf("overlord will never listen on any port due to cluster is not specified")
 		}
-        p.curClusterCnt = 0
+        p.CurClusterCnt = 0
         for _, conf := range ccs {
             var err = p.addCluster(conf)
             if err != nil {
@@ -95,7 +95,7 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 func (p *Proxy) addCluster(newConf *ClusterConfig) error {
     newConf.SN = genClusterSn()
 	p.lock.Lock()
-    var clusterID = p.curClusterCnt
+    var clusterID = p.CurClusterCnt
     newConf.ID = clusterID
     var newForwarder, err = NewForwarder(newConf)
     if err != nil {
@@ -115,7 +115,7 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
         newForwarder.Release()
         return servErr
     }
-    p.curClusterCnt++
+    p.CurClusterCnt++
     p.lock.Unlock()
     atomic.AddInt32(&ClusterCount, 1)
     log.Infof("succeed to add cluster:%s with addr:%s\n", newConf.Name, newConf.ListenAddr)
@@ -197,7 +197,7 @@ func (p *Proxy) Close() error {
 	if p.closed {
 		return nil
 	}
-    for i := 0; i < int(p.curClusterCnt); i++ {
+    for i := 0; i < int(p.CurClusterCnt); i++ {
 		p.clusters[i].Close()
     }
 	p.closed = true
@@ -299,7 +299,7 @@ func (p* Proxy) monitorConfChange() {
             continue
         }
         var oldConfs []*ClusterConfig;
-        for i := int32(0); i < p.curClusterCnt; i++ {
+        for i := int32(0); i < p.CurClusterCnt; i++ {
             var conf = p.clusters[i].getConf()
             oldConfs = append(oldConfs, conf)
         }
@@ -314,7 +314,7 @@ func (p* Proxy) monitorConfChange() {
         var changedConf []*ClusterConfig;
         changedConf, newAdd = p.parseChanged(newConfs, oldConfs)
 
-        var clusterCnt = p.curClusterCnt + int32(len(newAdd))
+        var clusterCnt = p.CurClusterCnt + int32(len(newAdd))
 
         if (clusterCnt > MaxClusterCnt) {
             log.Errorf("failed to reload conf as too much cluster will be added, new cluster count(%d) and max count(%d)",
