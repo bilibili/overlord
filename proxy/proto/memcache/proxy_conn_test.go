@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 
+	"overlord/pkg/mockconn"
+	libcon "overlord/pkg/net"
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
 
@@ -129,7 +132,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn([]byte(tt.Data))
+			conn := libcon.NewConn(mockconn.CreateConn([]byte(tt.Data), 1), time.Second, time.Second)
 			p := NewProxyConn(conn)
 			mlist := proto.GetMsgs(2)
 			// test req reuse.
@@ -154,7 +157,7 @@ func TestProxyConnDecodeOk(t *testing.T) {
 }
 
 func _createRespMsg(t *testing.T, req []byte, resps [][]byte) *proto.Message {
-	conn := _createConn([]byte(req))
+	conn := libcon.NewConn(mockconn.CreateConn([]byte(req), 1), time.Second, time.Second)
 	p := NewProxyConn(conn)
 	mlist := proto.GetMsgs(2)
 
@@ -202,16 +205,16 @@ func TestProxyConnEncodeOk(t *testing.T) {
 
 	for _, tt := range ts {
 		t.Run(tt.Name, func(t *testing.T) {
-			conn := _createConn(nil)
+			conn := libcon.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 			p := NewProxyConn(conn)
 			msg := _createRespMsg(t, []byte(tt.Req), tt.Resp)
 			err := p.Encode(msg, nil)
 			assert.NoError(t, err)
 			err = p.Flush()
 			assert.NoError(t, err)
-			c := conn.Conn.(*mockConn)
+			c := conn.Conn.(*mockconn.MockConn)
 			buf := make([]byte, 1024)
-			size, err := c.wbuf.Read(buf)
+			size, err := c.Wbuf.Read(buf)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.Except, string(buf[:size]))
 		})
@@ -219,7 +222,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 }
 
 func TestEncodeErr(t *testing.T) {
-	conn := _createConn(nil)
+	conn := libcon.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
 	p := NewProxyConn(conn)
 
 	msg := proto.NewMessage()
@@ -242,9 +245,9 @@ func TestEncodeErr(t *testing.T) {
 	assert.NoError(t, err)
 
 	p.Flush()
-	c := conn.Conn.(*mockConn)
+	c := conn.Conn.(*mockconn.MockConn)
 	buf := make([]byte, 1024)
-	size, err := c.wbuf.Read(buf)
+	size, err := c.Wbuf.Read(buf)
 	assert.NoError(t, err)
 	assert.Contains(t, string(buf[:size]), "SERVER_ERR")
 }

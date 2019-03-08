@@ -71,13 +71,21 @@ func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 }
 
 func (pc *proxyConn) decode(m *proto.Message) (err error) {
-	mark := pc.br.Mark()
-	if err = pc.resp.decode(pc.br); err != nil {
-		if err == bufio.ErrBufferFull {
-			pc.br.AdvanceTo(mark)
+	// for migrate sync PING process
+	for {
+		mark := pc.br.Mark()
+		if err = pc.resp.decode(pc.br); err != nil {
+			if err == bufio.ErrBufferFull {
+				pc.br.AdvanceTo(mark)
+			}
+			return
 		}
-		return
+
+		if pc.resp.arrayn != 0 {
+			break
+		}
 	}
+
 	if pc.resp.arrayn < 1 {
 		r := nextReq(m)
 		r.resp.copy(pc.resp)

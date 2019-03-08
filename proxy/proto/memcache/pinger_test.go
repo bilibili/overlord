@@ -1,14 +1,17 @@
 package memcache
 
 import (
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPingerPingOk(t *testing.T) {
-	conn := _createConn(pongBytes)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 1), time.Second, time.Second)
 	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
@@ -16,7 +19,7 @@ func TestPingerPingOk(t *testing.T) {
 }
 
 func TestPingerPingMore(t *testing.T) {
-	conn := _createRepeatConn(pongBytes, 2)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 2), time.Second, time.Second)
 	pinger := NewPinger(conn)
 
 	err := pinger.Ping()
@@ -27,7 +30,7 @@ func TestPingerPingMore(t *testing.T) {
 }
 
 func TestPingerPing100Ok(t *testing.T) {
-	conn := _createRepeatConn(pongBytes, 100)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 100), time.Second, time.Second)
 	pinger := NewPinger(conn)
 
 	for i := 0; i < 100; i++ {
@@ -40,16 +43,16 @@ func TestPingerPing100Ok(t *testing.T) {
 }
 
 func TestPingerErr(t *testing.T) {
-	conn := _createRepeatConn(pongBytes, 100)
-	c := conn.Conn.(*mockConn)
-	c.err = errors.New("some error")
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 100), time.Second, time.Second)
+	c := conn.Conn.(*mockconn.MockConn)
+	c.Err = errors.New("some error")
 	pinger := NewPinger(conn)
 	err := pinger.Ping()
 	assert.EqualError(t, err, "some error")
 }
 
 func TestPingerClosed(t *testing.T) {
-	conn := _createRepeatConn(pongBytes, 100)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 100), time.Second, time.Second)
 	pinger := NewPinger(conn)
 	err := pinger.Close()
 	assert.NoError(t, err)
@@ -60,7 +63,7 @@ func TestPingerClosed(t *testing.T) {
 }
 
 func TestPingerNotReturnPong(t *testing.T) {
-	conn := _createRepeatConn([]byte("baka\r\n"), 100)
+	conn := libnet.NewConn(mockconn.CreateConn([]byte("baka\r\n"), 100), time.Second, time.Second)
 	pinger := NewPinger(conn)
 	err := pinger.Ping()
 	assert.Error(t, err)

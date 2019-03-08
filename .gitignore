@@ -23,5 +23,7 @@ cmd/balancer/balancer
 cmd/apicli/apicli
 proxy/test/conf/lotsof/*.conf
 proxy/test/proxy.log.*
+cmd/anzi/anzi
+cmd/enri/enri
 coverage.txt
 go.sum

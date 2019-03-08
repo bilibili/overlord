@@ -58,6 +58,8 @@ func NewHandler(p *Proxy, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
 		closeWhenChange: cc.CloseWhenChange,
 		conn:            client,
 	}
+
+	h.conn = libnet.NewConn(h.conn, time.Second*time.Duration(cc.ReadTimeout), time.Second*time.Duration(cc.WriteTimeout))
 	// cache type
 	switch h.CacheType {
 	case types.CacheTypeMemcache:

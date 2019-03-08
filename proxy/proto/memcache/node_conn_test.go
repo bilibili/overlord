@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"overlord/pkg/bufio"
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
 
 	"github.com/pkg/errors"
@@ -14,7 +16,7 @@ import (
 )
 
 func _createNodeConn(data []byte) *nodeConn {
-	conn := _createConn(data)
+	conn := libnet.NewConn(mockconn.CreateConn(data, 1), time.Second, time.Second)
 	nc := &nodeConn{
 		cluster: "clusterA",
 		addr:    "127.0.0.1:5000",
@@ -62,11 +64,11 @@ func TestNodeConnWriteOk(t *testing.T) {
 			err = nc.Flush()
 			assert.NoError(t, err)
 
-			m, ok := nc.conn.Conn.(*mockConn)
+			m, ok := nc.conn.Conn.(*mockconn.MockConn)
 			assert.True(t, ok)
 
 			buf := make([]byte, 1024)
-			size, err := m.wbuf.Read(buf)
+			size, err := m.Wbuf.Read(buf)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.except, string(buf[:size]))
 		})
@@ -99,11 +101,11 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 			err = nc.Flush()
 			assert.NoError(t, err)
 
-			c, ok := nc.conn.Conn.(*mockConn)
+			c, ok := nc.conn.Conn.(*mockconn.MockConn)
 			assert.True(t, ok)
 
 			buf := make([]byte, 1024)
-			size, err := c.wbuf.Read(buf)
+			size, err := c.Wbuf.Read(buf)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.except, string(buf[:size]))
 		})
@@ -114,9 +116,8 @@ func TestNodeConnWriteBatchOk(t *testing.T) {
 func TestNodeConnWriteBatchHasErr(t *testing.T) {
 	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
 	nc := _createNodeConn(nil)
-
-	ec := _createConn(nil)
-	ec.Conn.(*mockConn).err = errors.New("write error")
+	ec := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	ec.Conn.(*mockconn.MockConn).Err = errors.New("write error")
 	nc.bw = bufio.NewWriter(ec)
 	nc.bw.Write([]byte("err"))
 	nc.bw.Flush() // action err
@@ -128,9 +129,8 @@ func TestNodeConnWriteBatchHasErr(t *testing.T) {
 func TestNodeConnWriteBatchFlushHasErr(t *testing.T) {
 	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
 	nc := _createNodeConn(nil)
-
-	ec := _createConn(nil)
-	ec.Conn.(*mockConn).err = errors.New("flush error")
+	ec := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	ec.Conn.(*mockconn.MockConn).Err = errors.New("flush error")
 	nc.bw = bufio.NewWriter(ec)
 
 	nc.Write(msg)
@@ -238,8 +238,8 @@ func TestNodeConnReadOk(t *testing.T) {
 func TestNodeConnReadHasErr(t *testing.T) {
 	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
 	nc := _createNodeConn([]byte("END\r\n"))
-	ec := _createConn(nil)
-	ec.Conn.(*mockConn).err = errors.New("read error")
+	ec := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	ec.Conn.(*mockconn.MockConn).Err = errors.New("read error")
 	nc.br = bufio.NewReader(ec, bufio.Get(128))
 
 	err := nc.Read(msg)

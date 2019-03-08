@@ -1,46 +1,17 @@
 package net
 
 import (
-	"bytes"
 	"net"
 	"testing"
 	"time"
 
+	"overlord/pkg/mockconn"
+
 	"github.com/stretchr/testify/assert"
 )
 
-type mockAddr string
-
-func (m mockAddr) Network() string {
-	return "tcp"
-}
-func (m mockAddr) String() string {
-	return string(m)
-}
-
-type mockConn struct {
-	rbuf *bytes.Buffer
-	wbuf *bytes.Buffer
-	addr mockAddr
-}
-
-func (m *mockConn) Read(b []byte) (n int, err error) {
-	return m.rbuf.Read(b)
-}
-func (m *mockConn) Write(b []byte) (n int, err error) {
-	return m.wbuf.Write(b)
-}
-
-func (m *mockConn) Close() error         { return nil }
-func (m *mockConn) LocalAddr() net.Addr  { return m.addr }
-func (m *mockConn) RemoteAddr() net.Addr { return m.addr }
-
-func (m *mockConn) SetDeadline(t time.Time) error      { return nil }
-func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
-func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
-
 func TestConnProxyImplConnAlwaysCallMock(t *testing.T) {
-	mconn := &mockConn{addr: "127.0.0.1:12345"}
+	mconn := &mockconn.MockConn{}
 	conn := NewConn(mconn, time.Second, time.Second)
 	assert.Nil(t, conn.SetDeadline(time.Now()))
 	assert.Nil(t, conn.SetReadDeadline(time.Now()))
@@ -51,10 +22,7 @@ func TestConnProxyImplConnAlwaysCallMock(t *testing.T) {
 
 func _testReadWriteWithMockTimeout(t *testing.T, rt, wt time.Duration) {
 	data := []byte("Bilibili 干杯 - ( ゜- ゜)つロ")
-	mconn := &mockConn{
-		rbuf: bytes.NewBuffer(data),
-		wbuf: new(bytes.Buffer),
-	}
+	mconn := mockconn.CreateConn(data, 1)
 	conn := NewConn(mconn, rt, wt)
 
 	recv := make([]byte, len(data))
@@ -80,10 +48,7 @@ func TestConnProxyMockReadWriteZero(t *testing.T) {
 
 func TestConnResetReadWriteTimeout(t *testing.T) {
 	data := []byte("Bilibili 干杯 - ( ゜- ゜)つロ")
-	mconn := &mockConn{
-		rbuf: bytes.NewBuffer(data),
-		wbuf: new(bytes.Buffer),
-	}
+	mconn := mockconn.CreateConn(data, 1)
 	conn := NewConn(mconn, time.Second, time.Second)
 
 	recv := make([]byte, len(data))
@@ -95,10 +60,7 @@ func TestConnResetReadWriteTimeout(t *testing.T) {
 	// TODO(wayslog): reexport change attributes as a function
 	conn.readTimeout = 0
 	conn.writeTimeout = 0
-	mconn = &mockConn{
-		rbuf: bytes.NewBuffer(data),
-		wbuf: new(bytes.Buffer),
-	}
+	mconn = mockconn.CreateConn(data, 1)
 	conn.Conn = mconn
 
 	recv = make([]byte, len(data))

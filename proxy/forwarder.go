@@ -167,7 +167,9 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 
 // Close close forwarder.
 func (f *defaultForwarder) Close() error {
-	if !atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
+	if atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
+		// first closed
+		log.Infof("delay close nodePipes")
 		return nil
 	}
 	return nil
@@ -220,12 +222,11 @@ func (f *defaultForwarder) processPing(p *pinger) {
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
-		if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+		if atomic.LoadInt32(&f.state) == forwarderStateClosed {
 			_ = p.ping.Close()
-			log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
 			return
 		}
-		// log.Infof("pinger of forwarder:%p try to ping backend", f)
+
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0

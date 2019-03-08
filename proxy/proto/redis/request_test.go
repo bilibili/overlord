@@ -2,8 +2,11 @@ package redis
 
 import (
 	"testing"
+	"time"
 
 	"overlord/pkg/bufio"
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,7 +14,7 @@ import (
 func TestRequestNewRequest(t *testing.T) {
 	var bs = []byte("*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n")
 	// conn
-	conn := _createConn(bs)
+	conn := libnet.NewConn(mockconn.CreateConn(bs, 1), time.Second, time.Second)
 	br := bufio.NewReader(conn, bufio.Get(1024))
 	br.Read()
 	req := getReq()

@@ -38,8 +38,6 @@ overlord-proxy 的灵感来源自著名的缓存代理组件 twemproxy 和 corvu
 
 enri 是我们自己开发拓展的 redis cluster 管理工具，它将在命令行为运维人员提供一种简单快速的检查和管理集群的方式。它受 [ruskit](https://github.com/eleme/ruskit) 的启发，并且加入了许多其没有的功能，同时在性能上进行了改进。可以让治理集群的工作变得简单轻松。
 
-TODO:剩下的得工具写完才能写
-
 ## 数据迁移工具: anzi
 
 受 [redis-migrate-tool](https://github.com/vipshop/redis-migrate-tool) 的启发，我们开发了自己的迁移工具。与原工具相比，新的迁移工具采用Go语言编写，同时将支持更加服务化的场景，可以同时创建和传输多个集群的数据。同时可以集成 platform,也就意味着用户可以更加方便的将集群数据在平台之间迁移。

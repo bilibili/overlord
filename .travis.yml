@@ -30,6 +30,7 @@ install:
   - bash scripts/install-travis-etcd.sh
   - docker pull grokzen/redis-cluster:4.0.9
   - docker run -e "IP=0.0.0.0" -d -p 7000-7007:7000-7007 grokzen/redis-cluster:4.0.9
+  - docker run -e "IP=0.0.0.0" -d -p 8000-8007:8000-8007 grokzen/redis-cluster:4.0.9
 
 script:
   - ./scripts/codecov.sh

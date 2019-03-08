@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -165,6 +166,41 @@ func (cc *ClusterConfig) Validate() error {
 	return nil
 }
 
+// SetDefault config content with cluster config
+func (cc *ClusterConfig) SetDefault() {
+	if len(cc.Servers) == 0 {
+		return
+	}
+
+	if cc.HashMethod == "" {
+		cc.HashMethod = "fnv1a64"
+	}
+
+	if cc.HashDistribution == "" {
+		cc.HashDistribution = "ketama"
+	}
+
+	if cc.HashTag == "" {
+		cc.HashTag = "{}"
+	}
+
+	if cc.ListenProto == "" {
+		cc.ListenProto = "tcp"
+	}
+
+	if cc.NodeConnections == 0 {
+		cc.NodeConnections = 2
+	}
+
+	if len(cc.ListenAddr) == 0 {
+		fmt.Fprint(os.Stderr, "checking out ListenAddr may only using for [anzi] from\n")
+	} else if !strings.Contains(cc.ListenAddr, ":") {
+		addr := fmt.Sprintf("%s:%s", "0.0.0.0", cc.ListenAddr)
+		fmt.Fprintf(os.Stderr, "cluster(%s).cc.ListenAddr don't contains ':', using %s\n", cc.Name, addr)
+		cc.ListenAddr = addr
+	}
+}
+
 // ClusterConfigs cluster configs.
 type ClusterConfigs struct {
 	Clusters []*ClusterConfig
@@ -177,6 +213,7 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		return errors.Wrapf(err, "Load From File:%s", path)
 	}
 	for _, cc := range ccs.Clusters {
+		cc.SetDefault()
 		if err = cc.Validate(); err != nil {
 			return err
 		}

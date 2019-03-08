@@ -945,7 +945,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 			assert.Equal(t, 1, getChanged)
 			breakNow = true
 		default:
-			var clusterCnt = atomic.LoadInt32(server.CurClusterCnt)
+			var clusterCnt = atomic.LoadInt32(&(server.CurClusterCnt))
 			if int(clusterCnt) == int(proxy.MaxClusterCnt) {
 				breakNow = true
 			}

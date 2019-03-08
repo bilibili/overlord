@@ -2,20 +2,24 @@ package redis
 
 import (
 	"testing"
+	"time"
+
+	"overlord/pkg/mockconn"
+	libnet "overlord/pkg/net"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPingerPingOk(t *testing.T) {
-	conn := _createConn(pongBytes)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 1), time.Second, time.Second)
 	p := NewPinger(conn)
 	err := p.Ping()
 	assert.NoError(t, err)
 }
 
 func TestPingerClosed(t *testing.T) {
-	conn := _createRepeatConn(pongBytes, 10)
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 10), time.Second, time.Second)
 	p := NewPinger(conn)
 	assert.NoError(t, p.Close())
 	err := p.Ping()
@@ -24,21 +28,20 @@ func TestPingerClosed(t *testing.T) {
 }
 
 func TestPingerWrongResp(t *testing.T) {
-	conn := _createConn([]byte("-Error: iam more than 7 bytes\r\n"))
+	conn := libnet.NewConn(mockconn.CreateConn([]byte("-Error: iam more than 7 bytes\r\n"), 1), time.Second, time.Second)
 	p := NewPinger(conn)
 	err := p.Ping()
 	assert.Equal(t, ErrBadPong, errors.Cause(err))
-
-	conn = _createConn([]byte("-Err\r\n"))
+	conn = libnet.NewConn(mockconn.CreateConn([]byte("-Err\r\n"), 1), time.Second, time.Second)
 	p = NewPinger(conn)
 	err = p.Ping()
 	assert.Equal(t, ErrBadPong, errors.Cause(err))
 }
 
 func TestPingerPingErr(t *testing.T) {
-	conn := _createConn(pongBytes)
-	c := conn.Conn.(*mockConn)
-	c.err = errors.New("some error")
+	conn := libnet.NewConn(mockconn.CreateConn(pingBytes, 1), time.Second, time.Second)
+	c := conn.Conn.(*mockconn.MockConn)
+	c.Err = errors.New("some error")
 	p := NewPinger(conn)
 	err := p.Ping()
 	assert.EqualError(t, err, "some error")

@@ -110,6 +110,10 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 
 func (c *cluster) Close() error {
 	if !atomic.CompareAndSwapInt32(&c.state, opening, closed) {
+		np := c.slotNode.Load().(*slotNode)
+		for _, npc := range np.nodePipe {
+			npc.Close()
+		}
 		return nil
 	}
 	return nil
@@ -164,7 +168,7 @@ func (c *cluster) fetchproc() {
 	for {
 		select {
 		case <-c.action:
-		case <-time.After(1 * time.Minute):
+		case <-time.After(30 * time.Minute):
 		}
 		c.tryFetch()
 	}
