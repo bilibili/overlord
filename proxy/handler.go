@@ -95,7 +95,7 @@ func (h *Handler) handle() {
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
-            log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
+            // log.Warnf("conn:%d failed to decode message, get error:%s", h.conn.ID, err.Error())
 			h.deferHandle(messages, err)
             forwarder.Release()
 			return
@@ -125,7 +125,7 @@ func (h *Handler) handle() {
 		for _, msg := range msgs {
             if err := h.pc.Encode(msg, forwarder); err != nil {
 				h.pc.Flush()
-                log.Warnf("failed to encode message, close front connection now")
+                // log.Warnf("failed to encode message, close front connection now")
 				h.deferHandle(messages, err)
                 forwarder.Release()
 				return
@@ -137,7 +137,7 @@ func (h *Handler) handle() {
 			}
 		}
         if err := h.pc.Flush(); err != nil {
-            log.Warnf("failed to flush message, close front connection now")
+            // log.Warnf("failed to flush message, close front connection now")
 			h.deferHandle(messages, err)
             forwarder.Release()
 			return

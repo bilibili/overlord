@@ -472,7 +472,7 @@ var gProxyConfFile = "./conf/proxy.conf"
 func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var ClusterConfFile = "./conf/noclose_cluster.conf"
     setupRedis("8201", "8202")
-    var firstConfName = "conf/noclose/redis_standalone_0.conf"
+    var firstConfName = "conf/noclose/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
@@ -484,7 +484,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
     var confCnt = 4
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
-        var name = "conf/noclose/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
+        var name = "conf/noclose/" + strconv.Itoa(int(i)) + ".conf"
         confList[i] = name
     }
 
@@ -533,7 +533,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     var ClusterConfFile = "./conf/close_cluster.conf"
     setupRedis("8203", "8204")
-    var firstConfName = "conf/close/redis_standalone_0.conf"
+    var firstConfName = "conf/close/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
@@ -546,7 +546,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
     var confCnt = 4
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
-        var name = "conf/close/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
+        var name = "conf/close/" + strconv.Itoa(int(i)) + ".conf"
         confList[i] = name
     }
 
@@ -598,7 +598,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     log.Infof("start reload case on nopanic when conf is invalid\n")
     var ClusterConfFile = "./conf/nopanic_cluster.conf"
     setupRedis("8205", "8206")
-    var firstConfName = "conf/nopanic/redis_standalone_0.conf"
+    var firstConfName = "conf/nopanic/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
@@ -610,15 +610,14 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
     var confCnt = 26
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
-        var name = "conf/nopanic/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
+        var name = "conf/nopanic/" + strconv.Itoa(int(i)) + ".conf"
         confList[i] = name
     }
 
     var server, err = proxy.NewProxy(proxyConf)
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
-    var name = "conf/nopanic/redis_standalone_0.conf"
-    initConf, initErr := proxy.LoadClusterConf(name)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
 	require.NoError(t, initErr)
 
     server.Serve(initConf)
@@ -665,7 +664,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     var ClusterConfFile = "./conf/cnnleak_cluster.conf"
     setupRedis("8207", "8208")
-    var firstConfName = "conf/frontleak/redis_standalone_0.conf"
+    var firstConfName = "conf/frontleak/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
@@ -678,15 +677,14 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
     var confCnt = 3
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
-        var name = "conf/frontleak/redis_standalone_" + strconv.Itoa(int(i)) + ".conf"
+        var name = "conf/frontleak/" + strconv.Itoa(int(i)) + ".conf"
         confList[i] = name
     }
 
     var server, err = proxy.NewProxy(proxyConf)
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
-    var name = "conf/frontleak/redis_standalone_0.conf"
-    initConf, initErr := proxy.LoadClusterConf(name)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
 	require.NoError(t, initErr)
 
     server.Serve(initConf)
@@ -732,7 +730,7 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
 func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     var ClusterConfFile = "./conf/mc_cluster.conf"
     setupMC("8209", "8210")
-    var firstConfName = "conf/memcache/standalone_0.conf"
+    var firstConfName = "conf/memcache/0.conf"
     var cmd = "cp " + firstConfName + " " + ClusterConfFile
     ExecCmd(cmd)
     var proxyConf = &proxy.Config{}
@@ -745,15 +743,14 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
     var confCnt = 3
     var confList = make([]string, confCnt, confCnt)
     for i := 0; i < confCnt; i++ {
-        var name = "conf/memcache/standalone_" + strconv.Itoa(int(i)) + ".conf"
+        var name = "conf/memcache/" + strconv.Itoa(int(i)) + ".conf"
         confList[i] = name
     }
 
     var server, err = proxy.NewProxy(proxyConf)
     server.ClusterConfFile = ClusterConfFile
 	assert.NoError(t, err)
-    var name = "conf/memcache/standalone_0.conf"
-    initConf, initErr := proxy.LoadClusterConf(name)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
 	require.NoError(t, initErr)
 
     server.Serve(initConf)
@@ -880,14 +877,13 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 		defer log.Close()
 	}
 
-    var name = "conf/lotsof/0.conf"
-    initConf, initErr := proxy.LoadClusterConf(name)
+    initConf, initErr := proxy.LoadClusterConf(firstConfName)
 	require.NoError(t, initErr)
 
     log.Info("start reload case on lots of when conf is invalid")
     var confCnt = int(proxy.MaxClusterCnt) + 3
     var confNameList = make([]string, confCnt, confCnt)
-    confNameList[0] = name
+    confNameList[0] = firstConfName
 
     var baseConfig proxy.ClusterConfig;
     baseConfig = *(initConf[0])
