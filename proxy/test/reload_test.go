@@ -19,7 +19,7 @@ import (
 var SeqNO int = 0
 
 func setupRedis(port1, port2 string) {
-	proxy.ClusterSn = 0
+	proxy.ClusterID = 0
 	proxy.MonitorCfgIntervalMilliSecs = 500
 	proxy.ClusterChangeCount = 0
 	proxy.AddClusterFailCnt = 0
@@ -58,7 +58,7 @@ func checkAndKillStandalone(expectCnt int) {
 }
 
 func setupMC(port1, port2 string) {
-	proxy.ClusterSn = 0
+	proxy.ClusterID = 0
 	proxy.MonitorCfgIntervalMilliSecs = 500
 	proxy.ClusterChangeCount = 0
 	proxy.AddClusterFailCnt = 0
@@ -465,7 +465,7 @@ func updateConfFromList(intervalInSec int, fileName string, confs []proxy.Cluste
 	}
 }
 
-var gProxyConfFile = "./conf/proxy.conf"
+var ProxyConfFile = "./conf/proxy.conf"
 
 func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 	var ClusterConfFile = "./conf/noclose_cluster.conf"
@@ -474,7 +474,7 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -543,7 +543,7 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -616,7 +616,7 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -689,7 +689,7 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -755,7 +755,7 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -829,7 +829,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -892,7 +892,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -934,7 +934,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	var key = "key_lots_get2"
 	var val = "val_lots_get2"
 	go loopGet(frontAddr1, key, val, 0, 0, 0, true, chGet1)
-	go updateConf(400, ClusterConfFile, confNameList, chUpdate)
+	go updateConf(300, ClusterConfFile, confNameList, chUpdate)
 	var updateConfRet = <-chUpdate
 	log.Infof("update configure routine return ret:%d\n", updateConfRet)
 	for {
@@ -985,7 +985,7 @@ func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()
@@ -1090,7 +1090,7 @@ func TestClusterConfigReloadClusterRemoved(t *testing.T) {
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
 	var proxyConf = &proxy.Config{}
-	var loadConfError = proxyConf.LoadFromFile(gProxyConfFile)
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
 	assert.NoError(t, loadConfError)
 	if log.Init(proxyConf.Config) {
 		defer log.Close()

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	errs "errors"
+	"fmt"
 	"net"
 	"sort"
 	"strconv"
@@ -24,7 +25,7 @@ import (
 // proxy errors
 var (
 	ErrProxyMoreMaxConns              = errs.New("Proxy accept more than max connextions")
-	ClusterSn                   int32 = 0
+	ClusterID                   int32 = 0
 	MonitorCfgIntervalMilliSecs int   = 10 * 100 // Time interval to monitor config change
 	ClusterChangeCount          int32 = 0
 	ClusterConfChangeFailCnt    int32 = 0
@@ -33,13 +34,19 @@ var (
 	FailedDueToRemovedCnt       int32 = 0
 )
 
-const MaxClusterCnt int32 = 128
+const (
+	MaxClusterCnt  int32 = 128
+	ClusterRunning int32 = 0
+	ClusterStopped int32 = 1
+)
 
 type Cluster struct {
 	conf        *ClusterConfig
 	clientConns map[int64]*libnet.Conn
 	forwarder   proto.Forwarder
 	mutex       sync.Mutex
+	proxy       *Proxy
+	state       int32
 }
 
 // Proxy is proxy.
@@ -47,7 +54,7 @@ type Proxy struct {
 	c               *Config
 	ClusterConfFile string // cluster configure file name
 
-	clusters      [MaxClusterCnt]*Cluster
+	clusters      map[string]*Cluster
 	CurClusterCnt int32
 	once          sync.Once
 
@@ -64,12 +71,13 @@ func NewProxy(c *Config) (p *Proxy, err error) {
 		return
 	}
 	p = &Proxy{}
+	p.clusters = make(map[string]*Cluster)
 	p.c = c
 	return
 }
 
-func genClusterSn() int32 {
-	var id = atomic.AddInt32(&ClusterSn, 1)
+func genClusterID() int32 {
+	var id = atomic.AddInt32(&ClusterID, 1)
 	return id
 }
 
@@ -92,23 +100,39 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	})
 }
 
+func (p *Proxy) incConnectionCnt() (int32, bool) {
+	if p.c.Proxy.MaxConnections <= 0 {
+		return 0, true
+	}
+	var conn = atomic.LoadInt32(&p.conns)
+	if conn > p.c.Proxy.MaxConnections {
+		return conn, false
+	}
+	atomic.AddInt32(&p.conns, 1)
+	return conn, true
+}
+func (p *Proxy) descConnectionCnt() {
+	if p.c.Proxy.MaxConnections <= 0 {
+		return
+	}
+	atomic.AddInt32(&p.conns, -1)
+}
+
 func (p *Proxy) addCluster(newConf *ClusterConfig) error {
-	newConf.SN = genClusterSn()
+	newConf.ID = genClusterID()
 	p.lock.Lock()
-	var clusterID = p.CurClusterCnt
-	newConf.ID = clusterID
 	var newForwarder, err = NewForwarder(newConf)
 	if err != nil {
 		p.lock.Unlock()
 		return err
 	}
 	newForwarder.AddRef()
-	var cluster = &Cluster{conf: newConf, forwarder: newForwarder}
+	var cluster = &Cluster{conf: newConf, forwarder: newForwarder, proxy: p}
 	cluster.clientConns = make(map[int64]*libnet.Conn)
-	p.clusters[clusterID] = cluster
-	var servErr = p.serve(clusterID)
+	p.clusters[cluster.conf.Name] = cluster
+	var servErr = cluster.serve()
 	if servErr != nil {
-		p.clusters[clusterID] = nil
+		delete(p.clusters, cluster.conf.Name)
 		p.lock.Unlock()
 		cluster.Close()
 		cluster.forwarder = nil
@@ -121,23 +145,24 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
 	return nil
 }
 
-func (p *Proxy) serve(cid int32) error {
+func (c *Cluster) serve() error {
 	// listen
-	var conf = p.getClusterConf(cid)
+	atomic.StoreInt32(&c.state, ClusterRunning)
+	var conf = c.getConf()
 	l, err := Listen(conf.ListenProto, conf.ListenAddr)
 	if err != nil {
 		log.Errorf("failed to listen on address:%s, got error:%s\n", conf.ListenAddr, err.Error())
 		return err
 	}
 	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", conf.Name, conf.ListenAddr)
-	go p.accept(cid, l)
+	go c.accept(l)
 	return nil
 }
 
-func (p *Proxy) accept(cid int32, l net.Listener) {
+func (c *Cluster) accept(l net.Listener) {
 	for {
-		var conf = p.getClusterConf(cid)
-		if p.closed {
+		var conf = c.getConf()
+		if atomic.LoadInt32(&c.state) != ClusterRunning {
 			log.Infof("overlord proxy cluster[%s] addr(%s) stop listen", conf.Name, conf.ListenAddr)
 			return
 		}
@@ -149,43 +174,41 @@ func (p *Proxy) accept(cid int32, l net.Listener) {
 			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", conf.Name, conf.ListenAddr, err)
 			continue
 		}
-		if p.c.Proxy.MaxConnections > 0 {
-			if conns := atomic.LoadInt32(&p.conns); conns > p.c.Proxy.MaxConnections {
-				// cache type
-				var encoder proto.ProxyConn
-				switch conf.CacheType {
-				case types.CacheTypeMemcache:
-					encoder = memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case types.CacheTypeMemcacheBinary:
-					encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case types.CacheTypeRedis:
-					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				case types.CacheTypeRedisCluster:
-					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-				}
-				if encoder != nil {
-					var f = p.GetForwarder(cid)
-					_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns), f)
-					_ = encoder.Flush()
-					f.Release()
-				}
-				_ = conn.Close()
-				if log.V(4) {
-					log.Warnf("proxy reject connection count(%d) due to more than max(%d)", conns, p.c.Proxy.MaxConnections)
-				}
-				continue
+		if cnt, succ := c.proxy.incConnectionCnt(); !succ {
+			// cache type
+			var encoder proto.ProxyConn
+			switch conf.CacheType {
+			case types.CacheTypeMemcache:
+				encoder = memcache.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			case types.CacheTypeMemcacheBinary:
+				encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			case types.CacheTypeRedis:
+				encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			case types.CacheTypeRedisCluster:
+				encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 			}
+			if encoder != nil {
+				var f = c.getForwarder()
+				_ = encoder.Encode(proto.ErrMessage(ErrProxyMoreMaxConns), f)
+				_ = encoder.Flush()
+				f.Release()
+			}
+			_ = conn.Close()
+			if log.V(4) {
+				log.Warnf("proxy reject connection count(%d) due to more than max(%d)", cnt, c.proxy.c.Proxy.MaxConnections)
+			}
+			fmt.Printf("Exceed max connection limit\n")
+			continue
 		}
-		atomic.AddInt32(&p.conns, 1)
-		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(p.c.Proxy.ReadTimeout), time.Second*time.Duration(p.c.Proxy.WriteTimeout))
-		err = p.addConnection(cid, conf.SN, frontConn)
+		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(c.proxy.c.Proxy.ReadTimeout), time.Second*time.Duration(c.proxy.c.Proxy.WriteTimeout))
+		err = c.addConnection(conf.ID, frontConn)
 		if err != nil {
 			// corner case, configure changed when we try to keep this connection
 			log.Errorf("corner case, configure just changed when after accept a connection, got error:%s\n", err.Error())
 			frontConn.Close()
 			continue
 		}
-		NewHandler(p, conf, frontConn).Handle()
+		NewHandler(c, conf, frontConn).Handle()
 	}
 }
 
@@ -196,39 +219,11 @@ func (p *Proxy) Close() error {
 	if p.closed {
 		return nil
 	}
-	for i := 0; i < int(p.CurClusterCnt); i++ {
-		p.clusters[i].Close()
-	}
 	p.closed = true
+	for _, cluster := range p.clusters {
+		cluster.Close()
+	}
 	return nil
-}
-
-// Get forwarder from proxy, thread safe
-func (p *Proxy) addConnection(cid int32, sn int32, conn *libnet.Conn) error {
-	var ret = p.clusters[cid].addConnection(sn, conn)
-	return ret
-}
-
-func (p *Proxy) RemoveConnection(cid int32, connID int64) {
-	p.clusters[cid].removeConnection(connID)
-}
-
-func (p *Proxy) CloseAndRemoveConnection(cid int32, connID int64) {
-	p.clusters[cid].closeAndRemoveConnection(connID)
-}
-
-func (p *Proxy) CloseAllConnections(cid int32) {
-	p.clusters[cid].closeAllConnections()
-}
-
-// Get forwarder from proxy, thread safe
-func (p *Proxy) GetForwarder(cid int32) proto.Forwarder {
-	return p.clusters[cid].getForwarder()
-}
-
-// Get forwarder from proxy, thread safe
-func (p *Proxy) getClusterConf(cid int32) *ClusterConfig {
-	return p.clusters[cid].getConf()
 }
 
 func (p *Proxy) anyClusterRemoved(newConfs, oldConfs []*ClusterConfig) bool {
@@ -255,7 +250,6 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 	for _, newConf := range newConfs {
 		var find = false
 		var diff = false
-		var oldConf *ClusterConfig = nil
 		var valid = true
 		for _, conf := range oldConfs {
 			if newConf.Name != conf.Name {
@@ -268,9 +262,6 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 				log.Errorf("configure change of cluster(%s) is invalid", newConf.Name)
 				break
 			}
-			if diff {
-				oldConf = conf
-			}
 			break
 		}
 		if !find {
@@ -280,7 +271,6 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 		if (!valid) || (find && !diff) {
 			continue
 		}
-		newConf.ID = oldConf.ID
 		changed = append(changed, newConf)
 		continue
 	}
@@ -298,8 +288,8 @@ func (p *Proxy) monitorConfChange() {
 			continue
 		}
 		var oldConfs []*ClusterConfig
-		for i := int32(0); i < p.CurClusterCnt; i++ {
-			var conf = p.clusters[i].getConf()
+		for _, cluster := range p.clusters {
+			var conf = cluster.getConf()
 			oldConfs = append(oldConfs, conf)
 		}
 		var removed = p.anyClusterRemoved(newConfs, oldConfs)
@@ -322,10 +312,10 @@ func (p *Proxy) monitorConfChange() {
 		}
 		for _, conf := range changedConf {
 			// use new forwarder now
-			var err = p.clusters[conf.ID].processConfChange(conf)
+			var err = p.clusters[conf.Name].processConfChange(conf)
 			if err == nil {
 				atomic.AddInt32(&ClusterChangeCount, 1)
-				log.Infof("succeed to change conf of cluster(%s:%d)\n", conf.Name, conf.ID)
+				log.Infof("succeed to change conf of cluster:%s\n", conf.Name)
 				continue
 			}
 			atomic.AddInt32(&ClusterConfChangeFailCnt, 1)
@@ -344,6 +334,7 @@ func (p *Proxy) monitorConfChange() {
 }
 
 func (c *Cluster) Close() {
+	atomic.StoreInt32(&c.state, ClusterStopped)
 	c.forwarder.Close()
 	c.closeAllConnections()
 }
@@ -351,8 +342,8 @@ func (c *Cluster) Close() {
 func (c *Cluster) addConnection(sn int32, conn *libnet.Conn) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	if sn != c.conf.SN {
-		return errors.New("config is change, try again from:" + strconv.Itoa(int(sn)) + " to:" + strconv.Itoa(int(c.conf.SN)))
+	if sn != c.conf.ID {
+		return errors.New("config is change, try again from:" + strconv.Itoa(int(sn)) + " to:" + strconv.Itoa(int(c.conf.ID)))
 	}
 	c.clientConns[conn.ID] = conn
 	return nil
@@ -387,8 +378,10 @@ func (c *Cluster) closeAllConnections() {
 }
 
 func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
-	newConf.ID = c.conf.ID
-	newConf.SN = genClusterSn()
+	if newConf.Name != c.conf.Name {
+		return errors.New("invalid Cluster conf, name:" + newConf.Name + " not equal with old:" + c.conf.Name)
+	}
+	newConf.ID = genClusterID()
 	var newForwarder, err = NewForwarder(newConf)
 	if err != nil {
 		return err

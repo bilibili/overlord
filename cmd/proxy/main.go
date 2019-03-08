@@ -21,11 +21,11 @@ const (
 )
 
 var (
-	version  bool
-	check    bool
-	pprof    string
-	metrics  bool
-	confFile string
+	version         bool
+	check           bool
+	pprof           string
+	metrics         bool
+	confFile        string
 	clusterConfFile string
 )
 
@@ -74,7 +74,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-    p.ClusterConfFile = clusterConfFile
+	p.ClusterConfFile = clusterConfFile
 	defer p.Close()
 	p.Serve(ccs)
 	// pprof
@@ -107,11 +107,11 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 		c.Proxy.UseMetrics = metrics
 	}
 	// high priority end
-    var tmpCCS, err = proxy.LoadClusterConf(clusterConfFile)
-    if (err != nil) {
-        panic(err)
-    }
-    ccs = tmpCCS
+	var tmpCCS, err = proxy.LoadClusterConf(clusterConfFile)
+	if err != nil {
+		panic(err)
+	}
+	ccs = tmpCCS
 	return
 }
 

@@ -33,8 +33,7 @@ var (
 
 // Handler handle conn.
 type Handler struct {
-	p               *Proxy
-	ClusterID       int32
+	cluster         *Cluster
 	CacheType       types.CacheType
 	Name            string
 	ListenAddr      string
@@ -48,10 +47,9 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(p *Proxy, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
+func NewHandler(c *Cluster, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
 	h = &Handler{
-		p:               p,
-		ClusterID:       cc.ID,
+		cluster:         c,
 		Name:            cc.Name,
 		CacheType:       cc.CacheType,
 		ListenAddr:      cc.ListenAddr,
@@ -93,7 +91,7 @@ func (h *Handler) handle() {
 		forwarder proto.Forwarder
 	)
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
-	forwarder = h.p.GetForwarder(h.ClusterID)
+	forwarder = h.cluster.getForwarder()
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
@@ -109,19 +107,10 @@ func (h *Handler) handle() {
 				h.deferHandle(messages, err)
 				return
 			}
-			forwarder = h.p.GetForwarder(h.ClusterID)
+			forwarder = h.cluster.getForwarder()
 		}
 		// here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
 		forwarder.Forward(msgs)
-		/*
-		   if (err != nil) {
-		       log.Infof("forwarder of cluster:%d is close, need to reconnect", h.ClusterID)
-		       fmt.Printf("forwarder of cluster:%d is close, client need to reconn, get err:%s\n", h.ClusterID, err.Error())
-		       h.deferHandle(messages, err)
-		       forwarder.Release()
-		       return
-		   }
-		*/
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
@@ -171,7 +160,7 @@ func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, 
 }
 
 func (h *Handler) deferHandle(msgs []*proto.Message, err error) {
-	h.p.RemoveConnection(h.ClusterID, h.conn.ID)
+	h.cluster.removeConnection(h.conn.ID)
 	proto.PutMsgs(msgs)
 	h.closeWithError(err)
 	return
@@ -181,7 +170,7 @@ func (h *Handler) closeWithError(err error) {
 	if atomic.CompareAndSwapInt32(&h.closed, handlerOpening, handlerClosed) {
 		h.err = err
 		_ = h.conn.Close()
-		atomic.AddInt32(&h.p.conns, -1) // NOTE: decr!!!
+		h.cluster.proxy.descConnectionCnt()
 		if prom.On {
 			prom.ConnDecr(h.Name)
 		}

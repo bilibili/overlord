@@ -1,1 +1,11 @@
-*.conf
+close_cluster.conf
+cnnleak_cluster.conf
+lotsof_cluster.conf
+mc_cluster.conf
+noclose_cluster.conf
+nopanic_cluster.conf
+rediscluster_addr_invalid.conf
+rediscluster_cluster.conf
+rediscluster_seed_cluster.conf
+some_cluster_removed.conf
+test/

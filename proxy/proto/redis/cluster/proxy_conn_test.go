@@ -15,10 +15,9 @@ import (
 
 func TestProxyConn(t *testing.T) {
 	pc := &proxyConn{
-		// c:  &cluster{},
 		pc: &redis.ProxyConn{},
 	}
-    cls := &cluster{}
+	cls := &cluster{}
 	cls.fakeNodesBytes = []byte("fake nodes bytes")
 	cls.fakeSlotsBytes = []byte("fake slots bytes")
 	bw := &bufio.Writer{}
