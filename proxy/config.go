@@ -2,8 +2,8 @@ package proxy
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 
 	"overlord/pkg/log"
 	"overlord/pkg/types"
@@ -28,11 +28,11 @@ type Config struct {
 func DefaultConfig() *Config {
 	c := &Config{}
 	if _, err := toml.Decode(defaultConfig, c); err != nil {
-        // it is safety to panic here
+		// it is safety to panic here
 		panic(err)
 	}
 	if err := c.Validate(); err != nil {
-        // it is safety to panic here
+		// it is safety to panic here
 		panic(err)
 	}
 	return c
@@ -56,8 +56,8 @@ func (c *Config) Validate() error {
 // ClusterConfig cluster config.
 type ClusterConfig struct {
 	Name             string
-    ID               int32           // ID is set in memory, not from conf file, used to access a config from a array
-    SN               int32           // SN is set in memory, not from conf file, it is used to identify the version of a config since name & ID is not changed
+	ID               int32           // ID is set in memory, not from conf file, used to access a config from a array
+	SN               int32           // SN is set in memory, not from conf file, it is used to identify the version of a config since name & ID is not changed
 	HashMethod       string          `toml:"hash_method"`
 	HashDistribution string          `toml:"hash_distribution"`
 	HashTag          string          `toml:"hash_tag"`
@@ -76,92 +76,92 @@ type ClusterConfig struct {
 }
 
 func ValidateRedisCluster(servers []string) error {
-    if len(servers) == 0 {
-        return errors.New("empty redis cluster list")
-    }
-    for _, one := range(servers) {
-        var ipPort = strings.Split(one, ":")
-        if len(ipPort) != 2 && len(ipPort) != 3 {
-            return errors.New("invalid backend redis address format:" + one)
-        }
-        var intPort, err = strconv.Atoi(ipPort[1])
-        if err != nil || intPort <= 0 {
-            return errors.New("invalid backend redis address format:" + one)
-        }
+	if len(servers) == 0 {
+		return errors.New("empty redis cluster list")
+	}
+	for _, one := range servers {
+		var ipPort = strings.Split(one, ":")
+		if len(ipPort) != 2 && len(ipPort) != 3 {
+			return errors.New("invalid backend redis address format:" + one)
+		}
+		var intPort, err = strconv.Atoi(ipPort[1])
+		if err != nil || intPort <= 0 {
+			return errors.New("invalid backend redis address format:" + one)
+		}
 
-    }
-    return nil
+	}
+	return nil
 }
 
 func ValidateStandalone(servers []string) error {
-    if len(servers) == 0 {
-        return errors.New("empty backend server list")
-    }
-    for _, one := range(servers) {
-        var ipAlise = strings.Split(one, " ")
-        if len(ipAlise) != 1 && len(ipAlise) != 2 {
-            return errors.New("invalid backend address format:" + one)
-        }
-        var ipPort = strings.Split(ipAlise[0], ":")
-        if len(ipPort) != 3 {
-            return errors.New("invalid backend redis address format:" + one)
-        }
-        var intPort, err1 = strconv.Atoi(ipPort[1])
-        if err1 != nil || intPort <= 0 {
-            return errors.New("invalid backend redis address format:" + one)
-        }
-        var weight, err2 = strconv.Atoi(ipPort[2])
-        if err2 != nil || weight < 0 {
-            return errors.New("invalid backend redis address format:" + one)
-        }
-    }
-    return nil
+	if len(servers) == 0 {
+		return errors.New("empty backend server list")
+	}
+	for _, one := range servers {
+		var ipAlise = strings.Split(one, " ")
+		if len(ipAlise) != 1 && len(ipAlise) != 2 {
+			return errors.New("invalid backend address format:" + one)
+		}
+		var ipPort = strings.Split(ipAlise[0], ":")
+		if len(ipPort) != 3 {
+			return errors.New("invalid backend redis address format:" + one)
+		}
+		var intPort, err1 = strconv.Atoi(ipPort[1])
+		if err1 != nil || intPort <= 0 {
+			return errors.New("invalid backend redis address format:" + one)
+		}
+		var weight, err2 = strconv.Atoi(ipPort[2])
+		if err2 != nil || weight < 0 {
+			return errors.New("invalid backend redis address format:" + one)
+		}
+	}
+	return nil
 }
 
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
-    if cc.Name == "" {
-        return errors.New("cluster name is not provided")
-    }
-    if (cc.HashMethod != "fnv1a_64") {
-        return errors.New("hash method:" + cc.HashMethod + " is not support")
-    }
-    if (cc.HashDistribution  != "ketama") {
-        return errors.New("hash distribution:" + cc.HashDistribution + " is not support")
-    }
-    if (cc.CacheType != types.CacheTypeMemcache && cc.CacheType != types.CacheTypeMemcacheBinary && cc.CacheType != types.CacheTypeRedis && cc.CacheType != types.CacheTypeRedisCluster) {
-        return errors.New("back end cache type is not support")
-    }
-    if (cc.ListenProto != "tcp" && cc.ListenProto != "unix") {
-        return errors.New("listen proto:" + cc.ListenProto + " is not support")
-    }
-    if (cc.DialTimeout < 0 || cc.ReadTimeout < 0 || cc.WriteTimeout < 0 || cc.NodeConnections <= 0 || cc.PingFailLimit < 0) {
-        return errors.New("cannot meet condition: dial_timeout >= 0 and read_timeout >= 0 write_timeout >= 0 && node_connections > 0 && ping_fail_limit > 0")
-    }
+	if cc.Name == "" {
+		return errors.New("cluster name is not provided")
+	}
+	if cc.HashMethod != "fnv1a_64" {
+		return errors.New("hash method:" + cc.HashMethod + " is not support")
+	}
+	if cc.HashDistribution != "ketama" {
+		return errors.New("hash distribution:" + cc.HashDistribution + " is not support")
+	}
+	if cc.CacheType != types.CacheTypeMemcache && cc.CacheType != types.CacheTypeMemcacheBinary && cc.CacheType != types.CacheTypeRedis && cc.CacheType != types.CacheTypeRedisCluster {
+		return errors.New("back end cache type is not support")
+	}
+	if cc.ListenProto != "tcp" && cc.ListenProto != "unix" {
+		return errors.New("listen proto:" + cc.ListenProto + " is not support")
+	}
+	if cc.DialTimeout < 0 || cc.ReadTimeout < 0 || cc.WriteTimeout < 0 || cc.NodeConnections <= 0 || cc.PingFailLimit < 0 {
+		return errors.New("cannot meet condition: dial_timeout >= 0 and read_timeout >= 0 write_timeout >= 0 && node_connections > 0 && ping_fail_limit > 0")
+	}
 
-    var ipPort = strings.Split(cc.ListenAddr, ":")
-    if len(ipPort) != 2 {
-        return errors.New("invalid listen address:" + cc.ListenAddr)
-    }
-    var intPort, err = strconv.Atoi(ipPort[1])
-    if err != nil {
-        return errors.New("invalid listen address:" + cc.ListenAddr)
-    }
-    if intPort <= 0 {
-        return errors.New("invalid port in listen address:" + cc.ListenAddr)
-    }
-    if (cc.CacheType == types.CacheTypeRedisCluster) {
-        err = ValidateRedisCluster(cc.Servers)
-        if err != nil {
-            return err
-        }
-    } else {
-        err = ValidateStandalone(cc.Servers)
-        if err != nil {
-            return err
-        }
-    }
+	var ipPort = strings.Split(cc.ListenAddr, ":")
+	if len(ipPort) != 2 {
+		return errors.New("invalid listen address:" + cc.ListenAddr)
+	}
+	var intPort, err = strconv.Atoi(ipPort[1])
+	if err != nil {
+		return errors.New("invalid listen address:" + cc.ListenAddr)
+	}
+	if intPort <= 0 {
+		return errors.New("invalid port in listen address:" + cc.ListenAddr)
+	}
+	if cc.CacheType == types.CacheTypeRedisCluster {
+		err = ValidateRedisCluster(cc.Servers)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = ValidateStandalone(cc.Servers)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -197,36 +197,35 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 }
 
 func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
-    err = nil
-    ccs = nil
+	err = nil
+	ccs = nil
 	checks := map[string]struct{}{}
-    cs := &ClusterConfigs{}
-    if err = cs.LoadFromFile(path); err != nil {
-        return
-    }
-    for _, cc := range cs.Clusters {
-        if _, ok := checks[cc.Name]; ok {
-            err = errors.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
-            return
-        }
-        checks[cc.Name] = struct{}{}
-        var ipPort = strings.Split(cc.ListenAddr, ":")
-        if len(ipPort) != 2 {
-            err = errors.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
-            return
-        }
-        var port = ipPort[1]
-        if _, ok := checks[port]; ok {
-            err = errors.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
-            return
-        }
+	cs := &ClusterConfigs{}
+	if err = cs.LoadFromFile(path); err != nil {
+		return
+	}
+	for _, cc := range cs.Clusters {
+		if _, ok := checks[cc.Name]; ok {
+			err = errors.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
+			return
+		}
+		checks[cc.Name] = struct{}{}
+		var ipPort = strings.Split(cc.ListenAddr, ":")
+		if len(ipPort) != 2 {
+			err = errors.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
+			return
+		}
+		var port = ipPort[1]
+		if _, ok := checks[port]; ok {
+			err = errors.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
+			return
+		}
 
-        checks[port] = struct{}{}
-    }
-    ccs = append(ccs, cs.Clusters...)
-    return
+		checks[port] = struct{}{}
+	}
+	ccs = append(ccs, cs.Clusters...)
+	return
 }
-
 
 const defaultConfig = `
 ##################################################

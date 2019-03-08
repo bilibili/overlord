@@ -49,14 +49,13 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 }
 
 func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
-	var n = &nodeConn{
+	return &nodeConn{
 		cluster: cluster,
 		addr:    addr,
 		conn:    conn,
 		br:      bufio.NewReader(conn, bufio.Get(nodeReadBufSize)),
 		bw:      bufio.NewWriter(conn),
 	}
-    return n
 }
 
 func (nc *nodeConn) Write(m *proto.Message) (err error) {

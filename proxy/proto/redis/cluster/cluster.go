@@ -56,17 +56,17 @@ type cluster struct {
 	fakeSlotsBytes []byte
 	once           sync.Once
 
-	state int32
-    useCount int32
-    id int32
+	state    int32
+	id       int32
+	useCount int32
 }
 
 // NewForwarder new proto Forwarder.
 func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) (proto.Forwarder, error) {
-    if conns <= 0 {
-        var err = errs.New("failed to create redis cluster as conns count <= 0")
-        return nil, err
-    }
+	if conns <= 0 {
+		var err = errs.New("failed to create redis cluster as conns count <= 0")
+		return nil, err
+	}
 	c := &cluster{
 		name:    name,
 		servers: servers,
@@ -77,15 +77,15 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		hashTag: hashTag,
 		action:  make(chan struct{}),
 	}
-    c.id = atomic.AddInt32(&ClusterStartID, 1)
+	c.id = atomic.AddInt32(&ClusterStartID, 1)
 	if !c.tryFetch() {
 		var err = errs.New("failed to get any redis cluster seed nodes")
-        return nil, err
+		return nil, err
 	}
 	var err = c.fake(listen)
-    if (err != nil) {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 	go c.fetchproc()
 	return c, nil
 }
@@ -122,18 +122,18 @@ func (c *cluster) State() int32 {
 
 func (c *cluster) AddRef() int32 {
 	var cnt = atomic.AddInt32(&c.useCount, 1)
-    return cnt
+	return cnt
 }
 
-func (c *cluster) ID() int32{
-    return c.id
+func (c *cluster) ID() int32 {
+	return c.id
 }
 
 func (c *cluster) Release() {
 	var cnt = atomic.AddInt32(&c.useCount, -1)
-    if (cnt == 0) {
-        log.Infof("TODO close connection to for backend redis cluster")
-    }
+	if cnt == 0 {
+		log.Infof("TODO close connection to for backend redis cluster")
+	}
 }
 
 func (c *cluster) getPipe(key []byte) (ncp *proto.NodeConnPipe) {
@@ -249,40 +249,40 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 }
 
 func (c *cluster) fake(listen string) error {
-    _, port, err := net.SplitHostPort(listen)
-    if err != nil {
-        return err
-    }
-    inters, err := net.Interfaces()
-    if err != nil {
-        return err
-    }
-    for _, inter := range inters {
-        if strings.HasPrefix(inter.Name, "lo") {
-            continue
-        }
-        addrs, err := inter.Addrs()
-        if err != nil {
-            continue
-        }
-        for _, addr := range addrs {
-            if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
-                ipStr := ipnet.IP.String()
+	_, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return err
+	}
+	inters, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, inter := range inters {
+		if strings.HasPrefix(inter.Name, "lo") {
+			continue
+		}
+		addrs, err := inter.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+				ipStr := ipnet.IP.String()
 
-                ipStrLen := len(ipStr)
-                slotsStr := strings.Replace(fakeClusterSlots, "{IPLEN}", strconv.Itoa(ipStrLen), -1)
-                slotsStr = strings.Replace(slotsStr, "{IP}", ipStr, -1)
-                slotsStr = strings.Replace(slotsStr, "{PORT}", port, -1)
-                c.fakeSlotsBytes = []byte(slotsStr)
+				ipStrLen := len(ipStr)
+				slotsStr := strings.Replace(fakeClusterSlots, "{IPLEN}", strconv.Itoa(ipStrLen), -1)
+				slotsStr = strings.Replace(slotsStr, "{IP}", ipStr, -1)
+				slotsStr = strings.Replace(slotsStr, "{PORT}", port, -1)
+				c.fakeSlotsBytes = []byte(slotsStr)
 
-                nodesStr := strings.Replace(fakeClusterNodes, "{ADDR}", net.JoinHostPort(ipStr, port), -1)
-                nodesLen := len(nodesStr)
-                c.fakeNodesBytes = []byte("$" + strconv.Itoa(nodesLen) + "\r\n" + nodesStr + "\r\n")
-                return nil
-            }
-        }
-    }
-    return nil
+				nodesStr := strings.Replace(fakeClusterNodes, "{ADDR}", net.JoinHostPort(ipStr, port), -1)
+				nodesLen := len(nodesStr)
+				c.fakeNodesBytes = []byte("$" + strconv.Itoa(nodesLen) + "\r\n" + nodesStr + "\r\n")
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 type slotNode struct {

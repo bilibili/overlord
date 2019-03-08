@@ -31,10 +31,10 @@ type Pinger interface {
 
 // Forwarder is the interface for backend run and process the messages.
 type Forwarder interface {
-	Forward([]*Message) error
+	AddRef() int32
 	Close() error
-    AddRef() int32
-    Release()
-    State() int32
-    ID() int32
+	Forward([]*Message) error
+	Release()
+	State() int32
+	ID() int32
 }

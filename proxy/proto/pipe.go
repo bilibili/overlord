@@ -27,14 +27,13 @@ type NodeConnPipe struct {
 	l      sync.RWMutex
 
 	errCh chan error
-
 	state int32
 }
 
 // NewNodeConnPipe new NodeConnPipe.
 func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 	if conns <= 0 {
-        // It is safety to panic here, as this number is checked when create redis cluster
+		// It is safety to panic here, as this number is checked when create redis cluster
 		panic("the number of connections cannot be zero")
 	}
 	ncp = &NodeConnPipe{

@@ -48,8 +48,8 @@ func (pc *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err er
 			arr := resp.Array()
 			if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
 				if len(arr) == 2 && forwarder != nil {
-                    var cls *cluster
-                    cls = forwarder.(*cluster)
+					var cls *cluster
+					cls = forwarder.(*cluster)
 
 					// CLUSTER COMMANDS
 					conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]

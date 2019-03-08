@@ -40,8 +40,8 @@ var (
 		types.CacheTypeMemcacheBinary: struct{}{},
 		types.CacheTypeRedis:          struct{}{},
 	}
-    PingSleepTimeSec int32 = 300
-    ForwardID int32 = 10000
+	ForwardID        int32 = 10000
+	PingSleepTimeSec int32 = 300
 )
 
 // NewForwarder new a Forwarder by cluster config.
@@ -56,7 +56,7 @@ func NewForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
 		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
 		return rclstr.NewForwarder(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, dto, rto, wto, []byte(cc.HashTag))
 	}
-    // it is safety to panic here, as ClusterConfig must pass config validation
+	// it is safety to panic here, as ClusterConfig must pass config validation
 	panic("unsupported protocol")
 }
 
@@ -72,15 +72,15 @@ type defaultForwarder struct {
 	aliasMap map[string]string
 	nodePipe map[string]*proto.NodeConnPipe
 
-	state int32
-    useCount int32
-    id int32
+	state    int32
+	useCount int32
+	id       int32
 }
 
 // newDefaultForwarder must combinf.
 func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
-    f := &defaultForwarder{cc: cc, state:forwarderStateOpening, useCount: 0 }
-    f.id = atomic.AddInt32(&ForwardID, 1)
+	f := &defaultForwarder{cc: cc, state: forwarderStateOpening, useCount: 0}
+	f.id = atomic.AddInt32(&ForwardID, 1)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
@@ -124,22 +124,23 @@ func (f *defaultForwarder) State() int32 {
 }
 
 func (f *defaultForwarder) ID() int32 {
-    return f.id
+	return f.id
 }
 
 func (f *defaultForwarder) AddRef() int32 {
 	var cnt = atomic.AddInt32(&(f.useCount), 1)
-    return cnt
+	return cnt
 }
 
 func (f *defaultForwarder) Release() {
 	var cnt = atomic.AddInt32(&(f.useCount), -1)
-    if (cnt == 0) {
-        for _, conn := range(f.nodePipe) {
-            conn.Close()
-        }
-    }
+	if cnt == 0 {
+		for _, conn := range f.nodePipe {
+			conn.Close()
+		}
+	}
 }
+
 // Forward impl proto.Forwarder
 func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 	for _, m := range msgs {
@@ -203,13 +204,13 @@ func (f *defaultForwarder) trimHashTag(key []byte) []byte {
 
 // pingSleepTime for unit test override!!!
 var pingSleep = func(f *defaultForwarder, timeInSec int32) {
-    for i := int32(0); i < timeInSec; i++ {
-        var state = atomic.LoadInt32(&f.state)
-        if state == forwarderStateClosed {
-            return
-        }
-        time.Sleep(time.Second)
-    }
+	for i := int32(0); i < timeInSec; i++ {
+		var state = atomic.LoadInt32(&f.state)
+		if state == forwarderStateClosed {
+			return
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func (f *defaultForwarder) processPing(p *pinger) {
@@ -219,12 +220,12 @@ func (f *defaultForwarder) processPing(p *pinger) {
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
-        if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
-            _ = p.ping.Close()
-            log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
-            return
-        }
-        // log.Infof("pinger of forwarder:%p try to ping backend", f)
+		if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
+			_ = p.ping.Close()
+			log.Warnf("forwarder of cluster:%d is close, no need to ping anymore", f.cc.ID)
+			return
+		}
+		// log.Infof("pinger of forwarder:%p try to ping backend", f)
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0
@@ -259,7 +260,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 		} else if log.V(3) {
 			log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
 		}
-        pingSleep(f, PingSleepTimeSec)
+		pingSleep(f, PingSleepTimeSec)
 	}
 }
 
@@ -285,7 +286,7 @@ func newNodeConn(cc *ClusterConfig, addr string) proto.NodeConn {
 	case types.CacheTypeRedis:
 		return redis.NewNodeConn(cc.Name, addr, dto, rto, wto)
 	default:
-        // It is safety to panic here
+		// It is safety to panic here
 		panic(types.ErrNoSupportCacheType)
 	}
 }
@@ -301,7 +302,7 @@ func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
 	case types.CacheTypeRedis:
 		return redis.NewPinger(conn)
 	default:
-        // It is safety to panic here
+		// It is safety to panic here
 		panic(types.ErrNoSupportCacheType)
 	}
 }
