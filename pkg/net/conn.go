@@ -3,7 +3,6 @@ package net
 import (
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 )
 
@@ -22,7 +21,6 @@ type Conn struct {
 	dialTimeout  time.Duration
 	readTimeout  time.Duration
 	writeTimeout time.Duration
-	ID           int64
 
 	closed bool
 }
@@ -36,8 +34,7 @@ func DialWithTimeout(addr string, dialTimeout, readTimeout, writeTimeout time.Du
 
 // NewConn will create new Connection with given socket
 func NewConn(sock net.Conn, readTimeout, writeTimeout time.Duration) (c *Conn) {
-	var id = atomic.AddInt64(&ConnectionCnt, 1)
-	c = &Conn{Conn: sock, readTimeout: readTimeout, writeTimeout: writeTimeout, ID: id}
+	c = &Conn{Conn: sock, readTimeout: readTimeout, writeTimeout: writeTimeout}
 	return
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,6 +24,7 @@ import (
 // proxy errors
 var (
 	ErrProxyMoreMaxConns              = errs.New("Proxy accept more than max connextions")
+	ErrProxyConfChanged               = errs.New("Proxy configure is changed, need to reconnect")
 	ClusterID                   int32 = 0
 	MonitorCfgIntervalMilliSecs int   = 10 * 100 // Time interval to monitor config change
 	ClusterChangeCount          int32 = 0
@@ -41,12 +41,13 @@ const (
 )
 
 type Cluster struct {
-	conf        *ClusterConfig
-	clientConns map[int64]*libnet.Conn
-	forwarder   proto.Forwarder
-	mutex       sync.Mutex
-	proxy       *Proxy
-	state       int32
+	conf         *ClusterConfig
+	clientConns  map[int64]*Handler
+	forwarder    proto.Forwarder
+	mutex        sync.Mutex
+	proxy        *Proxy
+	state        int32
+	connectionSN int64
 }
 
 // Proxy is proxy.
@@ -127,8 +128,8 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
 		return err
 	}
 	newForwarder.AddRef()
-	var cluster = &Cluster{conf: newConf, forwarder: newForwarder, proxy: p}
-	cluster.clientConns = make(map[int64]*libnet.Conn)
+	var cluster = &Cluster{conf: newConf, forwarder: newForwarder, proxy: p, connectionSN: 0}
+	cluster.clientConns = make(map[int64]*Handler)
 	p.clusters[cluster.conf.Name] = cluster
 	var servErr = cluster.serve()
 	if servErr != nil {
@@ -174,6 +175,12 @@ func (c *Cluster) accept(l net.Listener) {
 			log.Errorf("cluster(%s) addr(%s) accept connection error:%+v", conf.Name, conf.ListenAddr, err)
 			continue
 		}
+		var newConf = c.getConf()
+		if newConf.ID != conf.ID {
+			_ = conn.Close()
+			log.Errorf("cluster:%s conf is just changed from:%d to %d, close client conn and let client retry\n", conf.Name, conf.ID, newConf.ID)
+			continue
+		}
 		if cnt, succ := c.proxy.incConnectionCnt(); !succ {
 			// cache type
 			var encoder proto.ProxyConn
@@ -201,14 +208,10 @@ func (c *Cluster) accept(l net.Listener) {
 			continue
 		}
 		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(c.proxy.c.Proxy.ReadTimeout), time.Second*time.Duration(c.proxy.c.Proxy.WriteTimeout))
-		err = c.addConnection(conf.ID, frontConn)
-		if err != nil {
-			// corner case, configure changed when we try to keep this connection
-			log.Errorf("corner case, configure just changed when after accept a connection, got error:%s\n", err.Error())
-			frontConn.Close()
-			continue
-		}
-		NewHandler(c, conf, frontConn).Handle()
+		var id = atomic.AddInt64(&c.connectionSN, 1)
+		var handler = NewHandler(c, conf, id, frontConn)
+		c.addConnection(id, handler)
+		handler.Handle()
 	}
 }
 
@@ -334,17 +337,15 @@ func (p *Proxy) monitorConfChange() {
 }
 
 func (c *Cluster) Close() {
+	log.Infof("start to close all client connections of cluster:%s\n", c.conf.Name)
 	atomic.StoreInt32(&c.state, ClusterStopped)
 	c.forwarder.Close()
 	c.closeAllConnections()
 }
 
-func (c *Cluster) addConnection(sn int32, conn *libnet.Conn) error {
+func (c *Cluster) addConnection(id int64, conn *Handler) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	if sn != c.conf.ID {
-		return errors.New("config is change, try again from:" + strconv.Itoa(int(sn)) + " to:" + strconv.Itoa(int(c.conf.ID)))
-	}
 	c.clientConns[conn.ID] = conn
 	return nil
 }
@@ -355,22 +356,10 @@ func (c *Cluster) removeConnection(id int64) {
 	delete(c.clientConns, id)
 }
 
-func (c *Cluster) closeAndRemoveConnection(id int64) {
-	c.mutex.Lock()
-	var conn, ok = c.clientConns[id]
-	if !ok {
-		c.mutex.Unlock()
-		return
-	}
-	delete(c.clientConns, id)
-	c.mutex.Unlock()
-	conn.Close()
-}
-
 func (c *Cluster) closeAllConnections() {
 	c.mutex.Lock()
 	var curConns = c.clientConns
-	c.clientConns = make(map[int64]*libnet.Conn)
+	c.clientConns = make(map[int64]*Handler)
 	c.mutex.Unlock()
 	for _, conn := range curConns {
 		conn.Close()
@@ -392,7 +381,7 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 	var oldForwarder = c.forwarder
 	c.forwarder = newForwarder
 	if newConf.CloseWhenChange {
-		c.clientConns = make(map[int64]*libnet.Conn)
+		c.clientConns = make(map[int64]*Handler)
 	}
 	c.conf = newConf
 	c.mutex.Unlock()

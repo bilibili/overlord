@@ -38,6 +38,7 @@ type Handler struct {
 	Name            string
 	ListenAddr      string
 	closeWhenChange bool
+	ID              int64
 
 	conn *libnet.Conn
 	pc   proto.ProxyConn
@@ -47,13 +48,14 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(c *Cluster, cc *ClusterConfig, client *libnet.Conn) (h *Handler) {
+func NewHandler(c *Cluster, cc *ClusterConfig, id int64, client *libnet.Conn) (h *Handler) {
 	h = &Handler{
 		cluster:         c,
-		Name:            cc.Name,
 		CacheType:       cc.CacheType,
+		Name:            cc.Name,
 		ListenAddr:      cc.ListenAddr,
 		closeWhenChange: cc.CloseWhenChange,
+		ID:              id,
 		conn:            client,
 	}
 
@@ -90,8 +92,9 @@ func (h *Handler) handle() {
 		err       error
 		forwarder proto.Forwarder
 	)
+	defer h.cluster.removeConnection(h.ID)
 	messages = h.allocMaxConcurrent(wg, messages, len(msgs))
-	forwarder = h.cluster.getForwarder()
+	forwarder = h.cluster.getForwarder() // reference is hold in automatically
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
@@ -104,13 +107,19 @@ func (h *Handler) handle() {
 		if forwarderStateClosed == fState {
 			forwarder.Release()
 			if h.closeWhenChange {
-				h.deferHandle(messages, err)
+				h.deferHandle(messages, nil)
 				return
 			}
 			forwarder = h.cluster.getForwarder()
 		}
-		// here, forwwarder maybe get twice in redis cluster case, which will get in Encode process
-		forwarder.Forward(msgs)
+		// TODO: check return value of forwarder as wait may hang forever
+		err = forwarder.Forward(msgs)
+		if err != nil {
+			forwarder.Release()
+			log.Errorf("failed to forward msg to backend, get error:%s\n", err.Error())
+			h.deferHandle(messages, err)
+			return
+		}
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
@@ -160,13 +169,17 @@ func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, 
 }
 
 func (h *Handler) deferHandle(msgs []*proto.Message, err error) {
-	h.cluster.removeConnection(h.conn.ID)
 	proto.PutMsgs(msgs)
 	h.closeWithError(err)
 	return
 }
 
+func (h *Handler) Close() {
+	h.closeWithError(nil)
+}
+
 func (h *Handler) closeWithError(err error) {
+	// TODO: state check and connection check
 	if atomic.CompareAndSwapInt32(&h.closed, handlerOpening, handlerClosed) {
 		h.err = err
 		_ = h.conn.Close()
@@ -174,7 +187,7 @@ func (h *Handler) closeWithError(err error) {
 		if prom.On {
 			prom.ConnDecr(h.Name)
 		}
-		if log.V(2) && errors.Cause(err) != io.EOF {
+		if log.V(2) && err != nil && errors.Cause(err) != io.EOF {
 			log.Warnf("cluster(%s) addr(%s) remoteAddr(%s) handler close error:%+v", h.Name, h.ListenAddr, h.conn.RemoteAddr(), err)
 		}
 	}

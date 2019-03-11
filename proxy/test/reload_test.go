@@ -354,6 +354,7 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
 					if prevConnSucc {
 						prevConnSucc = false
 						cnnCloseCnt++
+						log.Infof("connection close, new connection close count is:%d\n", cnnCloseCnt)
 					}
 					var err2 = cli.Connect()
 					if err2 != nil {
@@ -390,7 +391,7 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
 				return
 			}
 			if expChangeCnt > 0 && changeCnt >= int32(expChangeCnt) {
-				log.Infof("detect cluster changed, but read change and conn change not expect, change:%d connection close:%d rChange:%d\n", changeCnt, cnnCloseCnt, rChange)
+				log.Infof("detect cluster changed, but read change and conn lost not expect, change:%d connection close:%d readChange:%d\n", changeCnt, cnnCloseCnt, rChange)
 
 				if cnnCloseCnt == expCnnFailCnt && rChange == expRCnt {
 					log.Infof("detect cluster changed, work as expect")
@@ -961,7 +962,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 		var addr = "127.0.0.1:" + strconv.Itoa(8513+int(i))
 		var err = get(addr, key, val, 0)
 		if i < int(proxy.MaxClusterCnt) {
-			assert.NoError(t, err)
+			assert.NoError(t, err, "failed to check on address:"+addr)
 		} else {
 			require.True(t, err != nil)
 		}
@@ -1079,6 +1080,10 @@ func TestClusterConfigReloadValidateAddress(t *testing.T) {
 
 	stCluster1[0] = "0.0.0.0:0:-1 name"
 	assert.Error(t, proxy.ValidateStandalone(stCluster1))
+
+	stCluster1[0] = "0.0.0.0:1023:1"
+	assert.NoError(t, proxy.ValidateStandalone(stCluster1))
+
 }
 
 func TestClusterConfigReloadClusterRemoved(t *testing.T) {
