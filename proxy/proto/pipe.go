@@ -2,8 +2,12 @@ package proto
 
 import (
 	"errors"
+	"overlord/pkg/prom"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	perr "github.com/pkg/errors"
 
 	"overlord/pkg/hashkit"
 )
@@ -166,8 +170,15 @@ func (mp *msgPipe) pipe() {
 		}
 	MEND:
 		for i := 0; i < mp.count; i++ {
-			mp.batch[i].WithError(err) // NOTE: maybe err is nil
-			mp.batch[i].Done()
+			msg := mp.batch[i]
+			msg.WithError(err) // NOTE: maybe err is nil
+			msg.Done()
+			if prom.On {
+				prom.HandleTime(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
+				if err != nil {
+					prom.ErrIncr(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), perr.Cause(err).Error())
+				}
+			}
 		}
 		mp.count = 0
 		if err != nil {

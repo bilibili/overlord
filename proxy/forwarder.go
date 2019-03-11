@@ -4,6 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"net"
+	"overlord/pkg/prom"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -200,7 +201,6 @@ func (f defaultForwarder) processPing(p *pinger) {
 			_ = p.ping.Close()
 			return
 		}
-
 		err = p.ping.Ping()
 		if err == nil {
 			p.failure = 0
@@ -215,6 +215,9 @@ func (f defaultForwarder) processPing(p *pinger) {
 			continue
 		} else {
 			_ = p.ping.Close()
+			if prom.On {
+				prom.ErrIncr(f.cc.Name, p.addr, "ping", errors.Cause(err).Error())
+			}
 			p.ping = newPingConn(p.cc, p.addr)
 		}
 
