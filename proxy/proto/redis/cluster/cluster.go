@@ -79,6 +79,8 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 	}
 	c.id = atomic.AddInt32(&ClusterStartID, 1)
 	if !c.tryFetch() {
+		_ = c.Close()
+		log.Warnf("fail to init fetch cluster all seeds nodes cluster")
 		var err = errs.New("failed to get any redis cluster seed nodes")
 		return nil, err
 	}
@@ -110,7 +112,11 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 
 func (c *cluster) Close() error {
 	if !atomic.CompareAndSwapInt32(&c.state, opening, closed) {
-		np := c.slotNode.Load().(*slotNode)
+		sn := c.slotNode.Load()
+		if sn == nil {
+			return nil
+		}
+		np := sn.(*slotNode)
 		for _, npc := range np.nodePipe {
 			npc.Close()
 		}
