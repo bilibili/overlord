@@ -561,7 +561,7 @@ func TestEject(t *testing.T) {
 	}
 
 	eject := ccs[0]
-	fer := p.clusters[eject.Name].forwarder.(*defaultForwarder)
+	fer := p.clusters["eject-cluster"].forwarder.(*defaultForwarder)
 	mp := &mockPing{}
 
 	monkey.Patch(newPingConn, func(cc *ClusterConfig, addr string) proto.Pinger {

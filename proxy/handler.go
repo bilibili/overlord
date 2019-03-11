@@ -112,14 +112,8 @@ func (h *Handler) handle() {
 			}
 			forwarder = h.cluster.getForwarder()
 		}
-		// TODO: check return value of forwarder as wait may hang forever
-		err = forwarder.Forward(msgs)
-		if err != nil {
-			forwarder.Release()
-			log.Errorf("failed to forward msg to backend, get error:%s\n", err.Error())
-			h.deferHandle(messages, err)
-			return
-		}
+		// no need to check return of Forward, wait count is not increased if not forward succ
+		forwarder.Forward(msgs)
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {

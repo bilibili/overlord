@@ -8,8 +8,7 @@ import (
 
 var (
 	// ErrConnClosed error connection closed.
-	ErrConnClosed       = errors.New("connection is closed")
-	ConnectionCnt int64 = 0
+	ErrConnClosed = errors.New("connection is closed")
 )
 
 // Conn is a net.Conn self implement
