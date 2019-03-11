@@ -47,14 +47,14 @@ func Init() {
 		prometheus.HistogramOpts{
 			Name:    statProxyTimer,
 			Help:    statProxyTimer,
-			Buckets: []float64{100, 200, 400, 1000},
+			Buckets: []float64{1000, 2000, 4000, 10000},
 		}, clusterCmdLabels)
 	prometheus.MustRegister(proxyTimer)
 	handlerTimer = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    statHandlerTimer,
 			Help:    statHandlerTimer,
-			Buckets: []float64{100, 200, 400, 1000},
+			Buckets: []float64{1000, 2000, 4000, 10000},
 		}, clusterNodeCmdLabels)
 	prometheus.MustRegister(handlerTimer)
 	// metrics
