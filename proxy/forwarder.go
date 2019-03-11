@@ -25,6 +25,7 @@ import (
 const (
 	forwarderStateOpening = int32(0)
 	forwarderStateClosed  = int32(1)
+	forwarderStateStopped = int32(2)
 )
 
 // errors
@@ -115,6 +116,7 @@ func newDefaultForwarder(cc *ClusterConfig) (proto.Forwarder, error) {
 			go f.processPing(p)
 		}
 	}
+	f.AddRef()
 	return f, nil
 }
 
@@ -135,8 +137,11 @@ func (f *defaultForwarder) AddRef() int32 {
 func (f *defaultForwarder) Release() {
 	var cnt = atomic.AddInt32(&(f.useCount), -1)
 	if cnt == 0 {
-		for _, conn := range f.nodePipe {
-			conn.Close()
+		var curState = atomic.LoadInt32(&f.state)
+		if curState != forwarderStateClosed {
+			for _, conn := range f.nodePipe {
+				conn.Close()
+			}
 		}
 	}
 }
@@ -170,9 +175,16 @@ func (f *defaultForwarder) Close() error {
 	if atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
 		// first closed
 		log.Infof("delay close nodePipes")
+		for _, conn := range f.nodePipe {
+			conn.Close()
+		}
 		return nil
 	}
 	return nil
+}
+
+func (f *defaultForwarder) Stop() {
+	atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateStopped)
 }
 
 func (f *defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
@@ -208,7 +220,7 @@ func (f *defaultForwarder) trimHashTag(key []byte) []byte {
 var pingSleep = func(f *defaultForwarder, timeInSec int32) {
 	for i := int32(0); i < timeInSec; i++ {
 		var state = atomic.LoadInt32(&f.state)
-		if state == forwarderStateClosed {
+		if state != forwarderStateOpening {
 			return
 		}
 		time.Sleep(time.Second)
@@ -222,7 +234,7 @@ func (f *defaultForwarder) processPing(p *pinger) {
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
-		if atomic.LoadInt32(&f.state) == forwarderStateClosed {
+		if atomic.LoadInt32(&f.state) != forwarderStateOpening {
 			_ = p.ping.Close()
 			return
 		}

@@ -104,7 +104,7 @@ func (h *Handler) handle() {
 			return
 		}
 		var fState = forwarder.State()
-		if forwarderStateClosed == fState {
+		if forwarderStateOpening != fState {
 			forwarder.Release()
 			if h.closeWhenChange {
 				h.deferHandle(messages, nil)

@@ -127,7 +127,7 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
 		p.lock.Unlock()
 		return err
 	}
-	newForwarder.AddRef()
+	// refs is incread in NewFowarder
 	var cluster = &Cluster{conf: newConf, forwarder: newForwarder, proxy: p, connectionSN: 0}
 	cluster.clientConns = make(map[int64]*Handler)
 	p.clusters[cluster.conf.Name] = cluster
@@ -339,8 +339,16 @@ func (p *Proxy) monitorConfChange() {
 func (c *Cluster) Close() {
 	log.Infof("start to close all client connections of cluster:%s\n", c.conf.Name)
 	atomic.StoreInt32(&c.state, ClusterStopped)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	c.forwarder.Close()
-	c.closeAllConnections()
+
+	var curConns = c.clientConns
+	c.clientConns = make(map[int64]*Handler)
+	for _, conn := range curConns {
+		conn.Close()
+	}
+
 }
 
 func (c *Cluster) addConnection(id int64, conn *Handler) error {
@@ -356,16 +364,6 @@ func (c *Cluster) removeConnection(id int64) {
 	delete(c.clientConns, id)
 }
 
-func (c *Cluster) closeAllConnections() {
-	c.mutex.Lock()
-	var curConns = c.clientConns
-	c.clientConns = make(map[int64]*Handler)
-	c.mutex.Unlock()
-	for _, conn := range curConns {
-		conn.Close()
-	}
-}
-
 func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 	if newConf.Name != c.conf.Name {
 		return errors.New("invalid Cluster conf, name:" + newConf.Name + " not equal with old:" + c.conf.Name)
@@ -375,8 +373,12 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 	if err != nil {
 		return err
 	}
-	newForwarder.AddRef()
+	// refs of new forwarder is increased in NewForwarder
 	c.mutex.Lock()
+	if atomic.LoadInt32(&c.state) != ClusterRunning {
+		c.mutex.Unlock()
+		return errors.New("cluster:" + newConf.Name + " is stopped, no need to reload conf")
+	}
 	var oldConns = c.clientConns
 	var oldForwarder = c.forwarder
 	c.forwarder = newForwarder
@@ -385,7 +387,7 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 	}
 	c.conf = newConf
 	c.mutex.Unlock()
-	oldForwarder.Close()
+	oldForwarder.Stop()
 	oldForwarder.Release()
 	if newConf.CloseWhenChange {
 		for _, conn := range oldConns {

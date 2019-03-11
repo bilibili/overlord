@@ -19,6 +19,7 @@ import (
 const (
 	opening = int32(0)
 	closed  = int32(1)
+	stopped = int32(2)
 
 	musk = 0x3fff
 )
@@ -89,6 +90,7 @@ func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, 
 		return nil, err
 	}
 	go c.fetchproc()
+	c.AddRef()
 	return c, nil
 }
 
@@ -108,6 +110,10 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 		}
 	}
 	return nil
+}
+
+func (c *cluster) Stop() {
+	atomic.CompareAndSwapInt32(&c.state, opening, stopped)
 }
 
 func (c *cluster) Close() error {
@@ -142,7 +148,19 @@ func (c *cluster) ID() int32 {
 func (c *cluster) Release() {
 	var cnt = atomic.AddInt32(&c.useCount, -1)
 	if cnt == 0 {
-		log.Infof("TODO close connection to for backend redis cluster")
+		var curState = atomic.LoadInt32(&c.state)
+		if curState == closed {
+			return
+		}
+
+		sn := c.slotNode.Load()
+		if sn == nil {
+			return
+		}
+		np := sn.(*slotNode)
+		for _, npc := range np.nodePipe {
+			npc.Close()
+		}
 	}
 }
 
