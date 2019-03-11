@@ -231,6 +231,9 @@ func (f defaultForwarder) processPing(p *pinger) {
 		}
 		if !del {
 			f.ring.DelNode(p.alias)
+			if prom.On {
+				prom.ErrIncr(f.cc.Name, p.addr, "ping", "del node")
+			}
 			del = true
 			if log.V(2) {
 				log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d then del", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
