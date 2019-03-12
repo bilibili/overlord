@@ -26,8 +26,9 @@ var (
 )
 
 type nodeConn struct {
-	c  *cluster
-	nc proto.NodeConn
+	c    *cluster
+	addr string
+	nc   proto.NodeConn
 
 	sb strings.Builder
 
@@ -38,10 +39,19 @@ type nodeConn struct {
 
 func newNodeConn(c *cluster, addr string) (nc proto.NodeConn) {
 	nc = &nodeConn{
-		c:  c,
-		nc: redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
+		c:    c,
+		addr: addr,
+		nc:   redis.NewNodeConn(c.name, addr, c.dto, c.rto, c.wto),
 	}
 	return
+}
+
+func (nc *nodeConn) Addr() string {
+	return nc.addr
+}
+
+func (nc *nodeConn) Cluster() string {
+	return nc.c.name
 }
 
 func (nc *nodeConn) Write(m *proto.Message) (err error) {

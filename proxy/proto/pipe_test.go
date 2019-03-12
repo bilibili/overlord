@@ -16,6 +16,14 @@ type mockNodeConn struct {
 	err        error
 }
 
+func (n *mockNodeConn) Addr() string {
+	return "mock"
+}
+
+func (n *mockNodeConn) Cluster() string {
+	return "mock"
+}
+
 func (n *mockNodeConn) Write(*Message) error { return nil }
 func (n *mockNodeConn) Read(*Message) error {
 	if n.count == n.num {

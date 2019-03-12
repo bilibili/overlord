@@ -44,6 +44,14 @@ func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout ti
 	return
 }
 
+func (n *nodeConn) Addr() string {
+	return n.addr
+}
+
+func (n *nodeConn) Cluster() string {
+	return n.cluster
+}
+
 func (n *nodeConn) Write(m *proto.Message) (err error) {
 	if n.Closed() {
 		err = errors.WithStack(ErrClosed)

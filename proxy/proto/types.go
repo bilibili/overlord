@@ -21,6 +21,8 @@ type NodeConn interface {
 	Read(*Message) error
 	Flush() error
 	Close() error
+	Addr() string
+	Cluster() string
 }
 
 // Pinger for executor ping node.

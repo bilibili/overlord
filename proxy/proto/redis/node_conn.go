@@ -58,6 +58,14 @@ func newNodeConn(cluster, addr string, conn *libnet.Conn) proto.NodeConn {
 	}
 }
 
+func (nc *nodeConn) Addr() string {
+	return nc.addr
+}
+
+func (nc *nodeConn) Cluster() string {
+	return nc.cluster
+}
+
 func (nc *nodeConn) Write(m *proto.Message) (err error) {
 	if nc.Closed() {
 		err = errors.WithStack(ErrNodeConnClosed)
