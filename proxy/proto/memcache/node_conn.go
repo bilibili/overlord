@@ -61,6 +61,7 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
+	m.MarkWrite()
 	_ = n.bw.Write(mcr.rTp.Bytes())
 	_ = n.bw.Write(spaceBytes)
 	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
@@ -129,6 +130,7 @@ REREADData:
 	}
 	mcr.data = append(mcr.data, bs...)
 	mcr.data = append(mcr.data, data...)
+	m.MarkRead()
 	return
 }
 
