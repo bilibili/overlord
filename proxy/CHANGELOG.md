@@ -1,5 +1,11 @@
 # Overlord-proxy
 
+## Version 1.6.0
+1. add migrate tools named [anzi](https://github.com/bilibili/overlord/blob/master/doc/wiki-cn/tools.md)
+2. add cluster manager tools [enri](https://github.com/bilibili/overlord/blob/master/doc/wiki-cn/enri.md)
+3. fixed overlord panic when all cluster seed nodes down
+4. add back prometheus monitor metrics
+
 ## Version 1.5.5
 1. change pinger as long connection.
 
