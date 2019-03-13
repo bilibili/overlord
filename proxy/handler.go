@@ -168,6 +168,7 @@ func (h *Handler) deferHandle(msgs []*proto.Message, err error) {
 	return
 }
 
+// Close update state of handler and front connection
 func (h *Handler) Close() {
 	h.closeWithError(nil)
 }

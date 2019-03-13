@@ -17,6 +17,24 @@ const (
 	HashMethodMurmur    = "murmur"
 )
 
+var (
+	HashMethods = map[string]bool{
+		HashMethodFnv1a64: true,
+		HashMethodFnv1a32: true,
+		HashMethodFnv164:  true,
+		HashMethodFnv132:  true,
+
+		HashMethodCRC16:  true,
+		HashMethodCRC32:  true,
+		HashMethodCRC32a: true,
+
+		HashMethodMD5:       true,
+		HashMethodOneOnTime: true,
+		HashMethodHsieh:     true,
+		HashMethodMurmur:    true,
+	}
+)
+
 // NewRing will create new and need init method.
 func NewRing(des, method string) *HashRing {
 

@@ -26,7 +26,7 @@ var (
 	ErrProxyMoreMaxConns              = errs.New("Proxy accept more than max connextions")
 	ErrProxyConfChanged               = errs.New("Proxy configure is changed, need to reconnect")
 	ClusterID                   int32 = 0
-	MonitorCfgIntervalMilliSecs int   = 10 * 100 // Time interval to monitor config change
+	MonitorCfgIntervalMilliSecs int   = 50 * 1000 // Time interval to monitor config change
 	ClusterChangeCount          int32 = 0
 	ClusterConfChangeFailCnt    int32 = 0
 	AddClusterFailCnt           int32 = 0

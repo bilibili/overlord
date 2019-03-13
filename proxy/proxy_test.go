@@ -426,7 +426,11 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 		conn.SetReadDeadline(time.Now().Add(time.Second))
 		bs := make([]byte, 24)
 		if n, err := br.Read(bs); err != nil || n != 24 {
-			t.Errorf("conn read cmd:%x error:%s resp:%x", cmd[1], err, bs)
+			var errStr = ""
+			if err != nil {
+				errStr = err.Error()
+			}
+			t.Errorf("conn read cmd:%x error:%s resp:%x", cmd[1], errStr, bs)
 			continue
 		}
 		if bytes.Equal(bs[6:8], []byte{0x00, 0x01}) {

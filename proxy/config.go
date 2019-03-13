@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"overlord/pkg/hashkit"
 	"overlord/pkg/log"
 	"overlord/pkg/types"
 
@@ -75,44 +76,46 @@ type ClusterConfig struct {
 	Servers          []string        `toml:"servers"`
 }
 
+// ValidateRedisCluster validate redis cluster address is valid or not
 func ValidateRedisCluster(servers []string) error {
 	if len(servers) == 0 {
 		return errors.New("empty redis cluster list")
 	}
-	for _, one := range servers {
-		var ipPort = strings.Split(one, ":")
+	for _, server := range servers {
+		var ipPort = strings.Split(server, ":")
 		if len(ipPort) != 2 && len(ipPort) != 3 {
-			return errors.New("invalid backend redis address format:" + one)
+			return errors.New("invalid backend redis address format:" + server)
 		}
 		var intPort, err = strconv.Atoi(ipPort[1])
 		if err != nil || intPort <= 0 {
-			return errors.New("invalid backend redis address format:" + one)
+			return errors.New("invalid backend redis address format:" + server)
 		}
 
 	}
 	return nil
 }
 
+// ValidateStandalone validate redis/memcache address is valid or not
 func ValidateStandalone(servers []string) error {
 	if len(servers) == 0 {
 		return errors.New("empty backend server list")
 	}
-	for _, one := range servers {
-		var ipAlise = strings.Split(one, " ")
+	for _, server := range servers {
+		var ipAlise = strings.Split(server, " ")
 		if len(ipAlise) != 1 && len(ipAlise) != 2 {
-			return errors.New("invalid backend address format:" + one)
+			return errors.New("invalid backend address format:" + server)
 		}
 		var ipPort = strings.Split(ipAlise[0], ":")
 		if len(ipPort) != 3 {
-			return errors.New("invalid backend redis address format:" + one)
+			return errors.New("invalid backend redis address format:" + server)
 		}
 		var intPort, err1 = strconv.Atoi(ipPort[1])
 		if err1 != nil || intPort <= 0 {
-			return errors.New("invalid backend redis address format:" + one)
+			return errors.New("invalid backend redis address format:" + server)
 		}
 		var weight, err2 = strconv.Atoi(ipPort[2])
 		if err2 != nil || weight < 0 {
-			return errors.New("invalid backend redis address format:" + one)
+			return errors.New("invalid backend redis address format:" + server)
 		}
 	}
 	return nil
@@ -122,11 +125,13 @@ func ValidateStandalone(servers []string) error {
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
 	if cc.Name == "" {
-		return errors.New("cluster name is not provided")
+		return errors.New("cluster name is empty")
 	}
-	if cc.HashMethod != "fnv1a_64" {
+
+	if _, ok := hashkit.HashMethods[cc.HashMethod]; !ok {
 		return errors.New("hash method:" + cc.HashMethod + " is not support")
 	}
+
 	if cc.HashDistribution != "ketama" {
 		return errors.New("hash distribution:" + cc.HashDistribution + " is not support")
 	}
@@ -233,8 +238,6 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 }
 
 func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
-	err = nil
-	ccs = nil
 	checks := map[string]struct{}{}
 	cs := &ClusterConfigs{}
 	if err = cs.LoadFromFile(path); err != nil {

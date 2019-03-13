@@ -58,7 +58,7 @@ type MigrateProc struct {
 // Migrate start new migrate process
 func (m *MigrateProc) Migrate() error {
 	cfg := proxy.DefaultConfig()
-	p, err := proxy.New(cfg)
+	p, err := proxy.NewProxy(cfg)
 	if err != nil {
 		return err
 	}

@@ -107,6 +107,9 @@ func (r *RedisConn) Put(key, value string) error {
 		return errors.New("put operation return value len:0")
 	}
 	var respType = r.readBuf[0]
+	if readLen < 4 {
+		return errors.New("invalid response:" + string(r.readBuf))
+	}
 	var rawMsg = r.readBuf[1 : readLen-2]
 	if respType == '+' {
 		return nil
@@ -163,11 +166,30 @@ func (r *RedisConn) Get(key string) (string, error) {
 		var err = errors.New("invalid response msg:" + msg)
 		return "", err
 	}
-	var msg = r.readBuf[1 : readLen-2]
+	// expect response msg format $len\r\ndata\r\n
+	var msg = r.readBuf[1:]
 	if msg[0] == '-' && msg[1] == '1' {
 		var err = errors.New(ErrNotFound)
 		return "", err
 	}
+	var index = -1
+	for i := 0; i < len(msg); i++ {
+		if msg[i] == '\n' {
+			index = i
+		}
+	}
+	if index < 0 {
+		var err = fmt.Errorf("get operation redis return invalid msg:%s, \n is not found", string(msg))
+		return "", err
+	}
+	if msg[index] == '\n' {
+		if msg[index-1] == '\r' {
+			msg = msg[:index-1]
+		} else {
+			msg = msg[:index]
+		}
+	}
+
 	var msgLenStr = ""
 	for i := 0; i < len(msg); i++ {
 		if msg[i] == '\r' {
@@ -181,7 +203,9 @@ func (r *RedisConn) Get(key string) (string, error) {
 	}
 	var msgLen, _ = strconv.Atoi(msgLenStr)
 	if len(msgLenStr)+2+msgLen != len(msg) {
-		var err = fmt.Errorf("get operation redis return msg len invalid, msg:%s, raw:%s", msg, raw)
+		var tmpMsg = strings.Replace(raw, "\r", "R", -1)
+		tmpMsg = strings.Replace(tmpMsg, "\n", "N", -1)
+		var err = fmt.Errorf("get operation redis return msg len:%d len(msg):%d invalid, msg:%s, raw:%s", msgLen, len(msg), msg, tmpMsg)
 		return "", err
 	}
 	return string(msg[len(msgLenStr)+2:]), nil

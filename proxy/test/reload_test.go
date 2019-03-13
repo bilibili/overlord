@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -12,6 +14,7 @@ import (
 	"overlord/pkg/log"
 	"overlord/proxy"
 
+	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,61 +89,15 @@ func writeToFile(name, content string) error {
 var fileSn = 0
 
 func dumpClusterConf(fileName string, confs proxy.ClusterConfigs) error {
-	var fullContent = ""
-	for index := 0; index < len(confs.Clusters); index++ {
-		var conf = confs.Clusters[index]
-		if conf == nil {
-			continue
-		}
-		var content = "[[clusters]]\n"
-		content += "name = \"" + conf.Name + "\"\n"
-		content += "hash_method = \"" + conf.HashMethod + "\"\n"
-		content += "hash_distribution = \"" + conf.HashDistribution + "\"\n"
-		content += "hash_tag = \"" + conf.HashTag + "\"\n"
-		content += "cache_type = \"" + string(conf.CacheType) + "\"\n"
-		content += "listen_proto = \"" + conf.ListenProto + "\"\n"
-		content += "listen_addr = \"" + conf.ListenAddr + "\"\n"
-		content += "redis_auth = \"" + conf.RedisAuth + "\"\n"
-		content += "dial_timeout = " + strconv.FormatInt(int64(conf.DialTimeout), 10) + "\n"
-		content += "read_timeout = " + strconv.FormatInt(int64(conf.ReadTimeout), 10) + "\n"
-		content += "write_timeout = " + strconv.FormatInt(int64(conf.WriteTimeout), 10) + "\n"
-		content += "node_connections = " + strconv.FormatInt(int64(conf.NodeConnections), 10) + "\n"
-		content += "ping_fail_limit = " + strconv.FormatInt(int64(conf.PingFailLimit), 10) + "\n"
-		if conf.PingAutoEject {
-			content += "ping_auto_eject = true\n"
-		} else {
-			content += "ping_auto_eject = false\n"
-		}
-		if conf.CloseWhenChange {
-			content += "close_front_conn_when_conf_change = true\n"
-		} else {
-			content += "close_front_conn_when_conf_change = false\n"
-		}
-		content += "servers = [\n"
-		for i := 0; i < len(conf.Servers); i++ {
-			content += "    \"" + conf.Servers[i] + "\",\n"
-		}
-		content += "]\n"
-		fullContent += content
+	var buf bytes.Buffer
+	encoder := toml.NewEncoder(&buf)
+	err := encoder.Encode(confs)
+	if err != nil {
+		return err
 	}
-	var err = writeToFile(fileName, fullContent)
-	// var file2 = fileName + "." + strconv.Itoa(int(fileSn))
-	// fileSn++
-	// writeToFile(file2, fullContent)
+	var content = buf.Bytes()
+	err = ioutil.WriteFile(fileName, content, 0644)
 	return err
-	/*
-	   var fd, err1 = os.Create(fileName)
-	   if err1 != nil {
-	       return err1
-	   }
-	   defer fd.Close()
-	   var _, err2 = fd.WriteString(fullContent)
-	   if err2 != nil {
-	       return err2
-	   }
-	   fd.Sync()
-	   return nil
-	*/
 }
 
 func getRedisConnCnt(addr string) int {
