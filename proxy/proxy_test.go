@@ -425,7 +425,7 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 		}
 		conn.SetReadDeadline(time.Now().Add(time.Second))
 		bs := make([]byte, 24)
-		if n, err := br.Read(bs); err != nil || n != 24 {
+		if n, err := io.ReadFull(conn, bs); err != nil || n != 24 {
 			var errStr = ""
 			if err != nil {
 				errStr = err.Error()
