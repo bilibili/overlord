@@ -430,7 +430,7 @@ func testCmdBin(t testing.TB, cmds ...[]byte) {
 			if err != nil {
 				errStr = err.Error()
 			}
-			t.Errorf("conn read cmd:%x error:%s resp:%x", cmd[1], errStr, bs)
+			t.Errorf("conn read cmd:%x error:%s resp:%x return len:%d", cmd[1], errStr, bs, n)
 			continue
 		}
 		if bytes.Equal(bs[6:8], []byte{0x00, 0x01}) {
