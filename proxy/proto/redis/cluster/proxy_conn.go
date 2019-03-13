@@ -21,7 +21,8 @@ var (
 
 // errors
 var (
-	ErrInvalidArgument = errs.New("cluster command with wrong argument")
+	ErrInvalidArgument   = errs.New("cluster command with wrong argument")
+	ErrClusteTypeChanged = errs.New("Cannot handle request when changing backend cluster mode")
 )
 
 type proxyConn struct {
@@ -48,9 +49,11 @@ func (pc *proxyConn) Encode(m *proto.Message, forwarder proto.Forwarder) (err er
 			arr := resp.Array()
 			if bytes.Equal(arr[0].Data(), cmdClusterBytes) {
 				if len(arr) == 2 && forwarder != nil {
-					var cls *cluster
-					cls = forwarder.(*cluster)
-
+					var cls, ok = forwarder.(*cluster)
+					if !ok {
+						err = errors.WithStack(ErrClusteTypeChanged)
+						return
+					}
 					// CLUSTER COMMANDS
 					conv.UpdateToUpper(arr[1].Data()) // NOTE: when arr[0] is CLUSTER, upper arr[1]
 					pcc := pc.pc.(*redis.ProxyConn)

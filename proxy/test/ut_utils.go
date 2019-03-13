@@ -182,11 +182,14 @@ func (r *RedisConn) Get(key string) (string, error) {
 		var err = fmt.Errorf("get operation redis return invalid msg:%s, \n is not found", string(msg))
 		return "", err
 	}
+	var msglen = 0
 	if msg[index] == '\n' {
 		if msg[index-1] == '\r' {
 			msg = msg[:index-1]
+			msglen = index - 1
 		} else {
 			msg = msg[:index]
+			msglen = index
 		}
 	}
 
@@ -201,11 +204,11 @@ func (r *RedisConn) Get(key string) (string, error) {
 		}
 		msgLenStr += string(msg[i])
 	}
-	var msgLen, _ = strconv.Atoi(msgLenStr)
-	if len(msgLenStr)+2+msgLen != len(msg) {
+	var msgLenInt, _ = strconv.Atoi(msgLenStr)
+	if len(msgLenStr)+2+msgLenInt != msglen {
 		var tmpMsg = strings.Replace(raw, "\r", "R", -1)
 		tmpMsg = strings.Replace(tmpMsg, "\n", "N", -1)
-		var err = fmt.Errorf("get operation redis return msg len:%d len(msg):%d invalid, msg:%s, raw:%s", msgLen, len(msg), msg, tmpMsg)
+		var err = fmt.Errorf("get operation redis return msg len:%d len(msg):%d invalid, raw:%s", msgLenInt, msglen, tmpMsg)
 		return "", err
 	}
 	return string(msg[len(msgLenStr)+2:]), nil

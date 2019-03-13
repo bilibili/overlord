@@ -769,7 +769,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	log.Infof("start reload case of redis cluster\n")
 
 	var cluster1 = "127.0.0.1:7000"
-	var cluster2 = "127.0.0.1:9000"
+	var cluster2 = "127.0.0.1:8000"
 	var cli1 = NewRedisConn(cluster1)
 	var cli2 = NewRedisConn(cluster2)
 	cli1.autoReconn = true

@@ -2,7 +2,6 @@ package proxy
 
 import (
 	errs "errors"
-	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -121,25 +120,21 @@ func (p *Proxy) descConnectionCnt() {
 
 func (p *Proxy) addCluster(newConf *ClusterConfig) error {
 	newConf.ID = genClusterID()
-	p.lock.Lock()
 	var newForwarder, err = NewForwarder(newConf)
 	if err != nil {
-		p.lock.Unlock()
 		return err
 	}
 	// refs is incread in NewFowarder
-	var cluster = &Cluster{conf: newConf, forwarder: newForwarder, proxy: p, connectionSN: 0}
-	cluster.clientConns = make(map[int64]*Handler)
-	p.clusters[cluster.conf.Name] = cluster
+	var cluster = NewCluster(newConf, newForwarder, p)
 	var servErr = cluster.serve()
 	if servErr != nil {
-		delete(p.clusters, cluster.conf.Name)
-		p.lock.Unlock()
 		cluster.Close()
 		cluster.forwarder = nil
 		newForwarder.Release()
 		return servErr
 	}
+	p.lock.Lock()
+	p.clusters[cluster.conf.Name] = cluster
 	p.CurClusterCnt++
 	p.lock.Unlock()
 	log.Infof("succeed to add cluster:%s with addr:%s\n", newConf.Name, newConf.ListenAddr)
@@ -204,7 +199,6 @@ func (c *Cluster) accept(l net.Listener) {
 			if log.V(4) {
 				log.Warnf("proxy reject connection count(%d) due to more than max(%d)", cnt, c.proxy.c.Proxy.MaxConnections)
 			}
-			fmt.Printf("Exceed max connection limit\n")
 			continue
 		}
 		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(c.proxy.c.Proxy.ReadTimeout), time.Second*time.Duration(c.proxy.c.Proxy.WriteTimeout))
@@ -227,6 +221,11 @@ func (p *Proxy) Close() error {
 		cluster.Close()
 	}
 	return nil
+}
+func (p *Proxy) isClosed() bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.closed
 }
 
 func (p *Proxy) anyClusterRemoved(newConfs, oldConfs []*ClusterConfig) bool {
@@ -267,11 +266,14 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 			}
 			break
 		}
+		if !valid {
+			continue
+		}
 		if !find {
 			newAdd = append(newAdd, newConf)
 			continue
 		}
-		if (!valid) || (find && !diff) {
+		if !diff {
 			continue
 		}
 		changed = append(changed, newConf)
@@ -283,6 +285,9 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) (changed, newA
 
 func (p *Proxy) monitorConfChange() {
 	for {
+		if p.isClosed() {
+			return
+		}
 		time.Sleep(time.Duration(MonitorCfgIntervalMilliSecs) * time.Millisecond)
 		var newConfs, err = LoadClusterConf(p.ClusterConfFile)
 		if err != nil {
@@ -336,6 +341,12 @@ func (p *Proxy) monitorConfChange() {
 	}
 }
 
+func NewCluster(c *ClusterConfig, f proto.Forwarder, p *Proxy) *Cluster {
+	var cluster = &Cluster{conf: c, forwarder: f, proxy: p, state: ClusterStopped, connectionSN: 0}
+	cluster.clientConns = make(map[int64]*Handler)
+	return cluster
+}
+
 func (c *Cluster) Close() {
 	log.Infof("start to close all client connections of cluster:%s\n", c.conf.Name)
 	atomic.StoreInt32(&c.state, ClusterStopped)
@@ -369,6 +380,7 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 		return errors.New("invalid Cluster conf, name:" + newConf.Name + " not equal with old:" + c.conf.Name)
 	}
 	newConf.ID = genClusterID()
+	// reference of forwarder is hold automatically
 	var newForwarder, err = NewForwarder(newConf)
 	if err != nil {
 		return err
@@ -377,19 +389,22 @@ func (c *Cluster) processConfChange(newConf *ClusterConfig) error {
 	c.mutex.Lock()
 	if atomic.LoadInt32(&c.state) != ClusterRunning {
 		c.mutex.Unlock()
+		newForwarder.Stop()
+		newForwarder.Release()
 		return errors.New("cluster:" + newConf.Name + " is stopped, no need to reload conf")
 	}
 	var oldConns = c.clientConns
 	var oldForwarder = c.forwarder
 	c.forwarder = newForwarder
-	if newConf.CloseWhenChange {
+	var closeFront = newConf.CloseWhenChange
+	if closeFront {
 		c.clientConns = make(map[int64]*Handler)
 	}
 	c.conf = newConf
 	c.mutex.Unlock()
 	oldForwarder.Stop()
 	oldForwarder.Release()
-	if newConf.CloseWhenChange {
+	if closeFront {
 		for _, conn := range oldConns {
 			conn.Close()
 		}
@@ -414,6 +429,10 @@ func (c *Cluster) getConf() *ClusterConfig {
 
 func compareConf(oldConf, newConf *ClusterConfig) (changed, valid bool) {
 	valid = (oldConf.ListenAddr == newConf.ListenAddr)
+	if !valid {
+		changed = false
+		return
+	}
 	if ((oldConf.HashMethod != newConf.HashMethod) ||
 		(oldConf.HashDistribution != newConf.HashDistribution) ||
 		(oldConf.HashTag != newConf.HashTag) ||

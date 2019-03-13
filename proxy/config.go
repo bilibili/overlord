@@ -123,7 +123,6 @@ func ValidateStandalone(servers []string) error {
 
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
-	// TODO(felix): complete validates
 	if cc.Name == "" {
 		return errors.New("cluster name is empty")
 	}

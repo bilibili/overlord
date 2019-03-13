@@ -18,20 +18,20 @@ const (
 )
 
 var (
-	HashMethods = map[string]bool{
-		HashMethodFnv1a64: true,
-		HashMethodFnv1a32: true,
-		HashMethodFnv164:  true,
-		HashMethodFnv132:  true,
+	HashMethods = map[string]struct{}{
+		HashMethodFnv1a64: struct{}{},
+		HashMethodFnv1a32: struct{}{},
+		HashMethodFnv164:  struct{}{},
+		HashMethodFnv132:  struct{}{},
 
-		HashMethodCRC16:  true,
-		HashMethodCRC32:  true,
-		HashMethodCRC32a: true,
+		HashMethodCRC16:  struct{}{},
+		HashMethodCRC32:  struct{}{},
+		HashMethodCRC32a: struct{}{},
 
-		HashMethodMD5:       true,
-		HashMethodOneOnTime: true,
-		HashMethodHsieh:     true,
-		HashMethodMurmur:    true,
+		HashMethodMD5:       struct{}{},
+		HashMethodOneOnTime: struct{}{},
+		HashMethodHsieh:     struct{}{},
+		HashMethodMurmur:    struct{}{},
 	}
 )
 

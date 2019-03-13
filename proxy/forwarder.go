@@ -142,6 +142,7 @@ func (f *defaultForwarder) Release() {
 			for _, conn := range f.nodePipe {
 				conn.Close()
 			}
+			log.Infof("Close all backend connection when refs desc to 0")
 		}
 	}
 }
