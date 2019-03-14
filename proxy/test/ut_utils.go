@@ -144,74 +144,78 @@ func (r *RedisConn) Get(key string) (string, error) {
 		r.hasConn = false
 		return "", errors.New(ErrWriteFail)
 	}
-	var readLen = 0
-	readLen, err = r.conn.Read(r.readBuf)
-	if err != nil {
-		r.hasConn = false
-		return "", errors.New(ErrReadFail)
-	}
-	if readLen == 0 {
-		var err = errors.New("get operation return value len:0")
-		return "", err
-	}
-	var raw = string(r.readBuf)
-	var respType = r.readBuf[0]
-	if respType != '$' {
-		var msg = string(r.readBuf)
-		var err = fmt.Errorf("get operation redis return msg:%s, raw:%s", msg, raw)
-		return "", err
-	}
-	if readLen <= 3 {
-		var msg = string(r.readBuf)
-		var err = errors.New("invalid response msg:" + msg)
-		return "", err
-	}
-	// expect response msg format $len\r\ndata\r\n
-	var msg = r.readBuf[1:]
-	if msg[0] == '-' && msg[1] == '1' {
-		var err = errors.New(ErrNotFound)
-		return "", err
-	}
-	var index = -1
-	for i := 0; i < len(msg); i++ {
-		if msg[i] == '\n' {
-			index = i
+	var (
+		result          = make([]byte, 0, 1024)
+		hasReadHead     = false
+		dataLen         = -1
+		msgLen          = 0
+		lenStr          = ""
+		expectReadLen   = 0
+		valueStartIndex = 0
+		useRN           = false
+	)
+	for {
+		var readLen, err = r.conn.Read(r.readBuf)
+		if err != nil {
+			r.hasConn = false
+			return "", errors.New(ErrReadFail)
 		}
-	}
-	if index < 0 {
-		var err = fmt.Errorf("get operation redis return invalid msg:%s, \n is not found", string(msg))
-		return "", err
-	}
-	var msglen = 0
-	if msg[index] == '\n' {
-		if msg[index-1] == '\r' {
-			msg = msg[:index-1]
-			msglen = index - 1
-		} else {
-			msg = msg[:index]
-			msglen = index
+		if readLen == 0 {
+			var err = fmt.Errorf("get operation redis return empty msg")
+			return "", err
 		}
-	}
-
-	var msgLenStr = ""
-	for i := 0; i < len(msg); i++ {
-		if msg[i] == '\r' {
-			if i+1 >= len(msg) || msg[i+1] != '\n' {
-				var err = fmt.Errorf("get operation redis return invalid msg:%s, raw:%s", msg, raw)
+		if !hasReadHead {
+			var respType = r.readBuf[0]
+			if respType != '$' {
+				var msg = string(r.readBuf[:readLen])
+				var err = fmt.Errorf("get operation redis return msg:%s", msg)
 				return "", err
 			}
+			hasReadHead = true
+			result = append(result, r.readBuf[:readLen]...)
+		} else {
+			result = append(result, r.readBuf[:readLen]...)
+		}
+		//log.Infof("read from redis, return msg len:%d, msg:%s result:%s \n", readLen,
+		//strconv.Quote(string(r.readBuf[:readLen])),
+		//strconv.Quote(string(result)))
+		msgLen += readLen
+		if dataLen < 0 {
+			for i := 1; i < msgLen; i++ {
+				// log.Infof("start to process:%c\n", result[i])
+				if result[i] == '\n' {
+					if result[i-1] == '\r' {
+						lenStr = string(result[1 : i-1])
+						// log.Infof("try to parse len str:%s\n", strconv.Quote(lenStr))
+						var msgLenInt, _ = strconv.Atoi(lenStr)
+						dataLen = msgLenInt
+						expectReadLen = i + dataLen + 2
+						useRN = true
+					} else {
+						lenStr = string(result[1:i])
+						// log.Infof("try to parse len str:%s\n", strconv.Quote(lenStr))
+						var msgLenInt, _ = strconv.Atoi(lenStr)
+						dataLen = msgLenInt
+						expectReadLen = i + dataLen + 1
+					}
+					valueStartIndex = i + 1
+					if dataLen < 0 {
+						return "", errors.New(ErrNotFound)
+					}
+					// log.Infof("parse get data len:%d, has read len:%d expectReadLen:%d\n", dataLen, msgLen, expectReadLen)
+					break
+				}
+			}
+		}
+		if expectReadLen > 0 && msgLen >= expectReadLen {
 			break
 		}
-		msgLenStr += string(msg[i])
 	}
-	var msgLenInt, _ = strconv.Atoi(msgLenStr)
-	if len(msgLenStr)+2+msgLenInt != msglen {
-		var tmpMsg = strings.Replace(raw, "\r", "R", -1)
-		tmpMsg = strings.Replace(tmpMsg, "\n", "N", -1)
-		var err = fmt.Errorf("get operation redis return msg len:%d len(msg):%d invalid, raw:%s", msgLenInt, msglen, tmpMsg)
-		return "", err
+	var content = result[valueStartIndex : msgLen-1]
+	if useRN {
+		content = result[valueStartIndex : msgLen-2]
 	}
-	return string(msg[len(msgLenStr)+2:]), nil
+	return string(content), nil
 }
 
 func ParseRedisClientCnt(msg string) int {

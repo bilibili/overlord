@@ -311,7 +311,7 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
 					if prevConnSucc {
 						prevConnSucc = false
 						cnnCloseCnt++
-						log.Infof("connection close, new connection close count is:%d\n", cnnCloseCnt)
+						log.Infof("find connection close, new connection close count is:%d\n", cnnCloseCnt)
 					}
 					var err2 = cli.Connect()
 					if err2 != nil {
@@ -319,17 +319,22 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
 						log.Errorf("failed to connect to redis, get error:%s\n", err2.Error())
 						return
 					}
-				}
-				if notFound(err) {
-					if prevRdSucc {
-						prevRdSucc = false
-						rChange++
+				} else {
+					if notFound(err) {
+						if prevRdSucc {
+							prevRdSucc = false
+							rChange++
+							log.Infof("find read result change from succeed to not found, now change cnt:%d\n", rChange)
+						}
+						prevConnSucc = true
+					} else {
+						log.Infof("meet unprocessed error:%s\n", err.Error())
 					}
-					prevConnSucc = true
 				}
 			} else {
 				if !prevRdSucc {
 					rChange++
+					log.Infof("find read result change from fail to succeed, now change cnt:%d\n", rChange)
 				}
 				prevRdSucc = true
 				prevConnSucc = true
