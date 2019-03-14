@@ -437,16 +437,25 @@ func (m *MemcacheConn) Put(key, value string) error {
 		m.hasConn = false
 		return err
 	}
-	var readLen = 0
-	readLen, err = m.conn.Read(m.readBuf)
-	if err != nil {
-		m.hasConn = false
-		return errors.New(ErrReadFail)
+	var result = make([]byte, 0, 1024)
+	var msgLen = 0
+	for {
+		var readLen = 0
+		readLen, err = m.conn.Read(m.readBuf)
+		if err != nil {
+			m.hasConn = false
+			return errors.New(ErrReadFail)
+		}
+		if readLen == 0 {
+			return errors.New("mem put operation return value len:0")
+		}
+		result = append(result, m.readBuf[:readLen]...)
+		msgLen += readLen
+		if result[msgLen-1] == '\n' {
+			break
+		}
 	}
-	if readLen == 0 {
-		return errors.New("mem put operation return value len:0")
-	}
-	var returnVal = string(m.readBuf[0:readLen])
+	var returnVal = string(result[:msgLen])
 	returnVal = strings.Replace(returnVal, " ", "", -1)
 	returnVal = strings.Replace(returnVal, "\r\n", "\n", -1)
 	var msgList = strings.Split(returnVal, "\n")
@@ -456,7 +465,10 @@ func (m *MemcacheConn) Put(key, value string) error {
 	if msgList[0] == "STORED" {
 		return nil
 	}
-	var cmd = strings.Replace(req, "\r\n", "RN", -1)
+	var cmd = strconv.Quote(string(req))
+	if strings.Contains(msgList[0], "SERVER_ERROR") {
+		return fmt.Errorf("failed to put to memcache, get server error return msg:[%s], put cmd:%s server:%s", msgList[0], cmd, m.ServerAddr)
+	}
 	return fmt.Errorf("failed to put to memcache, return msg:[%s], put cmd:%s server:%s", msgList[0], cmd, m.ServerAddr)
 }
 
@@ -476,17 +488,26 @@ func (m *MemcacheConn) Get(key string) (string, error) {
 		m.hasConn = false
 		return "", errors.New(ErrWriteFail)
 	}
-	var readLen = 0
-	readLen, err = m.conn.Read(m.readBuf)
-	if err != nil {
-		m.hasConn = false
-		return "", errors.New(ErrReadFail)
+	var result = make([]byte, 0, 1024)
+	var msgLen = 0
+	for {
+		var readLen = 0
+		readLen, err = m.conn.Read(m.readBuf)
+		if err != nil {
+			m.hasConn = false
+			return "", errors.New(ErrReadFail)
+		}
+		if readLen == 0 {
+			var err = errors.New("get operation return value len:0")
+			return "", err
+		}
+		msgLen += readLen
+		result = append(result, m.readBuf[:readLen]...)
+		if result[msgLen-1] == '\n' {
+			break
+		}
 	}
-	if readLen == 0 {
-		var err = errors.New("get operation return value len:0")
-		return "", err
-	}
-	var respMsg = string(m.readBuf[0:readLen])
+	var respMsg = string(result[:msgLen])
 	respMsg = strings.Replace(respMsg, "\r\n", "\n", -1)
 	respMsg = strings.TrimSuffix(respMsg, "\n")
 	respMsg = strings.TrimSuffix(respMsg, " ")
@@ -499,7 +520,8 @@ func (m *MemcacheConn) Get(key string) (string, error) {
 		return "", err
 	}
 	if len(msgList) != 3 {
-		var err = fmt.Errorf("get operation memcache return unexpected msg:%s, msglen:%d\n", respMsg, len(msgList))
+		var msgStr = strconv.Quote(respMsg)
+		var err = fmt.Errorf("get operation memcache return unexpected msg:%s, msglen:%d\n", msgStr, msgLen)
 		return "", err
 	}
 	return msgList[1], nil

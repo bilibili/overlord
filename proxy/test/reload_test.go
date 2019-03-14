@@ -271,12 +271,14 @@ func loopGetImpl(addr, key, val string, expChangeCnt, expRCnt, expCnnFailCnt int
 	var err = cli.Connect()
 	if err != nil {
 		log.Errorf("failed to connect to redis, get error:%s\n", err.Error())
+		ch <- -1
 		return
 	}
 	defer cli.Close()
 	if writeFirst {
 		err = cli.Put(key, val)
 		if err != nil {
+			ch <- -1
 			log.Errorf("failed to put kv to redis, get error:%s\n", err.Error())
 			return
 		}
@@ -847,6 +849,16 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	tearDownRedis()
 }
 
+func removeFiles(toRemove []string) {
+	for _, file := range toRemove {
+		if file == "" {
+			continue
+		}
+		var cmd = "rm " + file
+		ExecCmd(cmd)
+	}
+}
+
 func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	var ClusterConfFile = "./conf/lotsof_cluster.conf"
 	setupRedis("8213", "8214")
@@ -867,22 +879,26 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	log.Info("start reload case on lots of when conf is invalid")
 	var confCnt = int(proxy.MaxClusterCnt) + 3
 	var confNameList = make([]string, confCnt, confCnt)
+	var toRemove = make([]string, 0, confCnt)
 	confNameList[0] = firstConfName
 
 	var baseConfig proxy.ClusterConfig
 	baseConfig = *(initConf[0])
 	var confList proxy.ClusterConfigs
-	confList.Clusters = make([]*proxy.ClusterConfig, confCnt, confCnt)
+	confList.Clusters = make([]*proxy.ClusterConfig, 1, confCnt)
 	confList.Clusters[0] = &baseConfig
+
 	for i := 1; i < confCnt-1; i++ {
 		var fileName = "conf/lotsof/" + strconv.Itoa(int(i)) + ".conf"
 		var newConf = baseConfig
 		newConf.Name = baseConfig.Name + "_" + strconv.Itoa(int(i))
 		newConf.ListenAddr = "127.0.0.1:" + strconv.Itoa(8513+int(i))
-		confList.Clusters[i] = &newConf
-		dumpClusterConf(fileName, confList)
+		confList.Clusters = append(confList.Clusters, &newConf)
+		var err = dumpClusterConf(fileName, confList)
+		require.NoError(t, err, "try to dump:"+fileName)
 		confNameList[i] = fileName
 		// fmt.Printf("add conf file:%s\n", confNameList[i])
+		toRemove = append(toRemove, fileName)
 	}
 	confNameList[confCnt-1] = "conf/lotsof/127.conf"
 
@@ -936,6 +952,7 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	assert.Equal(t, 0, int(clusterChangeCnt))
 	assert.Equal(t, 128, int(server.CurClusterCnt))
 	log.Info("lots of case done")
+	removeFiles(toRemove)
 	tearDownRedis()
 }
 
