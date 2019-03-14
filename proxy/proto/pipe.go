@@ -176,9 +176,10 @@ func (mp *msgPipe) pipe() {
 			msg.WithError(err) // NOTE: maybe err is nil
 			msg.Done()
 			if prom.On {
-				prom.HandleTime(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 				if err != nil {
 					prom.ErrIncr(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), perr.Cause(err).Error())
+				} else {
+					prom.HandleTime(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 				}
 			}
 		}
