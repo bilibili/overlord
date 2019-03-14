@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+	"sync"
+	"sync/atomic"
+	libnet "overlord/pkg/net"
 
 	"overlord/pkg/log"
 )
@@ -705,6 +708,147 @@ func KillAllMC() error {
 	var cmd = "ps aux |grep memcache |grep -v 11211| grep -v grep  | awk '{print $2}' | xargs -n 1 kill -9"
 	var _, err = ExecCmd(cmd)
 	return err
+}
+
+
+type RedisServer struct {
+    connectionCnt int32
+    port string
+    state int32
+    kvStore map[string]string
+	mutex        sync.Mutex
+}
+
+func NewServer() *RedisServer {
+    var s = &RedisServer{}
+    s.kvStore = make (map[string]string)
+    s.connectionCnt = 0
+    return s
+}
+
+func (s *RedisServer) start() error {
+    var addr = "0.0.0.0:" + s.port
+	listen, err := net.Listen("tcp", addr)
+    if err != nil {
+        return err
+    }
+    go s.accept(listen)
+    return nil
+}
+
+func (s *RedisServer) accept(listen net.Listener) {
+    for {
+        if atomic.LoadInt32(&s.state) != 0 {
+            listen.Close()
+            return
+        }
+        conn, err := listen.Accept()
+        if err != nil {
+            if conn != nil {
+                _ = conn.Close()
+            }
+            log.Errorf("addr:0.0.0.0:%s accept connection error:%+v", s.port, err)
+            continue
+        }
+		atomic.AddInt32(&s.connectionCnt, 1)
+		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(10), time.Second*time.Duration(10))
+        go s.process(frontConn)
+    }
+}
+
+func findEnd(input []byte, start, end int) int {
+    for i := start; i < end; i++ {
+        if input[i] == '\n' {
+            return i
+        }
+    }
+    return -1
+}
+
+func (s *RedisServer) process(conn *libnet.Conn) {
+    var databuf = make([]byte, 0, 1024)
+    for {
+        if atomic.LoadInt32(&s.state) != 0 {
+            return
+        }
+        var tmpBuf = make([]byte, 0, 1024)
+        var msgLen = 0
+        for {
+            var buf = make([]byte, 1024, 10240)
+            var readLen, err = conn.Read(buf)
+            if err != nil {
+                conn.Close()
+                log.Errorf("failed to read from client, get error:%s\n", err.Error())
+                return
+            }
+            if readLen == 0 {
+                continue
+            }
+            msgLen += readLen
+            tmpBuf = append(tmpBuf, buf...)
+            fmt.Printf("get request:%s, msgLen:%d\n", strconv.Quote(string(tmpBuf[:msgLen])), msgLen)
+            if tmpBuf[msgLen-1] == '\n' {
+                break
+            }
+        }
+        databuf = append(databuf, tmpBuf[:msgLen]...)
+        var start_pos = 0
+        var end_pos = len(databuf)
+        fmt.Printf("recv msg:%s\n", strconv.Quote(string(databuf[:end_pos])))
+        fmt.Printf("start:%d end:%d\n", start_pos, end_pos)
+        for {
+            var index = findEnd(databuf, start_pos, end_pos)
+            if index < 0 {
+                if start_pos > 0 {
+                    var tmp = make([]byte, 0, 1024)
+                    tmp = append(tmp, databuf[start_pos:end_pos]...)
+                    databuf = tmp
+                }
+                continue
+            }
+            var result = databuf[start_pos:index + 1]
+            fmt.Printf("start to process one:%s [%d:%d]\n", strconv.Quote(string(result)), start_pos, index + 1)
+            start_pos = index + 1
+            var cmd = string(result[0:3])
+            var resp = ""
+            if cmd == "GET" {
+                var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
+                msg = strings.Replace(msg, "\n", "", -1)
+                var msgList = strings.Split(msg, " ")
+                var key = msgList[1]
+                s.mutex.Lock()
+                var val, ok = s.kvStore[key]
+                s.mutex.Unlock()
+                if ok {
+                    resp = "$" + strconv.Itoa(len(val)) + "\r\n" + val + "\r\n"
+                } else {
+                    resp = "$-1\r\n"
+                }
+            } else if cmd == "SET" {
+                var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
+                msg = strings.Replace(msg, "\n", "", -1)
+                var msgList = strings.Split(msg, " ")
+                var key = msgList[1]
+                var val = msgList[2]
+                s.mutex.Lock()
+                s.kvStore[key] = val
+                s.mutex.Unlock()
+                resp = "+OK\r\n"
+            } else if cmd == "INF" {
+                var cnt = atomic.LoadInt32(&s.connectionCnt)
+                resp = "connected_clients:" + strconv.Itoa(int(cnt)) + "\r\n"
+            } else {
+                fmt.Printf("unknown cmd:%s, just continue\n", cmd)
+                continue
+            }
+            var byteArray = []byte(resp)
+            var _, err = conn.Write(byteArray)
+            if err != nil {
+                log.Errorf("failed to write resp:%s to client, got err:%s\n", strconv.Quote(resp), err.Error())
+                conn.Close()
+            }
+        }
+    }
 }
 
 //func main() {

@@ -21,6 +21,26 @@ import (
 
 var SeqNO int = 0
 
+func setupRedis2(port1, port2 string, s1* RedisServer, s2* RedisServer) {
+	proxy.ClusterID = 0
+	proxy.MonitorCfgIntervalMilliSecs = 500
+	proxy.ClusterChangeCount = 0
+	proxy.AddClusterFailCnt = 0
+	proxy.ClusterConfChangeFailCnt = 0
+	proxy.LoadFailCnt = 0
+	proxy.FailedDueToRemovedCnt = 0
+    s1.port = port1
+    s2.port = port2
+    var err1 = s1.start()
+    if err1 != nil {
+		fmt.Printf("failed to start redis1, get error:%s\n", err1.Error())
+    }
+    var err2 = s2.start()
+    if err2 != nil {
+		fmt.Printf("failed to start redis2, get error:%s\n", err2.Error())
+    }
+}
+
 func setupRedis(port1, port2 string) {
 	proxy.ClusterID = 0
 	proxy.MonitorCfgIntervalMilliSecs = 500
@@ -507,6 +527,9 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 
 func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
 	var ClusterConfFile = "./conf/close_cluster.conf"
+    var s1 = NewServer()
+    var s2 = NewServer()
+	// setupRedis2("8203", "8204", s1, s2)
 	setupRedis("8203", "8204")
 	var firstConfName = "conf/close/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
