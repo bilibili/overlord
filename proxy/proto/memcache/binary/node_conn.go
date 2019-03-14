@@ -62,7 +62,6 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
-	m.MarkWrite()
 	_ = n.bw.Write(magicReqBytes)
 
 	cmd := mcr.rTp
@@ -131,7 +130,6 @@ REREADData:
 		return
 	}
 	mcr.data = append(mcr.data, data...)
-	m.MarkRead()
 	return
 }
 

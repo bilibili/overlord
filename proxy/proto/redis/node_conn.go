@@ -79,7 +79,6 @@ func (nc *nodeConn) Write(m *proto.Message) (err error) {
 	if !req.IsSupport() || req.IsCtl() {
 		return
 	}
-	m.MarkWrite()
 	if err = req.resp.encode(nc.bw); err != nil {
 		err = errors.WithStack(err)
 	}
@@ -117,7 +116,6 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 			err = errors.WithStack(err)
 			return
 		}
-		m.MarkRead()
 		return
 	}
 }

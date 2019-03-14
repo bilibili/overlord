@@ -147,6 +147,7 @@ func (mp *msgPipe) pipe() {
 			}
 			mp.batch[mp.count] = m
 			mp.count++
+			m.MarkWrite()
 			err = nc.Write(m)
 			m = nil
 			if err != nil {
@@ -163,6 +164,7 @@ func (mp *msgPipe) pipe() {
 			for i := 0; i < mp.count; i++ {
 				if err == nil {
 					err = nc.Read(mp.batch[i])
+					mp.batch[i].MarkRead()
 				} else {
 					goto MEND
 				}
