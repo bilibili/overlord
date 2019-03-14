@@ -27,6 +27,8 @@ func setupRedis(port1, port2 string) {
 	proxy.ClusterChangeCount = 0
 	proxy.AddClusterFailCnt = 0
 	proxy.ClusterConfChangeFailCnt = 0
+	proxy.LoadFailCnt = 0
+	proxy.FailedDueToRemovedCnt = 0
 	KillAllRedis()
 	var sn = strconv.Itoa(SeqNO)
 	var redisConf1 = "/tmp/redis_s_" + port1 + "_" + sn + ".conf"
@@ -66,6 +68,8 @@ func setupMC(port1, port2 string) {
 	proxy.ClusterChangeCount = 0
 	proxy.AddClusterFailCnt = 0
 	proxy.ClusterConfChangeFailCnt = 0
+	proxy.LoadFailCnt = 0
+	proxy.FailedDueToRemovedCnt = 0
 	KillAllMC()
 	StartStandAloneMC(port1)
 	StartStandAloneMC(port2)
