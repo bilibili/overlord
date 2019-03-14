@@ -97,24 +97,32 @@ func (r *RedisConn) Put(key, value string) error {
 		r.hasConn = false
 		return err
 	}
-	var readLen = 0
-	readLen, err = r.conn.Read(r.readBuf)
-	if err != nil {
-		r.hasConn = false
-		return errors.New(ErrReadFail)
+	var msgLen = 0
+	var result = make([]byte, 0, 1024)
+	for {
+		var readLen = 0
+		readLen, err = r.conn.Read(r.readBuf)
+		if err != nil {
+			r.hasConn = false
+			return errors.New(ErrReadFail)
+		}
+		if readLen == 0 {
+			return errors.New("put operation return value len:0")
+		}
+		result = append(result, r.readBuf[:readLen]...)
+		msgLen += readLen
+		if result[msgLen-1] == '\n' {
+			break
+		}
 	}
-	if readLen == 0 {
-		return errors.New("put operation return value len:0")
+	if msgLen < 4 {
+		return errors.New("invalid response:" + strconv.Quote(string(result[:msgLen])))
 	}
-	var respType = r.readBuf[0]
-	if readLen < 4 {
-		return errors.New("invalid response:" + string(r.readBuf))
-	}
-	var rawMsg = r.readBuf[1 : readLen-2]
+	var respType = result[0]
 	if respType == '+' {
 		return nil
 	}
-	var msg = string(rawMsg)
+	var msg = string(result[1 : msgLen-2])
 	// MOVED 6233 127.0.0.1:7001
 	if strings.HasPrefix(msg, "MOVED") {
 		msg = strings.Replace(msg, "\r\n", "\n", -1)
@@ -125,10 +133,11 @@ func (r *RedisConn) Put(key, value string) error {
 		newCli.autoReconn = true
 		return newCli.Put(key, value)
 	}
+	var respMsgStr = strconv.Quote(string(result[:msgLen]))
 	if respType == '-' {
-		return fmt.Errorf("put operation redis return msg:%s, put cmd:%s", msg, req)
+		return fmt.Errorf("put operation redis return msg:%s, put cmd:%s", respMsgStr, req)
 	}
-	return fmt.Errorf("put operation redis return msg:%s#%s, put cmd:%s redis:%s", string(respType), msg, req, r.ServerAddr)
+	return fmt.Errorf("put operation redis return msg:%s#%s, put cmd:%s redis:%s", string(respType), respMsgStr, req, r.ServerAddr)
 }
 
 func (r *RedisConn) Get(key string) (string, error) {
