@@ -323,16 +323,13 @@ func newPingConn(cc *ClusterConfig, addr string) proto.Pinger {
 
 func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias bool, err error) {
 	for _, svr := range svrs {
-		if strings.Contains(svr, " ") {
-			alias = true
-		} else if alias {
-			err = ErrConfigServerFormat
-			return
-		}
 		var (
 			ss    []string
 			addrW string
 		)
+		if strings.Contains(svr, " ") {
+			alias = true
+		}
 		if alias {
 			ss = strings.Split(svr, " ")
 			if len(ss) != 2 {

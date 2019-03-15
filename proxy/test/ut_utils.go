@@ -109,7 +109,7 @@ func (r *RedisConn) Put(key, value string) error {
 		readLen, err = r.conn.Read(r.readBuf)
 		if err != nil {
 			r.hasConn = false
-			return errors.New(ErrReadFail)
+			return errors.New(ErrReadFail + " connection return:" + err.Error())
 		}
 		if readLen == 0 {
 			return errors.New("put operation return value len:0")
