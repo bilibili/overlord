@@ -128,6 +128,7 @@ func (p *Proxy) addCluster(newConf *ClusterConfig) error {
 	var cluster = NewCluster(newConf, newForwarder, p)
 	var servErr = cluster.serve()
 	if servErr != nil {
+		log.Errorf("failed to start cluster:%s to server, get error:%s\n", newConf.Name, servErr.Error())
 		cluster.Close()
 		cluster.forwarder = nil
 		newForwarder.Release()

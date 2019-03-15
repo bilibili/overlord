@@ -9,22 +9,24 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	libnet "overlord/pkg/net"
 	"strconv"
 	"strings"
-	"time"
-	"unsafe"
 	"sync"
 	"sync/atomic"
-	libnet "overlord/pkg/net"
+	"time"
+	"unsafe"
 
 	"overlord/pkg/log"
 )
 
 var (
-	ErrWriteFail = "write failed"
-	ErrReadFail  = "read failed"
-	ErrNotFound  = "key_not_found"
-	StartSeqNO   = 0
+	ErrWriteFail   = "write failed"
+	ErrReadFail    = "read failed"
+	ErrNotFound    = "key_not_found"
+	StartSeqNO     = 0
+	RedisServer    = 0
+	MemcacheServer = 1
 )
 
 type CliConn interface {
@@ -710,145 +712,315 @@ func KillAllMC() error {
 	return err
 }
 
-
-type RedisServer struct {
-    connectionCnt int32
-    port string
-    state int32
-    kvStore map[string]string
-	mutex        sync.Mutex
+type RMServer struct {
+	connectionCnt int32
+	port          string
+	state         int32
+	kvStore       map[string]string
+	mutex         sync.Mutex
+	listener      net.Listener
+	serverType    int
 }
 
-func NewServer() *RedisServer {
-    var s = &RedisServer{}
-    s.kvStore = make (map[string]string)
-    s.connectionCnt = 0
-    return s
+func NewRedisServer() *RMServer {
+	var s = &RMServer{serverType: RedisServer}
+	s.kvStore = make(map[string]string)
+	s.connectionCnt = 0
+	return s
 }
 
-func (s *RedisServer) start() error {
-    var addr = "0.0.0.0:" + s.port
-	listen, err := net.Listen("tcp", addr)
-    if err != nil {
-        return err
-    }
-    go s.accept(listen)
-    return nil
+func NewMemServer() *RMServer {
+	var s = &RMServer{serverType: MemcacheServer}
+	s.kvStore = make(map[string]string)
+	s.connectionCnt = 0
+	return s
 }
 
-func (s *RedisServer) accept(listen net.Listener) {
-    for {
-        if atomic.LoadInt32(&s.state) != 0 {
-            listen.Close()
-            return
-        }
-        conn, err := listen.Accept()
-        if err != nil {
-            if conn != nil {
-                _ = conn.Close()
-            }
-            log.Errorf("addr:0.0.0.0:%s accept connection error:%+v", s.port, err)
-            continue
-        }
+func (s *RMServer) start() error {
+	var addr = "0.0.0.0:" + s.port
+	var err error
+	s.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	go s.accept()
+	return nil
+}
+
+func (s *RMServer) stop() {
+	atomic.StoreInt32(&s.state, -1)
+	s.listener.Close()
+}
+
+func (s *RMServer) accept() {
+	for {
+		if atomic.LoadInt32(&s.state) != 0 {
+			s.listener.Close()
+			return
+		}
+		conn, err := s.listener.Accept()
+		if err != nil {
+			if conn != nil {
+				_ = conn.Close()
+			}
+			log.Errorf("addr:0.0.0.0:%s accept connection error:%+v", s.port, err)
+			continue
+		}
 		atomic.AddInt32(&s.connectionCnt, 1)
 		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(10), time.Second*time.Duration(10))
-        go s.process(frontConn)
-    }
+		if s.serverType == RedisServer {
+			go s.processRedis(frontConn)
+		} else {
+			go s.processMemcache(frontConn)
+		}
+	}
 }
 
-func findEnd(input []byte, start, end int) int {
-    for i := start; i < end; i++ {
-        if input[i] == '\n' {
-            return i
-        }
-    }
-    return -1
+func (s *RMServer) handleGetCmd(input string) (error, string) {
+	// "*2\r\n$3\r\nGET\r\n$13\r\nkey_loop_get2\r\n"
+	input = strings.Replace(input, "\r\n", "\n", -1)
+	var cmdList = strings.Split(input, "$")
+	if cmdList[0][0] != '*' {
+		return errors.New("invalid request" + strconv.Quote(input) + ", not start with *"), ""
+	}
+	var cmd = strings.Split(cmdList[1], "\n")[1]
+	if cmd != "GET" {
+		return errors.New("request" + strconv.Quote(input) + " not get request"), ""
+	}
+	var key = strings.Split(cmdList[2], "\n")[1]
+	s.mutex.Lock()
+	var val, ok = s.kvStore[key]
+	s.mutex.Unlock()
+	var resp = ""
+	if ok {
+		resp = "$" + strconv.Itoa(len(val)) + "\r\n" + val + "\r\n"
+	} else {
+		resp = "$-1\r\n"
+	}
+	return nil, resp
 }
 
-func (s *RedisServer) process(conn *libnet.Conn) {
-    var databuf = make([]byte, 0, 1024)
-    for {
-        if atomic.LoadInt32(&s.state) != 0 {
-            return
-        }
-        var tmpBuf = make([]byte, 0, 1024)
-        var msgLen = 0
-        for {
-            var buf = make([]byte, 1024, 10240)
-            var readLen, err = conn.Read(buf)
-            if err != nil {
-                conn.Close()
-                log.Errorf("failed to read from client, get error:%s\n", err.Error())
-                return
-            }
-            if readLen == 0 {
-                continue
-            }
-            msgLen += readLen
-            tmpBuf = append(tmpBuf, buf...)
-            fmt.Printf("get request:%s, msgLen:%d\n", strconv.Quote(string(tmpBuf[:msgLen])), msgLen)
-            if tmpBuf[msgLen-1] == '\n' {
-                break
-            }
-        }
-        databuf = append(databuf, tmpBuf[:msgLen]...)
-        var start_pos = 0
-        var end_pos = len(databuf)
-        fmt.Printf("recv msg:%s\n", strconv.Quote(string(databuf[:end_pos])))
-        fmt.Printf("start:%d end:%d\n", start_pos, end_pos)
-        for {
-            var index = findEnd(databuf, start_pos, end_pos)
-            if index < 0 {
-                if start_pos > 0 {
-                    var tmp = make([]byte, 0, 1024)
-                    tmp = append(tmp, databuf[start_pos:end_pos]...)
-                    databuf = tmp
-                }
-                continue
-            }
-            var result = databuf[start_pos:index + 1]
-            fmt.Printf("start to process one:%s [%d:%d]\n", strconv.Quote(string(result)), start_pos, index + 1)
-            start_pos = index + 1
-            var cmd = string(result[0:3])
-            var resp = ""
-            if cmd == "GET" {
-                var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
-                msg = strings.Replace(msg, "\n", "", -1)
-                var msgList = strings.Split(msg, " ")
-                var key = msgList[1]
-                s.mutex.Lock()
-                var val, ok = s.kvStore[key]
-                s.mutex.Unlock()
-                if ok {
-                    resp = "$" + strconv.Itoa(len(val)) + "\r\n" + val + "\r\n"
-                } else {
-                    resp = "$-1\r\n"
-                }
-            } else if cmd == "SET" {
-                var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
-                msg = strings.Replace(msg, "\n", "", -1)
-                var msgList = strings.Split(msg, " ")
-                var key = msgList[1]
-                var val = msgList[2]
-                s.mutex.Lock()
-                s.kvStore[key] = val
-                s.mutex.Unlock()
-                resp = "+OK\r\n"
-            } else if cmd == "INF" {
-                var cnt = atomic.LoadInt32(&s.connectionCnt)
-                resp = "connected_clients:" + strconv.Itoa(int(cnt)) + "\r\n"
-            } else {
-                fmt.Printf("unknown cmd:%s, just continue\n", cmd)
-                continue
-            }
-            var byteArray = []byte(resp)
-            var _, err = conn.Write(byteArray)
-            if err != nil {
-                log.Errorf("failed to write resp:%s to client, got err:%s\n", strconv.Quote(resp), err.Error())
-                conn.Close()
-            }
-        }
-    }
+func (s *RMServer) handleSetCmd(input string) error {
+	// "*3\r\n   $3\r\nSET\r\n  $5\r\nmykey\r\n $7\r\nmyvalue\r\n"
+	input = strings.Replace(input, "\r\n", "\n", -1)
+	var cmdList = strings.Split(input, "$")
+	if cmdList[0][0] != '*' {
+		return errors.New("invalid request" + strconv.Quote(input) + ", not start with *")
+	}
+	var cmd = strings.Split(cmdList[1], "\n")[1]
+	if cmd != "SET" {
+		return errors.New("request" + strconv.Quote(input) + " not set request")
+	}
+	var key = strings.Split(cmdList[2], "\n")[1]
+	var value = strings.Split(cmdList[3], "\n")[1]
+	s.mutex.Lock()
+	s.kvStore[key] = value
+	s.mutex.Unlock()
+	return nil
+}
+
+func countDollarCnt(data []byte, length int) int {
+	var cnt = 0
+	for i := 0; i < length; i++ {
+		if data[i] == '$' {
+			cnt++
+		}
+	}
+	return cnt
+}
+
+func (s *RMServer) processRedis(conn *libnet.Conn) {
+	for {
+		var databuf = make([]byte, 0, 1024)
+		if atomic.LoadInt32(&s.state) != 0 {
+			conn.Close()
+			atomic.AddInt32(&s.connectionCnt, -1)
+			return
+		}
+		var msgLen = 0
+		for {
+			var buf = make([]byte, 1024, 10240)
+			var readLen, err = conn.Read(buf)
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue
+				}
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				log.Errorf("redis server failed to read from client, get error:%s\n", err.Error())
+				return
+			}
+			if readLen == 0 {
+				continue
+			}
+			msgLen += readLen
+			databuf = append(databuf, buf[:readLen]...)
+			if databuf[0] == '*' {
+				if msgLen <= 1 {
+					continue
+				}
+				var cntStr = string(databuf[1])
+				var cnt, err = strconv.Atoi(cntStr)
+				if err != nil {
+					conn.Close()
+					atomic.AddInt32(&s.connectionCnt, -1)
+					log.Errorf("invalid request format, request:%s\n", strconv.Quote(string(databuf[:msgLen])))
+					return
+				}
+				if countDollarCnt(databuf, msgLen) != cnt {
+					continue
+				}
+				break
+			} else if databuf[msgLen-1] == '\n' {
+				break
+			}
+		}
+		// fmt.Printf("recv msg:%s\n", strconv.Quote(string(databuf[:msgLen])))
+		{
+			var result = databuf[:msgLen]
+			var cmd = string(result[0:3])
+			cmd = strings.ToUpper(cmd)
+			var resp = ""
+			if cmd == "GET" {
+				var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
+				msg = strings.Replace(msg, "\n", "", -1)
+				var msgList = strings.Split(msg, " ")
+				var key = msgList[1]
+				s.mutex.Lock()
+				var val, ok = s.kvStore[key]
+				s.mutex.Unlock()
+				if ok {
+					resp = "$" + strconv.Itoa(len(val)) + "\r\n" + val + "\r\n"
+				} else {
+					resp = "$-1\r\n"
+				}
+			} else if cmd == "SET" {
+				var msg = strings.Replace(string(result[:msgLen]), "\r", "", -1)
+				msg = strings.Replace(msg, "\n", "", -1)
+				var msgList = strings.Split(msg, " ")
+				var key = msgList[1]
+				var val = msgList[2]
+				s.mutex.Lock()
+				s.kvStore[key] = val
+				s.mutex.Unlock()
+				resp = "+OK\r\n"
+			} else if cmd == "INF" {
+				var cnt = atomic.LoadInt32(&s.connectionCnt)
+				resp = "connected_clients:" + strconv.Itoa(int(cnt)) + "\r\n"
+			} else if cmd[0] == '*' {
+				var reqStr = string(databuf[:msgLen])
+				if cmd[1] == '3' {
+					var err = s.handleSetCmd(reqStr)
+					if err != nil {
+						conn.Close()
+						atomic.AddInt32(&s.connectionCnt, -1)
+						log.Errorf("failed to process cmd, get err:%s\n", err.Error())
+						return
+					}
+					resp = "+OK\r\n"
+				} else if cmd[1] == '2' {
+					var err, getResp = s.handleGetCmd(reqStr)
+					if err != nil {
+						conn.Close()
+						atomic.AddInt32(&s.connectionCnt, -1)
+						log.Errorf("failed to process cmd, get err:%s\n", err.Error())
+						return
+					}
+					resp = getResp
+				}
+			} else {
+				log.Errorf("unknown cmd:%s, close client connection\n", cmd)
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				return
+			}
+			var byteArray = []byte(resp)
+			var _, err = conn.Write(byteArray)
+			if err != nil {
+				log.Errorf("failed to write resp:%s to client, got err:%s\n", strconv.Quote(resp), err.Error())
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				return
+			}
+		}
+	}
+}
+
+func (s *RMServer) processMemcache(conn *libnet.Conn) {
+	for {
+		var databuf = make([]byte, 0, 1024)
+		if atomic.LoadInt32(&s.state) != 0 {
+			conn.Close()
+			atomic.AddInt32(&s.connectionCnt, -1)
+			return
+		}
+		var msgLen = 0
+		for {
+			var buf = make([]byte, 1024, 10240)
+			var readLen, err = conn.Read(buf)
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue
+				}
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				log.Errorf("memcache server failed to read from client, get error:%s\n", err.Error())
+				return
+			}
+			msgLen += readLen
+			databuf = append(databuf, buf[:readLen]...)
+			if databuf[msgLen-1] == '\n' {
+				break
+			}
+		}
+		// fmt.Printf("memcache recv msg:%s\n", strconv.Quote(string(databuf[:msgLen])))
+		{
+			var result = databuf[:msgLen]
+			var reqStr = strings.Replace(string(result), "\r", "", -1)
+			var argList = strings.Split(reqStr, "\n")
+			var body = ""
+			if len(argList) == 2 {
+				body = argList[1]
+			}
+			var cmds = strings.Split(string(argList[0]), " ")
+			var cmd = cmds[0]
+			cmd = strings.ToUpper(cmd)
+			var resp = ""
+			if cmd == "GET" {
+				var key = cmds[1]
+				s.mutex.Lock()
+				var val, ok = s.kvStore[key]
+				s.mutex.Unlock()
+				if ok {
+					resp = "VALUE " + key + "0" + strconv.Itoa(len(val)) + "0" + "\r\n" + val + "\r\n"
+				} else {
+					resp = "END\r\n"
+				}
+			} else if cmd == "SET" {
+				var key = cmds[1]
+				s.mutex.Lock()
+				s.kvStore[key] = body
+				s.mutex.Unlock()
+				resp = "STORED\r\n"
+			} else if cmd == "STATS" {
+				var cnt = atomic.LoadInt32(&s.connectionCnt)
+				resp = "STAT connected_clients:" + strconv.Itoa(int(cnt)) + "\r\n"
+			} else {
+				log.Errorf("unknown cmd:%s, close client connection\n", cmd)
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				return
+			}
+			var byteArray = []byte(resp)
+			var _, err = conn.Write(byteArray)
+			if err != nil {
+				log.Errorf("mecache server failed to write resp:%s to client, got err:%s\n", strconv.Quote(resp), err.Error())
+				conn.Close()
+				atomic.AddInt32(&s.connectionCnt, -1)
+				return
+			}
+		}
+	}
 }
 
 //func main() {

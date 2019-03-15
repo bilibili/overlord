@@ -21,7 +21,7 @@ import (
 
 var SeqNO int = 0
 
-func setupRedis2(port1, port2 string, s1* RedisServer, s2* RedisServer) {
+func setupRedis(port1, port2 string, s1 *RMServer, s2 *RMServer) {
 	proxy.ClusterID = 0
 	proxy.MonitorCfgIntervalMilliSecs = 500
 	proxy.ClusterChangeCount = 0
@@ -29,60 +29,23 @@ func setupRedis2(port1, port2 string, s1* RedisServer, s2* RedisServer) {
 	proxy.ClusterConfChangeFailCnt = 0
 	proxy.LoadFailCnt = 0
 	proxy.FailedDueToRemovedCnt = 0
-    s1.port = port1
-    s2.port = port2
-    var err1 = s1.start()
-    if err1 != nil {
-		fmt.Printf("failed to start redis1, get error:%s\n", err1.Error())
-    }
-    var err2 = s2.start()
-    if err2 != nil {
-		fmt.Printf("failed to start redis2, get error:%s\n", err2.Error())
-    }
-}
-
-func setupRedis(port1, port2 string) {
-	proxy.ClusterID = 0
-	proxy.MonitorCfgIntervalMilliSecs = 500
-	proxy.ClusterChangeCount = 0
-	proxy.AddClusterFailCnt = 0
-	proxy.ClusterConfChangeFailCnt = 0
-	proxy.LoadFailCnt = 0
-	proxy.FailedDueToRemovedCnt = 0
-	KillAllRedis()
-	var sn = strconv.Itoa(SeqNO)
-	var redisConf1 = "/tmp/redis_s_" + port1 + "_" + sn + ".conf"
-	var redisConf2 = "/tmp/redis_s_" + port2 + "_" + sn + ".conf"
-	var err1 = StartStandAloneRedis(redisConf1, port1, redisConf1+".log")
-	var err2 = StartStandAloneRedis(redisConf2, port2, redisConf2+".log")
+	s1.port = port1
+	s2.port = port2
+	var err1 = s1.start()
 	if err1 != nil {
 		fmt.Printf("failed to start redis1, get error:%s\n", err1.Error())
 	}
+	var err2 = s2.start()
 	if err2 != nil {
-		fmt.Printf("failed to start redis1, get error:%s\n", err2.Error())
-	}
-	SeqNO++
-}
-func tearDownRedis() {
-	KillAllRedis()
-}
-func tearDownMecache() {
-	KillAllMC()
-}
-
-func checkAndKillStandalone(expectCnt int) {
-	for {
-		var changed = atomic.LoadInt32(&proxy.ClusterChangeCount)
-		if changed >= int32(expectCnt) {
-			log.Infof("cluster changed:%d larger than expect:%d, go kill standalone\n", int(changed), expectCnt)
-			KillAllRedis()
-			return
-		}
-		time.Sleep(time.Duration(50) * time.Millisecond)
+		fmt.Printf("failed to start redis2, get error:%s\n", err2.Error())
 	}
 }
+func teardownRMServer(s1 *RMServer, s2 *RMServer) {
+	s1.stop()
+	s2.stop()
+}
 
-func setupMC(port1, port2 string) {
+func setupMC(port1, port2 string, s1, s2 *RMServer) {
 	proxy.ClusterID = 0
 	proxy.MonitorCfgIntervalMilliSecs = 500
 	proxy.ClusterChangeCount = 0
@@ -90,9 +53,17 @@ func setupMC(port1, port2 string) {
 	proxy.ClusterConfChangeFailCnt = 0
 	proxy.LoadFailCnt = 0
 	proxy.FailedDueToRemovedCnt = 0
-	KillAllMC()
-	StartStandAloneMC(port1)
-	StartStandAloneMC(port2)
+
+	s1.port = port1
+	s2.port = port2
+	var err1 = s1.start()
+	if err1 != nil {
+		fmt.Printf("failed to start memcache1, get error:%s\n", err1.Error())
+	}
+	var err2 = s2.start()
+	if err2 != nil {
+		fmt.Printf("failed to start memcache2, get error:%s\n", err2.Error())
+	}
 	SeqNO++
 }
 
@@ -458,7 +429,10 @@ var ProxyConfFile = "./conf/proxy.conf"
 
 func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 	var ClusterConfFile = "./conf/noclose_cluster.conf"
-	setupRedis("8201", "8202")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8201", "8202", s1, s2)
+
 	var firstConfName = "conf/noclose/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
@@ -522,15 +496,14 @@ func TestClusterConfigLoadFromFileNoCloseFront(t *testing.T) {
 
 	server.Close()
 	log.Info("no close front connection case done")
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
 	var ClusterConfFile = "./conf/close_cluster.conf"
-    var s1 = NewServer()
-    var s2 = NewServer()
-	// setupRedis2("8203", "8204", s1, s2)
-	setupRedis("8203", "8204")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8203", "8204", s1, s2)
 	var firstConfName = "conf/close/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
@@ -597,13 +570,16 @@ func TestClusterConfigLoadFromFileCloseFront(t *testing.T) {
 
 	server.Close()
 	log.Info("close front connection case done")
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 	log.Infof("start reload case on nopanic when conf is invalid\n")
 	var ClusterConfFile = "./conf/nopanic_cluster.conf"
-	setupRedis("8205", "8206")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8205", "8206", s1, s2)
+
 	var firstConfName = "conf/nopanic/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
@@ -671,12 +647,15 @@ func TestClusterConfigLoadDuplicatedAddrNoPanic(t *testing.T) {
 	assert.True(t, loadFail > 23)
 	log.Info("no panic case done")
 
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigFrontConnectionLeak(t *testing.T) {
 	var ClusterConfFile = "./conf/cnnleak_cluster.conf"
-	setupRedis("8207", "8208")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8207", "8208", s1, s2)
+
 	var firstConfName = "conf/frontleak/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
@@ -737,12 +716,15 @@ func TestClusterConfigFrontConnectionLeak(t *testing.T) {
 	assert.Equal(t, 2, int(cnt1)) // self, forwarder2
 	log.Info("front leak case done")
 	server.Close()
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
 	var ClusterConfFile = "./conf/mc_cluster.conf"
-	setupMC("8209", "8210")
+	var s1 = NewMemServer()
+	var s2 = NewMemServer()
+	setupMC("8209", "8210", s1, s2)
+
 	var firstConfName = "conf/memcache/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
 	ExecCmd(cmd)
@@ -794,12 +776,15 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
 	assert.Equal(t, 2, int(clusterChangeCnt))
 	assert.Equal(t, 1, int(clusterCnt))
 	log.Info("memcache reload done")
-	tearDownMecache()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	var ClusterConfFile = "./conf/rediscluster_cluster.conf"
-	setupRedis("8211", "8212")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8211", "8212", s1, s2)
+
 	log.Infof("start reload case of redis cluster\n")
 
 	var cluster1 = "127.0.0.1:7000"
@@ -849,7 +834,6 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	go loopGet(frontAddr1, key, val, 3, 0, 1, true, chGet1)
 	go loopGetToSucc(frontAddr2, key, val, chGet2)
 	go updateConf(2000, ClusterConfFile, confList, chUpdate)
-	go checkAndKillStandalone(1)
 	var retCnt = 0
 	for {
 		select {
@@ -873,7 +857,7 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	assert.Equal(t, 3, int(clusterChangeCnt))
 	assert.Equal(t, 2, int(clusterCnt))
 	log.Info("redis cluster reload done")
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func removeFiles(toRemove []string) {
@@ -888,7 +872,10 @@ func removeFiles(toRemove []string) {
 
 func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	var ClusterConfFile = "./conf/lotsof_cluster.conf"
-	setupRedis("8213", "8214")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8213", "8214", s1, s2)
+
 	proxy.MonitorCfgIntervalMilliSecs = 100
 	var firstConfName = "conf/lotsof/0.conf"
 	var cmd = "cp " + firstConfName + " " + ClusterConfFile
@@ -967,7 +954,10 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 		var addr = "127.0.0.1:" + strconv.Itoa(8513+int(i))
 		var err = get(addr, key, val, 0)
 		if i < int(proxy.MaxClusterCnt) {
-			assert.NoError(t, err, "failed to check on address:"+addr)
+			if err != nil {
+				log.Infof("succeed to get from addr:%s\n", addr)
+			}
+			require.NoError(t, err, "failed to check on address:"+addr)
 		} else {
 			require.True(t, err != nil)
 		}
@@ -980,12 +970,15 @@ func TestClusterConfigLoadLotsofCluster(t *testing.T) {
 	assert.Equal(t, 128, int(server.CurClusterCnt))
 	log.Info("lots of case done")
 	removeFiles(toRemove)
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
 	var ClusterConfFile = "./conf/rediscluster_seed_cluster.conf"
-	setupRedis("8215", "8216")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8215", "8216", s1, s2)
+
 	log.Infof("start reload case of get seed fail\n")
 
 	var firstConfName = "conf/getseedfail/0.conf"
@@ -1026,7 +1019,7 @@ func TestClusterConfigReloadGetRedisSeedFail(t *testing.T) {
 	var faildCnt = atomic.LoadInt32(&proxy.AddClusterFailCnt)
 	assert.True(t, faildCnt > 0)
 	log.Info("redis cluster get seek fail case done")
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
 
 func TestClusterConfigReloadValidateAddress(t *testing.T) {
@@ -1094,7 +1087,10 @@ func TestClusterConfigReloadValidateAddress(t *testing.T) {
 
 func TestClusterConfigReloadClusterRemoved(t *testing.T) {
 	var ClusterConfFile = "./conf/some_cluster_removed.conf"
-	setupRedis("8217", "8218")
+	var s1 = NewRedisServer()
+	var s2 = NewRedisServer()
+	setupRedis("8217", "8218", s1, s2)
+
 	log.Infof("start reload case of cluster removed\n")
 
 	var firstConfName = "conf/cluster_removed/0.conf"
@@ -1135,5 +1131,5 @@ func TestClusterConfigReloadClusterRemoved(t *testing.T) {
 	var faildCnt = int(atomic.LoadInt32(&proxy.FailedDueToRemovedCnt))
 	assert.True(t, faildCnt > 0)
 	log.Info("redis cluster removed case done")
-	tearDownRedis()
+	teardownRMServer(s1, s2)
 }
