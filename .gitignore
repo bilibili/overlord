@@ -26,4 +26,3 @@ proxy/test/proxy.log.*
 cmd/anzi/anzi
 cmd/enri/enri
 coverage.txt
-go.sum

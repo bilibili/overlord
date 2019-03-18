@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,7 +49,7 @@ type Handler struct {
 }
 
 // NewHandler new a conn handler.
-func NewHandler(c *Cluster, cc *ClusterConfig, id int64, client *libnet.Conn) (h *Handler) {
+func NewHandler(c *Cluster, cc *ClusterConfig, id int64, client net.Conn) (h *Handler) {
 	h = &Handler{
 		cluster:         c,
 		CacheType:       cc.CacheType,
@@ -56,10 +57,9 @@ func NewHandler(c *Cluster, cc *ClusterConfig, id int64, client *libnet.Conn) (h
 		ListenAddr:      cc.ListenAddr,
 		closeWhenChange: cc.CloseWhenChange,
 		ID:              id,
-		conn:            client,
 	}
 
-	h.conn = libnet.NewConn(h.conn, time.Second*time.Duration(cc.ReadTimeout), time.Second*time.Duration(cc.WriteTimeout))
+	h.conn = libnet.NewConn(client, time.Second*time.Duration(cc.ReadTimeout), time.Second*time.Duration(cc.WriteTimeout))
 	// cache type
 	switch h.CacheType {
 	case types.CacheTypeMemcache:

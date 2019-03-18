@@ -202,9 +202,8 @@ func (c *Cluster) accept(l net.Listener) {
 			}
 			continue
 		}
-		var frontConn = libnet.NewConn(conn, time.Second*time.Duration(c.proxy.c.Proxy.ReadTimeout), time.Second*time.Duration(c.proxy.c.Proxy.WriteTimeout))
 		var id = atomic.AddInt64(&c.connectionSN, 1)
-		var handler = NewHandler(c, conf, id, frontConn)
+		var handler = NewHandler(c, conf, id, conn)
 		c.addConnection(id, handler)
 		handler.Handle()
 	}
