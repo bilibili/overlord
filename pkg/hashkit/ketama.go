@@ -54,15 +54,21 @@ func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	return
 }
 
-// Init init hash ring with nodes.
 func (h *HashRing) Init(nodes []string, spots []int) {
+	h.lock.Lock()
+	h.init(nodes, spots)
+	h.lock.Unlock()
+}
+
+// Init init hash ring with nodes.
+func (h *HashRing) init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
-	h.lock.Lock()
+	// h.lock.Lock()
 	h.nodes = nodes
 	h.spots = spots
-	h.lock.Unlock()
+	// h.lock.Unlock()
 	var (
 		ticks          []nodeHash
 		svrn           = len(nodes)
@@ -127,13 +133,13 @@ func (h *HashRing) AddNode(node string, spot int) {
 			tmpSpot = append(tmpSpot, h.spots[i])
 		}
 	}
-	h.lock.Unlock()
 	if !exitst {
 		tmpNode = append(tmpNode, node)
 		tmpSpot = append(tmpSpot, spot)
 		log.Infof("add node %s spot %d", node, spot)
+		h.init(tmpNode, tmpSpot)
 	}
-	h.Init(tmpNode, tmpSpot)
+	h.lock.Unlock()
 }
 
 // DelNode delete a node from the hash ring.
@@ -155,10 +161,10 @@ func (h *HashRing) DelNode(n string) {
 			log.Info("ketama del node ", n)
 		}
 	}
-	h.lock.Unlock()
 	if del {
-		h.Init(tmpNode, tmpSpot)
+		h.init(tmpNode, tmpSpot)
 	}
+	h.lock.Unlock()
 }
 
 // GetNode returns result node by given key.
