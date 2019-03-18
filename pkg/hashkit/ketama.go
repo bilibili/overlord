@@ -60,6 +60,10 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 	h.lock.Unlock()
 }
 
+func (h *HashRing) Replace(nodes []string, spots []int) {
+	return h.Init(nodes, spots)
+}
+
 // Init init hash ring with nodes.
 func (h *HashRing) init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
@@ -123,6 +127,7 @@ func (h *HashRing) AddNode(node string, spot int) {
 		exitst  bool
 	)
 	h.lock.Lock()
+	defer h.lock.Unlock()
 	for i, nd := range h.nodes {
 		tmpNode = append(tmpNode, nd)
 		if nd == node {
@@ -139,7 +144,6 @@ func (h *HashRing) AddNode(node string, spot int) {
 		log.Infof("add node %s spot %d", node, spot)
 		h.init(tmpNode, tmpSpot)
 	}
-	h.lock.Unlock()
 }
 
 // DelNode delete a node from the hash ring.
@@ -152,6 +156,7 @@ func (h *HashRing) DelNode(n string) {
 		del     bool
 	)
 	h.lock.Lock()
+	defer h.lock.Unlock()
 	for i, nd := range h.nodes {
 		if nd != n {
 			tmpNode = append(tmpNode, nd)
@@ -164,7 +169,6 @@ func (h *HashRing) DelNode(n string) {
 	if del {
 		h.init(tmpNode, tmpSpot)
 	}
-	h.lock.Unlock()
 }
 
 // GetNode returns result node by given key.
