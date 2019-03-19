@@ -3,6 +3,8 @@ package proxy
 import (
 	errs "errors"
 	"net"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,18 +18,22 @@ import (
 	"overlord/proxy/proto/redis"
 	rclstr "overlord/proxy/proto/redis/cluster"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 )
 
 // proxy errors
 var (
-	ErrProxyMoreMaxConns = errs.New("Proxy accept more than max connextions")
+	ErrProxyMoreMaxConns       = errs.New("Proxy accept more than max connextions")
+	LoadFailCnt          int32 = 0
+	ClusterChangeCount   int32 = 0
 )
 
 // Proxy is proxy.
 type Proxy struct {
-	c   *Config
-	ccs []*ClusterConfig
+	c               *Config
+	ClusterConfFile string // cluster configure file name
+	ccs             []*ClusterConfig
 
 	forwarders map[string]proto.Forwarder
 	once       sync.Once
@@ -51,16 +57,15 @@ func New(c *Config) (p *Proxy, err error) {
 
 // Serve is the main accept() loop of a server.
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
-	p.once.Do(func() {
-		p.ccs = ccs
-		p.forwarders = map[string]proto.Forwarder{}
-		if len(ccs) == 0 {
-			log.Warnf("overlord will never listen on any port due to cluster is not specified")
-		}
-		for _, cc := range ccs {
-			p.serve(cc)
-		}
-	})
+	p.ccs = ccs
+	p.forwarders = map[string]proto.Forwarder{}
+	if len(ccs) == 0 {
+		log.Warnf("overlord will never listen on any port due to cluster is not specified")
+	}
+	for _, cc := range ccs {
+		p.serve(cc)
+	}
+	go p.monitorConfChange()
 }
 
 func (p *Proxy) serve(cc *ClusterConfig) {
@@ -134,4 +139,155 @@ func (p *Proxy) Close() error {
 	}
 	p.closed = true
 	return nil
+}
+func (p *Proxy) isClosed() bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.closed
+}
+
+func (p *Proxy) monitorConfChange() {
+	watch, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Errorf("failed to create file change watcher, get error:%s\n", err.Error())
+		return
+	}
+	defer watch.Close()
+	err = watch.Add(p.ClusterConfFile)
+	if err != nil {
+		log.Errorf("failed to monitor content change of file:%s with error:%s\n", p.ClusterConfFile, err.Error())
+		return
+	}
+	for {
+		if p.isClosed() {
+			log.Infof("proxy is closed, exit configure file monitor\n")
+			return
+		}
+		select {
+		case ev := <-watch.Events:
+			{
+				//判断事件发生的类型，如下5种
+				// Create 创建
+				// Write 写入
+				// Remove 删除
+				// Rename 重命名
+				// Chmod 修改权限
+				if ev.Op&fsnotify.Create == fsnotify.Create {
+					log.Infof("find new create file:%s\n", ev.Name)
+					p.handleConfigChange()
+				}
+				if ev.Op&fsnotify.Write == fsnotify.Write {
+					log.Infof("find conf file:%s updated\n", ev.Name)
+					p.handleConfigChange()
+				}
+				if ev.Op&fsnotify.Remove == fsnotify.Remove {
+					log.Infof("find conf file:%s removed", ev.Name)
+				}
+				if ev.Op&fsnotify.Rename == fsnotify.Rename {
+					log.Infof("find conf file:%s\n renamed", ev.Name)
+					p.handleConfigChange()
+				}
+				if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
+					log.Infof("find mod of conf file:%s\n changed", ev.Name)
+				}
+			}
+		case err := <-watch.Errors:
+			{
+				log.Errorf("watch config file:%s get error:%s\n", p.ClusterConfFile, err.Error())
+				return
+			}
+		}
+	}
+}
+
+func (p *Proxy) handleConfigChange() {
+	var newConfs, err = LoadClusterConf(p.ClusterConfFile)
+	if err != nil {
+		log.Errorf("failed to load conf file:%s, got error:%s\n", p.ClusterConfFile, err.Error())
+		atomic.AddInt32(&LoadFailCnt, 1)
+		return
+	}
+	var changedConf []*ClusterConfig
+	changedConf = p.parseChanged(newConfs, p.ccs)
+
+	for _, conf := range changedConf {
+		p.updateConfig(conf)
+		log.Infof("update conf of cluster:%s\n", conf.Name)
+	}
+	if len(changedConf) > 0 {
+		atomic.AddInt32(&ClusterChangeCount, 1)
+	}
+}
+
+func (p *Proxy) updateConfig(conf *ClusterConfig) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	var f, ok = p.forwarders[conf.Name]
+	if !ok {
+		return
+	}
+	var err = f.Update(conf.Servers)
+	if err != nil {
+		log.Errorf("failed to update conf of cluster:%s with error:%s\n", conf.Name, err.Error())
+		return
+	}
+	for index, oldConf := range p.ccs {
+		if oldConf.Name != conf.Name {
+			continue
+		}
+		p.ccs[index].Servers = conf.Servers
+	}
+
+}
+
+func (p *Proxy) supportChange(conf *ClusterConfig) bool {
+	if conf.CacheType == types.CacheTypeRedisCluster {
+		return false
+	}
+	return true
+}
+
+func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) []*ClusterConfig {
+	var changed = make([]*ClusterConfig, 0, len(oldConfs))
+	for _, newConf := range newConfs {
+		if !p.supportChange(newConf) {
+			continue
+		}
+		var find = false
+		var diff = false
+		for _, conf := range oldConfs {
+			if newConf.Name != conf.Name {
+				continue
+			}
+			if !p.supportChange(conf) {
+				find = false
+				break
+			}
+			find = true
+			diff = compareConf(conf, newConf)
+			break
+		}
+		if !find || !diff {
+			continue
+		}
+		changed = append(changed, newConf)
+		continue
+	}
+	return changed
+}
+
+func compareConf(oldConf, newConf *ClusterConfig) bool {
+	if len(oldConf.Servers) != len(newConf.Servers) {
+		return true
+	}
+	var server1 = oldConf.Servers
+	var server2 = newConf.Servers
+	sort.Strings(server1)
+	sort.Strings(server2)
+	var str1 = strings.Join(server1, "_")
+	var str2 = strings.Join(server2, "_")
+	if str1 != str2 {
+		return true
+	}
+	return false
 }

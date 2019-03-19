@@ -61,7 +61,7 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 }
 
 func (h *HashRing) Replace(nodes []string, spots []int) {
-	return h.Init(nodes, spots)
+	h.Init(nodes, spots)
 }
 
 // Init init hash ring with nodes.

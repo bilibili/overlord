@@ -3,6 +3,7 @@ package proxy
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"overlord/pkg/log"
@@ -69,6 +70,32 @@ type ClusterConfig struct {
 	PingFailLimit    int             `toml:"ping_fail_limit"`
 	PingAutoEject    bool            `toml:"ping_auto_eject"`
 	Servers          []string        `toml:"servers"`
+}
+
+// ValidateStandalone validate redis/memcache address is valid or not
+func ValidateStandalone(servers []string) error {
+	if len(servers) == 0 {
+		return errors.New("empty backend server list")
+	}
+	for _, server := range servers {
+		var ipAlise = strings.Split(server, " ")
+		if len(ipAlise) != 1 && len(ipAlise) != 2 {
+			return errors.New("invalid backend address format:" + server)
+		}
+		var ipPort = strings.Split(ipAlise[0], ":")
+		if len(ipPort) != 3 {
+			return errors.New("invalid backend redis address format:" + server)
+		}
+		var intPort, err1 = strconv.Atoi(ipPort[1])
+		if err1 != nil || intPort <= 0 {
+			return errors.New("invalid backend redis address format:" + server)
+		}
+		var weight, err2 = strconv.Atoi(ipPort[2])
+		if err2 != nil || weight < 0 {
+			return errors.New("invalid backend redis address format:" + server)
+		}
+	}
+	return nil
 }
 
 // Validate validate config field value.
@@ -145,6 +172,35 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		}
 	}
 	return nil
+}
+
+func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
+	checks := map[string]struct{}{}
+	cs := &ClusterConfigs{}
+	if err = cs.LoadFromFile(path); err != nil {
+		return
+	}
+	for _, cc := range cs.Clusters {
+		if _, ok := checks[cc.Name]; ok {
+			err = errors.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
+			return
+		}
+		checks[cc.Name] = struct{}{}
+		var ipPort = strings.Split(cc.ListenAddr, ":")
+		if len(ipPort) != 2 {
+			err = errors.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
+			return
+		}
+		var port = ipPort[1]
+		if _, ok := checks[port]; ok {
+			err = errors.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
+			return
+		}
+
+		checks[port] = struct{}{}
+	}
+	ccs = append(ccs, cs.Clusters...)
+	return
 }
 
 const defaultConfig = `
