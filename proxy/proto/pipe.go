@@ -175,13 +175,17 @@ func (mp *msgPipe) pipe() {
 			msg := mp.batch[i]
 			msg.WithError(err) // NOTE: maybe err is nil
 			if prom.On {
+				cmd := msg.Request().CmdString()
+				duration := msg.RemoteDur()
+				msg.Done()
 				if err != nil {
-					prom.ErrIncr(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), perr.Cause(err).Error())
+					prom.ErrIncr(nc.Cluster(), nc.Addr(), cmd, perr.Cause(err).Error())
 				} else {
-					prom.HandleTime(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
+					prom.HandleTime(nc.Cluster(), nc.Addr(), cmd, int64(duration/time.Microsecond))
 				}
+			} else {
+				msg.Done()
 			}
-			msg.Done()
 		}
 		mp.count = 0
 		if err != nil {
