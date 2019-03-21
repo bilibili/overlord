@@ -174,7 +174,6 @@ func (mp *msgPipe) pipe() {
 		for i := 0; i < mp.count; i++ {
 			msg := mp.batch[i]
 			msg.WithError(err) // NOTE: maybe err is nil
-			msg.Done()
 			if prom.On {
 				if err != nil {
 					prom.ErrIncr(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), perr.Cause(err).Error())
@@ -182,6 +181,7 @@ func (mp *msgPipe) pipe() {
 					prom.HandleTime(nc.Cluster(), nc.Addr(), msg.Request().CmdString(), int64(msg.RemoteDur()/time.Microsecond))
 				}
 			}
+			msg.Done()
 		}
 		mp.count = 0
 		if err != nil {
