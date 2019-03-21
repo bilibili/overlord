@@ -78,7 +78,6 @@ func (c *Connections) init(cc *ClusterConfig, addrs, ans []string, hasAlias, cre
 	if hasAlias {
 		for idx, aname := range ans {
 			c.aliasMap[aname] = addrs[idx]
-			log.Infof("in connection:%p init, add alisa:%s with addr:%s\n", c, aname, addrs[idx])
 		}
 	}
 	if createConn {
@@ -176,7 +175,7 @@ func (f *defaultForwarder) Update(servers []string) error {
 	newConns.init(f.cc, addrs, ans, alias, false)
 	var copyed = make(map[string]bool)
 	for _, addr := range addrs {
-		toAddr := addr // NOTE: avoid closure
+		toAddr := addr
 		conn, ok := curConns.nodePipe[toAddr]
 		if ok {
 			newConns.nodePipe[toAddr] = conn
@@ -186,26 +185,21 @@ func (f *defaultForwarder) Update(servers []string) error {
 		newConns.nodePipe[toAddr] = proto.NewNodeConnPipe(f.cc.NodeConnections, func() proto.NodeConn {
 			return newNodeConn(f.cc, toAddr)
 		})
-		log.Infof("create new connection to addrs:%s conn:%p\n", toAddr, newConns.nodePipe[toAddr])
 	}
 	atomic.AddInt32(&f.version, 1)
 	f.conns.Store(newConns)
-	log.Infof("start new connections done, conn change from:%p to %p\n", curConns, newConns)
 	if alias {
 		f.ring.Replace(ans, ws)
 	} else {
 		f.ring.Replace(addrs, ws)
 	}
-	log.Infof("replace ring done\n")
 	for addr, conn := range curConns.nodePipe {
 		var _, find = copyed[addr]
 		if find {
 			continue
 		}
-		log.Infof("try to close connection:%p with backend as it will not be used any more", conn)
 		conn.Close()
 	}
-	log.Infof("close unused connection done\n")
 
 	if f.cc.PingAutoEject {
 		var curVersion = atomic.LoadInt32(&f.version)
@@ -224,14 +218,12 @@ func (f *defaultForwarder) Update(servers []string) error {
 func (f *defaultForwarder) Close() error {
 	if atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
 		// first closed
-		log.Infof("delay close nodePipes")
 		var curConns, ok = f.conns.Load().(*Connections)
 		if !ok {
 			return errors.WithStack(ErrConnectionNotExist)
 		}
 
 		for _, np := range curConns.nodePipe {
-			log.Infof("try to close conn:%p when forwarder is closed\n", np)
 			go np.Close()
 		}
 		return nil
@@ -242,7 +234,6 @@ func (f *defaultForwarder) Close() error {
 func (f *defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
 	var addr string
 	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
-		log.Infof("failed to get addr from ring\n")
 		return
 	}
 	var conns *Connections
@@ -251,18 +242,12 @@ func (f *defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok boo
 		log.Errorf("failed to load connections\n")
 		return
 	}
-	var prev = addr
 	if conns.alias {
 		if addr, ok = conns.aliasMap[addr]; !ok {
-			for a, cnn := range conns.aliasMap {
-				log.Infof("alias conn:%p map:%p has:%s ---> %s\n", conns, conns.aliasMap, a, cnn)
-			}
-			log.Errorf("addr:%s is not found in alias map\n", prev)
 			return
 		}
 	}
 	ncp, ok = conns.nodePipe[addr]
-	// log.Infof("forward use connnection alias:%s addr:%s conn:%p find:%v\n", prev, addr, ncp, ok)
 	return
 }
 
@@ -395,6 +380,7 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		if strings.Contains(svr, " ") {
 			alias = true
 		} else if alias {
+			log.Errorf("use alias but not contains blank:%s\n", svr)
 			err = ErrConfigServerFormat
 			return
 		}
@@ -405,6 +391,7 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		if alias {
 			ss = strings.Split(svr, " ")
 			if len(ss) != 2 {
+				log.Errorf("use alias but not len is not 2 svr:%s\n", svr)
 				err = ErrConfigServerFormat
 				return
 			}
@@ -415,18 +402,20 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		}
 		ss = strings.Split(addrW, ":")
 		if len(ss) != 3 {
+			log.Errorf("use addr not 3 addr:%s\n", svr)
 			err = ErrConfigServerFormat
 			return
 		}
 		addrs = append(addrs, net.JoinHostPort(ss[0], ss[1]))
 		w, we := conv.Btoi([]byte(ss[2]))
 		if we != nil || w <= 0 {
+			log.Errorf("use wait not < 0 addr:%s\n", svr)
 			err = ErrConfigServerFormat
 			return
 		}
 		ws = append(ws, int(w))
 	}
-	if len(addrs) != len(ans) {
+	if len(addrs) != len(ans) && len(ans) > 0 {
 		err = ErrConfigServerFormat
 	}
 	return

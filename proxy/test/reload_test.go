@@ -504,9 +504,19 @@ func TestClusterConfigReloadMemcacheCluster(t *testing.T) {
 	err = check(keylist, valuelist, cli, "mem_cache_put", true)
 	require.NoError(t, err)
 
+	src = "conf/memcache/3.conf"
+	log.Infof("start to copy file:%s\n", src)
+	cmd = "cp " + src + " " + ClusterConfFile
+	var _, err3 = ExecCmd(cmd)
+	require.NoError(t, err3)
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	err = check(keylist, valuelist, cli, "mem_cache_put", true) // expect failed to load, so no impact
+	require.NoError(t, err)
+
 	var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
 	assert.Equal(t, 2, int(clusterChangeCnt))
 	log.Info("memcache reload done")
+	server.Close()
 	teardownRMServer(s1, s2)
 }
 
@@ -561,9 +571,21 @@ func TestClusterConfigReloadRedisCluster(t *testing.T) {
 	err = check(keylist, valuelist, cli, "redis_put", true)
 	require.NoError(t, err)
 
+	// alias is removed
+	src = "conf/standalone_redis/3.conf"
+	log.Infof("start to copy file:%s\n", src)
+	cmd = "cp " + src + " " + ClusterConfFile
+	var _, err3 = ExecCmd(cmd)
+	require.NoError(t, err3)
+	time.Sleep(time.Duration(100) * time.Millisecond)
+	err = check(keylist, valuelist, cli, "redis_put", true)
+	require.NoError(t, err)
+
 	var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
-	assert.Equal(t, 2, int(clusterChangeCnt))
+	assert.Equal(t, 3, int(clusterChangeCnt))
+
 	log.Info("standalone redis reload done")
+	server.Close()
 	teardownRMServer(s1, s2)
 }
 
@@ -604,23 +626,68 @@ func TestClusterConfigReloadNoChange(t *testing.T) {
 	cmd = "cp " + src + " " + ClusterConfFile
 	var _, err3 = ExecCmd(cmd)
 	require.NoError(t, err3)
-	time.Sleep(time.Duration(1000) * time.Millisecond)
+	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	log.Infof("start to rename file:%s\n", ClusterConfFile)
 	cmd = "mv " + ClusterConfFile + " " + ClusterConfFile + ".tmp"
 	var _, err4 = ExecCmd(cmd)
 	require.NoError(t, err4)
-	time.Sleep(time.Duration(1000) * time.Millisecond)
+	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	src = "conf/nochange/2.conf"
 	log.Infof("start to copy file:%s\n", src)
 	cmd = "cp " + src + " " + ClusterConfFile
 	var _, err5 = ExecCmd(cmd)
 	require.NoError(t, err5)
-	time.Sleep(time.Duration(1000) * time.Millisecond)
+	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	var clusterChangeCnt = atomic.LoadInt32(&proxy.ClusterChangeCount)
 	assert.Equal(t, 0, int(clusterChangeCnt))
+
+	var failCnt = atomic.LoadInt32(&proxy.LoadFailCnt)
+	assert.Equal(t, 2, int(failCnt))
+	server.Close()
+}
+
+func TestClusterConfigInvalidConf(t *testing.T) {
+	clearEnv()
+	var proxyConf = &proxy.Config{}
+	var loadConfError = proxyConf.LoadFromFile(ProxyConfFile)
+	require.NoError(t, loadConfError)
+	if log.Init(proxyConf.Config) {
+		defer log.Close()
+	}
+	var _, err = proxy.LoadClusterConf("conf/invalid/empty_server.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/more_alisa.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/no_weight.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/invalid_port.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/invalid_weight.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/duplicate_name.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/duplicate_ip.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
+
+	_, err = proxy.LoadClusterConf("conf/invalid/some_has_alisa.conf")
+	require.Error(t, err)
+	log.Infof("load conf get error:%s\n", err.Error())
 }
 
 func removeFiles(toRemove []string) {

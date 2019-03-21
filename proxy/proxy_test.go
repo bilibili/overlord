@@ -569,7 +569,7 @@ func TestEject(t *testing.T) {
 	})
 
 	ping := &pinger{cc: eject, addr: "test-addr", alias: "mc1", weight: 10}
-	go fer.processPing(ping)
+	go fer.processPing(ping, 2)
 
 	for _, tt := range ts {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:22211", time.Second)

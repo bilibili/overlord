@@ -77,23 +77,33 @@ func ValidateStandalone(servers []string) error {
 	if len(servers) == 0 {
 		return errors.New("empty backend server list")
 	}
+	var useAlisaCnt = 0
+	var noAlisaCnt = 0
 	for _, server := range servers {
 		var ipAlise = strings.Split(server, " ")
 		if len(ipAlise) != 1 && len(ipAlise) != 2 {
 			return errors.New("invalid backend address format:" + server)
 		}
+		if len(ipAlise) == 1 {
+			noAlisaCnt++
+		} else {
+			useAlisaCnt++
+		}
 		var ipPort = strings.Split(ipAlise[0], ":")
 		if len(ipPort) != 3 {
-			return errors.New("invalid backend redis address format:" + server)
+			return errors.New("invalid backend redis address format:" + server + ", no weight")
 		}
 		var intPort, err1 = strconv.Atoi(ipPort[1])
 		if err1 != nil || intPort <= 0 {
-			return errors.New("invalid backend redis address format:" + server)
+			return errors.New("invalid backend redis address format:" + server + ", port invalid")
 		}
 		var weight, err2 = strconv.Atoi(ipPort[2])
 		if err2 != nil || weight < 0 {
-			return errors.New("invalid backend redis address format:" + server)
+			return errors.New("invalid backend redis address format:" + server + ", weight invalid")
 		}
+	}
+	if useAlisaCnt > 0 && noAlisaCnt > 0 {
+		return errors.New("some backend servers has alisa while others not")
 	}
 	return nil
 }
@@ -101,6 +111,9 @@ func ValidateStandalone(servers []string) error {
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
+	if cc.CacheType != types.CacheTypeRedisCluster {
+		return ValidateStandalone(cc.Servers)
+	}
 	return nil
 }
 

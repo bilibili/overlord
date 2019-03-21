@@ -3,6 +3,7 @@ package proxy
 import (
 	errs "errors"
 	"net"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -153,7 +154,13 @@ func (p *Proxy) monitorConfChange() {
 		return
 	}
 	defer watch.Close()
-	err = watch.Add(p.ClusterConfFile)
+	var absPath = ""
+	absPath, err = filepath.Abs(filepath.Dir(p.ClusterConfFile))
+	if err != nil {
+		log.Errorf("failed to get abs path of file:%s, get error:%s\n", p.ClusterConfFile, err.Error())
+	}
+
+	err = watch.Add(absPath)
 	if err != nil {
 		log.Errorf("failed to monitor content change of file:%s with error:%s\n", p.ClusterConfFile, err.Error())
 		return
@@ -166,29 +173,23 @@ func (p *Proxy) monitorConfChange() {
 		select {
 		case ev := <-watch.Events:
 			{
-				//判断事件发生的类型，如下5种
-				// Create 创建
-				// Write 写入
-				// Remove 删除
-				// Rename 重命名
-				// Chmod 修改权限
 				if ev.Op&fsnotify.Create == fsnotify.Create {
-					log.Infof("find new create file:%s\n", ev.Name)
+					log.Infof("find new created file:%s\n", ev.Name)
 					p.handleConfigChange()
 				}
 				if ev.Op&fsnotify.Write == fsnotify.Write {
-					log.Infof("find conf file:%s updated\n", ev.Name)
+					log.Infof("find content of file:%s updated\n", ev.Name)
 					p.handleConfigChange()
 				}
 				if ev.Op&fsnotify.Remove == fsnotify.Remove {
-					log.Infof("find conf file:%s removed", ev.Name)
+					log.Infof("find file:%s removed", ev.Name)
 				}
 				if ev.Op&fsnotify.Rename == fsnotify.Rename {
-					log.Infof("find conf file:%s\n renamed", ev.Name)
+					log.Infof("find file:%s renamed", ev.Name)
 					p.handleConfigChange()
 				}
 				if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
-					log.Infof("find mod of conf file:%s\n changed", ev.Name)
+					log.Infof("find mod of conf file:%s changed", ev.Name)
 				}
 			}
 		case err := <-watch.Errors:
@@ -211,25 +212,25 @@ func (p *Proxy) handleConfigChange() {
 	changedConf = p.parseChanged(newConfs, p.ccs)
 
 	for _, conf := range changedConf {
-		p.updateConfig(conf)
+		var err = p.updateConfig(conf)
+		if err == nil {
+			atomic.AddInt32(&ClusterChangeCount, 1)
+		}
 		log.Infof("update conf of cluster:%s\n", conf.Name)
-	}
-	if len(changedConf) > 0 {
-		atomic.AddInt32(&ClusterChangeCount, 1)
 	}
 }
 
-func (p *Proxy) updateConfig(conf *ClusterConfig) {
+func (p *Proxy) updateConfig(conf *ClusterConfig) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	var f, ok = p.forwarders[conf.Name]
 	if !ok {
-		return
+		return errors.New("Forwarder:" + conf.Name + " is not found when update cluster config")
 	}
 	var err = f.Update(conf.Servers)
 	if err != nil {
 		log.Errorf("failed to update conf of cluster:%s with error:%s\n", conf.Name, err.Error())
-		return
+		return err
 	}
 	for index, oldConf := range p.ccs {
 		if oldConf.Name != conf.Name {
@@ -237,7 +238,7 @@ func (p *Proxy) updateConfig(conf *ClusterConfig) {
 		}
 		p.ccs[index].Servers = conf.Servers
 	}
-
+	return nil
 }
 
 func (p *Proxy) supportChange(conf *ClusterConfig) bool {
