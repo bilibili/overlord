@@ -89,6 +89,7 @@ func (h *Handler) handle() {
 	for {
 		// 1. read until limit or error
 		if msgs, err = h.pc.Decode(messages); err != nil {
+			log.Errorf("failed to decode msg, close conn, got error:%s\n", err.Error())
 			h.deferHandle(messages, err)
 			return
 		}
@@ -100,6 +101,7 @@ func (h *Handler) handle() {
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)
+				log.Errorf("failed to encode msg, close conn, got error:%s\n", err.Error())
 				return
 			}
 			msg.MarkEnd()
@@ -110,6 +112,7 @@ func (h *Handler) handle() {
 		}
 		if err = h.pc.Flush(); err != nil {
 			h.deferHandle(messages, err)
+			log.Errorf("failed to flush msg, close conn, got error:%s\n", err.Error())
 			return
 		}
 		// 4. release resource

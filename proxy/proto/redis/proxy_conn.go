@@ -11,6 +11,7 @@ import (
 	"overlord/proxy/proto"
 
 	"github.com/pkg/errors"
+	"overlord/pkg/log"
 )
 
 var (
@@ -168,6 +169,7 @@ func nextReq(m *proto.Message) *Request {
 
 func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if err = m.Err(); err != nil {
+		log.Errorf("err in msg is not nil, error:%s\n", err.Error())
 		se := errors.Cause(err).Error()
 		pc.bw.Write(respErrorBytes)
 		pc.bw.Write([]byte(se))
@@ -205,6 +207,7 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 		err = req.reply.encode(pc.bw)
 	}
 	if err != nil {
+		log.Errorf("failed to encode, request type:%d\n", int(req.mType))
 		err = errors.WithStack(err)
 	}
 	return
