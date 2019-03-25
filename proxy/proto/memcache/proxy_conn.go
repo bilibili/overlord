@@ -93,7 +93,7 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		if err == nil {
 			log.Infof("cmd full parsed: %v", *m.Request().(*MCRequest))
 		}
-
+		return err
 	case "add":
 		return p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
 	case "replace":
