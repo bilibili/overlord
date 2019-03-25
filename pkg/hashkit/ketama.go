@@ -142,8 +142,8 @@ func (h *HashRing) AddNode(node string, spot int) {
 		tmpNode = append(tmpNode, node)
 		tmpSpot = append(tmpSpot, spot)
 		log.Infof("add node %s spot %d", node, spot)
-		h.init(tmpNode, tmpSpot)
 	}
+	h.init(tmpNode, tmpSpot)
 }
 
 // DelNode delete a node from the hash ring.

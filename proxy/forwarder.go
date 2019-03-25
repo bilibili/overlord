@@ -391,7 +391,6 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		if alias {
 			ss = strings.Split(svr, " ")
 			if len(ss) != 2 {
-				log.Errorf("use alias but not len is not 2 svr:%s\n", svr)
 				err = ErrConfigServerFormat
 				return
 			}
@@ -402,14 +401,12 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		}
 		ss = strings.Split(addrW, ":")
 		if len(ss) != 3 {
-			log.Errorf("use addr not 3 addr:%s\n", svr)
 			err = ErrConfigServerFormat
 			return
 		}
 		addrs = append(addrs, net.JoinHostPort(ss[0], ss[1]))
 		w, we := conv.Btoi([]byte(ss[2]))
 		if we != nil || w <= 0 {
-			log.Errorf("use wait not < 0 addr:%s\n", svr)
 			err = ErrConfigServerFormat
 			return
 		}

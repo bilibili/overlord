@@ -158,11 +158,12 @@ func (p *Proxy) monitorConfChange() {
 	absPath, err = filepath.Abs(filepath.Dir(p.ClusterConfFile))
 	if err != nil {
 		log.Errorf("failed to get abs path of file:%s, get error:%s\n", p.ClusterConfFile, err.Error())
+		return
 	}
 
 	err = watch.Add(absPath)
 	if err != nil {
-		log.Errorf("failed to monitor content change of file:%s with error:%s\n", p.ClusterConfFile, err.Error())
+		log.Errorf("failed to monitor content change of dir:%s with error:%s\n", absPath, err.Error())
 		return
 	}
 	for {
@@ -194,7 +195,7 @@ func (p *Proxy) monitorConfChange() {
 			}
 		case err := <-watch.Errors:
 			{
-				log.Errorf("watch config file:%s get error:%s\n", p.ClusterConfFile, err.Error())
+				log.Errorf("watch dir:%s get error:%s\n", absPath, err.Error())
 				return
 			}
 		}

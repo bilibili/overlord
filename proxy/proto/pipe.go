@@ -10,7 +10,6 @@ import (
 	perr "github.com/pkg/errors"
 
 	"overlord/pkg/hashkit"
-	"overlord/pkg/log"
 )
 
 const (
@@ -152,7 +151,6 @@ func (mp *msgPipe) pipe() {
 			err = nc.Write(m)
 			m = nil
 			if err != nil {
-				log.Errorf("failed to write request, got error:%s\n", err.Error())
 				goto MEND
 			}
 			if mp.count >= pipeMaxCount {
@@ -161,7 +159,6 @@ func (mp *msgPipe) pipe() {
 		}
 		if err == nil && mp.count > 0 {
 			if err = nc.Flush(); err != nil {
-				log.Errorf("failed to flush request, got error:%s\n", err.Error())
 				goto MEND
 			}
 			for i := 0; i < mp.count; i++ {
@@ -169,7 +166,6 @@ func (mp *msgPipe) pipe() {
 					err = nc.Read(mp.batch[i])
 					mp.batch[i].MarkRead()
 				} else {
-					log.Errorf("failed to read request, got error:%s\n", err.Error())
 					goto MEND
 				}
 			}
@@ -194,7 +190,6 @@ func (mp *msgPipe) pipe() {
 		}
 		m, ok = <-mp.input // NOTE: avoid infinite loop
 		if !ok {
-			log.Errorf("failed to read from mp.input, return\n")
 			nc.Close()
 			return
 		}
