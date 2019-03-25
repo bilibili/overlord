@@ -2,6 +2,7 @@ package memcache
 
 import (
 	"bytes"
+	"strconv"
 
 	"overlord/pkg/bufio"
 	"overlord/pkg/conv"
@@ -10,6 +11,7 @@ import (
 	"overlord/proxy/proto"
 
 	"github.com/pkg/errors"
+	"overlord/pkg/log"
 )
 
 // memcached protocol: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
@@ -84,6 +86,9 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	switch string(line[bg:ed]) {
 	// Storage commands:
 	case "set":
+		if bytes.Contains(line, []byte("live_app_room_skin_info")) {
+			log.Infof("cmd line :%s ", strconv.Quote(string(line)))
+		}
 		return p.decodeStorage(m, line[ed:], RequestTypeSet, false)
 	case "add":
 		return p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
