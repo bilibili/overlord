@@ -128,6 +128,20 @@ func (f defaultForwarder) Forward(msgs []*proto.Message) error {
 				ncp.Push(subm)
 			}
 		} else {
+			if m == nil {
+				log.Infof("message is nil for %v", m)
+			}
+
+			req := m.Request()
+			if req == nil {
+				log.Infof("request is nil in %v", m)
+			}
+
+			key := req.Key()
+			if key == nil {
+				log.Infof("key is nil in %v", req)
+			}
+
 			ncp, ok := f.getPipes(m.Request().Key())
 			if !ok {
 				m.WithError(ErrForwarderHashNoNode)
