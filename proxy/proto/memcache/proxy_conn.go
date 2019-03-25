@@ -126,6 +126,7 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	case "gats":
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	}
+	log.Infof("bad protocol as %s", strconv.Quote(string(line)))
 	err = errors.WithStack(ErrBadRequest)
 	return
 }
