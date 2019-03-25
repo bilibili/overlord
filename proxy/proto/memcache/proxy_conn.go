@@ -89,7 +89,11 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		if bytes.Contains(line, []byte("live_app_room_skin_info")) {
 			log.Infof("cmd line :%s ", strconv.Quote(string(line)))
 		}
-		return p.decodeStorage(m, line[ed:], RequestTypeSet, false)
+		err = p.decodeStorage(m, line[ed:], RequestTypeSet, false)
+		if err == nil {
+			log.Infof("cmd full parsed: %v", *m.Request().(*MCRequest))
+		}
+
 	case "add":
 		return p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
 	case "replace":
