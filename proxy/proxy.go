@@ -160,7 +160,6 @@ func (p *Proxy) monitorConfChange() {
 		log.Errorf("failed to get abs path of file:%s, get error:%s\n", p.ClusterConfFile, err.Error())
 		return
 	}
-
 	err = watch.Add(absPath)
 	if err != nil {
 		log.Errorf("failed to monitor content change of dir:%s with error:%s\n", absPath, err.Error())
@@ -209,12 +208,9 @@ func (p *Proxy) handleConfigChange() {
 		atomic.AddInt32(&LoadFailCnt, 1)
 		return
 	}
-	var changedConf []*ClusterConfig
-	changedConf = p.parseChanged(newConfs, p.ccs)
-
+	var changedConf = p.parseChanged(newConfs, p.ccs)
 	for _, conf := range changedConf {
-		var err = p.updateConfig(conf)
-		if err == nil {
+		if p.updateConfig(conf) == nil {
 			atomic.AddInt32(&ClusterChangeCount, 1)
 		}
 		log.Infof("update conf of cluster:%s\n", conf.Name)
@@ -255,30 +251,20 @@ func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) []*ClusterConf
 		if !p.supportChange(newConf) {
 			continue
 		}
-		var find = false
-		var diff = false
-		for _, conf := range oldConfs {
-			if newConf.Name != conf.Name {
+		for _, oldConf := range oldConfs {
+			if newConf.Name != oldConf.Name {
 				continue
 			}
-			if !p.supportChange(conf) {
-				find = false
-				break
+			if hasDiff(oldConf, newConf) {
+				changed = append(changed, newConf)
 			}
-			find = true
-			diff = compareConf(conf, newConf)
 			break
 		}
-		if !find || !diff {
-			continue
-		}
-		changed = append(changed, newConf)
-		continue
 	}
 	return changed
 }
 
-func compareConf(oldConf, newConf *ClusterConfig) bool {
+func hasDiff(oldConf, newConf *ClusterConfig) bool {
 	if len(oldConf.Servers) != len(newConf.Servers) {
 		return true
 	}
@@ -288,8 +274,5 @@ func compareConf(oldConf, newConf *ClusterConfig) bool {
 	sort.Strings(server2)
 	var str1 = strings.Join(server1, "_")
 	var str2 = strings.Join(server2, "_")
-	if str1 != str2 {
-		return true
-	}
-	return false
+	return (str1 != str2)
 }
