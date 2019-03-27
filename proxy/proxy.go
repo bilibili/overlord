@@ -233,7 +233,8 @@ func (p *Proxy) updateConfig(conf *ClusterConfig) error {
 		if oldConf.Name != conf.Name {
 			continue
 		}
-		p.ccs[index].Servers = conf.Servers
+		p.ccs[index].Servers = make([]string, len(conf.Servers), cap(conf.Servers))
+		copy(p.ccs[index].Servers, conf.Servers)
 	}
 	return nil
 }
