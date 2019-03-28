@@ -17,6 +17,7 @@ import (
 
 	"github.com/bouk/monkey"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -562,6 +563,9 @@ func TestEject(t *testing.T) {
 
 	eject := ccs[0]
 	fer := p.forwarders["eject-cluster"].(*defaultForwarder)
+	conns, ok := fer.conns.Load().(*Connections)
+	require.True(t, ok)
+
 	mp := &mockPing{}
 
 	monkey.Patch(newPingConn, func(cc *ClusterConfig, addr string) proto.Pinger {
@@ -569,8 +573,8 @@ func TestEject(t *testing.T) {
 	})
 
 	ping := &pinger{cc: eject, addr: "test-addr", alias: "mc1", weight: 10}
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	go fer.processPing(ctx, ping)
+	// ctx, cancelCtx := context.WithCancel(context.Background())
+	go fer.processPing(conns, ping)
 
 	for _, tt := range ts {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:22211", time.Second)
@@ -607,7 +611,7 @@ func TestEject(t *testing.T) {
 			}
 		})
 	}
-	cancelCtx()
+	conns.cancel()
 }
 
 type mockPing struct {

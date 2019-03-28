@@ -222,7 +222,7 @@ func (p *Proxy) updateConfig(conf *ClusterConfig) error {
 	defer p.lock.Unlock()
 	var f, ok = p.forwarders[conf.Name]
 	if !ok {
-		return errors.New("Forwarder:" + conf.Name + " is not found when update cluster config")
+		return errs.New("Forwarder:" + conf.Name + " is not found when update cluster config")
 	}
 	var err = f.Update(conf.Servers)
 	if err != nil {
@@ -239,17 +239,10 @@ func (p *Proxy) updateConfig(conf *ClusterConfig) error {
 	return nil
 }
 
-func (p *Proxy) supportChange(conf *ClusterConfig) bool {
-	if conf.CacheType == types.CacheTypeRedisCluster {
-		return false
-	}
-	return true
-}
-
 func (p *Proxy) parseChanged(newConfs, oldConfs []*ClusterConfig) []*ClusterConfig {
 	var changed = make([]*ClusterConfig, 0, len(oldConfs))
 	for _, newConf := range newConfs {
-		if !p.supportChange(newConf) {
+		if newConf.CacheType == types.CacheTypeRedisCluster {
 			continue
 		}
 		for _, oldConf := range oldConfs {

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	errs "errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -75,35 +76,34 @@ type ClusterConfig struct {
 // ValidateStandalone validate redis/memcache address is valid or not
 func ValidateStandalone(servers []string) error {
 	if len(servers) == 0 {
-		return errors.New("empty backend server list")
+		return errs.New("empty backend server list")
 	}
-	var useAlisaCnt = 0
-	var noAlisaCnt = 0
+	var useAliasCnt, noAliasCnt int
 	for _, server := range servers {
-		var ipAlise = strings.Split(server, " ")
-		if len(ipAlise) != 1 && len(ipAlise) != 2 {
-			return errors.New("invalid backend address format:" + server)
+		var ipAlias = strings.Split(server, " ")
+		if len(ipAlias) != 1 && len(ipAlias) != 2 {
+			return errs.New("invalid backend address format:" + server)
 		}
-		if len(ipAlise) == 1 {
-			noAlisaCnt++
+		if len(ipAlias) == 1 {
+			noAliasCnt++
 		} else {
-			useAlisaCnt++
+			useAliasCnt++
 		}
-		var ipPort = strings.Split(ipAlise[0], ":")
+		ipPort := strings.Split(ipAlias[0], ":")
 		if len(ipPort) != 3 {
-			return errors.New("invalid backend redis address format:" + server + ", no weight")
+			return errs.New("invalid backend redis address format:" + server + ", no weight")
 		}
-		var intPort, err1 = strconv.Atoi(ipPort[1])
+		intPort, err1 := strconv.Atoi(ipPort[1])
 		if err1 != nil || intPort <= 0 {
-			return errors.New("invalid backend redis address format:" + server + ", port invalid")
+			return errs.New("invalid backend redis address format:" + server + ", port invalid")
 		}
-		var weight, err2 = strconv.Atoi(ipPort[2])
+		weight, err2 := strconv.Atoi(ipPort[2])
 		if err2 != nil || weight < 0 {
-			return errors.New("invalid backend redis address format:" + server + ", weight invalid")
+			return errs.New("invalid backend redis address format:" + server + ", weight invalid")
 		}
 	}
-	if useAlisaCnt > 0 && noAlisaCnt > 0 {
-		return errors.New("some backend servers has alisa while others not")
+	if useAliasCnt > 0 && noAliasCnt > 0 {
+		return errs.New("some backend servers has alias while others not")
 	}
 	return nil
 }
@@ -195,18 +195,18 @@ func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
 	}
 	for _, cc := range cs.Clusters {
 		if _, ok := checks[cc.Name]; ok {
-			err = errors.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
+			err = errs.New("duplicate cluster name:" + cc.Name + " in cluster conf file.")
 			return
 		}
 		checks[cc.Name] = struct{}{}
 		var ipPort = strings.Split(cc.ListenAddr, ":")
 		if len(ipPort) != 2 {
-			err = errors.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
+			err = errs.New("invalid listen address:" + cc.ListenAddr + " in cluster conf file.")
 			return
 		}
 		var port = ipPort[1]
 		if _, ok := checks[port]; ok {
-			err = errors.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
+			err = errs.New("duplicate listen address:" + cc.ListenAddr + " in cluster conf file.")
 			return
 		}
 

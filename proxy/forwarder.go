@@ -62,29 +62,34 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 
 type Connections struct {
 	// recording alias to real node
-	alias      bool
-	aliasMap   map[string]string
-	nodePipe   map[string]*proto.NodeConnPipe
-	ctx        context.Context
-	cancelPing context.CancelFunc
+	alias    bool
+	aliasMap map[string]string
+	nodePipe map[string]*proto.NodeConnPipe
+	ctx      context.Context
+	cancel   context.CancelFunc
+	ring     *hashkit.HashRing
 }
 
-func newConnections() *Connections {
+func newConnections(cc *ClusterConfig) *Connections {
 	var conn = &Connections{}
 	conn.aliasMap = make(map[string]string)
 	conn.nodePipe = make(map[string]*proto.NodeConnPipe)
-	conn.ctx, conn.cancelPing = context.WithCancel(context.Background())
+	conn.ctx, conn.cancel = context.WithCancel(context.Background())
+	conn.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
 	return conn
 }
 
-func (c *Connections) init(cc *ClusterConfig, addrs, ans []string, hasAlias bool,
+func (c *Connections) init(cc *ClusterConfig, addrs []string, ws []int, ans []string, hasAlias bool,
 	conns map[string]*proto.NodeConnPipe) map[string]bool {
 	c.alias = hasAlias
-	var copyed = make(map[string]bool)
+	copyed := make(map[string]bool)
 	if hasAlias {
 		for idx, aname := range ans {
 			c.aliasMap[aname] = addrs[idx]
 		}
+		c.ring.Init(ans, ws)
+	} else {
+		c.ring.Init(addrs, ws)
 	}
 	// start nbc
 	for _, addr := range addrs {
@@ -104,13 +109,10 @@ func (c *Connections) init(cc *ClusterConfig, addrs, ans []string, hasAlias bool
 
 // defaultForwarder implement the default hashring router and msgbatch.
 type defaultForwarder struct {
-	cc *ClusterConfig
-
-	ring    *hashkit.HashRing
+	cc      *ClusterConfig
 	hashTag []byte
-
-	conns atomic.Value
-	state int32
+	conns   atomic.Value
+	state   int32
 }
 
 // newDefaultForwarder must combinf.
@@ -121,17 +123,11 @@ func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	if err != nil {
 		panic(err)
 	}
-	var conns = newConnections()
-	conns.init(cc, addrs, ans, alias, make(map[string]*proto.NodeConnPipe))
+	var conns = newConnections(cc)
+	conns.init(cc, addrs, ws, ans, alias, make(map[string]*proto.NodeConnPipe))
 	f.hashTag = []byte(cc.HashTag)
-	f.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
 	f.conns.Store(conns)
-	if alias {
-		f.ring.Init(ans, ws)
-	} else {
-		f.ring.Init(addrs, ws)
-	}
-	f.startPinger(conns.ctx, addrs, ans, ws, alias)
+	f.startPinger(conns, addrs, ans, ws, alias)
 	return f
 }
 
@@ -140,10 +136,15 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 	if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
 		return ErrForwarderClosed
 	}
+	conns, ok := f.conns.Load().(*Connections)
+	if !ok {
+		return ErrConnectionNotExist
+	}
+
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
-				ncp, ok := f.getPipes(subm.Request().Key())
+				ncp, ok := conns.getPipes(f, subm.Request().Key())
 				if !ok {
 					m.WithError(ErrForwarderHashNoNode)
 					return errors.WithStack(ErrForwarderHashNoNode)
@@ -151,7 +152,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 				ncp.Push(subm)
 			}
 		} else {
-			ncp, ok := f.getPipes(m.Request().Key())
+			ncp, ok := conns.getPipes(f, m.Request().Key())
 			if !ok {
 				m.WithError(ErrForwarderHashNoNode)
 				return errors.WithStack(ErrForwarderHashNoNode)
@@ -161,7 +162,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 	}
 	return nil
 }
-func (f *defaultForwarder) startPinger(ctx context.Context, addrs, ans []string, ws []int, useAlias bool) {
+func (f *defaultForwarder) startPinger(conns *Connections, addrs, ans []string, ws []int, useAlias bool) {
 	if !f.cc.PingAutoEject {
 		return
 	}
@@ -170,7 +171,7 @@ func (f *defaultForwarder) startPinger(ctx context.Context, addrs, ans []string,
 		if useAlias {
 			p.alias = ans[idx]
 		}
-		go f.processPing(ctx, p)
+		go f.processPing(conns, p)
 	}
 }
 
@@ -179,19 +180,14 @@ func (f *defaultForwarder) Update(servers []string) error {
 	if err != nil {
 		return err
 	}
-	var oldConns, ok = f.conns.Load().(*Connections)
+	oldConns, ok := f.conns.Load().(*Connections)
 	if !ok {
 		return errors.WithStack(ErrConnectionNotExist)
 	}
-	oldConns.cancelPing()
-	var newConns = newConnections()
-	var copyed = newConns.init(f.cc, addrs, ans, alias, oldConns.nodePipe)
+	oldConns.cancel()
+	newConns := newConnections(f.cc)
+	copyed := newConns.init(f.cc, addrs, ws, ans, alias, oldConns.nodePipe)
 	f.conns.Store(newConns)
-	if alias {
-		f.ring.Replace(ans, ws)
-	} else {
-		f.ring.Replace(addrs, ws)
-	}
 	for addr, conn := range oldConns.nodePipe {
 		if copyed[addr] {
 			continue
@@ -199,7 +195,7 @@ func (f *defaultForwarder) Update(servers []string) error {
 		log.Infof("connection to node:%s is not used anymore, just close it\n", addr)
 		conn.Close()
 	}
-	f.startPinger(newConns.ctx, addrs, ans, ws, alias)
+	f.startPinger(newConns, addrs, ans, ws, alias)
 	return nil
 }
 
@@ -220,23 +216,17 @@ func (f *defaultForwarder) Close() error {
 	return nil
 }
 
-func (f *defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
+func (c *Connections) getPipes(f *defaultForwarder, key []byte) (ncp *proto.NodeConnPipe, ok bool) {
 	var addr string
-	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
+	if addr, ok = c.ring.GetNode(f.trimHashTag(key)); !ok {
 		return
 	}
-	var conns *Connections
-	conns, ok = f.conns.Load().(*Connections)
-	if !ok {
-		log.Errorf("failed to load connections\n")
-		return
-	}
-	if conns.alias {
-		if addr, ok = conns.aliasMap[addr]; !ok {
+	if c.alias {
+		if addr, ok = c.aliasMap[addr]; !ok {
 			return
 		}
 	}
-	ncp, ok = conns.nodePipe[addr]
+	ncp, ok = c.nodePipe[addr]
 	return
 }
 
@@ -263,7 +253,7 @@ var PingSleepTime = func(t bool) time.Duration {
 	return time.Second
 }
 
-func (f *defaultForwarder) processPing(ctx context.Context, p *pinger) {
+func (f *defaultForwarder) processPing(conns *Connections, p *pinger) {
 	var (
 		err error
 		del bool
@@ -271,7 +261,7 @@ func (f *defaultForwarder) processPing(ctx context.Context, p *pinger) {
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
 		select {
-		case <-ctx.Done():
+		case <-conns.ctx.Done():
 			_ = p.ping.Close()
 			log.Infof("node pinger is closed, return directly\n")
 			return
@@ -285,7 +275,7 @@ func (f *defaultForwarder) processPing(ctx context.Context, p *pinger) {
 				p.failure = 0
 				if del {
 					del = false
-					f.ring.AddNode(p.alias, p.weight)
+					conns.ring.AddNode(p.alias, p.weight)
 					if log.V(4) {
 						log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
 					}
@@ -309,7 +299,7 @@ func (f *defaultForwarder) processPing(ctx context.Context, p *pinger) {
 				continue
 			}
 			if !del {
-				f.ring.DelNode(p.alias)
+				conns.ring.DelNode(p.alias)
 				if prom.On {
 					prom.ErrIncr(f.cc.Name, p.addr, "ping", "del node")
 				}

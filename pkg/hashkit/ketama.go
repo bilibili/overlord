@@ -60,10 +60,6 @@ func (h *HashRing) Init(nodes []string, spots []int) {
 	h.lock.Unlock()
 }
 
-func (h *HashRing) Replace(nodes []string, spots []int) {
-	h.Init(nodes, spots)
-}
-
 // Init init hash ring with nodes.
 func (h *HashRing) init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
