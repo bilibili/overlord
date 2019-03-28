@@ -184,10 +184,10 @@ func (f *defaultForwarder) Update(servers []string) error {
 	if !ok {
 		return errors.WithStack(ErrConnectionNotExist)
 	}
-	oldConns.cancel()
 	newConns := newConnections(f.cc)
 	copyed := newConns.init(f.cc, addrs, ws, ans, alias, oldConns.nodePipe)
 	f.conns.Store(newConns)
+	oldConns.cancel()
 	for addr, conn := range oldConns.nodePipe {
 		if copyed[addr] {
 			continue
