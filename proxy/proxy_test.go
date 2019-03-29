@@ -557,13 +557,13 @@ func TestEject(t *testing.T) {
 		{Name: "MultiCmdGetOk", Line: 6, Cmd: "gets a_11\r\ngets a_11\r\n", Except: []string{"VALUE a_11 0 1", "\r\n1\r\n", "END\r\n"}},
 	}
 
-	PingSleepTime = func(t bool) time.Duration {
+	pingSleepTime = func(t bool) time.Duration {
 		return 100 * time.Millisecond // NOTE: make sure test sleep duration more than ping duration
 	}
 
 	eject := ccs[0]
 	fer := p.forwarders["eject-cluster"].(*defaultForwarder)
-	conns, ok := fer.conns.Load().(*Connections)
+	conns, ok := fer.conns.Load().(*connections)
 	require.True(t, ok)
 
 	mp := &mockPing{}
@@ -574,7 +574,7 @@ func TestEject(t *testing.T) {
 
 	ping := &pinger{cc: eject, addr: "test-addr", alias: "mc1", weight: 10}
 	// ctx, cancelCtx := context.WithCancel(context.Background())
-	go fer.processPing(conns, ping)
+	go conns.processPing(ping)
 
 	for _, tt := range ts {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:22211", time.Second)

@@ -17,7 +17,7 @@ import (
 
 const (
 	// VERSION version
-	VERSION = "1.6.0"
+	VERSION = "1.7.0"
 )
 
 var (
@@ -27,6 +27,7 @@ var (
 	metrics         bool
 	confFile        string
 	clusterConfFile string
+	reload          bool
 )
 
 type clustersFlag []string
@@ -53,6 +54,7 @@ func init() {
 	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
 	flag.StringVar(&confFile, "conf", "", "conf file of proxy itself.")
 	flag.StringVar(&clusterConfFile, "cluster", "", "conf file of backend cluster.")
+	flag.BoolVar(&reload, "reload", false, "reloading the servers in cluster config file.")
 }
 
 func main() {
@@ -74,9 +76,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	p.ClusterConfFile = clusterConfFile
 	defer p.Close()
 	p.Serve(ccs)
+	if reload {
+		p.MonitorConfChange(clusterConfFile)
+	}
 	// pprof
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)

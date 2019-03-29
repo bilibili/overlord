@@ -54,6 +54,7 @@ func newRingWithHash(hash func([]byte) uint) (h *HashRing) {
 	return
 }
 
+// Init init ring.
 func (h *HashRing) Init(nodes []string, spots []int) {
 	h.lock.Lock()
 	h.init(nodes, spots)
@@ -65,10 +66,8 @@ func (h *HashRing) init(nodes []string, spots []int) {
 	if len(nodes) != len(spots) {
 		panic("nodes length not equal spots length")
 	}
-	// h.lock.Lock()
 	h.nodes = nodes
 	h.spots = spots
-	// h.lock.Unlock()
 	var (
 		ticks          []nodeHash
 		svrn           = len(nodes)
