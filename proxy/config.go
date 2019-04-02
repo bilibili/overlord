@@ -62,21 +62,22 @@ func (c *Config) Validate() error {
 
 // ClusterConfig cluster config.
 type ClusterConfig struct {
-	Name             string
-	HashMethod       string          `toml:"hash_method"`
-	HashDistribution string          `toml:"hash_distribution"`
-	HashTag          string          `toml:"hash_tag"`
-	CacheType        types.CacheType `toml:"cache_type"`
-	ListenProto      string          `toml:"listen_proto"`
-	ListenAddr       string          `toml:"listen_addr"`
-	RedisAuth        string          `toml:"redis_auth"`
-	DialTimeout      int             `toml:"dial_timeout"`
-	ReadTimeout      int             `toml:"read_timeout"`
-	WriteTimeout     int             `toml:"write_timeout"`
-	NodeConnections  int32           `toml:"node_connections"`
-	PingFailLimit    int             `toml:"ping_fail_limit"`
-	PingAutoEject    bool            `toml:"ping_auto_eject"`
-	Servers          []string        `toml:"servers"`
+	Name              string
+	HashMethod        string          `toml:"hash_method"`
+	HashDistribution  string          `toml:"hash_distribution"`
+	HashTag           string          `toml:"hash_tag"`
+	CacheType         types.CacheType `toml:"cache_type"`
+	ListenProto       string          `toml:"listen_proto"`
+	ListenAddr        string          `toml:"listen_addr"`
+	RedisAuth         string          `toml:"redis_auth"`
+	DialTimeout       int             `toml:"dial_timeout"`
+	ReadTimeout       int             `toml:"read_timeout"`
+	WriteTimeout      int             `toml:"write_timeout"`
+	NodeConnections   int32           `toml:"node_connections"`
+	PingFailLimit     int             `toml:"ping_fail_limit"`
+	PingAutoEject     bool            `toml:"ping_auto_eject"`
+	SlowlogSlowerThan int             `toml:"slowlog_slower_than"`
+	Servers           []string        `toml:"servers"`
 }
 
 // ValidateStandalone validate redis/memcache address is valid or not

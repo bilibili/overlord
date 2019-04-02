@@ -255,7 +255,19 @@ func minInt(a, b int) int {
 	return a
 }
 
-// Slowlog impl Slowloger
-func (m *Message) Slowlog() *SlowlogEntry {
-	return nil
+// Slowlog impl Slowlogger
+func (m *Message) Slowlog() (slog *SlowlogEntry) {
+	if m.IsBatch() {
+		slog = NewSlowlogEntry(m.Type)
+		slog.Subs = make([]*SlowlogEntry, m.reqn)
+		for i, req := range m.Requests() {
+			slog.Subs[i] = req.Slowlog()
+		}
+	} else {
+		slog = m.Request().Slowlog()
+		slog.StartTime = m.st
+		slog.TotalDur = m.TotalDur()
+		slog.RemoteDur = m.RemoteDur()
+	}
+	return
 }

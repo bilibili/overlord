@@ -95,6 +95,8 @@ node_connections = 2
 ping_fail_limit = 3
 # A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.
 ping_auto_eject = false
+
+slowlog_slower_than = 10
 # A list of server address, port (name:port or ip:port) for this server pool when cache type is redis_cluster.
 servers = [
     "127.0.0.1:7000",

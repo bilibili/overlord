@@ -16,6 +16,7 @@ import (
 	mcbin "overlord/proxy/proto/memcache/binary"
 	"overlord/proxy/proto/redis"
 	rclstr "overlord/proxy/proto/redis/cluster"
+	"overlord/proxy/slowlog"
 
 	"github.com/pkg/errors"
 )
@@ -37,6 +38,9 @@ type Handler struct {
 	p  *Proxy
 	cc *ClusterConfig
 
+	slog       slowlog.Handler
+	slowerThan time.Duration
+
 	forwarder proto.Forwarder
 
 	conn *libnet.Conn
@@ -52,6 +56,11 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forwarder proto.Forw
 		p:         p,
 		cc:        cc,
 		forwarder: forwarder,
+	}
+
+	if cc.SlowlogSlowerThan != 0 {
+		h.slowerThan = time.Duration(cc.SlowlogSlowerThan) * time.Microsecond
+		h.slog = slowlog.Get(cc.Name)
 	}
 
 	h.conn = libnet.NewConn(conn, time.Second*time.Duration(h.p.c.Proxy.ReadTimeout), time.Second*time.Duration(h.p.c.Proxy.WriteTimeout))
@@ -112,7 +121,14 @@ func (h *Handler) handle() {
 			h.deferHandle(messages, err)
 			return
 		}
-		// 4. release resource
+
+		if h.slowerThan != 0 {
+			for _, msg := range msgs {
+				h.slog.Record(msg.Slowlog())
+			}
+		}
+
+		// 4. check slowlog before release resource
 		for _, msg := range msgs {
 			msg.Reset()
 		}

@@ -3,6 +3,8 @@ package slowlog
 import (
 	"overlord/proxy/proto"
 	"sync/atomic"
+	"sync"
+	"fmt"
 )
 
 const slowlogMaxCount = 1024
@@ -10,7 +12,6 @@ const slowlogMaxCount = 1024
 func newStore(name string) *Store {
 	return &Store{
 		name:   name,
-		count:  0,
 		cursor: 0,
 		msgs:   make([]atomic.Value, slowlogMaxCount),
 	}
@@ -19,21 +20,22 @@ func newStore(name string) *Store {
 // Store is the collector of slowlog
 type Store struct {
 	name   string
-	count  int32
 	cursor int32
 	msgs   []atomic.Value
 }
 
 // Record impl the Handler
-func (s *Store) Record(msg *proto.Message) {
+func (s *Store) Record(msg *proto.SlowlogEntry) {
 	if msg == nil {
 		return
 	}
 
 	for {
 		if atomic.CompareAndSwapInt32(&s.cursor, s.cursor, s.cursor+1) {
-			idx := s.cursor % s.count
+			idx := s.cursor % slowlogMaxCount
 			s.msgs[idx].Store(msg)
+			fmt.Println(msg.String())
+			break
 		}
 	}
 }
@@ -46,8 +48,8 @@ func (s *Store) Reply() *proto.SlowlogEntries {
 		if m == nil {
 			break
 		}
-		protoMsg := m.(*proto.Message)
-		entries = append(entries, protoMsg.Slowlog())
+		sentry := m.(*proto.SlowlogEntry)
+		entries = append(entries, sentry)
 	}
 
 	ses := &proto.SlowlogEntries{
@@ -57,30 +59,39 @@ func (s *Store) Reply() *proto.SlowlogEntries {
 	return ses
 }
 
-var storeMap = map[string]*Store{}
+var (
+	storeMap  = map[string]*Store{}
+	storeLock sync.RWMutex
+)
 
 // Handler is the handler which contains the store instance with async call
 type Handler interface {
-	Record(msg *proto.Message)
+	Record(msg *proto.SlowlogEntry)
 	Reply() *proto.SlowlogEntries
 }
 
-// New create the message Handler or get the exists one
-func New(name string) Handler {
+// Get create the message Handler or get the exists one
+func Get(name string) Handler {
+	storeLock.RLock()
 	if s, ok := storeMap[name]; ok {
-		return &storeHandler{store: s}
+		handler := &storeHandler{store: s}
+		storeLock.RUnlock()
+		return handler
 	}
+	storeLock.RUnlock()
 
+	storeLock.Lock()
+	defer storeLock.Unlock()
 	s := newStore(name)
 	storeMap[name] = s
-	return New(name)
+	return &storeHandler{store: s}
 }
 
 type storeHandler struct {
 	store *Store
 }
 
-func (sr *storeHandler) Record(msg *proto.Message) {
+func (sr *storeHandler) Record(msg *proto.SlowlogEntry) {
 	sr.store.Record(msg)
 }
 
