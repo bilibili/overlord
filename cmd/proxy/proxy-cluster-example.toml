@@ -27,6 +27,7 @@ node_connections = 2
 ping_fail_limit = 3
 # A boolean value that controls if server should be ejected temporarily when it fails consecutively ping_fail_limit times.
 ping_auto_eject = true
+slowlog_slower_than = 10
 # A list of server address, port and weight (name:port:weight or ip:port:weight) for this server pool. Also you can use alias name like: ip:port:weight alias.
 servers = [
     "127.0.0.1:11211:1 mc1",

@@ -112,7 +112,6 @@ func (h *Handler) handle() {
 				return
 			}
 			msg.MarkEnd()
-			msg.ResetSubs()
 			if prom.On {
 				prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
 			}
@@ -122,9 +121,13 @@ func (h *Handler) handle() {
 			return
 		}
 
+
 		if h.slowerThan != 0 {
 			for _, msg := range msgs {
-				h.slog.Record(msg.Slowlog())
+				if msg.TotalDur() > h.slowerThan {
+					h.slog.Record(msg.Slowlog())
+				}
+				msg.ResetSubs()
 			}
 		}
 
