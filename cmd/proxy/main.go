@@ -88,6 +88,7 @@ func main() {
 			prom.On = false
 		}
 	}
+	prom.VersionState(VERSION)
 	// hanlde signal
 	signalHandler()
 }

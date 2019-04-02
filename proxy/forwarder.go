@@ -216,7 +216,7 @@ func (f defaultForwarder) processPing(p *pinger) {
 		} else {
 			_ = p.ping.Close()
 			if prom.On {
-				prom.ErrIncr(f.cc.Name, p.addr, "ping", errors.Cause(err).Error())
+				prom.ErrIncr(f.cc.Name, p.addr, "ping", "network err")
 			}
 			p.ping = newPingConn(p.cc, p.addr)
 		}
