@@ -290,7 +290,7 @@ func (c *connections) processPing(p *pinger) {
 			} else {
 				_ = p.ping.Close()
 				if prom.On {
-					prom.ErrIncr(c.cc.Name, p.addr, "ping", errors.Cause(err).Error())
+					prom.ErrIncr(c.cc.Name, p.addr, "ping", "network err")
 				}
 				p.ping = newPingConn(p.cc, p.addr)
 			}
