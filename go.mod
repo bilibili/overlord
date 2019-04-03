@@ -6,6 +6,7 @@ require (
 	github.com/Pallinder/go-randomdata v1.1.0
 	github.com/aviddiviner/go-murmur v0.0.0-20150519214947-b9740d71e571
 	github.com/bouk/monkey v1.0.1
+	github.com/bradfitz/gomemcache v0.0.0-20190329173943-551aad21a668
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/gin-contrib/sse v0.0.0-20170109093832-22d885f9ecc7 // indirect
 	github.com/gin-gonic/gin v1.3.0
@@ -13,6 +14,7 @@ require (
 	github.com/gogo/protobuf v1.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20181024230925-c65c006176ff // indirect
 	github.com/golang/protobuf v1.2.0
+	github.com/gomodule/redigo v1.7.0
 	github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.6.4 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
