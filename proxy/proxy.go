@@ -12,6 +12,7 @@ import (
 
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
+	"overlord/pkg/prom"
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/memcache"
@@ -166,6 +167,7 @@ func (p *Proxy) MonitorConfChange(ccf string) {
 			if ev.Op&fsnotify.Create == fsnotify.Create || ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Rename == fsnotify.Rename {
 				newConfs, err := LoadClusterConf(p.ccf)
 				if err != nil {
+					prom.ErrIncr(p.ccf, p.ccf, "config reload", err.Error())
 					log.Errorf("failed to load conf file:%s and got error:%v", p.ccf, err)
 					continue
 				}
@@ -174,6 +176,7 @@ func (p *Proxy) MonitorConfChange(ccf string) {
 					if err = p.updateConfig(conf); err == nil {
 						log.Infof("reload successful cluster:%s config succeed", conf.Name)
 					} else {
+						prom.ErrIncr(conf.Name, conf.Name, "cluster reload", err.Error())
 						log.Errorf("reload failed cluster:%s config and get error:%v", conf.Name, err)
 					}
 				}

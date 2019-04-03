@@ -4,7 +4,6 @@ import (
 	"bytes"
 	errs "errors"
 	"sync"
-	"unsafe"
 )
 
 var (
@@ -148,8 +147,7 @@ func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	key := *((*string)(unsafe.Pointer(&r.resp.array[0].data)))
-	_, ok := reqSupportCmdMap[key]
+	_, ok := reqSupportCmdMap[string(r.resp.array[0].data)]
 	return ok
 }
 
@@ -158,8 +156,7 @@ func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	key := *((*string)(unsafe.Pointer(&r.resp.array[0].data)))
-	_, ok := reqControlCmdMap[key]
+	_, ok := reqControlCmdMap[string(r.resp.array[0].data)]
 	return ok
 }
 
