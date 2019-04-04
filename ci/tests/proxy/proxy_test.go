@@ -1,24 +1,20 @@
 package proxy
 
 import (
+	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/gomodule/redigo/redis"
+	"github.com/stretchr/testify/assert"
+
+	"overlord/pkg/types"
+	"overlord/proxy"
+
 	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
-	"overlord/proxy"
 	"testing"
 	"time"
-	//libnet "overlord/pkg/net"
-	"overlord/pkg/types"
-	// "overlord/proxy/proto"
-
-	"github.com/bradfitz/gomemcache/memcache"
-	"github.com/gomodule/redigo/redis"
-
-	"github.com/stretchr/testify/assert"
-	// "github.com/bouk/monkey"
-	// "github.com/stretchr/testify/require"
 )
 
 // GLOBAL configs

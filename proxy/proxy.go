@@ -157,6 +157,7 @@ func (p *Proxy) MonitorConfChange(ccf string) {
 		log.Errorf("failed to monitor content change of dir:%s with error:%v", absPath, err)
 		return
 	}
+	log.Infof("proxy is watching changes cluster config absolute path as %s", absPath)
 	for {
 		if p.closed {
 			log.Infof("proxy is closed and exit configure file:%s monitor", p.ccf)
