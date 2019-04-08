@@ -272,7 +272,7 @@ func (c *connections) processPing(p *pinger) {
 		select {
 		case <-c.ctx.Done():
 			_ = p.ping.Close()
-			log.Infof("node pinger is closed, return directly\n")
+			log.Infof("node:%s addr:%s pinger is closed return directly", p.alias, p.addr)
 			return
 		default:
 			err = p.ping.Ping()

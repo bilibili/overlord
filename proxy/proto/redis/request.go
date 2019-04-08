@@ -143,6 +143,9 @@ func (r *Request) Reply() *RESP {
 }
 
 // IsSupport check command support.
+//
+// NOTE: use string([]byte) as a map key, it is very specific!!!
+// https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
@@ -152,6 +155,9 @@ func (r *Request) IsSupport() bool {
 }
 
 // IsCtl is control command.
+//
+// NOTE: use string([]byte) as a map key, it is very specific!!!
+// https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
