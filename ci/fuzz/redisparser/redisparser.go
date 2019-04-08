@@ -1,4 +1,4 @@
-package rparser
+package redisparser
 
 import (
 	"bytes"
