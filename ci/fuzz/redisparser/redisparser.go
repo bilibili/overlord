@@ -13,11 +13,17 @@ import (
 	"overlord/proxy/proto/redis"
 )
 
+var (
+	pc proto.ProxyConn
+	msgs []*proto.Message
+	nc *libnet.Conn
+)
+
 func Fuzz(data []byte) int {
 	conn := _createConn(data)
 	nc := libnet.NewConn(conn, time.Second, time.Second)
-	pc := redis.NewProxyConn(nc)
-	msgs := proto.GetMsgs(4)
+	pc = redis.NewProxyConn(nc)
+	msgs = proto.GetMsgs(4)
 	nmsgs, err := pc.Decode(msgs)
 	if err == bufio.ErrBufferFull {
 		return -1
@@ -50,10 +56,7 @@ func (m mockAddr) String() string {
 
 type mockConn struct {
 	addr   mockAddr
-	rbuf   *bytes.Buffer
-	wbuf   *bytes.Buffer
-	data   []byte
-	repeat int
+	buf   *bytes.Buffer
 	err    error
 	closed int32
 }
@@ -66,11 +69,7 @@ func (m *mockConn) Read(b []byte) (n int, err error) {
 		err = m.err
 		return
 	}
-	if m.repeat > 0 {
-		m.rbuf.Write(m.data)
-		m.repeat--
-	}
-	return m.rbuf.Read(b)
+	return m.buf.Read(b)
 }
 
 func (m *mockConn) Write(b []byte) (n int, err error) {
@@ -82,7 +81,7 @@ func (m *mockConn) Write(b []byte) (n int, err error) {
 		err = m.err
 		return
 	}
-	return m.wbuf.Write(b)
+	return m.buf.Write(b)
 }
 
 // writeBuffers impl the net.buffersWriter to support writev
@@ -90,7 +89,7 @@ func (m *mockConn) writeBuffers(buf *net.Buffers) (int64, error) {
 	if m.err != nil {
 		return 0, m.err
 	}
-	return buf.WriteTo(m.wbuf)
+	return buf.WriteTo(m.buf)
 }
 
 func (m *mockConn) Close() error {
@@ -107,25 +106,9 @@ func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // _createConn is useful tools for handler test
 func _createConn(data []byte) net.Conn {
-	return _createRepeatConn(data, 1)
-}
-
-func _createRepeatConn(data []byte, r int) net.Conn {
 	mconn := &mockConn{
 		addr:   "127.0.0.1:12345",
-		rbuf:   bytes.NewBuffer(nil),
-		wbuf:   new(bytes.Buffer),
-		data:   data,
-		repeat: r,
+		buf:   bytes.NewBuffer(data),
 	}
 	return mconn
-}
-
-func _createDownStreamConn() (net.Conn, *bytes.Buffer) {
-	buf := new(bytes.Buffer)
-	mconn := &mockConn{
-		addr: "127.0.0.1:12345",
-		wbuf: buf,
-	}
-	return mconn, buf
 }
