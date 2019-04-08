@@ -17,3 +17,5 @@ ls ci/fuzz/ | xargs -n1 -I"{}" python scripts/fuzz_tools.py ci/fuzz/{}
 rm -rf vendor
 mv go.mod.backup go.mod
 mv go.sum.backup go.sum
+
+export GO111MODULE=on
