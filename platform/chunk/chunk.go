@@ -166,9 +166,30 @@ func mapIntoPortsMap(offers []ms.Offer) map[string][]int {
 	return innerMap
 }
 
+func dpFillHostRes(disableHost map[string]struct{}, hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
+	left := count
+	hosts = make([]*hostRes, 0)
+	hrmap := make(map[string]int)
+	for i, hr := range hrs {
+		hrmap[hr.name] = i
+	}
+	for _, hr := range hrs {
+		hosts = append(hosts, &hostRes{name: hr.name, count: 0})
+	}
+	var all = count
+	for {
+		i := findMinHrs(hrs, hosts, disableHost, all, scale)
+		if left == 0 {
+			return
+		}
+		hosts[i].count += scale
+		left -= scale
+	}
+}
+
 // dp means dynamic dispatch
 // if disableHost not nil ,cannot dispatch resouce on disable host.
-func dpFillHostRes(chunks []*Chunk, disableHost map[string]struct{}, hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
+func dpFillHostResWithChunk(chunks []*Chunk, disableHost map[string]struct{}, hrs []*hostRes, count int, scale int) (hosts []*hostRes) {
 	left := count
 	hosts = make([]*hostRes, 0)
 	hrmap := make(map[string]int)
@@ -372,14 +393,16 @@ func GetHostCountInChunks(chunks []*Chunk) map[string][]int {
 
 // ChunksAppend scale masternum with origin chunks.
 func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ...ms.Offer) (newChunks []*Chunk, err error) {
-	hrs, err := checkChunk(chunks, masterNum, memory, cpu, offers...)
+	hrs, err := genHostRes(masterNum, memory, cpu, true, offers...)
 	if err != nil {
 		return
 	}
+
 	if !checkDist(hrs, (len(chunks)*2+masterNum)*2) {
 		err = ErrBadDist
 		return
 	}
+
 	hrmap := make(map[string]int)
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
@@ -394,23 +417,6 @@ func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ..
 		}
 	}
 	links := []link{}
-	// recover chunks to linktable
-	for _, chunk := range chunks {
-		base := chunk.Nodes[0].Name
-		linkto := chunk.Nodes[2].Name
-		i, oki := hrmap[base]
-		if oki {
-			hrs[i].count -= 2
-		}
-		j, okj := hrmap[linkto]
-		if okj {
-			hrs[j].count -= 2
-		}
-		if oki && okj {
-			linkTable[i][j]++
-			linkTable[j][i]++
-		}
-	}
 
 	for {
 		name, count := maxHost(hrs)
@@ -432,6 +438,35 @@ func ChunksAppend(chunks []*Chunk, masterNum int, memory, cpu float64, offers ..
 	}
 	portsMap := mapIntoPortsMap(offers)
 	newChunks = links2Chunks(links, portsMap)
+	return
+}
+
+func genHostRes(masterNum int, memory, cpu float64, allowNot3Not4 bool, offers ...ms.Offer) (hrs []*hostRes, err error) {
+	if masterNum%2 != 0 {
+		err = ErrBadMasterNum
+		return
+	}
+	hosts := getHosts(offers...)
+	if len(hosts) < 3 {
+		err = ErrNotEnoughHost
+		return
+	}
+	if !allowNot3Not4 && len(hosts) == 3 && masterNum == 4 {
+		err = ErrNot3Not4
+		return
+	}
+	hrs = mapIntoHostRes(offers, memory, cpu)
+
+	if !checkIfEnough(hrs, masterNum*2) {
+		err = ErrNotEnoughResource
+		return
+	}
+	sort.Sort(byCountDesc(hrs))
+	hrmap := make(map[string]int)
+	for i, hr := range hrs {
+		hrmap[hr.name] = i
+	}
+	hrs = dpFillHostRes(nil, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
 	return
 }
 
@@ -460,7 +495,7 @@ func checkChunk(chunk []*Chunk, masterNum int, memory, cpu float64, offers ...ms
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
 	}
-	hrs = dpFillHostRes(chunk, nil, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
+	hrs = dpFillHostResWithChunk(chunk, nil, hrs, masterNum*2, 2) // NOTICE: each master is a half chunk
 	return
 }
 
@@ -495,7 +530,7 @@ func ChunksRecover(chunks []*Chunk, host string, memory, cpu float64, offers ...
 	for i, hr := range hrs {
 		hrmap[hr.name] = i
 	}
-	hrs = dpFillHostRes(chunks, relateHost, hrs, dpCount, 2)
+	hrs = dpFillHostResWithChunk(chunks, relateHost, hrs, dpCount, 2)
 	if !checkDist(hrs, allCount) {
 		err = ErrBadDist
 		return

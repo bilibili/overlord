@@ -68,6 +68,18 @@ func TestChunksAppend(t *testing.T) {
 	assert.Len(t, newChunks, 1)
 }
 
+func TestChunksAppendWithFiveHost(t *testing.T) {
+	// for test of 0|2|2|2|2 cases, and 4|2|2|2|2 recover
+	offers := _createOffers(5, 128*1024, 32, 7000, 8000)
+	chunks, err := Chunks(4, 100.0, 1.0, offers...)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 2)
+
+	newChunks, err := ChunksAppend(chunks, 2, 100.0, 1, offers...)
+	assert.NoError(t, err, "append by same offer host")
+	assert.Len(t, newChunks, 1)
+}
+
 func TestChunksRecover(t *testing.T) {
 	offers := _createOffers(6, 128*1024, 32, 7000, 8000)
 	chunks, err := Chunks(6, 100.0, 1.0, offers...)
