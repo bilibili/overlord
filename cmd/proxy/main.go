@@ -79,7 +79,7 @@ func main() {
 	defer p.Close()
 	p.Serve(ccs)
 	if reload {
-		p.MonitorConfChange(clusterConfFile)
+		go p.MonitorConfChange(clusterConfFile)
 	}
 	// pprof
 	if c.Pprof != "" {
