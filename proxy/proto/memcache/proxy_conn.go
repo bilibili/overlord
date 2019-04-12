@@ -129,7 +129,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		return
 	}
 	// length
-	length, err := findLength(bs, cas)
+	length, err := findLength(bs[keyE:], cas)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -298,7 +298,7 @@ func findLength(bs []byte, cas bool) (int, error) {
 		return -1, ErrBadLength
 	}
 	length, err := conv.Btoi(ns[low:])
-	if err != nil {
+	if err != nil || length < 0 {
 		return -1, ErrBadLength
 	}
 	return int(length), nil

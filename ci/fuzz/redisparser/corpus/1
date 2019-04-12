@@ -1,0 +1,7 @@
+*3
+$5
+SETNX
+$1
+a
+$10
+abcdeabcde
