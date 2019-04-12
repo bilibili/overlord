@@ -33,4 +33,4 @@ Overlord已被哔哩哔哩用于生产环境。
 
 -------------
 
-*You are welcome to use Overlord in your product, and feel free to let us know~ :)*
+*Please report bugs, concerns, suggestions by issues, or join QQ-group 716486124 to discuss problems around source code.*
