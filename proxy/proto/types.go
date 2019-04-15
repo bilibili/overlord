@@ -35,4 +35,5 @@ type Pinger interface {
 type Forwarder interface {
 	Forward([]*Message) error
 	Close() error
+	Update(servers []string) error
 }

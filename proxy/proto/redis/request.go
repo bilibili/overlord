@@ -4,7 +4,6 @@ import (
 	"bytes"
 	errs "errors"
 	"sync"
-	"unsafe"
 )
 
 var (
@@ -144,22 +143,26 @@ func (r *Request) Reply() *RESP {
 }
 
 // IsSupport check command support.
+//
+// NOTE: use string([]byte) as a map key, it is very specific!!!
+// https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsSupport() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	key := *((*string)(unsafe.Pointer(&r.resp.array[0].data)))
-	_, ok := reqSupportCmdMap[key]
+	_, ok := reqSupportCmdMap[string(r.resp.array[0].data)]
 	return ok
 }
 
 // IsCtl is control command.
+//
+// NOTE: use string([]byte) as a map key, it is very specific!!!
+// https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsCtl() bool {
 	if r.resp.arrayn < 1 {
 		return false
 	}
-	key := *((*string)(unsafe.Pointer(&r.resp.array[0].data)))
-	_, ok := reqControlCmdMap[key]
+	_, ok := reqControlCmdMap[string(r.resp.array[0].data)]
 	return ok
 }
 

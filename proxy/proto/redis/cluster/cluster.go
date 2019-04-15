@@ -98,6 +98,11 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 	return nil
 }
 
+// Don't support update backend server list now
+func (c *cluster) Update([]string) error {
+	return nil
+}
+
 func (c *cluster) Close() error {
 	if !atomic.CompareAndSwapInt32(&c.state, opening, closed) {
 		sn := c.slotNode.Load()

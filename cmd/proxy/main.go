@@ -17,19 +17,17 @@ import (
 
 const (
 	// VERSION version
-	VERSION = "1.6.0"
+	VERSION = "1.7.0"
 )
 
 var (
-	version  bool
-	check    bool
-	logFile  string
-	logVl    int
-	debug    bool
-	pprof    string
-	metrics  bool
-	config   string
-	clusters clustersFlag
+	version         bool
+	check           bool
+	pprof           string
+	metrics         bool
+	confFile        string
+	clusterConfFile string
+	reload          bool
 )
 
 type clustersFlag []string
@@ -54,8 +52,9 @@ func init() {
 	flag.BoolVar(&version, "v", false, "print version.")
 	flag.StringVar(&pprof, "pprof", "", "pprof listen addr. high priority than conf.pprof.")
 	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
-	flag.StringVar(&config, "conf", "", "run with the specific configuration.")
-	flag.Var(&clusters, "cluster", "specify cache cluster configuration.")
+	flag.StringVar(&confFile, "conf", "", "conf file of proxy itself.")
+	flag.StringVar(&clusterConfFile, "cluster", "", "conf file of backend cluster.")
+	flag.BoolVar(&reload, "reload", false, "reloading the servers in cluster config file.")
 }
 
 func main() {
@@ -79,6 +78,9 @@ func main() {
 	}
 	defer p.Close()
 	p.Serve(ccs)
+	if reload {
+		go p.MonitorConfChange(clusterConfFile)
+	}
 	// pprof
 	if c.Pprof != "" {
 		go http.ListenAndServe(c.Pprof, nil)
@@ -88,14 +90,15 @@ func main() {
 			prom.On = false
 		}
 	}
+	prom.VersionState(VERSION)
 	// hanlde signal
 	signalHandler()
 }
 
 func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
-	if config != "" {
+	if confFile != "" {
 		c = &proxy.Config{}
-		if err := c.LoadFromFile(config); err != nil {
+		if err := c.LoadFromFile(confFile); err != nil {
 			panic(err)
 		}
 	} else {
@@ -108,30 +111,12 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 	if metrics {
 		c.Proxy.UseMetrics = metrics
 	}
-	if debug {
-		c.Debug = debug
-	}
-	if logFile != "" {
-		c.Log = logFile
-	}
-	if logVl > 0 {
-		c.LogVL = logVl
-	}
 	// high priority end
-	checks := map[string]struct{}{}
-	for _, cluster := range clusters {
-		cs := &proxy.ClusterConfigs{}
-		if err := cs.LoadFromFile(cluster); err != nil {
-			panic(err)
-		}
-		for _, cc := range cs.Clusters {
-			if _, ok := checks[cc.Name]; ok {
-				panic("the same cluster name cannot be repeated")
-			}
-			checks[cc.Name] = struct{}{}
-		}
-		ccs = append(ccs, cs.Clusters...)
+	var tmpCCS, err = proxy.LoadClusterConf(clusterConfFile)
+	if err != nil {
+		panic(err)
 	}
+	ccs = tmpCCS
 	return
 }
 

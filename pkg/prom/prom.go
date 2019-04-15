@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	statConns = "overlord_proxy_conns"
-	statErr   = "overlord_proxy_err"
+	statConns    = "overlord_proxy_conns"
+	statErr      = "overlord_proxy_err"
+	statVersions = "overlord_proxy_version"
 
 	statProxyTimer   = "overlord_proxy_timer"
 	statHandlerTimer = "overlord_proxy_handler_timer"
@@ -17,6 +18,7 @@ const (
 
 var (
 	conns        *prometheus.GaugeVec
+	versions     *prometheus.GaugeVec
 	gerr         *prometheus.GaugeVec
 	proxyTimer   *prometheus.HistogramVec
 	handlerTimer *prometheus.HistogramVec
@@ -25,6 +27,7 @@ var (
 	clusterNodeErrLabels = []string{"cluster", "node", "cmd", "error"}
 	clusterCmdLabels     = []string{"cluster", "cmd"}
 	clusterNodeCmdLabels = []string{"cluster", "node", "cmd"}
+	versionLabels        = []string{"version"}
 	// On Prom switch
 	On = true
 )
@@ -37,6 +40,12 @@ func Init() {
 			Help: statConns,
 		}, clusterLabels)
 	prometheus.MustRegister(conns)
+	versions = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: statVersions,
+			Help: statVersions,
+		}, versionLabels)
+	prometheus.MustRegister(versions)
 	gerr = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: statErr,
@@ -90,6 +99,14 @@ func ErrIncr(cluster, node, cmd, err string) {
 		return
 	}
 	gerr.WithLabelValues(cluster, node, cmd, err).Inc()
+}
+
+// VersionState set current versioin state.
+func VersionState(version string) {
+	if versions == nil {
+		return
+	}
+	versions.WithLabelValues(version).Set(1)
 }
 
 // ConnIncr increments one stat error counter.

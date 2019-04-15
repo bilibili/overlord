@@ -1,5 +1,10 @@
 # Overlord-proxy
 
+## Version 1.7.0
+1. add reload feature for cache type: redis, memcache, memcache_binary
+2. add more metrics
+3. add fuzz test for redis/memcache protocol
+
 ## Version 1.6.0
 1. add migrate tools named [anzi](https://github.com/bilibili/overlord/blob/master/doc/wiki-cn/tools.md)
 2. add cluster manager tools [enri](https://github.com/bilibili/overlord/blob/master/doc/wiki-cn/enri.md)

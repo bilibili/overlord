@@ -2,9 +2,9 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	errs "errors"
 	"net"
-	"overlord/pkg/prom"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -13,6 +13,7 @@ import (
 	"overlord/pkg/hashkit"
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
+	"overlord/pkg/prom"
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/memcache"
@@ -33,6 +34,7 @@ var (
 	ErrConfigServerFormat  = errs.New("servers config format error")
 	ErrForwarderHashNoNode = errs.New("forwarder hash no hit node")
 	ErrForwarderClosed     = errs.New("forwarder already closed")
+	ErrConnectionNotExist  = errs.New("connection of forwarder is not initialized")
 )
 
 var (
@@ -60,68 +62,42 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 
 // defaultForwarder implement the default hashring router and msgbatch.
 type defaultForwarder struct {
-	cc *ClusterConfig
-
-	ring    *hashkit.HashRing
+	cc      *ClusterConfig
 	hashTag []byte
-
-	// recording alias to real node
-	alias    bool
-	aliasMap map[string]string
-	nodePipe map[string]*proto.NodeConnPipe
-
-	state int32
+	conns   atomic.Value
+	state   int32
 }
 
 // newDefaultForwarder must combinf.
 func newDefaultForwarder(cc *ClusterConfig) proto.Forwarder {
 	f := &defaultForwarder{cc: cc}
+	f.hashTag = []byte(cc.HashTag)
 	// parse servers config
 	addrs, ws, ans, alias, err := parseServers(cc.Servers)
 	if err != nil {
 		panic(err)
 	}
-	f.alias = alias
-	f.hashTag = []byte(cc.HashTag)
-	f.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
-	f.aliasMap = make(map[string]string)
-	if alias {
-		for idx, aname := range ans {
-			f.aliasMap[aname] = addrs[idx]
-		}
-		f.ring.Init(ans, ws)
-	} else {
-		f.ring.Init(addrs, ws)
-	}
-	// start nbc
-	f.nodePipe = make(map[string]*proto.NodeConnPipe)
-	for _, addr := range addrs {
-		toAddr := addr // NOTE: avoid closure
-		f.nodePipe[toAddr] = proto.NewNodeConnPipe(cc.NodeConnections, func() proto.NodeConn {
-			return newNodeConn(cc, toAddr)
-		})
-	}
-	if cc.PingAutoEject {
-		for idx, addr := range addrs {
-			p := &pinger{cc: cc, addr: addr, alias: addr, weight: ws[idx]}
-			if f.alias {
-				p.alias = ans[idx]
-			}
-			go f.processPing(p)
-		}
-	}
+	conns := newConnections(cc)
+	conns.init(addrs, ans, ws, alias, nil)
+	conns.startPinger()
+	f.conns.Store(conns)
 	return f
 }
 
 // Forward impl proto.Forwarder
-func (f defaultForwarder) Forward(msgs []*proto.Message) error {
+func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 	if closed := atomic.LoadInt32(&f.state); closed == forwarderStateClosed {
 		return ErrForwarderClosed
+	}
+	conns, ok := f.conns.Load().(*connections)
+	if !ok {
+		return ErrConnectionNotExist
 	}
 	for _, m := range msgs {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
-				ncp, ok := f.getPipes(subm.Request().Key())
+				key := subm.Request().Key()
+				ncp, ok := conns.getPipes(f.trimHashTag(key))
 				if !ok {
 					m.WithError(ErrForwarderHashNoNode)
 					return errors.WithStack(ErrForwarderHashNoNode)
@@ -129,7 +105,8 @@ func (f defaultForwarder) Forward(msgs []*proto.Message) error {
 				ncp.Push(subm)
 			}
 		} else {
-			ncp, ok := f.getPipes(m.Request().Key())
+			key := m.Request().Key()
+			ncp, ok := conns.getPipes(f.trimHashTag(key))
 			if !ok {
 				m.WithError(ErrForwarderHashNoNode)
 				return errors.WithStack(ErrForwarderHashNoNode)
@@ -140,34 +117,49 @@ func (f defaultForwarder) Forward(msgs []*proto.Message) error {
 	return nil
 }
 
+func (f *defaultForwarder) Update(servers []string) error {
+	addrs, ws, ans, alias, err := parseServers(servers)
+	if err != nil {
+		return err
+	}
+	oldConns, ok := f.conns.Load().(*connections)
+	if !ok {
+		return errors.WithStack(ErrConnectionNotExist)
+	}
+	newConns := newConnections(f.cc)
+	copyed := newConns.init(addrs, ans, ws, alias, oldConns.nodePipe)
+	f.conns.Store(newConns)
+	oldConns.cancel()
+	newConns.startPinger()
+	// close unused
+	for addr, conn := range oldConns.nodePipe {
+		if copyed[addr] {
+			continue
+		}
+		log.Infof("connection to node:%s is not used anymore, just close it", addr)
+		conn.Close()
+	}
+	return nil
+}
+
 // Close close forwarder.
-func (f defaultForwarder) Close() error {
+func (f *defaultForwarder) Close() error {
 	if atomic.CompareAndSwapInt32(&f.state, forwarderStateOpening, forwarderStateClosed) {
 		// first closed
-		log.Infof("delay close nodePipes")
-		for _, np := range f.nodePipe {
+		var curConns, ok = f.conns.Load().(*connections)
+		if !ok {
+			return errors.WithStack(ErrConnectionNotExist)
+		}
+		for _, np := range curConns.nodePipe {
 			go np.Close()
 		}
+		curConns.cancel()
 		return nil
 	}
 	return nil
 }
 
-func (f defaultForwarder) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
-	var addr string
-	if addr, ok = f.ring.GetNode(f.trimHashTag(key)); !ok {
-		return
-	}
-	if f.alias {
-		if addr, ok = f.aliasMap[addr]; !ok {
-			return
-		}
-	}
-	ncp, ok = f.nodePipe[addr]
-	return
-}
-
-func (f defaultForwarder) trimHashTag(key []byte) []byte {
+func (f *defaultForwarder) trimHashTag(key []byte) []byte {
 	if len(f.hashTag) != 2 {
 		return key
 	}
@@ -182,6 +174,86 @@ func (f defaultForwarder) trimHashTag(key []byte) []byte {
 	return key[bidx+1 : bidx+1+eidx]
 }
 
+type connections struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	// recording alias to real node
+	cc         *ClusterConfig
+	alias      bool
+	addrs, ans []string
+	ws         []int
+	aliasMap   map[string]string
+	nodePipe   map[string]*proto.NodeConnPipe
+	ring       *hashkit.HashRing
+}
+
+func newConnections(cc *ClusterConfig) *connections {
+	c := &connections{}
+	c.cc = cc
+	c.aliasMap = make(map[string]string)
+	c.nodePipe = make(map[string]*proto.NodeConnPipe)
+	c.ring = hashkit.NewRing(cc.HashDistribution, cc.HashMethod)
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	return c
+}
+
+func (c *connections) init(addrs, ans []string, ws []int, alias bool, oldNcps map[string]*proto.NodeConnPipe) map[string]bool {
+	c.alias = alias
+	c.addrs = addrs
+	c.ans = ans
+	c.ws = ws
+	if alias {
+		for idx, aname := range ans {
+			c.aliasMap[aname] = addrs[idx]
+		}
+		c.ring.Init(ans, ws)
+	} else {
+		c.ring.Init(addrs, ws)
+	}
+	copyed := make(map[string]bool)
+	// start nbc
+	for _, addr := range addrs {
+		toAddr := addr // NOTE: avoid closure
+		var cnn, ok = oldNcps[toAddr]
+		if ok {
+			c.nodePipe[toAddr] = cnn
+			copyed[toAddr] = true
+		} else {
+			c.nodePipe[toAddr] = proto.NewNodeConnPipe(c.cc.NodeConnections, func() proto.NodeConn {
+				return newNodeConn(c.cc, toAddr)
+			})
+		}
+	}
+	return copyed
+}
+
+func (c *connections) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
+	var addr string
+	if addr, ok = c.ring.GetNode(key); !ok {
+		return
+	}
+	if c.alias {
+		if addr, ok = c.aliasMap[addr]; !ok {
+			return
+		}
+	}
+	ncp, ok = c.nodePipe[addr]
+	return
+}
+
+func (c *connections) startPinger() {
+	if !c.cc.PingAutoEject {
+		return
+	}
+	for idx, addr := range c.addrs {
+		p := &pinger{cc: c.cc, addr: addr, alias: addr, weight: c.ws[idx]}
+		if c.alias {
+			p.alias = c.ans[idx]
+		}
+		go c.processPing(p)
+	}
+}
+
 // pingSleepTime for unit test override!!!
 var pingSleepTime = func(t bool) time.Duration {
 	if t {
@@ -190,58 +262,61 @@ var pingSleepTime = func(t bool) time.Duration {
 	return time.Second
 }
 
-func (f defaultForwarder) processPing(p *pinger) {
+func (c *connections) processPing(p *pinger) {
 	var (
 		err error
 		del bool
 	)
 	p.ping = newPingConn(p.cc, p.addr)
 	for {
-		if atomic.LoadInt32(&f.state) == forwarderStateClosed {
+		select {
+		case <-c.ctx.Done():
 			_ = p.ping.Close()
+			log.Infof("node:%s addr:%s pinger is closed return directly", p.alias, p.addr)
 			return
-		}
-		err = p.ping.Ping()
-		if err == nil {
-			p.failure = 0
-			if del {
-				del = false
-				f.ring.AddNode(p.alias, p.weight)
-				if log.V(4) {
-					log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
+		default:
+			err = p.ping.Ping()
+			if err == nil {
+				p.failure = 0
+				if del {
+					del = false
+					c.ring.AddNode(p.alias, p.weight)
+					if log.V(4) {
+						log.Infof("node ping node:%s addr:%s success and readd", p.alias, p.addr)
+					}
 				}
+				time.Sleep(pingSleepTime(false))
+				continue
+			} else {
+				_ = p.ping.Close()
+				if prom.On {
+					prom.ErrIncr(c.cc.Name, p.addr, "ping", "network err")
+				}
+				p.ping = newPingConn(p.cc, p.addr)
 			}
-			time.Sleep(pingSleepTime(false))
-			continue
-		} else {
-			_ = p.ping.Close()
-			if prom.On {
-				prom.ErrIncr(f.cc.Name, p.addr, "ping", errors.Cause(err).Error())
-			}
-			p.ping = newPingConn(p.cc, p.addr)
-		}
 
-		p.failure++
-		if log.V(3) {
-			log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
-		}
-		if p.failure < f.cc.PingFailLimit {
-			time.Sleep(pingSleepTime(false))
-			continue
-		}
-		if !del {
-			f.ring.DelNode(p.alias)
-			if prom.On {
-				prom.ErrIncr(f.cc.Name, p.addr, "ping", "del node")
+			p.failure++
+			if log.V(3) {
+				log.Warnf("ping node:%s addr:%s fail:%d times with err:%v", p.alias, p.addr, p.failure, err)
 			}
-			del = true
-			if log.V(2) {
-				log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d then del", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
+			if p.failure < c.cc.PingFailLimit {
+				time.Sleep(pingSleepTime(false))
+				continue
 			}
-		} else if log.V(3) {
-			log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, f.cc.PingFailLimit)
+			if !del {
+				c.ring.DelNode(p.alias)
+				if prom.On {
+					prom.ErrIncr(c.cc.Name, p.addr, "ping", "del node")
+				}
+				del = true
+				if log.V(2) {
+					log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d then del", p.alias, p.addr, p.failure, c.cc.PingFailLimit)
+				}
+			} else if log.V(3) {
+				log.Errorf("ping node:%s addr:%s fail times:%d ge to limit:%d and already deled", p.alias, p.addr, p.failure, c.cc.PingFailLimit)
+			}
+			time.Sleep(pingSleepTime(true))
 		}
-		time.Sleep(pingSleepTime(true))
 	}
 }
 
@@ -291,7 +366,7 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		if strings.Contains(svr, " ") {
 			alias = true
 		} else if alias {
-			err = ErrConfigServerFormat
+			err = errors.Wrapf(ErrConfigServerFormat, "server:%s", svr)
 			return
 		}
 		var (
@@ -301,7 +376,7 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		if alias {
 			ss = strings.Split(svr, " ")
 			if len(ss) != 2 {
-				err = ErrConfigServerFormat
+				err = errors.Wrapf(ErrConfigServerFormat, "server:%s", svr)
 				return
 			}
 			addrW = ss[0]
@@ -311,16 +386,19 @@ func parseServers(svrs []string) (addrs []string, ws []int, ans []string, alias 
 		}
 		ss = strings.Split(addrW, ":")
 		if len(ss) != 3 {
-			err = ErrConfigServerFormat
+			err = errors.Wrapf(ErrConfigServerFormat, "server:%s", svr)
 			return
 		}
 		addrs = append(addrs, net.JoinHostPort(ss[0], ss[1]))
 		w, we := conv.Btoi([]byte(ss[2]))
 		if we != nil || w <= 0 {
-			err = ErrConfigServerFormat
+			err = errors.Wrapf(ErrConfigServerFormat, "server:%s", svr)
 			return
 		}
 		ws = append(ws, int(w))
+	}
+	if len(addrs) != len(ans) && len(ans) > 0 {
+		err = ErrConfigServerFormat
 	}
 	return
 }

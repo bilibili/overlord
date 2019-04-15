@@ -1,8 +1,10 @@
 package proxy
 
 import (
+	errs "errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"overlord/pkg/log"
@@ -11,6 +13,12 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/Pallinder/go-randomdata"
 	"github.com/pkg/errors"
+)
+
+// errs
+var (
+	ErrClusterConfInvalid   = errs.New("cluster config is invalid")
+	ErrClusterConfDuplicate = errs.New("cluster config is duplicate")
 )
 
 // Config proxy config.
@@ -71,9 +79,44 @@ type ClusterConfig struct {
 	Servers          []string        `toml:"servers"`
 }
 
+// ValidateStandalone validate redis/memcache address is valid or not
+func ValidateStandalone(servers []string) (err error) {
+	if len(servers) == 0 {
+		return errs.New("empty backend server list")
+	}
+	var hasAlias bool
+	for i, server := range servers {
+		ipAlias := strings.Split(server, " ")
+		if i == 0 && len(ipAlias) == 2 {
+			hasAlias = true
+		}
+		if (hasAlias && len(ipAlias) != 2) || (!hasAlias && len(ipAlias) != 1) {
+			err = errors.Wrapf(ErrClusterConfInvalid, "server:%s", server)
+			return
+		}
+		ipPort := strings.Split(ipAlias[0], ":")
+		if len(ipPort) != 3 {
+			err = errors.Wrapf(ErrClusterConfInvalid, "server:%s", server)
+			return
+		}
+		if port, e := strconv.Atoi(ipPort[1]); e != nil || port <= 0 {
+			err = errors.Wrapf(ErrClusterConfInvalid, "server:%s", server)
+			return
+		}
+		if weight, e := strconv.Atoi(ipPort[2]); e != nil || weight < 0 {
+			err = errors.Wrapf(ErrClusterConfInvalid, "server:%s", server)
+			return
+		}
+	}
+	return
+}
+
 // Validate validate config field value.
 func (cc *ClusterConfig) Validate() error {
 	// TODO(felix): complete validates
+	if cc.CacheType != types.CacheTypeRedisCluster {
+		return ValidateStandalone(cc.Servers)
+	}
 	return nil
 }
 
@@ -145,6 +188,35 @@ func (ccs *ClusterConfigs) LoadFromFile(path string) error {
 		}
 	}
 	return nil
+}
+
+// LoadClusterConf load cluster config.
+func LoadClusterConf(path string) (ccs []*ClusterConfig, err error) {
+	cs := &ClusterConfigs{}
+	if err = cs.LoadFromFile(path); err != nil {
+		return
+	}
+	checks := map[string]struct{}{}
+	for _, cc := range cs.Clusters {
+		if _, ok := checks[cc.Name]; ok {
+			err = errors.Wrapf(ErrClusterConfDuplicate, "name:%s", cc.Name)
+			return
+		}
+		checks[cc.Name] = struct{}{}
+		ipPort := strings.Split(cc.ListenAddr, ":")
+		if len(ipPort) != 2 {
+			err = errors.Wrapf(ErrClusterConfInvalid, "addr:%s", cc.ListenAddr)
+			return
+		}
+		port := ipPort[1]
+		if _, ok := checks[port]; ok {
+			err = errors.Wrapf(ErrClusterConfDuplicate, "addr:%s", cc.ListenAddr)
+			return
+		}
+		checks[port] = struct{}{}
+	}
+	ccs = append(ccs, cs.Clusters...)
+	return
 }
 
 const defaultConfig = `

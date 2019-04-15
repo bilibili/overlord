@@ -1,0 +1,37 @@
+[[clusters]]
+name = "reload_mc"
+hash_method = "fnv1a_64"
+hash_distribution = "ketama"
+hash_tag = ""
+cache_type = "memcache"
+listen_proto = "tcp"
+listen_addr = "0.0.0.0:20001"
+redis_auth = ""
+dial_timeout = 1000
+read_timeout = 1000
+write_timeout = 1000
+node_connections = 2
+ping_fail_limit = 3
+ping_auto_eject = true
+servers = [
+    "127.0.0.1:9101:1 mcExample",
+]
+
+[[clusters]]
+name = "reload-redis"
+hash_method = "fnv1a_64"
+hash_distribution = "ketama"
+hash_tag = ""
+cache_type = "redis"
+listen_proto = "tcp"
+listen_addr = "0.0.0.0:26379"
+redis_auth = ""
+dial_timeout = 1000
+read_timeout = 1000
+write_timeout = 1000
+node_connections = 2
+ping_fail_limit = 3
+ping_auto_eject = false
+servers = [
+    "127.0.0.1:9001:1 redisExample",
+]
