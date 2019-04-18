@@ -23,7 +23,7 @@ var (
 
 // Config proxy config.
 type Config struct {
-	Pprof string
+	Stat string
 	*log.Config
 	Proxy struct {
 		ReadTimeout    int   `toml:"read_timeout"`

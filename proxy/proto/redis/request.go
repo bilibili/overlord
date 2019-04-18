@@ -88,7 +88,7 @@ func newReq() *Request {
 func (r *Request) Slowlog() *proto.SlowlogEntry {
 	slog := proto.NewSlowlogEntry(types.CacheTypeRedis)
 	if r.resp.arrayn == 0 {
-		slog.Cmd = [][]byte{proto.CollapseBody(r.resp.data)}
+		slog.Cmd = []string{string(proto.CollapseBody(r.resp.data))}
 	}
 	slog.Cmd = collapseArray(r.resp.Array())
 	return slog
@@ -182,25 +182,25 @@ func (r *Request) IsCtl() bool {
 
 const maxArray = 32
 
-func collapseArray(rs []*resp) (collapsed [][]byte) {
+func collapseArray(rs []*resp) (collapsed []string) {
 	if len(rs) < maxArray {
-		collapsed = make([][]byte, len(rs), len(rs))
+		collapsed = make([]string, len(rs), len(rs))
 		for i, r := range rs {
-			collapsed[i] = proto.CollapseBody(r.data)
+			collapsed[i] = string(proto.CollapseBody(r.data))
 		}
 		return
 	}
-	collapsed = make([][]byte, maxArray, maxArray)
+	collapsed = make([]string, maxArray, maxArray)
 	for i := 0; i < 15; i++ {
-		collapsed[i] = proto.CollapseBody(rs[i].data)
+		collapsed[i] = string(proto.CollapseBody(rs[i].data))
 	}
 	tail := rs[len(rs)-16:]
 	for i := 0; i < 16; i++ {
-		collapsed[i+16] = proto.CollapseBody(tail[i].data)
+		collapsed[i+16] = string(proto.CollapseBody(tail[i].data))
 	}
 
 	collapsedCount := len(rs) - 31
-	collapsed[15] = []byte(fmt.Sprintf("...collapsed %d...", collapsedCount))
+	collapsed[15] = fmt.Sprintf("...collapsed %d...", collapsedCount)
 	return
 }
 

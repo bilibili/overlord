@@ -257,9 +257,9 @@ func (r *MCRequest) String() string {
 func (r *MCRequest) Slowlog() (slog *proto.SlowlogEntry) {
 	slog = proto.NewSlowlogEntry(types.CacheTypeMemcache)
 	if r.rTp == RequestTypeGat || r.rTp == RequestTypeGats {
-		slog.Cmd = [][]byte{r.rTp.Bytes(), r.data, r.key, crlfBytes}
+		slog.Cmd = []string{r.rTp.String(), string(r.data), string(r.key), string(crlfBytes)}
 	} else {
-		slog.Cmd = [][]byte{r.rTp.Bytes(), r.key, r.data}
+		slog.Cmd = []string{r.rTp.String(), string(r.key), string(r.data)}
 	}
 	return slog
 }

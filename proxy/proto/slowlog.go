@@ -12,8 +12,8 @@ const copyCollapsedMaxLength = 256 - 3
 
 // SlowlogEntries is the struct with additional infomation of slowlog
 type SlowlogEntries struct {
-	Cluster string
-	Entries []*SlowlogEntry
+	Cluster string          `json:"cluster"`
+	Entries []*SlowlogEntry `json:"entries"`
 }
 
 // NewSlowlogEntry build empty slowlog
@@ -31,7 +31,7 @@ func NewSlowlogEntry(ctype types.CacheType) *SlowlogEntry {
 // SlowlogEntry is each slowlog item
 type SlowlogEntry struct {
 	CacheType types.CacheType
-	Cmd       [][]byte
+	Cmd       []string
 
 	StartTime time.Time
 	TotalDur  time.Duration

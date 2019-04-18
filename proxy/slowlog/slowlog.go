@@ -1,10 +1,10 @@
 package slowlog
 
 import (
+	"overlord/pkg/log"
 	"overlord/proxy/proto"
-	"sync/atomic"
 	"sync"
-	"fmt"
+	"sync/atomic"
 )
 
 const slowlogMaxCount = 1024
@@ -12,7 +12,7 @@ const slowlogMaxCount = 1024
 func newStore(name string) *Store {
 	return &Store{
 		name:   name,
-		cursor: 0,
+		cursor: -1,
 		msgs:   make([]atomic.Value, slowlogMaxCount),
 	}
 }
@@ -34,7 +34,7 @@ func (s *Store) Record(msg *proto.SlowlogEntry) {
 		if atomic.CompareAndSwapInt32(&s.cursor, s.cursor, s.cursor+1) {
 			idx := s.cursor % slowlogMaxCount
 			s.msgs[idx].Store(msg)
-			fmt.Println(msg.String())
+			fh.save(s.name, msg)
 			break
 		}
 	}
@@ -97,4 +97,14 @@ func (sr *storeHandler) Record(msg *proto.SlowlogEntry) {
 
 func (sr *storeHandler) Reply() *proto.SlowlogEntries {
 	return sr.store.Reply()
+}
+
+// Init slowlog with file and http
+func Init(file string) error {
+	registerSlowlogHTTP()
+	if file == "" {
+		return nil
+	}
+	log.Infof("setup slowlog for file [%s]", file)
+	return initFileHandler(file)
 }
