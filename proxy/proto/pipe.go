@@ -14,7 +14,7 @@ const (
 	opened = int32(0)
 	closed = int32(1)
 
-	pipeMaxCount = 128
+	pipeMaxCount = 512
 )
 
 var (
@@ -71,11 +71,12 @@ func (ncp *NodeConnPipe) Push(m *Message) {
 	}
 	ncp.l.RUnlock()
 	if input != nil {
-		select {
-		case input <- m:
-			return
-		default:
-		}
+		input <- m
+		// select {
+		// case input <- m:
+		// 	return
+		// default:
+		// }
 	}
 	m.WithError(errPipeChanFull)
 	m.Done()
