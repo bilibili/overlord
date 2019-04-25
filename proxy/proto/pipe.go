@@ -72,11 +72,7 @@ func (ncp *NodeConnPipe) Push(m *Message) {
 	ncp.l.RUnlock()
 	if input != nil {
 		input <- m
-		// select {
-		// case input <- m:
-		// 	return
-		// default:
-		// }
+		return
 	}
 	m.WithError(errPipeChanFull)
 	m.Done()
