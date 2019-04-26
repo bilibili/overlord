@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	perr "github.com/pkg/errors"
-
 	"overlord/pkg/hashkit"
 )
 
@@ -179,7 +177,7 @@ func (mp *msgPipe) pipe() {
 				duration := msg.RemoteDur()
 				msg.Done()
 				if err != nil {
-					prom.ErrIncr(nc.Cluster(), nc.Addr(), cmd, perr.Cause(err).Error())
+					prom.ErrIncr(nc.Cluster(), nc.Addr(), cmd, "network err")
 				} else {
 					prom.HandleTime(nc.Cluster(), nc.Addr(), cmd, int64(duration/time.Microsecond))
 				}
