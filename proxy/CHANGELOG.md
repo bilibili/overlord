@@ -1,5 +1,8 @@
 # Overlord-proxy
 
+## Version 1.7.1
+1. set network io err to unify error in case of mem boom
+
 ## Version 1.7.0
 1. add reload feature for cache type: redis, memcache, memcache_binary
 2. add more metrics
