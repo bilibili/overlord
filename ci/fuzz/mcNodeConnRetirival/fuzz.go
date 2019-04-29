@@ -11,7 +11,8 @@ func Fuzz(data []byte) int {
 
 	memcache.WithReq(msg, memcache.RequestTypeGet, []byte("1824"), []byte("\r\n"))
 	if err := nc.Read(msg); err != nil {
-		return 1
+		// assert.EqualError(t, errors.Cause(err), "read error")
+		return -1
 	}
 	return 0
 }
