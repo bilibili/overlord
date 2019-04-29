@@ -286,7 +286,7 @@ func Check(node string) (err error) {
 	}
 
 	var times = 5
-	if !c.consistent() && times > 0 {
+	for !c.consistent() && times > 0 {
 		time.Sleep(time.Second)
 		times--
 	}
