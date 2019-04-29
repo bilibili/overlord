@@ -16,7 +16,7 @@ const (
 	opened = int32(0)
 	closed = int32(1)
 
-	nodeReadBufSize = 2 * 1024 * 1024 // NOTE: 2MB
+	nodeReadBufSize = 16 // NOTE: 2MB
 )
 
 type nodeConn struct {
@@ -33,6 +33,12 @@ type nodeConn struct {
 // NewNodeConn returns node conn.
 func NewNodeConn(cluster, addr string, dialTimeout, readTimeout, writeTimeout time.Duration) (nc proto.NodeConn) {
 	conn := libnet.DialWithTimeout(addr, dialTimeout, readTimeout, writeTimeout)
+	return NewNodeConnWithLibConn(cluster, addr, conn)
+}
+
+
+// NewNodeConnWithLibConn create NodeConn for mock
+func NewNodeConnWithLibConn(cluster, addr string,conn *libnet.Conn) (nc proto.NodeConn) {
 	nc = &nodeConn{
 		cluster: cluster,
 		addr:    addr,

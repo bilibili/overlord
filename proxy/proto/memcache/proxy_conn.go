@@ -251,7 +251,8 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 	return
 }
 
-func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
+// WithReq will fill with memcache request.
+func WithReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
 	req := m.NextReq()
 	if req == nil {
 		req := GetReq()
@@ -265,6 +266,10 @@ func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, dat
 		mcreq.key = key
 		mcreq.data = data
 	}
+}
+
+func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
+	WithReq(m, rtype, key, data)
 }
 
 func nextField(bs []byte) (begin, end int) {
