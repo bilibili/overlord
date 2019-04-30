@@ -16,7 +16,7 @@ const (
 	opened = int32(0)
 	closed = int32(1)
 
-	nodeReadBufSize = 2 * 1024 * 1024 // NOTE: 2MB
+	nodeReadBufSize = 512 * 1024 // NOTE: 2MB
 )
 
 type nodeConn struct {
@@ -120,6 +120,8 @@ REREAD:
 		return
 	}
 	ds := length + 2 + len(endBytes)
+	mcr.data = append(mcr.data, bs...)
+
 REREADData:
 	var data []byte
 	if data, err = n.br.ReadExact(ds); err == bufio.ErrBufferFull {
@@ -132,7 +134,6 @@ REREADData:
 		err = errors.WithStack(err)
 		return
 	}
-	mcr.data = append(mcr.data, bs...)
 	mcr.data = append(mcr.data, data...)
 	return
 }
