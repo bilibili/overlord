@@ -148,7 +148,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.WithStack(ErrBadRequest)
 		return
 	}
-	p.withReq(m, mtype, key, data)
+	WithReq(m, mtype, key, data)
 	return
 }
 
@@ -167,7 +167,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 		if b == len(ns)-2 {
 			break
 		}
-		p.withReq(m, reqType, ns[b:e], crlfBytes)
+		WithReq(m, reqType, ns[b:e], crlfBytes)
 	}
 	return
 }
@@ -179,7 +179,7 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 		err = errors.WithStack(ErrBadKey)
 		return
 	}
-	p.withReq(m, reqType, key, crlfBytes)
+	WithReq(m, reqType, key, crlfBytes)
 	return
 }
 
@@ -199,7 +199,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 			return
 		}
 	}
-	p.withReq(m, reqType, key, ns)
+	WithReq(m, reqType, key, ns)
 	return
 }
 
@@ -219,7 +219,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 			return
 		}
 	}
-	p.withReq(m, reqType, key, ns)
+	WithReq(m, reqType, key, ns)
 	return
 }
 
@@ -243,7 +243,7 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			err = errors.WithStack(ErrBadKey)
 			return
 		}
-		p.withReq(m, reqType, ns[b:e], expBs)
+		WithReq(m, reqType, ns[b:e], expBs)
 		if e == len(ns)-2 {
 			break
 		}
@@ -266,10 +266,6 @@ func WithReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
 		mcreq.key = key
 		mcreq.data = data
 	}
-}
-
-func (p *proxyConn) withReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
-	WithReq(m, rtype, key, data)
 }
 
 func nextField(bs []byte) (begin, end int) {
