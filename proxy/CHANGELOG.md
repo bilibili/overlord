@@ -1,5 +1,11 @@
 # Overlord-proxy
 
+## Version 1.7.4
+
+1. reduce node connection default memory allocation to 512k.
+2. fix memcache node connection bugs
+3. reduce prometheus memory usage when handles connection errors.
+
 ## Version 1.7.0
 1. add reload feature for cache type: redis, memcache, memcache_binary
 2. add more metrics
