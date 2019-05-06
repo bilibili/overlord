@@ -23,10 +23,18 @@ def timeit(f):
 
 @timeit
 def check_gen(cwd):
-    arr = list(os.listdir(os.path.join(cwd, "corpus")))
+    corpus_dir = os.path.join(cwd, "corpus")
+    if not os.path.exists(corpus_dir):
+        os.mkdir(corpus_dir)
+    arr = list(os.listdir(corpus_dir))
     if arr:
         return
     print("generate corpus ing...")
+
+    gen_file = os.path.join(cwd, "gen", "main.go")
+    if not os.path.exists(gen_file):
+        print("skip generate because %s not exists" % (gen_file,))
+        return
     out = subprocess.check_call(
         shlex.split("go run ./gen/main.go -out ./corpus/"), cwd=cwd)
     print(out)
