@@ -122,17 +122,17 @@ func (h *Handler) handle() {
 		}
 
 
+		// 4. check slowlog before release resource
 		if h.slowerThan != 0 {
 			for _, msg := range msgs {
 				if msg.TotalDur() > h.slowerThan {
 					h.slog.Record(msg.Slowlog())
 				}
-				msg.ResetSubs()
 			}
 		}
 
-		// 4. check slowlog before release resource
 		for _, msg := range msgs {
+			msg.ResetSubs()
 			msg.Reset()
 		}
 		// 5. alloc MaxConcurrent

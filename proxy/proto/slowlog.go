@@ -42,7 +42,13 @@ type SlowlogEntry struct {
 func (s *SlowlogEntry) String() string {
 	var sb strings.Builder
 	if len(s.Subs) == 0 {
-		_, _ = sb.WriteString(fmt.Sprintf("cache_type=%s start_time=%d total_duration=%dus remote_duration=%dus cmd=[", s.CacheType, s.StartTime.UnixNano()/1000000000, s.TotalDur/time.Microsecond, s.RemoteDur/time.Microsecond))
+		stime := s.StartTime.Format("2006-01-02T15:04:05.999999-07:00")
+		tus := s.TotalDur / time.Microsecond
+		rus := s.RemoteDur / time.Microsecond
+		_, _ = sb.WriteString(fmt.Sprintf(
+			"cache_type=%s start_time=%s total_duration=%dus remote_duration=%dus cmd=[",
+			s.CacheType, stime, tus, rus))
+
 		tmps := make([]string, len(s.Cmd))
 		for i, cmd := range s.Cmd {
 			tmps[i] = strconv.Quote(string(cmd))

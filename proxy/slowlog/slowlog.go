@@ -34,7 +34,9 @@ func (s *Store) Record(msg *proto.SlowlogEntry) {
 		if atomic.CompareAndSwapInt32(&s.cursor, s.cursor, s.cursor+1) {
 			idx := s.cursor % slowlogMaxCount
 			s.msgs[idx].Store(msg)
-			fh.save(s.name, msg)
+			if fh != nil {
+				fh.save(s.name, msg)
+			}
 			break
 		}
 	}
@@ -74,9 +76,8 @@ type Handler interface {
 func Get(name string) Handler {
 	storeLock.RLock()
 	if s, ok := storeMap[name]; ok {
-		handler := &storeHandler{store: s}
 		storeLock.RUnlock()
-		return handler
+		return s
 	}
 	storeLock.RUnlock()
 
@@ -84,19 +85,7 @@ func Get(name string) Handler {
 	defer storeLock.Unlock()
 	s := newStore(name)
 	storeMap[name] = s
-	return &storeHandler{store: s}
-}
-
-type storeHandler struct {
-	store *Store
-}
-
-func (sr *storeHandler) Record(msg *proto.SlowlogEntry) {
-	sr.store.Record(msg)
-}
-
-func (sr *storeHandler) Reply() *proto.SlowlogEntries {
-	return sr.store.Reply()
+	return s
 }
 
 // Init slowlog with file and http

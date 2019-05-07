@@ -39,6 +39,8 @@ func (f *fileHandler) openFile(file string) error {
 	f.fd = fd
 	f.wr = bufio.NewWriter(f.fd)
 	go func() {
+		defer f.fd.Close()
+
 		var sb strings.Builder
 		var ticker = time.NewTicker(f.flushInterval)
 
@@ -77,7 +79,7 @@ var fh *fileHandler
 func initFileHandler(file string) error {
 	fh = &fileHandler{
 		exchange:      make(chan fileEntry, 2048),
-		flushInterval: time.Second,
+		flushInterval: time.Second * 5,
 	}
 	return fh.openFile(file)
 }

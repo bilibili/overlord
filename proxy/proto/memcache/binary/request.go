@@ -3,8 +3,9 @@ package binary
 import (
 	errs "errors"
 	"fmt"
-	"overlord/proxy/proto"
 	"sync"
+
+	"overlord/proxy/proto"
 )
 
 const (
