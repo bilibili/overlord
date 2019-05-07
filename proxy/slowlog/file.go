@@ -3,10 +3,11 @@ package slowlog
 import (
 	"bufio"
 	"os"
-	"overlord/pkg/log"
-	"overlord/proxy/proto"
 	"strings"
 	"time"
+
+	"overlord/pkg/log"
+	"overlord/proxy/proto"
 )
 
 const byteSpace = byte(' ')

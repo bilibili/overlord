@@ -76,7 +76,6 @@ func (ncp *NodeConnPipe) Push(m *Message) {
 			return
 		default:
 		}
-		return
 	}
 	m.WithError(errPipeChanFull)
 	m.Done()

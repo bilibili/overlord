@@ -73,12 +73,12 @@ var collapseSymbol = []byte("...")
 // with length 256 - len("...") = 253
 func CollapseBody(src []byte) (dst []byte) {
 	if len(src) < copyCollapsedMaxLength {
-		dst = make([]byte, len(src), len(src))
+		dst = make([]byte, len(src))
 		copy(dst, src)
 		return
 	}
 
-	dst = make([]byte, 256, 256)
+	dst = make([]byte, 256)
 	copy(dst, src[:copyCollapsedMaxLength])
 	copy(dst[copyCollapsedMaxLength:], collapseSymbol)
 	return
