@@ -1,11 +1,9 @@
 package proto
 
 import (
-	"fmt"
-	"overlord/pkg/types"
-	"strconv"
-	"strings"
 	"time"
+
+	"overlord/pkg/types"
 )
 
 const copyCollapsedMaxLength = 256 - 3
@@ -30,39 +28,14 @@ func NewSlowlogEntry(ctype types.CacheType) *SlowlogEntry {
 
 // SlowlogEntry is each slowlog item
 type SlowlogEntry struct {
+	Cluster   string `json:"cluster,omitempty"`
 	CacheType types.CacheType
 	Cmd       []string
 
 	StartTime time.Time
 	TotalDur  time.Duration
 	RemoteDur time.Duration
-	Subs      []*SlowlogEntry
-}
-
-func (s *SlowlogEntry) String() string {
-	var sb strings.Builder
-	if len(s.Subs) == 0 {
-		stime := s.StartTime.Format("2006-01-02T15:04:05.999999-07:00")
-		tus := s.TotalDur / time.Microsecond
-		rus := s.RemoteDur / time.Microsecond
-		_, _ = sb.WriteString(fmt.Sprintf(
-			"cache_type=%s start_time=%s total_duration=%dus remote_duration=%dus cmd=[",
-			s.CacheType, stime, tus, rus))
-
-		tmps := make([]string, len(s.Cmd))
-		for i, cmd := range s.Cmd {
-			tmps[i] = strconv.Quote(string(cmd))
-		}
-		_, _ = sb.WriteString(strings.Join(tmps, ", "))
-		sb.WriteString("]")
-	} else {
-		for _, sub := range s.Subs {
-			sb.WriteString("batch slowlog \"")
-			sb.WriteString(sub.String())
-			sb.WriteString("\"\n")
-		}
-	}
-	return sb.String()
+	Subs      []*SlowlogEntry `json:"Subs,omitempty"`
 }
 
 // collapseSymbol is the fill in strings.

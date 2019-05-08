@@ -3,9 +3,9 @@ package slowlog
 import (
 	"bufio"
 	"os"
-	"strings"
 	"time"
 
+	"encoding/json"
 	"overlord/pkg/log"
 	"overlord/proxy/proto"
 )
@@ -13,50 +13,55 @@ import (
 const byteSpace = byte(' ')
 const byteLF = byte('\n')
 
-type fileEntry struct {
-	name  string
-	entry *proto.SlowlogEntry
-}
-
 type fileHandler struct {
 	fd            *os.File
 	wr            *bufio.Writer
-	exchange      chan fileEntry
+	encoder       *json.Encoder
+	exchange      chan *proto.SlowlogEntry
 	flushInterval time.Duration
 }
 
 func (f *fileHandler) save(cluster string, entry *proto.SlowlogEntry) {
+	entry.Cluster = cluster
 	select {
-	case f.exchange <- fileEntry{name: cluster, entry: entry}:
+	case f.exchange <- entry:
 	default:
 	}
 }
 
 func (f *fileHandler) openFile(file string) error {
-	fd, err := os.Create(file)
-	if err != nil {
-		return err
+	var (
+		fd *os.File
+		err error
+	)
+	if _, err = os.Stat(file); os.IsNotExist(err) {
+		// path/to/whatever does not exist
+		fd, err = os.Create(file)
+		if err != nil {
+			return err
+		}
+	} else {
+		fd, err = os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0755)
+		if err != nil {
+			return err
+		}
 	}
+
+
 	f.fd = fd
 	f.wr = bufio.NewWriter(f.fd)
+	f.encoder = json.NewEncoder(f.wr)
+
 	go func() {
 		defer f.fd.Close()
-
-		var sb strings.Builder
 		var ticker = time.NewTicker(f.flushInterval)
 
 		for {
 			select {
-			case fe := <-f.exchange:
-				sb.Reset()
-				sb.WriteString("cluster=")
-				sb.WriteString(fe.name)
-				sb.WriteByte(byteSpace)
-				sb.WriteString(fe.entry.String())
-				sb.WriteByte(byteLF)
-				_, err := f.wr.WriteString(sb.String())
+			case entry := <-f.exchange:
+				err := f.encoder.Encode(entry)
 				if err != nil {
-					log.Errorf("fail to output slowlog due %s", err)
+					log.Errorf("fail to write slowlog into file due %s", err)
 					return
 				}
 			case <-ticker.C:
@@ -79,7 +84,7 @@ var fh *fileHandler
 // initFileHandler will init the file handler to the given file
 func initFileHandler(file string) error {
 	fh = &fileHandler{
-		exchange:      make(chan fileEntry, 2048),
+		exchange:      make(chan *proto.SlowlogEntry, 2048),
 		flushInterval: time.Second * 5,
 	}
 	return fh.openFile(file)
