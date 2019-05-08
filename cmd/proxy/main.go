@@ -30,6 +30,7 @@ var (
 	clusterConfFile string
 	reload          bool
 	slowlogFile     string
+	slowlogSlowerThan int
 )
 
 type clustersFlag []string
@@ -58,6 +59,7 @@ func init() {
 	flag.StringVar(&clusterConfFile, "cluster", "", "conf file of backend cluster.")
 	flag.BoolVar(&reload, "reload", false, "reloading the servers in cluster config file.")
 	flag.StringVar(&slowlogFile, "slowlog", "", "slowlog is the file where slowlog output")
+	flag.IntVar(&slowlogSlowerThan, "slower-than", 0, "slower-than is the microseconds which slowlog must slower than.")
 }
 
 func main() {
@@ -125,6 +127,14 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 	if err != nil {
 		panic(err)
 	}
+
+	// reset slowlogslowerthan
+	if slowlogSlowerThan > 0 {
+		for _, cc := range tmpCCS {
+			cc.SlowlogSlowerThan = slowlogSlowerThan
+		}
+	}
+
 	ccs = tmpCCS
 	return
 }
