@@ -284,7 +284,7 @@ func (inst *Instance) sync() (err error) {
 		if err != nil {
 			return err
 		}
-		// log.Infof("read new line addr %s with %s", inst.Addr, strconv.Quote(string(data)))
+		log.Infof("read new line addr %s with %s", inst.Addr, strconv.Quote(string(data)))
 		if len(data) > 0 && data[0] == byte('$') {
 			break
 		}
@@ -406,7 +406,7 @@ func (inst *Instance) syncRDB(addr string) (err error) {
 	cb := NewProtocolCallbacker(addr)
 	rdb := NewRDB(inst.br, cb)
 	inst.tconn, err = rdb.Sync()
-	// log.Infof("receive target connection %v from rdb callback with error %s", inst.tconn, err)
+	log.Infof("receive target connection %v from rdb callback with error %s", inst.tconn, err)
 	return
 }
 

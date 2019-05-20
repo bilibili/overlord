@@ -194,6 +194,7 @@ func (r *RDB) bgSyncProc() (err error) {
 		}
 
 		if dtype == RDBOpcodeEOF {
+			log.Infof("finish rdb rading of upstream")
 			r.cb.EndOfRDB()
 			if r.version >= 5 {
 				_, err = io.ReadFull(r.rd, headbuf[:8])
