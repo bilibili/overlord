@@ -89,6 +89,7 @@ func (m *MigrateProc) Migrate() error {
 		return err
 	}
 
+	log.Infof("make rdb barrier channal of %d", m.cfg.MaxRDBConcurrency)
 	for i := 0; i < m.cfg.MaxRDBConcurrency; i++ {
 		m.barrierC <- struct{}{}
 	}
@@ -262,12 +263,16 @@ func (inst *Instance) sync() (err error) {
 
 	// 1. barrier run syncRDB
 	// 1.1 send psync ? -1
+	log.Infof("start to sync rdb of %s", inst.Addr)
 	_ = writeAll(psyncFullSyncCmd, inst.bw)
-	data, err := inst.br.ReadBytes(byteLF)
+	_ = inst.bw.Flush()
+	var data []byte
+	data, err = inst.br.ReadBytes(byteLF)
 	if err != nil {
 		return
 	}
 
+	log.Infof("parse psync reply of %s", inst.Addr)
 	err = inst.parsePSyncReply(data)
 	if err != nil {
 		return err
@@ -288,8 +293,10 @@ func (inst *Instance) sync() (err error) {
 	// read full rdb
 	err = inst.syncRDB(inst.Target)
 	if err != nil {
+		log.Warnf("syncing rdb fail of instance %s", inst.Addr)
 		return
 	}
+	log.Infof("syncing rdb done of instance %s", inst.Addr)
 
 	// 2. parsed rdb done then send notify to barrier chan
 	select {
