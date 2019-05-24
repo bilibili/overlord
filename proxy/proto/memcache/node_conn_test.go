@@ -157,6 +157,8 @@ func TestNodeConnWriteClosed(t *testing.T) {
 type mockReq struct {
 }
 
+func (*mockReq) Slowlog() *proto.SlowlogEntry { return nil }
+
 func (*mockReq) CmdString() string {
 	return ""
 }

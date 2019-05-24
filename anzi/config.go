@@ -22,7 +22,9 @@ type MigrateConfig struct {
 
 // SetDefault migrate config
 func (m *MigrateConfig) SetDefault() {
-	m.MaxRDBConcurrency = runtime.NumCPU()
+	if m.MaxRDBConcurrency == 0 {
+		m.MaxRDBConcurrency = runtime.NumCPU()
+	}
 	for _, from := range m.From {
 		from.SetDefault()
 	}

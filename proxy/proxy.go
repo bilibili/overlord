@@ -79,6 +79,9 @@ func (p *Proxy) serve(cc *ClusterConfig) {
 		panic(err)
 	}
 	log.Infof("overlord proxy cluster[%s] addr(%s) start listening", cc.Name, cc.ListenAddr)
+	if cc.SlowlogSlowerThan != 0 {
+		log.Infof("overlord start slowlog to [%s] with threshold [%d]us", cc.Name, cc.SlowlogSlowerThan)
+	}
 	go p.accept(cc, l, forwarder)
 }
 

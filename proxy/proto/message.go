@@ -196,6 +196,7 @@ func (m *Message) Batch() []*Message {
 	for i := 0; i < delta; i++ {
 		msg := getMsg()
 		msg.Type = m.Type
+		msg.st = m.st
 		msg.setRequest(m.req[min+i])
 		msg.WithWaitGroup(m.wg)
 		m.subs = append(m.subs, msg)
@@ -253,4 +254,24 @@ func minInt(a, b int) int {
 		return b
 	}
 	return a
+}
+
+// Slowlog impl Slowlogger
+func (m *Message) Slowlog() (slog *SlowlogEntry) {
+	if m.IsBatch() {
+		slog = NewSlowlogEntry(m.Type)
+		slog.Subs = make([]*SlowlogEntry, m.reqn)
+		for i, req := range m.Requests() {
+			slog.Subs[i] = req.Slowlog()
+			slog.Subs[i].StartTime = m.st
+			slog.Subs[i].RemoteDur = m.subs[i].rt.Sub(m.subs[i].wt)
+			slog.Subs[i].TotalDur = m.et.Sub(m.st)
+		}
+	} else {
+		slog = m.Request().Slowlog()
+		slog.StartTime = m.st
+		slog.TotalDur = m.TotalDur()
+		slog.RemoteDur = m.RemoteDur()
+	}
+	return
 }

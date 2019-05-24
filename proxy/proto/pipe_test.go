@@ -47,7 +47,8 @@ func (*mockRequest) Key() []byte {
 	rand.Read(bs)
 	return bs
 }
-func (*mockRequest) Put() {}
+func (*mockRequest) Put()                   {}
+func (*mockRequest) Slowlog() *SlowlogEntry { return nil }
 
 func TestPipe(t *testing.T) {
 	nc1 := &mockNodeConn{}

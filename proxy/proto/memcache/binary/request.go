@@ -4,6 +4,8 @@ import (
 	errs "errors"
 	"fmt"
 	"sync"
+
+	"overlord/proxy/proto"
 )
 
 const (
@@ -325,4 +327,9 @@ func (r *MCRequest) Key() []byte {
 
 func (r *MCRequest) String() string {
 	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.String(), r.key, r.data)
+}
+
+// Slowlog record the slowlog entry
+func (r *MCRequest) Slowlog() *proto.SlowlogEntry {
+	return nil
 }

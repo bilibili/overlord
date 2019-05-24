@@ -3,7 +3,11 @@ package redis
 import (
 	"bytes"
 	errs "errors"
+	"fmt"
 	"sync"
+
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
 )
 
 var (
@@ -78,6 +82,16 @@ func newReq() *Request {
 	r.resp = &resp{}
 	r.reply = &resp{}
 	return r
+}
+
+// Slowlog impl the Slowlogger interface
+func (r *Request) Slowlog() *proto.SlowlogEntry {
+	slog := proto.NewSlowlogEntry(types.CacheTypeRedis)
+	if r.resp.arrayn == 0 {
+		slog.Cmd = []string{string(proto.CollapseBody(r.resp.data))}
+	}
+	slog.Cmd = collapseArray(r.resp.Array())
+	return slog
 }
 
 // CmdString get the cmd
@@ -164,6 +178,30 @@ func (r *Request) IsCtl() bool {
 	}
 	_, ok := reqControlCmdMap[string(r.resp.array[0].data)]
 	return ok
+}
+
+const maxArray = 32
+
+func collapseArray(rs []*resp) (collapsed []string) {
+	if len(rs) < maxArray {
+		collapsed = make([]string, len(rs), len(rs))
+		for i, r := range rs {
+			collapsed[i] = string(proto.CollapseBody(r.data))
+		}
+		return
+	}
+	collapsed = make([]string, maxArray, maxArray)
+	for i := 0; i < 15; i++ {
+		collapsed[i] = string(proto.CollapseBody(rs[i].data))
+	}
+	tail := rs[len(rs)-16:]
+	for i := 0; i < 16; i++ {
+		collapsed[i+16] = string(proto.CollapseBody(tail[i].data))
+	}
+
+	collapsedCount := len(rs) - 31
+	collapsed[15] = fmt.Sprintf("...collapsed %d...", collapsedCount)
+	return
 }
 
 var (

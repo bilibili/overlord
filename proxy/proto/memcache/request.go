@@ -3,6 +3,8 @@ package memcache
 import (
 	errs "errors"
 	"fmt"
+	"overlord/pkg/types"
+	"overlord/proxy/proto"
 	"sync"
 )
 
@@ -249,4 +251,15 @@ func (r *MCRequest) Key() []byte {
 
 func (r *MCRequest) String() string {
 	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.Bytes(), r.key, r.data)
+}
+
+// Slowlog record the slowlog entry
+func (r *MCRequest) Slowlog() (slog *proto.SlowlogEntry) {
+	slog = proto.NewSlowlogEntry(types.CacheTypeMemcache)
+	if r.rTp == RequestTypeGat || r.rTp == RequestTypeGats {
+		slog.Cmd = []string{r.rTp.String(), string(r.data), string(r.key), string(crlfBytes)}
+	} else {
+		slog.Cmd = []string{r.rTp.String(), string(r.key), string(r.data)}
+	}
+	return slog
 }

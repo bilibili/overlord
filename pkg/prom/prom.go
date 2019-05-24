@@ -58,6 +58,7 @@ func Init() {
 			Help:    statProxyTimer,
 			Buckets: []float64{1000, 2000, 4000, 10000},
 		}, clusterCmdLabels)
+
 	prometheus.MustRegister(proxyTimer)
 	handlerTimer = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{

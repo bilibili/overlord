@@ -13,21 +13,24 @@ import (
 	"overlord/pkg/log"
 	"overlord/pkg/prom"
 	"overlord/proxy"
+	"overlord/proxy/slowlog"
 )
 
 const (
 	// VERSION version
-	VERSION = "1.7.4"
+	VERSION = "1.8.0"
 )
 
 var (
 	version         bool
 	check           bool
-	pprof           string
+	stat            string
 	metrics         bool
 	confFile        string
 	clusterConfFile string
 	reload          bool
+	slowlogFile     string
+	slowlogSlowerThan int
 )
 
 type clustersFlag []string
@@ -50,11 +53,13 @@ func init() {
 	flag.Usage = usage
 	flag.BoolVar(&check, "t", false, "conf file check")
 	flag.BoolVar(&version, "v", false, "print version.")
-	flag.StringVar(&pprof, "pprof", "", "pprof listen addr. high priority than conf.pprof.")
-	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse pprof port.")
+	flag.StringVar(&stat, "stat", "", "stat listen addr. high priority than conf.stat.")
+	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse stat port.")
 	flag.StringVar(&confFile, "conf", "", "conf file of proxy itself.")
 	flag.StringVar(&clusterConfFile, "cluster", "", "conf file of backend cluster.")
 	flag.BoolVar(&reload, "reload", false, "reloading the servers in cluster config file.")
+	flag.StringVar(&slowlogFile, "slowlog", "", "slowlog is the file where slowlog output")
+	flag.IntVar(&slowlogSlowerThan, "slower-than", 0, "slower-than is the microseconds which slowlog must slower than.")
 }
 
 func main() {
@@ -71,6 +76,12 @@ func main() {
 	if log.Init(c.Config) {
 		defer log.Close()
 	}
+	// init slowlog if need
+	err := slowlog.Init(slowlogFile)
+	if err != nil {
+		log.Errorf("fail to init slowlog due %s", err)
+	}
+
 	// new proxy
 	p, err := proxy.New(c)
 	if err != nil {
@@ -82,8 +93,8 @@ func main() {
 		go p.MonitorConfChange(clusterConfFile)
 	}
 	// pprof
-	if c.Pprof != "" {
-		go http.ListenAndServe(c.Pprof, nil)
+	if c.Stat != "" {
+		go http.ListenAndServe(c.Stat, nil)
 		if c.Proxy.UseMetrics {
 			prom.Init()
 		} else {
@@ -105,8 +116,8 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 		c = proxy.DefaultConfig()
 	}
 	// high priority start
-	if pprof != "" {
-		c.Pprof = pprof
+	if stat != "" {
+		c.Stat = stat
 	}
 	if metrics {
 		c.Proxy.UseMetrics = metrics
@@ -116,6 +127,14 @@ func parseConfig() (c *proxy.Config, ccs []*proxy.ClusterConfig) {
 	if err != nil {
 		panic(err)
 	}
+
+	// reset slowlogslowerthan
+	if slowlogSlowerThan > 0 {
+		for _, cc := range tmpCCS {
+			cc.SlowlogSlowerThan = slowlogSlowerThan
+		}
+	}
+
 	ccs = tmpCCS
 	return
 }

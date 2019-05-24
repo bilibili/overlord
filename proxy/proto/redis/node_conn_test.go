@@ -35,6 +35,8 @@ func (*mockCmd) Key() []byte {
 func (*mockCmd) Put() {
 }
 
+func (*mockCmd) Slowlog() *proto.SlowlogEntry { return nil }
+
 func TestNodeConnNewNodeConn(t *testing.T) {
 	nc := NewNodeConn("test", "127.0.0.1:12345", time.Second, time.Second, time.Second)
 	assert.NotNil(t, nc)
