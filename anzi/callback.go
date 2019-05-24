@@ -19,7 +19,7 @@ var (
 	BytesZAdd     = []byte("ZADD")
 	BytesHSet     = []byte("HSET")
 	Bytes         = []byte("SET")
-	BytesExpireAt = []byte("PEXPIRE")
+	BytesExpireAt = []byte("EXPIREAT")
 )
 
 // RDBCallback is the callback interface defined to call
