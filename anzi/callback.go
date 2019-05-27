@@ -3,14 +3,14 @@ package anzi
 import (
 	"bufio"
 	"fmt"
-	"net"
-	"strconv"
-
 	"io"
 	"io/ioutil"
-	"overlord/pkg/log"
+	"net"
+	"strconv"
 	"sync"
 	"time"
+
+	"overlord/pkg/log"
 )
 
 // define useful command
