@@ -56,7 +56,7 @@ type RDBCallback interface {
 func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 	p := &ProtocolCallbacker{
 		addr:     addr,
-		endOfRDB: make(chan struct{}),
+		endOfRDB: make(chan struct{}, 1),
 	}
 
 	conn, err := net.Dial("tcp", addr)
