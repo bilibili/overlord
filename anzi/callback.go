@@ -177,7 +177,7 @@ func (r *ProtocolCallbacker) ExpireAt(key []byte, expiry uint64) {
 		return
 	}
 
-	r.handleErr(writePlainCmd(r.bw, BytesExpireAt, key, []byte(fmt.Sprintf("%d", expiry)), 2))
+	r.handleErr(writePlainCmd(r.bw, BytesExpireAt, key, []byte(fmt.Sprintf("%d", expiry)), 3))
 }
 
 func (r *ProtocolCallbacker) handleErr(err error) {
@@ -201,7 +201,7 @@ func (r *ProtocolCallbacker) handleErr(err error) {
 }
 
 func write4ArgsCmd(w *bufio.Writer, cmd, key, field, val []byte) (err error) {
-	_ = writeBulkCount(w, 4)
+	_ = writeArrayCount(w, 4)
 	_ = writeToBulk(w, cmd)
 	_ = writeToBulk(w, key)
 	_ = writeToBulk(w, field)
@@ -214,14 +214,14 @@ func writePlainCmd(w *bufio.Writer, cmd, key, val []byte, size ...int) (err erro
 	if len(size) == 1 {
 		count = size[0]
 	}
-	_ = writeBulkCount(w, count)
+	_ = writeArrayCount(w, count)
 	_ = writeToBulk(w, cmd)
 	_ = writeToBulk(w, key)
 	err = writeToBulk(w, val)
 	return
 }
 
-func writeBulkCount(w *bufio.Writer, size int) (err error) {
+func writeArrayCount(w *bufio.Writer, size int) (err error) {
 	_, err = w.WriteString(fmt.Sprintf("*%d\r\n", size))
 	return
 }
