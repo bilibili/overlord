@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
-	"overlord/anzi"
-
-	"overlord/pkg/log"
 
 	"github.com/BurntSushi/toml"
+
+	"overlord/anzi"
+	"overlord/pkg/log"
+	"overlord/version"
 )
 
 var confPath string
@@ -14,6 +15,9 @@ var confPath string
 func main() {
 	flag.StringVar(&confPath, "conf", "anzi.toml", "anzi config file")
 	flag.Parse()
+	if version.ShowVersion() {
+		return
+	}
 
 	conf := new(anzi.Config)
 	_, err := toml.DecodeFile(confPath, &conf)

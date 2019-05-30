@@ -2,10 +2,12 @@ package main
 
 import (
 	"flag"
+	"time"
+
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/platform/mesos"
-	"time"
+	"overlord/version"
 
 	"github.com/BurntSushi/toml"
 )
@@ -24,6 +26,10 @@ var defConf = &mesos.Config{
 func main() {
 	flag.StringVar(&confPath, "conf", "", "scheduler conf")
 	flag.Parse()
+	if version.ShowVersion() {
+		return
+	}
+
 	conf := new(mesos.Config)
 	if confPath != "" {
 		_, err := toml.DecodeFile(confPath, &conf)

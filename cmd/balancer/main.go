@@ -7,6 +7,7 @@ import (
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/platform/job/balance"
+	"overlord/version"
 )
 
 var (
@@ -18,6 +19,10 @@ func main() {
 	flag.StringVar(&cluster, "cluster", "", "cluster name")
 	flag.StringVar(&db, "db", "", "etcd dsn")
 	flag.Parse()
+	if version.ShowVersion() {
+		return
+	}
+
 	log.InitHandle(log.NewStdHandler())
 	var etcdURL string
 	if strings.HasPrefix(db, "http://") {
