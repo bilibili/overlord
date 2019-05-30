@@ -28,3 +28,8 @@ func ShowVersion() bool {
 	}
 	return showVersion
 }
+
+// Str is the formatted version string
+func Str() string {
+	return vstr
+}

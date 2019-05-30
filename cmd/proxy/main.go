@@ -95,7 +95,7 @@ func main() {
 			prom.On = false
 		}
 	}
-	prom.VersionState(VERSION)
+	prom.VersionState(version.Str())
 	// hanlde signal
 	signalHandler()
 }
@@ -137,12 +137,12 @@ func signalHandler() {
 	var ch = make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for {
-		log.Infof("overlord proxy version[%s] start serving", VERSION)
+		log.Infof("overlord proxy version[%s] start serving", version.Str())
 		si := <-ch
-		log.Infof("overlord proxy version[%s] signal(%s) stop the process", VERSION, si.String())
+		log.Infof("overlord proxy version[%s] signal(%s) stop the process", version.Str(), si.String())
 		switch si {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			log.Infof("overlord proxy version[%s] exited", VERSION)
+			log.Infof("overlord proxy version[%s] exited", version.Str())
 			return
 		case syscall.SIGHUP:
 		default:
