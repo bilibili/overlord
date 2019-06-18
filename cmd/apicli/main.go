@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"overlord/pkg/log"
 	"overlord/platform/api/model"
-
-	"github.com/pkg/errors"
+	"overlord/version"
 )
 
 func main() {
@@ -21,6 +22,10 @@ func main() {
 	flag.StringVar(&appid, "appid", "", "appid name")
 	flag.StringVar(&addr, "addr", "", "addr of node to restart")
 	flag.Parse()
+	if version.ShowVersion() {
+		return
+	}
+
 	log.Init(nil)
 	var err error
 	switch {

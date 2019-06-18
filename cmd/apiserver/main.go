@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 
+	"github.com/BurntSushi/toml"
+
 	"overlord/pkg/log"
 	"overlord/platform/api/model"
 	"overlord/platform/api/server"
 	"overlord/platform/api/service"
-
-	"github.com/BurntSushi/toml"
+	"overlord/version"
 )
 
 var (
@@ -18,6 +19,11 @@ var (
 func main() {
 	flag.StringVar(&confPath, "conf", "conf.toml", "scheduler conf")
 	flag.Parse()
+
+	if version.ShowVersion() {
+		return
+	}
+
 	conf := new(model.ServerConfig)
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil {

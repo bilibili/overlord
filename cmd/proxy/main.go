@@ -14,22 +14,17 @@ import (
 	"overlord/pkg/prom"
 	"overlord/proxy"
 	"overlord/proxy/slowlog"
-)
-
-const (
-	// VERSION version
-	VERSION = "1.8.0"
+	"overlord/version"
 )
 
 var (
-	version         bool
-	check           bool
-	stat            string
-	metrics         bool
-	confFile        string
-	clusterConfFile string
-	reload          bool
-	slowlogFile     string
+	check             bool
+	stat              string
+	metrics           bool
+	confFile          string
+	clusterConfFile   string
+	reload            bool
+	slowlogFile       string
 	slowlogSlowerThan int
 )
 
@@ -52,7 +47,6 @@ var usage = func() {
 func init() {
 	flag.Usage = usage
 	flag.BoolVar(&check, "t", false, "conf file check")
-	flag.BoolVar(&version, "v", false, "print version.")
 	flag.StringVar(&stat, "stat", "", "stat listen addr. high priority than conf.stat.")
 	flag.BoolVar(&metrics, "metrics", false, "proxy support prometheus metrics and reuse stat port.")
 	flag.StringVar(&confFile, "conf", "", "conf file of proxy itself.")
@@ -64,10 +58,10 @@ func init() {
 
 func main() {
 	flag.Parse()
-	if version {
-		fmt.Printf("overlord version %s\n", VERSION)
+	if version.ShowVersion() {
 		os.Exit(0)
 	}
+
 	if check {
 		parseConfig()
 		os.Exit(0)
@@ -101,7 +95,7 @@ func main() {
 			prom.On = false
 		}
 	}
-	prom.VersionState(VERSION)
+	prom.VersionState(version.Str())
 	// hanlde signal
 	signalHandler()
 }
@@ -143,12 +137,12 @@ func signalHandler() {
 	var ch = make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for {
-		log.Infof("overlord proxy version[%s] start serving", VERSION)
+		log.Infof("overlord proxy version[%s] start serving", version.Str())
 		si := <-ch
-		log.Infof("overlord proxy version[%s] signal(%s) stop the process", VERSION, si.String())
+		log.Infof("overlord proxy version[%s] signal(%s) stop the process", version.Str(), si.String())
 		switch si {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			log.Infof("overlord proxy version[%s] exited", VERSION)
+			log.Infof("overlord proxy version[%s] exited", version.Str())
 			return
 		case syscall.SIGHUP:
 		default:

@@ -3,8 +3,12 @@ package anzi
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"strconv"
+	"sync"
+	"time"
 
 	"overlord/pkg/log"
 )
@@ -51,7 +55,8 @@ type RDBCallback interface {
 // NewProtocolCallbacker convert them as callback
 func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 	p := &ProtocolCallbacker{
-		addr: addr,
+		addr:     addr,
+		endOfRDB: make(chan struct{}, 1),
 	}
 
 	conn, err := net.Dial("tcp", addr)
@@ -60,6 +65,8 @@ func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 	} else {
 		p.conn = conn
 		p.bw = bufio.NewWriter(conn)
+		p.br = bufio.NewReader(conn)
+		go p.ignoreRecv()
 	}
 
 	return p
@@ -69,8 +76,33 @@ func NewProtocolCallbacker(addr string) *ProtocolCallbacker {
 // protocol data into downstream.
 type ProtocolCallbacker struct {
 	addr string
+
+	lock sync.RWMutex
 	conn net.Conn
 	bw   *bufio.Writer
+	br   *bufio.Reader
+
+	endOfRDB chan struct{}
+}
+
+func (r *ProtocolCallbacker) ignoreRecv() {
+	for {
+		select {
+		case <-r.endOfRDB:
+			return
+		default:
+		}
+
+		r.lock.RLock()
+		size, err := io.Copy(ioutil.Discard, r.br)
+		r.lock.RUnlock()
+		if size == 0 {
+			time.Sleep(time.Second)
+		}
+		if err != nil {
+			log.Warnf("fail to discard reader due %s", err)
+		}
+	}
 }
 
 // SelectDB impl Callback
@@ -95,6 +127,7 @@ func (r *ProtocolCallbacker) ResizeDB(size, esize uint64) {
 
 // EndOfRDB impl Callback
 func (r *ProtocolCallbacker) EndOfRDB() {
+	r.endOfRDB <- struct{}{}
 	log.Infof("EndOfRDB...")
 	_ = r.bw.Flush()
 }
@@ -144,7 +177,7 @@ func (r *ProtocolCallbacker) ExpireAt(key []byte, expiry uint64) {
 		return
 	}
 
-	r.handleErr(writePlainCmd(r.bw, BytesExpireAt, key, []byte(fmt.Sprintf("%d", expiry)), 2))
+	r.handleErr(writePlainCmd(r.bw, BytesExpireAt, key, []byte(fmt.Sprintf("%d", expiry)), 3))
 }
 
 func (r *ProtocolCallbacker) handleErr(err error) {
@@ -152,15 +185,23 @@ func (r *ProtocolCallbacker) handleErr(err error) {
 		return
 	}
 
-	_ = r.conn.Close()
-	r.conn, err = net.Dial("tcp", r.addr)
+	var conn net.Conn
+	conn, err = net.Dial("tcp", r.addr)
 	if err != nil {
 		log.Errorf("fail to reconnect due %s", err)
+		return
 	}
+
+	_ = r.conn.Close()
+	r.lock.Lock()
+	r.conn = conn
+	r.bw = bufio.NewWriter(r.conn)
+	r.br = bufio.NewReader(r.conn)
+	r.lock.Unlock()
 }
 
 func write4ArgsCmd(w *bufio.Writer, cmd, key, field, val []byte) (err error) {
-	_ = writeBulkCount(w, 4)
+	_ = writeArrayCount(w, 4)
 	_ = writeToBulk(w, cmd)
 	_ = writeToBulk(w, key)
 	_ = writeToBulk(w, field)
@@ -173,14 +214,14 @@ func writePlainCmd(w *bufio.Writer, cmd, key, val []byte, size ...int) (err erro
 	if len(size) == 1 {
 		count = size[0]
 	}
-	_ = writeBulkCount(w, count)
+	_ = writeArrayCount(w, count)
 	_ = writeToBulk(w, cmd)
 	_ = writeToBulk(w, key)
 	err = writeToBulk(w, val)
 	return
 }
 
-func writeBulkCount(w *bufio.Writer, size int) (err error) {
+func writeArrayCount(w *bufio.Writer, size int) (err error) {
 	_, err = w.WriteString(fmt.Sprintf("*%d\r\n", size))
 	return
 }
