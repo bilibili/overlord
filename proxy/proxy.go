@@ -168,6 +168,7 @@ func (p *Proxy) MonitorConfChange(ccf string) {
 		select {
 		case ev := <-watch.Events:
 			if ev.Op&fsnotify.Create == fsnotify.Create || ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Rename == fsnotify.Rename {
+				time.Sleep(time.Second)
 				newConfs, err := LoadClusterConf(p.ccf)
 				if err != nil {
 					prom.ErrIncr(p.ccf, p.ccf, "config reload", err.Error())
