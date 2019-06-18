@@ -232,7 +232,7 @@ func parseChanged(newConfs, oldConfs []*ClusterConfig) (changed []*ClusterConfig
 
 	for _, newConf := range newConfs {
 		for _, oldConf := range oldConfs {
-			if newConf.Name != oldConf.Name || len(newConf.Servers) != len(oldConf.Servers) {
+			if newConf.Name != oldConf.Name {
 				continue
 			}
 
