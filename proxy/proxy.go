@@ -4,7 +4,6 @@ import (
 	errs "errors"
 	"net"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -221,19 +220,41 @@ func (p *Proxy) updateConfig(conf *ClusterConfig) (err error) {
 }
 
 func parseChanged(newConfs, oldConfs []*ClusterConfig) (changed []*ClusterConfig) {
+
 	changed = make([]*ClusterConfig, 0, len(oldConfs))
+	for _, cf := range newConfs {
+		sort.Strings(cf.Servers)
+	}
+
+	for _, cf := range oldConfs {
+		sort.Strings(cf.Servers)
+	}
+
 	for _, newConf := range newConfs {
 		for _, oldConf := range oldConfs {
 			if newConf.Name != oldConf.Name || len(newConf.Servers) != len(oldConf.Servers) {
 				continue
 			}
-			sort.Strings(newConf.Servers)
-			sort.Strings(oldConf.Servers)
-			if !reflect.DeepEqual(newConf.Servers, oldConf.Servers) {
+
+			if !deepEqualOrderedStringSlice(newConf.Servers, oldConf.Servers) {
 				changed = append(changed, newConf)
 			}
 			break
 		}
 	}
 	return
+}
+
+func deepEqualOrderedStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
