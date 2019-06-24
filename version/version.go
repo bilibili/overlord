@@ -10,7 +10,7 @@ import (
 const (
 	OverlordMajor = 1
 	OverlordMinor = 8
-	OverlordPatch = 1
+	OverlordPatch = 2
 )
 
 var showVersion bool
