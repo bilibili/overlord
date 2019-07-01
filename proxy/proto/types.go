@@ -1,5 +1,14 @@
 package proto
 
+import (
+	"errors"
+)
+
+// defined common errors
+var (
+	ErrQuit = errors.New("close client conn")
+)
+
 // Slowlogger is the type which can convert self into slowlog entry
 type Slowlogger interface {
 	Slowlog() *SlowlogEntry

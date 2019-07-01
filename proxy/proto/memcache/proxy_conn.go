@@ -84,17 +84,17 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	switch string(line[bg:ed]) {
 	// Storage commands:
 	case "set":
-		return p.decodeStorage(m, line[ed:], RequestTypeSet, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeSet, 0)
 	case "add":
-		return p.decodeStorage(m, line[ed:], RequestTypeAdd, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeAdd, 0)
 	case "replace":
-		return p.decodeStorage(m, line[ed:], RequestTypeReplace, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeReplace, 0)
 	case "append":
-		return p.decodeStorage(m, line[ed:], RequestTypeAppend, false)
+		return p.decodeStorage(m, line[ed:], RequestTypeAppend, 0)
 	case "prepend":
-		return p.decodeStorage(m, line[ed:], RequestTypePrepend, false)
+		return p.decodeStorage(m, line[ed:], RequestTypePrepend, 0)
 	case "cas":
-		return p.decodeStorage(m, line[ed:], RequestTypeCas, true)
+		return p.decodeStorage(m, line[ed:], RequestTypeCas, 1)
 	// Retrieval commands:
 	case "get":
 		return p.decodeRetrieval(m, line[ed:], RequestTypeGet)
@@ -116,20 +116,34 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
 	case "gats":
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
+	case "quit":
+		return p.decodeQuit(m, line[ed:])
 	}
 	err = errors.WithStack(ErrBadRequest)
 	return
 }
 
-func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, cas bool) (err error) {
+func (p *proxyConn) decodeQuit(m *proto.Message, key []byte) (err error) {
+	WithReq(m, RequestTypeQuit, key, crlfBytes)
+	return
+}
+
+func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, skip int) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
 		err = errors.WithStack(ErrBadKey)
 		return
 	}
+
+	noreply := mtype == RequestTypeSet && bytes.Contains(bs, noreplyBytes)
+	if noreply {
+		mtype = RequestTypeSetNoreply
+		skip++
+	}
+
 	// length
-	length, err := findLength(bs[keyE:], cas)
+	length, err := parseLen(bs[keyE:], skip)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -148,6 +162,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.WithStack(ErrBadRequest)
 		return
 	}
+
 	WithReq(m, mtype, key, data)
 	return
 }
@@ -283,17 +298,31 @@ func nextField(bs []byte) (begin, end int) {
 	return
 }
 
-func findLength(bs []byte, cas bool) (int, error) {
-	pos := len(bs) - 2 // NOTE: trim right "\r\n"
-	ns := bs[:pos]
-	if cas {
-		// skip cas filed
+func skipLastSpace(ns []byte) []byte {
+	if len(ns) == 0 {
+		return ns
+	}
+	i := len(ns) - 1
+	for ; i >= 0; i-- {
+		if ns[i] != spaceByte {
+			break
+		}
+	}
+	return ns[:i+1]
+}
+
+func parseLen(bs []byte, skip int) (int, error) {
+	ns := bs[:len(bs)-2]
+	for i := 0; i < skip; i++ {
+		ns = skipLastSpace(ns)
 		si := revSpacIdx(ns)
 		if si == -1 {
 			return -1, ErrBadLength
 		}
 		ns = ns[:si]
 	}
+	ns = skipLastSpace(ns)
+
 	low := revSpacIdx(ns) + 1
 	if low == 0 {
 		return -1, ErrBadLength
@@ -349,6 +378,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		err = p.bw.Write(crlfBytes)
 		return
 	}
+
 	if !m.IsBatch() {
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
@@ -357,6 +387,16 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			err = p.bw.Write(crlfBytes)
 			return
 		}
+
+		if mcr.rTp == RequestTypeQuit {
+			err = proto.ErrQuit
+			return
+		}
+
+		if mcr.rTp == RequestTypeSetNoreply {
+			return
+		}
+
 		err = p.bw.Write(mcr.data)
 		return
 	}

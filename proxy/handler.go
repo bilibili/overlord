@@ -168,6 +168,9 @@ func (h *Handler) closeWithError(err error) {
 		h.err = err
 		_ = h.conn.Close()
 		atomic.AddInt32(&h.p.conns, -1) // NOTE: decr!!!
+		if err == proto.ErrQuit {
+			return
+		}
 		if prom.On {
 			prom.ConnDecr(h.cc.Name)
 		}
