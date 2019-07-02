@@ -122,12 +122,8 @@ REREAD:
 		return
 	}
 	var length int
-	var skip = 0
-	if mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats {
-		skip = 1
-	}
 
-	if length, err = parseLen(bs, skip); err != nil {
+	if length, err = parseLen(bs, 4); err != nil {
 		err = errors.WithStack(err)
 		return
 	}

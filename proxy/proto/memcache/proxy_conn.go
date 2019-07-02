@@ -128,7 +128,7 @@ func (p *proxyConn) decodeQuit(m *proto.Message, key []byte) (err error) {
 	return
 }
 
-func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, skip int) (err error) {
+func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, nth int) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -139,11 +139,10 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	noreply := mtype == RequestTypeSet && bytes.Contains(bs, noreplyBytes)
 	if noreply {
 		mtype = RequestTypeSetNoreply
-		skip++
 	}
 
 	// length
-	length, err := parseLen(bs[keyE:], skip)
+	length, err := parseLen(bs[keyE:], 3)
 	if err != nil {
 		err = errors.WithStack(err)
 		return
@@ -298,40 +297,24 @@ func nextField(bs []byte) (begin, end int) {
 	return
 }
 
-func skipLastSpace(ns []byte) []byte {
-	if len(ns) == 0 {
-		return ns
+func parseLen(bs []byte, nth int) (int, error) {
+	ns := nthFiled(bs, nth)
+	ival, err := conv.Btoi(ns)
+	if err != nil {
+		return -1, ErrBadLength
 	}
-	i := len(ns) - 1
-	for ; i >= 0; i-- {
-		if ns[i] != spaceByte {
-			break
-		}
-	}
-	return ns[:i+1]
+	return int(ival), err
 }
 
-func parseLen(bs []byte, skip int) (int, error) {
-	ns := bs[:len(bs)-2]
-	for i := 0; i < skip; i++ {
-		ns = skipLastSpace(ns)
-		si := revSpacIdx(ns)
-		if si == -1 {
-			return -1, ErrBadLength
+func nthFiled(bs []byte, nth int) []byte {
+	for i := 0; i < nth; i++ {
+		begin, end := nextField(bs)
+		if i == nth-1 {
+			return bs[begin:end]
 		}
-		ns = ns[:si]
+		bs = bs[end:]
 	}
-	ns = skipLastSpace(ns)
-
-	low := revSpacIdx(ns) + 1
-	if low == 0 {
-		return -1, ErrBadLength
-	}
-	length, err := conv.Btoi(ns[low:])
-	if err != nil || length < 0 {
-		return -1, ErrBadLength
-	}
-	return int(length), nil
+	return bs
 }
 
 // Currently the length limit of a key is set at 250 characters.

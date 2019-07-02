@@ -16,40 +16,40 @@ import (
 
 func TestParseLenGetsResponseOk(t *testing.T) {
 	x := []byte(" 0 11 22\r\n")
-	i, err := parseLen(x, 1)
+	i, err := parseLen(x, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 11, i)
 
-	x = []byte(" 0 11\r\n")
-	i, err = parseLen(x, 0)
+	x = []byte(" 1024 11\r\n")
+	i, err = parseLen(x, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 11, i)
 
-	i, err = parseLen([]byte("VALUE a 0 1 \r\n"), 0)
+	i, err = parseLen([]byte("VALUE a 0 1 \r\n"), 4)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, i)
 
-	i, err = parseLen([]byte("VALUE 0 1024 reply\r\n"), 1)
+	i, err = parseLen([]byte("VALUE 0 1024 reply\r\n"), 3)
 	assert.NoError(t, err)
 	assert.Equal(t, 1024, i)
 
-	i, err = parseLen([]byte("VALUE 0 1 1024 1023 reply\r\n"), 2)
+	i, err = parseLen([]byte("VALUE 0 1 1024 1023 reply\r\n"), 4)
 	assert.NoError(t, err)
 	assert.Equal(t, 1024, i)
 }
 
 func TestParseLenParseLengthError(t *testing.T) {
-	i, err := parseLen([]byte("VALUE 0 abcdefghich@asaeaw\r\n"), 0)
+	i, err := parseLen([]byte("VALUE 0 abcdefghich@asaeaw\r\n"), 3)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
 
-	i, err = parseLen([]byte("VALUE\r\n"), 1)
+	i, err = parseLen([]byte("VALUE\r\n"), 2)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
 
-	i, err = parseLen([]byte("VALUE 0\r\n"), 1)
+	i, err = parseLen([]byte("VALUE 0\r\n"), 0)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)

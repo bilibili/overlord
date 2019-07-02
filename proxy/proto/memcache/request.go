@@ -13,13 +13,13 @@ const (
 )
 
 var (
-	spaceBytes       = []byte{' '}
-	zeroBytes        = []byte{'0'}
-	oneBytes         = []byte{'1'}
-	crlfBytes        = []byte("\r\n")
+	spaceBytes   = []byte{' '}
+	zeroBytes    = []byte{'0'}
+	oneBytes     = []byte{'1'}
+	crlfBytes    = []byte("\r\n")
 	noreplyBytes = []byte("noreply")
-	endBytes         = []byte("END\r\n")
-	errorBytes       = []byte("ERROR\r\n")
+	endBytes     = []byte("END\r\n")
+	errorBytes   = []byte("ERROR\r\n")
 
 	setBytes        = []byte("set")
 	addBytes        = []byte("add")
