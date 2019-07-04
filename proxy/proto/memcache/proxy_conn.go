@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	serverErrorBytes = []byte(serverErrorPrefix)
+	serverErrorBytes  = []byte(serverErrorPrefix)
 	versionReplyBytes = []byte("VERSION ")
 )
 
@@ -83,42 +83,42 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	conv.UpdateToLower(line[bg:ed])
 	switch string(line[bg:ed]) {
 	// Storage commands:
-	case "set":
-		return p.decodeStorage(m, line[ed:], RequestTypeSet, 0)
-	case "add":
-		return p.decodeStorage(m, line[ed:], RequestTypeAdd, 0)
-	case "replace":
-		return p.decodeStorage(m, line[ed:], RequestTypeReplace, 0)
-	case "append":
-		return p.decodeStorage(m, line[ed:], RequestTypeAppend, 0)
-	case "prepend":
-		return p.decodeStorage(m, line[ed:], RequestTypePrepend, 0)
-	case "cas":
-		return p.decodeStorage(m, line[ed:], RequestTypeCas, 1)
+	case setString:
+		return p.decodeStorage(m, line[ed:], RequestTypeSet)
+	case addString:
+		return p.decodeStorage(m, line[ed:], RequestTypeAdd)
+	case replaceString:
+		return p.decodeStorage(m, line[ed:], RequestTypeReplace)
+	case appendString:
+		return p.decodeStorage(m, line[ed:], RequestTypeAppend)
+	case prependString:
+		return p.decodeStorage(m, line[ed:], RequestTypePrepend)
+	case casString:
+		return p.decodeStorage(m, line[ed:], RequestTypeCas)
 	// Retrieval commands:
-	case "get":
+	case getString:
 		return p.decodeRetrieval(m, line[ed:], RequestTypeGet)
-	case "gets":
+	case getsString:
 		return p.decodeRetrieval(m, line[ed:], RequestTypeGets)
 	// Deletion
-	case "delete":
+	case deleteString:
 		return p.decodeDelete(m, line[ed:], RequestTypeDelete)
 	// Increment/Decrement:
-	case "incr":
+	case incrString:
 		return p.decodeIncrDecr(m, line[ed:], RequestTypeIncr)
-	case "decr":
+	case decrString:
 		return p.decodeIncrDecr(m, line[ed:], RequestTypeDecr)
 	// Touch:
-	case "touch":
+	case touchString:
 		return p.decodeTouch(m, line[ed:], RequestTypeTouch)
 	// Get And Touch:
-	case "gat":
+	case gatString:
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
-	case "gats":
+	case gatsString:
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
-	case "quit":
+	case quitString:
 		return p.decodeQuit(m, line[ed:])
-	case "version":
+	case versionString:
 		return p.decodeVersion(m, line[ed:])
 	}
 	err = errors.WithStack(ErrBadRequest)
@@ -135,7 +135,7 @@ func (p *proxyConn) decodeQuit(m *proto.Message, key []byte) (err error) {
 	return
 }
 
-func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType, nth int) (err error) {
+func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -154,6 +154,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		err = errors.WithStack(err)
 		return
 	}
+
 	keyOffset := len(bs) - keyE
 	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
 	data, err := p.br.ReadExact(keyOffset + length + 2)
@@ -253,10 +254,12 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			return
 		}
 	}
+
 	var (
 		b, e int
 		ns   = bs[eE:]
 	)
+
 	for {
 		ns = ns[e:]
 		b, e = nextField(ns)
@@ -382,6 +385,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			err = proto.ErrQuit
 			return
 		}
+
 		if mcr.rTp == RequestTypeVersion {
 			_ = p.bw.Write(versionReplyBytes)
 			_ = p.bw.Write(version.Bytes())
@@ -396,6 +400,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		err = p.bw.Write(mcr.data)
 		return
 	}
+
 	for _, req := range m.Requests() {
 		mcr, ok := req.(*MCRequest)
 		if !ok {
@@ -415,6 +420,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		}
 		_ = p.bw.Write(bs)
 	}
+
 	err = p.bw.Write(endBytes)
 	return
 }
