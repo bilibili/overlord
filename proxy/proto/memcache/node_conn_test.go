@@ -240,7 +240,7 @@ func TestNodeConnReadOk(t *testing.T) {
 func TestNodeConnReadWithLargeValue(t *testing.T) {
 	msg := _createReqMsg(RequestTypeGet, []byte("mykey"), []byte("\r\n"))
 	bodySize := 1048576
-	head := []byte("VALUE a 1 0 1048576\r\n")
+	head := []byte("VALUE a 1 1048576\r\n")
 	tail := "\r\nEND\r\n"
 
 	data := []byte{}
@@ -249,9 +249,10 @@ func TestNodeConnReadWithLargeValue(t *testing.T) {
 		data = append(data, make([]byte, bodySize)...)
 		data = append(data, tail...)
 	}
+
 	nc := _createNodeConn(data)
 	for i := 0; i < 3; i++ {
-		t.Run(fmt.Sprintf("times-%d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("times-%d", i+1), func(t *testing.T) {
 			err := nc.Read(msg)
 			mcr := msg.Request().(*MCRequest)
 			assert.Len(t, mcr.data, len(head)+bodySize+len(tail))
