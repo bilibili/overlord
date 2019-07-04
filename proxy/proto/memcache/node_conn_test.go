@@ -251,10 +251,12 @@ func TestNodeConnReadWithLargeValue(t *testing.T) {
 	}
 	nc := _createNodeConn(data)
 	for i := 0; i < 3; i++ {
-		err := nc.Read(msg)
-		mcr := msg.Request().(*MCRequest)
-		assert.Equal(t, len(mcr.data), len(head)+bodySize+len(tail))
-		assert.NoError(t, err)
+		t.Run(fmt.Sprintf("times-%d", i), func(t *testing.T) {
+			err := nc.Read(msg)
+			mcr := msg.Request().(*MCRequest)
+			assert.Len(t, mcr.data, len(head)+bodySize+len(tail))
+			assert.NoError(t, err)
+		})
 	}
 
 }
