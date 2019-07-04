@@ -8,9 +8,9 @@ import (
 	libnet "overlord/pkg/net"
 	"overlord/pkg/types"
 	"overlord/proxy/proto"
+	"overlord/version"
 
 	"github.com/pkg/errors"
-	"overlord/version"
 )
 
 // memcached protocol: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
@@ -143,7 +143,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 		return
 	}
 
-	noreply := mtype == RequestTypeSet && bytes.Contains(bs, noreplyBytes)
+	noreply := mtype == RequestTypeSet && bytes.Contains(bs[keyE:], noreplyBytes)
 	if noreply {
 		mtype = RequestTypeSetNoreply
 	}
