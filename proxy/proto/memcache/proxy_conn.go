@@ -10,17 +10,17 @@ import (
 	"overlord/proxy/proto"
 
 	"github.com/pkg/errors"
+	"overlord/version"
 )
 
 // memcached protocol: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 const (
-	errorPrefix       = "ERROR"
-	clientErrorPrefix = "CLIENT_ERROR "
 	serverErrorPrefix = "SERVER_ERROR "
 )
 
 var (
 	serverErrorBytes = []byte(serverErrorPrefix)
+	versionReplyBytes = []byte("VERSION ")
 )
 
 type proxyConn struct {
@@ -118,8 +118,15 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	case "quit":
 		return p.decodeQuit(m, line[ed:])
+	case "version":
+		return p.decodeVersion(m, line[ed:])
 	}
 	err = errors.WithStack(ErrBadRequest)
+	return
+}
+
+func (p *proxyConn) decodeVersion(m *proto.Message, key []byte) (err error) {
+	WithReq(m, RequestTypeVersion, key, crlfBytes)
 	return
 }
 
@@ -373,6 +380,12 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 
 		if mcr.rTp == RequestTypeQuit {
 			err = proto.ErrQuit
+			return
+		}
+		if mcr.rTp == RequestTypeVersion {
+			_ = p.bw.Write(versionReplyBytes)
+			_ = p.bw.Write(version.Bytes())
+			err = p.bw.Write(crlfBytes)
 			return
 		}
 

@@ -66,7 +66,7 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
-	if mcr.rTp == RequestTypeQuit {
+	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeVersion {
 		return
 	}
 	_ = n.bw.Write(mcr.rTp.Bytes())
@@ -100,7 +100,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
-	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeSetNoreply{
+	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeSetNoreply || mcr.rTp == RequestTypeVersion {
 		return
 	}
 

@@ -37,6 +37,7 @@ var (
 	gatsBytes       = []byte("gats")
 	quitBytes       = []byte("quit")
 	setNoreplyBytes = []byte("set")
+	versionBytes    = []byte("version")
 	unknownBytes    = []byte("unknown")
 	// storedBytes = []byte("STORED\r\n")
 	// notStoredBytes = []byte("NOT_STORED\r\n")
@@ -62,6 +63,7 @@ const (
 	gatString        = "gat"
 	gatsString       = "gats"
 	quitString       = "quit"
+	versionString    = "version"
 	setNoreplyString = "set"
 	unknownString    = "unknown"
 )
@@ -103,6 +105,8 @@ func (rt RequestType) String() string {
 		return quitString
 	case RequestTypeSetNoreply:
 		return setNoreplyString
+	case RequestTypeVersion:
+		return versionString
 	}
 	return unknownString
 }
@@ -142,6 +146,8 @@ func (rt RequestType) Bytes() []byte {
 		return quitBytes
 	case RequestTypeSetNoreply:
 		return setNoreplyBytes
+	case RequestTypeVersion:
+		return versionBytes
 	}
 
 	return unknownBytes
@@ -166,6 +172,7 @@ const (
 	RequestTypeGats
 	RequestTypeQuit
 	RequestTypeSetNoreply
+	RequestTypeVersion
 )
 
 var (
