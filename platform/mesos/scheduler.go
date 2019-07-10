@@ -437,6 +437,7 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		taskid := status.TaskID.GetValue()
 		idx := strings.IndexByte(taskid, '-')
 		addr := taskid[:idx]
+		addr += "/state"
 		switch st := status.GetState(); st {
 		case ms.TASK_FINISHED:
 			log.Info("state finish")
