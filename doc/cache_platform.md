@@ -61,7 +61,7 @@ overlord
 
 #### scheduler 主体流程
 
-1. 连接到etcd/zk 获取 `/overlord/task` 目录下未完成的 job 并监听目录实时获取 api-server 下发的任务信息并保存到本地任务队列
+1. 连接到etcd/zk 获取 `/overlord/job` 目录下未完成的 job 并监听目录实时获取 api-server 下发的任务信息并保存到本地任务队列
 2. 注册到 mesos master 并订阅 mesos event。
 3. 监听 event_offer 事件，并判断当前任务队列是否有未完成任务
 4. oferr resources 是否符合task任务资源描述需求 （判断依据 mem cpu balance）
