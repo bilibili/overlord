@@ -32,6 +32,7 @@ require (
 	github.com/sirupsen/logrus v1.3.0 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
+	github.com/ugorji/go v1.1.7 // indirect
 	github.com/urfave/cli v1.18.0
 	go.etcd.io/etcd v0.0.0-20190109224148-fae6e92407e0
 	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c // indirect
