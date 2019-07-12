@@ -10,7 +10,7 @@
   "dependencies": {
     "axios": "^0.18.0",
     "element-ui": "^2.4.11",
-    "lodash": "^4.17.10",
+    "lodash": "^4.17.14",
     "vue": "^2.5.17",
     "vue-json-pretty": "^1.4.1",
     "vue-router": "^3.0.1",
