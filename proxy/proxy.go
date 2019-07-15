@@ -57,14 +57,6 @@ func New(c *Config) (p *Proxy, err error) {
 
 // Serve is the main accept() loop of a server.
 func (p *Proxy) Serve(ccs []*ClusterConfig) {
-	if len(ccs) != 0 {
-		for _, cs := range ccs {
-			log.Infof("start to serve cluster[%s] with configs %v", cs.Name, *cs)
-		}
-	} else {
-		log.Warn("no cluster config, skip")
-	}
-
 	p.ccs = ccs
 	if len(ccs) == 0 {
 		log.Warnf("overlord will never listen on any port due to cluster is not specified")
@@ -73,6 +65,7 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.forwarders = map[string]proto.Forwarder{}
 	p.lock.Unlock()
 	for _, cc := range ccs {
+		log.Infof("start to serve cluster[%s] with configs %v", cc.Name, *cc)
 		p.serve(cc)
 	}
 }

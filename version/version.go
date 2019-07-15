@@ -13,9 +13,11 @@ const (
 	OverlordPatch = 3
 )
 
-var showVersion bool
-var vstr string
-var vbytes []byte
+var (
+	showVersion bool
+	vstr string
+	vbytes []byte
+)
 
 func init() {
 	vstr = fmt.Sprintf("%d.%d.%d", OverlordMajor, OverlordMinor, OverlordPatch)
