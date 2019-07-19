@@ -66,6 +66,9 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
+	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeVersion {
+		return
+	}
 	_ = n.bw.Write(mcr.rTp.Bytes())
 	_ = n.bw.Write(spaceBytes)
 	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
@@ -97,6 +100,10 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
+	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeSetNoreply || mcr.rTp == RequestTypeVersion {
+		return
+	}
+
 	mcr.data = mcr.data[:0]
 REREAD:
 	var bs []byte
@@ -115,7 +122,8 @@ REREAD:
 		return
 	}
 	var length int
-	if length, err = findLength(bs, mcr.rTp == RequestTypeGets || mcr.rTp == RequestTypeGats); err != nil {
+
+	if length, err = parseLen(bs, 4); err != nil {
 		err = errors.WithStack(err)
 		return
 	}

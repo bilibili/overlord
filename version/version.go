@@ -10,14 +10,18 @@ import (
 const (
 	OverlordMajor = 1
 	OverlordMinor = 8
-	OverlordPatch = 2
+	OverlordPatch = 3
 )
 
-var showVersion bool
-var vstr string
+var (
+	showVersion bool
+	vstr string
+	vbytes []byte
+)
 
 func init() {
 	vstr = fmt.Sprintf("%d.%d.%d", OverlordMajor, OverlordMinor, OverlordPatch)
+	vbytes = []byte(vstr)
 	flag.BoolVar(&showVersion, "version", false, "show version and exit.")
 }
 
@@ -27,6 +31,11 @@ func ShowVersion() bool {
 		fmt.Fprintln(os.Stdout, vstr)
 	}
 	return showVersion
+}
+
+// Bytes return version bytes
+func Bytes() []byte {
+	return vbytes
 }
 
 // Str is the formatted version string
