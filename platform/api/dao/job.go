@@ -83,11 +83,13 @@ func (d *Dao) WatchJob(ctx context.Context) (j chan *model.Job) {
 	key, _ := d.e.WatchOn(ctx, etcd.JobsDir, etcd.ActionSet, etcd.ActionCreate)
 	j = make(chan *model.Job)
 	go func() {
-		node := <-key
-		pre, id := filepath.Split(node.Key)
-		_, group := filepath.Split(pre[:len(pre)-1])
-		job := &model.Job{ID: fmt.Sprintf("%s.%s", group, id), Param: node.Value}
-		j <- job
+		for {
+			node := <-key
+			pre, id := filepath.Split(node.Key)
+			_, group := filepath.Split(pre[:len(pre)-1])
+			job := &model.Job{ID: fmt.Sprintf("%s.%s", group, id), Param: node.Value}
+			j <- job
+		}
 	}()
 	return
 }
