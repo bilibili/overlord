@@ -35,6 +35,10 @@ type SlowlogEntry struct {
 	StartTime time.Time
 	TotalDur  time.Duration
 	RemoteDur time.Duration
+	WaitWriteDur time.Duration
+	PreEndDur    time.Duration
+	PipeDur      time.Duration
+	InputDur     time.Duration
 	Subs      []*SlowlogEntry `json:"Subs,omitempty"`
 }
 

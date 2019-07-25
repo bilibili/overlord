@@ -73,6 +73,7 @@ func (ncp *NodeConnPipe) Push(m *Message) {
 	if input != nil {
 		select {
 		case input <- m:
+			m.MarkStartInput()
 			return
 		default:
 		}
@@ -133,6 +134,7 @@ func (mp *msgPipe) pipe() {
 			if m == nil {
 				select {
 				case m, ok = <-mp.input:
+					m.MarkEndInput()
 					if !ok {
 						nc.Close()
 						return
@@ -191,6 +193,7 @@ func (mp *msgPipe) pipe() {
 			err = nil
 		}
 		m, ok = <-mp.input // NOTE: avoid infinite loop
+		m.MarkEndInput()
 		if !ok {
 			nc.Close()
 			return

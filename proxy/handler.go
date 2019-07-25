@@ -106,6 +106,7 @@ func (h *Handler) handle() {
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
+			msg.MarkEndPipe()
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)

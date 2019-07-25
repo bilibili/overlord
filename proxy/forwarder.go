@@ -102,6 +102,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 					m.WithError(ErrForwarderHashNoNode)
 					return errors.WithStack(ErrForwarderHashNoNode)
 				}
+				subm.MarkStartPipe()
 				ncp.Push(subm)
 			}
 		} else {
@@ -111,6 +112,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 				m.WithError(ErrForwarderHashNoNode)
 				return errors.WithStack(ErrForwarderHashNoNode)
 			}
+			m.MarkStartPipe()
 			ncp.Push(m)
 		}
 	}

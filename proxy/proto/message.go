@@ -70,8 +70,8 @@ type Message struct {
 	subs []*Message
 	wg   *sync.WaitGroup
 
-	// Start Time, Write Time, ReadTime, EndTime
-	st, wt, rt, et time.Time
+	// Start Time, Write Time, ReadTime, EndTime, Start Pipe Time, End Pipe Time, Start Pipe Time, End Pipe Time
+	st, wt, rt, et, spt, ept, sit, eit time.Time
 	err            error
 }
 
@@ -85,7 +85,7 @@ func NewMessage() *Message {
 func (m *Message) Reset() {
 	m.Type = types.CacheTypeUnknown
 	m.reqn = 0
-	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
+	m.st, m.wt, m.rt, m.et, m.spt, m.ept, m.sit, m.eit = defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
 }
 
@@ -108,6 +108,26 @@ func (m *Message) RemoteDur() time.Duration {
 	return m.rt.Sub(m.wt)
 }
 
+// WaitWriteDur ...
+func (m *Message) WaitWriteDur() time.Duration {
+	return m.wt.Sub(m.st)
+}
+
+// PreEndDur ...
+func (m *Message) PreEndDur() time.Duration {
+	return m.et.Sub(m.rt)
+}
+
+// PipeDur ...
+func (m *Message) PipeDur() time.Duration {
+	return m.ept.Sub(m.spt)
+}
+
+// InputDur ...
+func (m *Message) InputDur() time.Duration {
+	return m.eit.Sub(m.sit)
+}
+
 // MarkStart will set the start time of the command to now.
 func (m *Message) MarkStart() {
 	m.st = time.Now()
@@ -126,6 +146,26 @@ func (m *Message) MarkRead() {
 // MarkEnd will set the end time of the command to now.
 func (m *Message) MarkEnd() {
 	m.et = time.Now()
+}
+
+// MarkStartPipe ...
+func (m *Message) MarkStartPipe() {
+	m.spt = time.Now()
+}
+
+// MarkStartPipe ...
+func (m *Message) MarkEndPipe() {
+	m.ept = time.Now()
+}
+
+// MarkStartInput ...
+func (m *Message) MarkStartInput() {
+	m.sit = time.Now()
+}
+
+// MarkEndInput ...
+func (m *Message) MarkEndInput() {
+	m.eit = time.Now()
 }
 
 // ResetSubs will return the Msg data to flush and reset
@@ -266,12 +306,20 @@ func (m *Message) Slowlog() (slog *SlowlogEntry) {
 			slog.Subs[i].StartTime = m.st
 			slog.Subs[i].RemoteDur = m.subs[i].rt.Sub(m.subs[i].wt)
 			slog.Subs[i].TotalDur = m.et.Sub(m.st)
+			slog.Subs[i].WaitWriteDur = m.subs[i].WaitWriteDur()
+			slog.Subs[i].PreEndDur = m.subs[i].PreEndDur()
+			slog.Subs[i].PipeDur = m.subs[i].PipeDur()
+			slog.Subs[i].InputDur = m.subs[i].InputDur()
 		}
 	} else {
 		slog = m.Request().Slowlog()
 		slog.StartTime = m.st
 		slog.TotalDur = m.TotalDur()
 		slog.RemoteDur = m.RemoteDur()
+		slog.WaitWriteDur = m.WaitWriteDur()
+		slog.PreEndDur = m.PreEndDur()
+		slog.PipeDur = m.PipeDur()
+		slog.InputDur = m.InputDur()
 	}
 	return
 }
