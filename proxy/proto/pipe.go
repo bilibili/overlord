@@ -134,11 +134,11 @@ func (mp *msgPipe) pipe() {
 			if m == nil {
 				select {
 				case m, ok = <-mp.input:
-					m.MarkEndInput()
 					if !ok {
 						nc.Close()
 						return
 					}
+					m.MarkEndInput()
 				default:
 				}
 				if m == nil {
@@ -193,11 +193,11 @@ func (mp *msgPipe) pipe() {
 			err = nil
 		}
 		m, ok = <-mp.input // NOTE: avoid infinite loop
-		m.MarkEndInput()
 		if !ok {
 			nc.Close()
 			return
 		}
+		m.MarkEndInput()
 	}
 }
 
