@@ -46,3 +46,15 @@ func TestPingerPingErr(t *testing.T) {
 	err := p.Ping()
 	assert.EqualError(t, err, "some error")
 }
+
+func TestPingerFinishBufferOffset(t *testing.T) {
+	conn := libnet.NewConn(mockconn.CreateConn(pongBytes, 100), time.Second, time.Second)
+	pg := NewPinger(conn)
+	err := pg.Ping()
+	assert.NoError(t, err, "there is no error")
+
+	p, ok := pg.(*pinger)
+	assert.True(t, ok)
+	buf := p.br.Buffer()
+	assert.Len(t, buf.Bytes(), 0)
+}
