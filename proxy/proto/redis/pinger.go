@@ -57,7 +57,7 @@ func (p *pinger) Ping() (err error) {
 		return
 	}
 	_ = p.br.Read()
-	defer p.br.AdvanceTo(0)
+	defer p.br.Buffer().Reset()
 	data, err := p.br.ReadLine()
 	if err != nil {
 		err = errors.WithStack(err)
