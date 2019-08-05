@@ -149,6 +149,7 @@ func (c *cluster) fetchproc() {
 		case <-time.After(30 * time.Minute):
 		}
 		c.tryFetch()
+		time.Sleep(time.Second)
 	}
 }
 
