@@ -79,6 +79,11 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	if reply.Type() != respRedirect {
 		return
 	}
+	// tryFetch when redirect occurred
+	select {
+	case nc.c.action <- struct{}{}:
+	default:
+	}
 	if nc.redirects >= maxRedirects { // NOTE: check max redirects
 		if log.V(4) {
 			log.Infof("Redis Cluster NodeConn key(%s) already max redirects", req.Key())
