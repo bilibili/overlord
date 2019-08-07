@@ -307,13 +307,13 @@ var (
 		"5\r\nPFADD",
 		"7\r\nPFMERGE",
 		"4\r\nEVAL",
+		"11\r\nSUNIONSTORE",
+		"11\r\nZUNIONSTORE",
 	}
 	notSupportCmds = []string{
 		"6\r\nMSETNX",
 		"10\r\nSDIFFSTORE",
 		"11\r\nSINTERSTORE",
-		"11\r\nSUNIONSTORE",
-		"11\r\nZUNIONSTORE",
 		"5\r\nBLPOP",
 		"5\r\nBRPOP",
 		"10\r\nBRPOPLPUSH",

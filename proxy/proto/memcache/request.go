@@ -13,28 +13,32 @@ const (
 )
 
 var (
-	spaceBytes = []byte{' '}
-	zeroBytes  = []byte{'0'}
-	oneBytes   = []byte{'1'}
-	crlfBytes  = []byte("\r\n")
-	endBytes   = []byte("END\r\n")
-	errorBytes = []byte("ERROR\r\n")
+	spaceBytes   = []byte{' '}
+	zeroBytes    = []byte{'0'}
+	oneBytes     = []byte{'1'}
+	crlfBytes    = []byte("\r\n")
+	noreplyBytes = []byte("noreply")
+	endBytes     = []byte("END\r\n")
+	errorBytes   = []byte("ERROR\r\n")
 
-	setBytes     = []byte("set")
-	addBytes     = []byte("add")
-	replaceBytes = []byte("replace")
-	appendBytes  = []byte("append")
-	prependBytes = []byte("prepend")
-	casBytes     = []byte("cas")
-	getBytes     = []byte("get")
-	getsBytes    = []byte("gets")
-	deleteBytes  = []byte("delete")
-	incrBytes    = []byte("incr")
-	decrBytes    = []byte("decr")
-	touchBytes   = []byte("touch")
-	gatBytes     = []byte("gat")
-	gatsBytes    = []byte("gats")
-	unknownBytes = []byte("unknown")
+	setBytes        = []byte("set")
+	addBytes        = []byte("add")
+	replaceBytes    = []byte("replace")
+	appendBytes     = []byte("append")
+	prependBytes    = []byte("prepend")
+	casBytes        = []byte("cas")
+	getBytes        = []byte("get")
+	getsBytes       = []byte("gets")
+	deleteBytes     = []byte("delete")
+	incrBytes       = []byte("incr")
+	decrBytes       = []byte("decr")
+	touchBytes      = []byte("touch")
+	gatBytes        = []byte("gat")
+	gatsBytes       = []byte("gats")
+	quitBytes       = []byte("quit")
+	setNoreplyBytes = []byte("set")
+	versionBytes    = []byte("version")
+	unknownBytes    = []byte("unknown")
 	// storedBytes = []byte("STORED\r\n")
 	// notStoredBytes = []byte("NOT_STORED\r\n")
 	// existsBytes    = []byte("EXISTS\r\n")
@@ -44,21 +48,24 @@ var (
 )
 
 const (
-	setString     = "set"
-	addString     = "add"
-	replaceString = "replace"
-	appendString  = "append"
-	prependString = "prepend"
-	casString     = "cas"
-	getString     = "get"
-	getsString    = "gets"
-	deleteString  = "delete"
-	incrString    = "incr"
-	decrString    = "decr"
-	touchString   = "touch"
-	gatString     = "gat"
-	gatsString    = "gats"
-	unknownString = "unknown"
+	setString        = "set"
+	addString        = "add"
+	replaceString    = "replace"
+	appendString     = "append"
+	prependString    = "prepend"
+	casString        = "cas"
+	getString        = "get"
+	getsString       = "gets"
+	deleteString     = "delete"
+	incrString       = "incr"
+	decrString       = "decr"
+	touchString      = "touch"
+	gatString        = "gat"
+	gatsString       = "gats"
+	quitString       = "quit"
+	versionString    = "version"
+	setNoreplyString = "set"
+	unknownString    = "unknown"
 )
 
 // RequestType is the protocol-agnostic identifier for the command
@@ -94,6 +101,12 @@ func (rt RequestType) String() string {
 		return gatString
 	case RequestTypeGats:
 		return gatsString
+	case RequestTypeQuit:
+		return quitString
+	case RequestTypeSetNoreply:
+		return setNoreplyString
+	case RequestTypeVersion:
+		return versionString
 	}
 	return unknownString
 }
@@ -129,7 +142,14 @@ func (rt RequestType) Bytes() []byte {
 		return gatBytes
 	case RequestTypeGats:
 		return gatsBytes
+	case RequestTypeQuit:
+		return quitBytes
+	case RequestTypeSetNoreply:
+		return setNoreplyBytes
+	case RequestTypeVersion:
+		return versionBytes
 	}
+
 	return unknownBytes
 }
 
@@ -150,6 +170,9 @@ const (
 	RequestTypeTouch
 	RequestTypeGat
 	RequestTypeGats
+	RequestTypeQuit
+	RequestTypeSetNoreply
+	RequestTypeVersion
 )
 
 var (

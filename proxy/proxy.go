@@ -65,6 +65,7 @@ func (p *Proxy) Serve(ccs []*ClusterConfig) {
 	p.forwarders = map[string]proto.Forwarder{}
 	p.lock.Unlock()
 	for _, cc := range ccs {
+		log.Infof("start to serve cluster[%s] with configs %v", cc.Name, *cc)
 		p.serve(cc)
 	}
 }

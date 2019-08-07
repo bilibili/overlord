@@ -14,34 +14,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFindLengthGetsResponseOk(t *testing.T) {
-	// x := []byte{86, 65, 76, 85, 69, 32, 97, 95, 49, 49, 32, 48, 32, 49, 32, 51, 56, 51, 55, 13, 10}
+func TestParseLenGetsResponseOk(t *testing.T) {
 	x := []byte(" 0 11 22\r\n")
-	i, err := findLength(x, true)
+	i, err := parseLen(x, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 11, i)
 
-	x = []byte(" 0 11\r\n")
-	i, err = findLength(x, false)
+	x = []byte(" 1024 11\r\n")
+	i, err = parseLen(x, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, 11, i)
+
+	i, err = parseLen([]byte("VALUE a 0 1 \r\n"), 4)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, i)
+
+	i, err = parseLen([]byte("VALUE 0 1024 reply\r\n"), 3)
+	assert.NoError(t, err)
+	assert.Equal(t, 1024, i)
+
+	i, err = parseLen([]byte("VALUE 0 1 1024 1023 reply\r\n"), 4)
+	assert.NoError(t, err)
+	assert.Equal(t, 1024, i)
 }
 
-func TestFindLengthParseLengthError(t *testing.T) {
-	i, err := findLength([]byte("VALUE 0 abcdefghich@asaeaw\r\n"), false)
+func TestParseLenParseLengthError(t *testing.T) {
+	i, err := parseLen([]byte("VALUE 0 abcdefghich@asaeaw\r\n"), 3)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
 
-	i, err = findLength([]byte("VALUE\r\n"), true)
+	i, err = parseLen([]byte("VALUE\r\n"), 2)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
 
-	i, err = findLength([]byte("VALUE 0\r\n"), true)
+	i, err = parseLen([]byte("VALUE 0\r\n"), 0)
 	assert.Error(t, err)
 	assert.Equal(t, ErrBadLength, err)
 	assert.Equal(t, -1, i)
+
 }
 
 func TestNextFeild(t *testing.T) {
@@ -189,7 +201,7 @@ func TestProxyConnEncodeOk(t *testing.T) {
 		Except string
 	}{
 		{Name: "SetOk", Req: "set mykey 0 0 1\r\na\r\n", Resp: [][]byte{[]byte("STORED\r\n")}, Except: "STORED\r\n"},
-		{Name: "GetOk", Req: "get mykey\r\n", Resp: [][]byte{[]byte("VALUE 0 2\r\nab\r\nEND\r\n")}, Except: "VALUE 0 2\r\nab\r\nEND\r\n"},
+		{Name: "GetOk", Req: "get mykey\r\n", Resp: [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n")}, Except: "VALUE mykey 0 2\r\nab\r\nEND\r\n"},
 		{Name: "GetMultiOk", Req: "get mykey yourkey\r\n",
 			Resp:   [][]byte{[]byte("VALUE mykey 0 2\r\nab\r\nEND\r\n"), []byte("VALUE yourkey 0 3\r\ncde\r\nEND\r\n")},
 			Except: "VALUE mykey 0 2\r\nab\r\nVALUE yourkey 0 3\r\ncde\r\nEND\r\n"},
