@@ -9,15 +9,13 @@ import (
 	"strings"
 	"time"
 
-	
-	"overlord/platform/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/pkg/types"
+	"overlord/platform/chunk"
 	"overlord/platform/job"
 	"overlord/platform/job/create"
-	
-	"github.com/pkg/errors"
+
 	pb "github.com/golang/protobuf/proto"
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding/codecs"
@@ -26,10 +24,11 @@ import (
 	"github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/eventrules"
 	mstore "github.com/mesos/mesos-go/api/v1/lib/extras/store"
 	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
-	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"	
+	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/calls"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/events"
+	"github.com/pkg/errors"
 	cli "go.etcd.io/etcd/client"
 )
 
@@ -157,7 +156,6 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	}
 	return frameworkInfo
 }
-
 
 func (s *Scheduler) buildEventHandle() events.Handler {
 	logger := controller.LogEvents(eventLog)
@@ -435,8 +433,9 @@ func (s *Scheduler) statusUpdate() events.HandlerFunc {
 		}
 		log.Info(msg)
 		taskid := status.TaskID.GetValue()
-		idx := strings.IndexByte(taskid, '-')
-		addr := taskid[:idx]
+		countIdx := strings.LastIndexByte(taskid, '-')
+		clusterIdx := strings.LastIndexByte(taskid[:countIdx], '-')
+		addr := taskid[:clusterIdx]
 		addr += "/state"
 		switch st := status.GetState(); st {
 		case ms.TASK_FINISHED:
