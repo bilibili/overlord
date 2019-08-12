@@ -9,7 +9,7 @@ import (
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/redis"
 
-	"bou.ke/monkey"
+	"github.com/bouk/monkey"
 	"github.com/stretchr/testify/assert"
 )
 
