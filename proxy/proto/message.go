@@ -72,7 +72,8 @@ type Message struct {
 
 	// Start Time, Write Time, ReadTime, EndTime, Start Pipe Time, End Pipe Time, Start Pipe Time, End Pipe Time
 	st, wt, rt, et, spt, ept, sit, eit time.Time
-	err            error
+	addr                               string
+	err                                error
 }
 
 // NewMessage will create new message object.
@@ -128,6 +129,11 @@ func (m *Message) InputDur() time.Duration {
 	return m.eit.Sub(m.sit)
 }
 
+// Addr ...
+func (m *Message) Addr() string {
+	return m.addr
+}
+
 // MarkStart will set the start time of the command to now.
 func (m *Message) MarkStart() {
 	m.st = time.Now()
@@ -166,6 +172,11 @@ func (m *Message) MarkStartInput() {
 // MarkEndInput ...
 func (m *Message) MarkEndInput() {
 	m.eit = time.Now()
+}
+
+// MarkAddr ...
+func (m *Message) MarkAddr(addr string) {
+	m.addr = addr
 }
 
 // ResetSubs will return the Msg data to flush and reset
@@ -310,6 +321,7 @@ func (m *Message) Slowlog() (slog *SlowlogEntry) {
 			slog.Subs[i].PreEndDur = m.subs[i].PreEndDur()
 			slog.Subs[i].PipeDur = m.subs[i].PipeDur()
 			slog.Subs[i].InputDur = m.subs[i].InputDur()
+			slog.Subs[i].Addr = m.subs[i].Addr()
 		}
 	} else {
 		slog = m.Request().Slowlog()
@@ -320,6 +332,7 @@ func (m *Message) Slowlog() (slog *SlowlogEntry) {
 		slog.PreEndDur = m.PreEndDur()
 		slog.PipeDur = m.PipeDur()
 		slog.InputDur = m.InputDur()
+		slog.Addr = m.Addr()
 	}
 	return
 }

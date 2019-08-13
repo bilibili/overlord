@@ -14,7 +14,7 @@ const (
 	opened = int32(0)
 	closed = int32(1)
 
-	pipeMaxCount = 128
+	pipeMaxCount = 32
 )
 
 var (
@@ -148,6 +148,7 @@ func (mp *msgPipe) pipe() {
 			mp.batch[mp.count] = m
 			mp.count++
 			m.MarkWrite()
+			nc.Addr()
 			err = nc.Write(m)
 			m = nil
 			if err != nil {
@@ -165,6 +166,7 @@ func (mp *msgPipe) pipe() {
 				if err == nil {
 					err = nc.Read(mp.batch[i])
 					mp.batch[i].MarkRead()
+					mp.batch[i].MarkAddr(nc.Addr())
 				} else {
 					goto MEND
 				}
