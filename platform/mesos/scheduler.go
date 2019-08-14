@@ -498,7 +498,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		jobChunks = newChunk
 		chunks = append(chunks, newChunk...)
 	case job.OpDestroy:
-		s.destroyCluster(t)
+		s.destroyCluster(t, offers)
 		return
 	case job.OpRestart:
 		s.restartNode(t, offers)
@@ -580,7 +580,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		}
 		jobDist = dist
 	case job.OpDestroy:
-		s.destroyCluster(t)
+		s.destroyCluster(t, offers)
 		return
 	case job.OpScale:
 		var (
@@ -677,7 +677,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 	return
 }
 
-func (s *Scheduler) destroyCluster(t job.Job) {
+func (s *Scheduler) destroyCluster(t job.Job, offers []ms.Offer) {
 	var (
 		ctx = context.Background()
 	)
