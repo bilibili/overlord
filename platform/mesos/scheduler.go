@@ -9,15 +9,13 @@ import (
 	"strings"
 	"time"
 
-	
-	"overlord/platform/chunk"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
 	"overlord/pkg/types"
+	"overlord/platform/chunk"
 	"overlord/platform/job"
 	"overlord/platform/job/create"
-	
-	"github.com/pkg/errors"
+
 	pb "github.com/golang/protobuf/proto"
 	ms "github.com/mesos/mesos-go/api/v1/lib"
 	"github.com/mesos/mesos-go/api/v1/lib/encoding/codecs"
@@ -26,10 +24,11 @@ import (
 	"github.com/mesos/mesos-go/api/v1/lib/extras/scheduler/eventrules"
 	mstore "github.com/mesos/mesos-go/api/v1/lib/extras/store"
 	"github.com/mesos/mesos-go/api/v1/lib/httpcli"
-	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"	
+	"github.com/mesos/mesos-go/api/v1/lib/httpcli/httpsched"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/calls"
 	"github.com/mesos/mesos-go/api/v1/lib/scheduler/events"
+	"github.com/pkg/errors"
 	cli "go.etcd.io/etcd/client"
 )
 
@@ -158,7 +157,6 @@ func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	return frameworkInfo
 }
 
-
 func (s *Scheduler) buildEventHandle() events.Handler {
 	logger := controller.LogEvents(eventLog)
 	return eventrules.New().Handle(events.Handlers{
@@ -232,18 +230,22 @@ func (s *Scheduler) resourceOffers() events.HandlerFunc {
 		}
 		// if there don't have any task,decline all offers and suppress offer envent.
 		// until task comming and call revive to schedule new workloads by taskevent.
-		ofid := make([]ms.OfferID, len(offers))
-		for _, offer := range offers {
-			ofid = append(ofid, offer.ID)
-		}
-		decli := calls.Decline(ofid...)
-		// TODO: deal with error
-		_ = calls.CallNoData(ctx, s.cli, decli)
-		suppress := calls.Suppress()
-		// TODO: deal with error
-		_ = calls.CallNoData(ctx, s.cli, suppress)
+		s.declineAndSuppress(offers, ctx)
 		return nil
 	}
+}
+
+func (s *Scheduler) declineAndSuppress(offers []ms.Offer, ctx context.Context) {
+	ofid := make([]ms.OfferID, len(offers))
+	for _, offer := range offers {
+		ofid = append(ofid, offer.ID)
+	}
+	decli := calls.Decline(ofid...)
+	// TODO: deal with error
+	_ = calls.CallNoData(ctx, s.cli, decli)
+	suppress := calls.Suppress()
+	// TODO: deal with error
+	_ = calls.CallNoData(ctx, s.cli, suppress)
 }
 
 func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err error) {
@@ -679,6 +681,9 @@ func (s *Scheduler) destroyCluster(t job.Job) {
 	var (
 		ctx = context.Background()
 	)
+	// destroy didn't need to offers，should decline it immediately
+	s.declineAndSuppress(offers, ctx)
+
 	ci, err := s.getInfoFromEtcd(ctx, t.Name)
 	if err != nil {
 		log.Errorf("get info fail err %v", err)
