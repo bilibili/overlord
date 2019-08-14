@@ -114,6 +114,7 @@ func (ec *Executor) handleEvent(e *executor.Event) {
 		}
 	case executor.Event_KILL:
 		ec.kill(e.Kill.TaskID)
+		ec.shouldQuit = true
 	case executor.Event_SHUTDOWN:
 	case executor.Event_ACKNOWLEDGED:
 		delete(ec.unackedTasks, e.Acknowledged.TaskID)
