@@ -21,7 +21,7 @@ func TestRequestNewRequest(t *testing.T) {
 	err := req.resp.decode(br)
 	assert.Nil(t, err)
 	assert.Equal(t, mergeTypeNo, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "LLEN", req.CmdString())
 	assert.Equal(t, []byte("LLEN"), req.Cmd())
 	assert.Equal(t, "mylist", string(req.Key()))

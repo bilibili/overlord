@@ -1451,7 +1451,7 @@ async-foreach@^0.1.3:
 async-limiter@~1.0.0:
   version "1.0.0"
   resolved "https://registry.npm.taobao.org/async-limiter/download/async-limiter-1.0.0.tgz#78faed8c3d074ab81f22b4e985d79e8738f720f8"
-  integrity sha1-ePrtjD0HSrgfIrTphdeehzj3IPg=
+  integrity sha1-ePrtjD0HSrgfIrespTypehdeehzj3IPg=
 
 async-validator@~1.8.1:
   version "1.8.5"
@@ -4040,7 +4040,7 @@ globby@^9.2.0:
 globule@^1.0.0:
   version "1.2.1"
   resolved "https://registry.npm.taobao.org/globule/download/globule-1.2.1.tgz#5dffb1b191f22d20797a9369b49eab4e9839696d"
-  integrity sha1-Xf+xsZHyLSB5epNptJ6rTpg5aW0=
+  integrity sha1-Xf+xsZHyLSB5epNptJ6respTypeg5aW0=
   dependencies:
     glob "~7.1.1"
     lodash "~4.17.10"

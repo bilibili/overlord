@@ -15,7 +15,7 @@ func TestRespDecode(t *testing.T) {
 	ts := []struct {
 		Name       string
 		Bytes      []byte
-		ExpectTp   respType
+		ExpectTp   byte
 		ExpectLen  int
 		ExpectData []byte
 		ExpectArr  [][]byte
@@ -93,8 +93,8 @@ func TestRespDecode(t *testing.T) {
 			if err := r.decode(br); err != nil {
 				t.Fatalf("decode error:%v", err)
 			}
-			assert.Equal(t, tt.ExpectTp, r.rTp)
-			assert.Equal(t, tt.ExpectLen, r.arrayn)
+			assert.Equal(t, tt.ExpectTp, r.respType)
+			assert.Equal(t, tt.ExpectLen, r.arraySize)
 			assert.Equal(t, tt.ExpectData, r.data)
 			if len(tt.ExpectArr) > 0 {
 				for i, ea := range tt.ExpectArr {
@@ -114,119 +114,119 @@ func TestRespEncode(t *testing.T) {
 		{
 			Name: "ok",
 			Resp: &resp{
-				rTp:  respString,
-				data: []byte("OK"),
+				respType: respString,
+				data:     []byte("OK"),
 			},
 			Expect: []byte("+OK\r\n"),
 		},
 		{
 			Name: "error",
 			Resp: &resp{
-				rTp:  respError,
-				data: []byte("Error message"),
+				respType: respError,
+				data:     []byte("Error message"),
 			},
 			Expect: []byte("-Error message\r\n"),
 		},
 		{
 			Name: "int",
 			Resp: &resp{
-				rTp:  respInt,
-				data: []byte("1000"),
+				respType: respInt,
+				data:     []byte("1000"),
 			},
 			Expect: []byte(":1000\r\n"),
 		},
 		{
 			Name: "bulk",
 			Resp: &resp{
-				rTp:  respBulk,
-				data: []byte("6\r\nfoobar"),
+				respType: respBulk,
+				data:     []byte("6\r\nfoobar"),
 			},
 			Expect: []byte("$6\r\nfoobar\r\n"),
 		},
 		{
 			Name: "array1",
 			Resp: &resp{
-				rTp:  respArray,
-				data: []byte("2"),
+				respType: respArray,
+				data:     []byte("2"),
 				array: []*resp{
 					&resp{
-						rTp:  respBulk,
-						data: []byte("3\r\nfoo"),
+						respType: respBulk,
+						data:     []byte("3\r\nfoo"),
 					},
 					&resp{
-						rTp:  respBulk,
-						data: []byte("4\r\nbara"),
+						respType: respBulk,
+						data:     []byte("4\r\nbara"),
 					},
 				},
-				arrayn: 2,
+				arraySize: 2,
 			},
 			Expect: []byte("*2\r\n$3\r\nfoo\r\n$4\r\nbara\r\n"),
 		},
 		{
 			Name: "array2",
 			Resp: &resp{
-				rTp:  respArray,
-				data: []byte("3"),
+				respType: respArray,
+				data:     []byte("3"),
 				array: []*resp{
 					&resp{
-						rTp:  respInt,
-						data: []byte("1"),
+						respType: respInt,
+						data:     []byte("1"),
 					},
 					&resp{
-						rTp:  respInt,
-						data: []byte("2"),
+						respType: respInt,
+						data:     []byte("2"),
 					},
 					&resp{
-						rTp:  respInt,
-						data: []byte("3"),
+						respType: respInt,
+						data:     []byte("3"),
 					},
 				},
-				arrayn: 3,
+				arraySize: 3,
 			},
 			Expect: []byte("*3\r\n:1\r\n:2\r\n:3\r\n"),
 		},
 		{
 			Name: "array3",
 			Resp: &resp{
-				rTp:  respArray,
-				data: []byte("2"),
+				respType: respArray,
+				data:     []byte("2"),
 				array: []*resp{
 					&resp{
-						rTp:  respArray,
-						data: []byte("3"),
+						respType: respArray,
+						data:     []byte("3"),
 						array: []*resp{
 							&resp{
-								rTp:  respInt,
-								data: []byte("1"),
+								respType: respInt,
+								data:     []byte("1"),
 							},
 							&resp{
-								rTp:  respInt,
-								data: []byte("2"),
+								respType: respInt,
+								data:     []byte("2"),
 							},
 							&resp{
-								rTp:  respInt,
-								data: []byte("3"),
+								respType: respInt,
+								data:     []byte("3"),
 							},
 						},
-						arrayn: 3,
+						arraySize: 3,
 					},
 					&resp{
-						rTp:  respArray,
-						data: []byte("2"),
+						respType: respArray,
+						data:     []byte("2"),
 						array: []*resp{
 							&resp{
-								rTp:  respString,
-								data: []byte("Foo"),
+								respType: respString,
+								data:     []byte("Foo"),
 							},
 							&resp{
-								rTp:  respError,
-								data: []byte("Bar"),
+								respType: respError,
+								data:     []byte("Bar"),
 							},
 						},
-						arrayn: 2,
+						arraySize: 2,
 					},
 				},
-				arrayn: 2,
+				arraySize: 2,
 			},
 			Expect: []byte("*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n"),
 		},
@@ -250,8 +250,8 @@ func TestRespEncode(t *testing.T) {
 
 func TestRESPExportFunc(t *testing.T) {
 	var r = &RESP{
-		rTp:  respString,
-		data: []byte("abcde"),
+		respType: respString,
+		data:     []byte("abcde"),
 	}
 	assert.Equal(t, "abcde", string(r.Data()))
 	assert.Equal(t, respString, r.Type())

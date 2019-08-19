@@ -21,6 +21,7 @@ var (
 	cmdQuitBytes   = []byte("4\r\nQUIT")
 	cmdPingBytes   = []byte("4\r\nPING")
 	cmdMSetBytes   = []byte("4\r\nMSET")
+	cmdSetBytes    = []byte("3\r\nSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
 	cmdGetBytes    = []byte("3\r\nGET")
 	cmdDelBytes    = []byte("3\r\nDEL")
@@ -87,7 +88,7 @@ func newReq() *Request {
 // Slowlog impl the Slowlogger interface
 func (r *Request) Slowlog() *proto.SlowlogEntry {
 	slog := proto.NewSlowlogEntry(types.CacheTypeRedis)
-	if r.resp.arrayn == 0 {
+	if r.resp.arraySize == 0 {
 		slog.Cmd = []string{string(proto.CollapseBody(r.resp.data))}
 	}
 	slog.Cmd = collapseArray(r.resp.Array())
@@ -101,12 +102,12 @@ func (r *Request) CmdString() string {
 
 // Cmd get the cmd
 func (r *Request) Cmd() []byte {
-	if r.resp.arrayn < 1 {
+	if r.resp.arraySize < 1 {
 		return emptyBytes
 	}
 	cmd := r.resp.array[0]
 	var pos int
-	if cmd.rTp == respBulk {
+	if cmd.respType == respBulk {
 		pos = bytes.Index(cmd.data, crlfBytes) + 2
 	}
 	return cmd.data[pos:]
@@ -114,17 +115,17 @@ func (r *Request) Cmd() []byte {
 
 // Key impl the proto.protoRequest and get the Key of redis
 func (r *Request) Key() []byte {
-	if r.resp.arrayn < 1 {
+	if r.resp.arraySize < 1 {
 		return emptyBytes
 	}
-	if r.resp.arrayn == 1 {
+	if r.resp.arraySize == 1 {
 		return r.resp.array[0].data
 	}
 
 	k := r.resp.array[1]
 	// SUPPORT EVAL command
 	const evalArgsMinCount int = 4
-	if r.resp.arrayn >= evalArgsMinCount {
+	if r.resp.arraySize >= evalArgsMinCount {
 		if bytes.Equal(r.resp.array[0].data, cmdEvalBytes) {
 			// find the 4th key with index 3
 			k = r.resp.array[3]
@@ -132,7 +133,7 @@ func (r *Request) Key() []byte {
 	}
 
 	var pos int
-	if k.rTp == respBulk {
+	if k.respType == respBulk {
 		pos = bytes.Index(k.data, crlfBytes) + 2
 	}
 	return k.data[pos:]
@@ -161,7 +162,7 @@ func (r *Request) Reply() *RESP {
 // NOTE: use string([]byte) as a map key, it is very specific!!!
 // https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsSupport() bool {
-	if r.resp.arrayn < 1 {
+	if r.resp.arraySize < 1 {
 		return false
 	}
 	_, ok := reqSupportCmdMap[string(r.resp.array[0].data)]
@@ -173,7 +174,7 @@ func (r *Request) IsSupport() bool {
 // NOTE: use string([]byte) as a map key, it is very specific!!!
 // https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
 func (r *Request) IsCtl() bool {
-	if r.resp.arrayn < 1 {
+	if r.resp.arraySize < 1 {
 		return false
 	}
 	_, ok := reqControlCmdMap[string(r.resp.array[0].data)]

@@ -66,12 +66,12 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
-	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeVersion {
+	if mcr.respType == RequestTypeQuit || mcr.respType == RequestTypeVersion {
 		return
 	}
-	_ = n.bw.Write(mcr.rTp.Bytes())
+	_ = n.bw.Write(mcr.respType.Bytes())
 	_ = n.bw.Write(spaceBytes)
-	if mcr.rTp == RequestTypeGat || mcr.rTp == RequestTypeGats {
+	if mcr.respType == RequestTypeGat || mcr.respType == RequestTypeGats {
 		_ = n.bw.Write(mcr.data) // NOTE: exp time
 		_ = n.bw.Write(spaceBytes)
 		_ = n.bw.Write(mcr.key)
@@ -100,7 +100,7 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
-	if mcr.rTp == RequestTypeQuit || mcr.rTp == RequestTypeSetNoreply || mcr.rTp == RequestTypeVersion {
+	if mcr.respType == RequestTypeQuit || mcr.respType == RequestTypeSetNoreply || mcr.respType == RequestTypeVersion {
 		return
 	}
 
@@ -117,7 +117,7 @@ REREAD:
 		err = errors.WithStack(err)
 		return
 	}
-	if _, ok := withValueTypes[mcr.rTp]; !ok || bytes.Equal(bs, endBytes) || bytes.Equal(bs, errorBytes) {
+	if _, ok := withValueTypes[mcr.respType]; !ok || bytes.Equal(bs, endBytes) || bytes.Equal(bs, errorBytes) {
 		mcr.data = append(mcr.data, bs...)
 		return
 	}

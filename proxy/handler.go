@@ -122,7 +122,6 @@ func (h *Handler) handle() {
 			return
 		}
 
-
 		// 4. check slowlog before release resource
 		if h.slowerThan != 0 {
 			for _, msg := range msgs {
@@ -143,10 +142,10 @@ func (h *Handler) handle() {
 
 func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, lastCount int) []*proto.Message {
 	var alloc int
-	if lm := len(msgs); lm == 0 {
+	if msgsLength := len(msgs); msgsLength == 0 {
 		alloc = concurrent
-	} else if lm < maxConcurrent && lm == lastCount {
-		alloc = lm * concurrent
+	} else if msgsLength < maxConcurrent && msgsLength == lastCount {
+		alloc = msgsLength * concurrent
 	}
 	if alloc > 0 {
 		proto.PutMsgs(msgs)

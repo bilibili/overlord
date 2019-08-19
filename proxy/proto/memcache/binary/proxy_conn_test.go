@@ -221,7 +221,7 @@ func TestParseHeader(t *testing.T) {
 	req := newReq()
 	parseHeader(getTestData, req, true)
 	assert.Equal(t, byte(0x80), req.magic)
-	assert.Equal(t, []byte{0xc}, req.rTp.Bytes())
+	assert.Equal(t, []byte{0xc}, req.respType.Bytes())
 	assert.Equal(t, []byte{0x00, 0x03}, req.keyLen)
 	assert.Equal(t, []byte{0x00}, req.extraLen)
 	assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x03}, req.bodyLen)

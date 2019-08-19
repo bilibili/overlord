@@ -29,9 +29,9 @@ func _createNodeConn(data []byte) *nodeConn {
 
 func _createReqMsg(rtype RequestType, key, data []byte) *proto.Message {
 	mc := &MCRequest{
-		rTp:  rtype,
-		key:  key,
-		data: data,
+		respType: rtype,
+		key:      key,
+		data:     data,
 	}
 	pm := proto.NewMessage()
 	pm.WithRequest(mc)

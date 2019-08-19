@@ -35,9 +35,9 @@ func TestRequestTypeString(t *testing.T) {
 
 func TestMCRequestFuncsOk(t *testing.T) {
 	req := &MCRequest{
-		rTp:  RequestTypeGet,
-		key:  []byte("abc"),
-		data: []byte("\r\n"),
+		respType: RequestTypeGet,
+		key:      []byte("abc"),
+		data:     []byte("\r\n"),
 	}
 	assert.Equal(t, []byte("get"), req.Cmd())
 	assert.Equal(t, "abc", string(req.Key()))
@@ -45,7 +45,7 @@ func TestMCRequestFuncsOk(t *testing.T) {
 
 	req.Put()
 
-	assert.Equal(t, RequestTypeUnknown, req.rTp)
+	assert.Equal(t, RequestTypeUnknown, req.respType)
 	assert.Equal(t, []byte{}, req.key)
 	assert.Equal(t, []byte{}, req.data)
 }

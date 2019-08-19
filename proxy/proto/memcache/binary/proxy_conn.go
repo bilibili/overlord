@@ -79,7 +79,7 @@ NEXTGET:
 		err = errors.WithStack(err)
 		return
 	}
-	switch req.rTp {
+	switch req.respType {
 	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace, RequestTypeGet, RequestTypeGetK,
 		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend, RequestTypeTouch, RequestTypeGat:
 		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
@@ -94,7 +94,7 @@ NEXTGET:
 		}
 		goto NEXTGET
 	}
-	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command:%x", req.rTp)
+	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command:%x", req.respType)
 	return
 }
 
@@ -129,7 +129,7 @@ func (p *proxyConn) request(m *proto.Message) *MCRequest {
 func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 	req.magic = bs[0]
 	if isDecode {
-		req.rTp = RequestType(bs[1])
+		req.respType = RequestType(bs[1])
 	}
 	copy(req.keyLen, bs[2:4])
 	copy(req.extraLen, bs[4:5])
@@ -151,7 +151,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			return
 		}
 		_ = p.bw.Write(magicRespBytes) // NOTE: magic
-		_ = p.bw.Write(mcr.rTp.Bytes())
+		_ = p.bw.Write(mcr.respType.Bytes())
 		_ = p.bw.Write(mcr.keyLen)
 		_ = p.bw.Write(mcr.extraLen)
 		_ = p.bw.Write(zeroBytes)

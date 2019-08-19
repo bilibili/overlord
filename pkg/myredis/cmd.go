@@ -9,19 +9,19 @@ import (
 
 // Resp type define
 const (
-	RespUnknown respType = '0'
-	RespString  respType = '+'
-	RespError   respType = '-'
-	RespInt     respType = ':'
-	RespBulk    respType = '$'
-	RespArray   respType = '*'
+	RespUnknown byte = '0'
+	RespString  byte = '+'
+	RespError   byte = '-'
+	RespInt     byte = ':'
+	RespBulk    byte = '$'
+	RespArray   byte = '*'
 )
 
 // respType is the type of redis Resp
-type respType = byte
+//type respType = byte
 
 type Resp struct {
-	RType respType
+	RType byte
 
 	Data  []byte
 	Array []*Resp
