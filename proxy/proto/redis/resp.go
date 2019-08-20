@@ -10,16 +10,16 @@ import (
 )
 
 // respType is the type of redis resp
-//type respType = byte
+type respType = byte
 
 // resp type define
 const (
-	respUnknown byte = '0'
-	respString  byte = '+'
-	respError   byte = '-'
-	respInt     byte = ':'
-	respBulk    byte = '$'
-	respArray   byte = '*'
+	respUnknown respType = '0'
+	respString  respType = '+'
+	respError   respType = '-'
+	respInt     respType = ':'
+	respBulk    respType = '$'
+	respArray   respType = '*'
 )
 
 var (
@@ -62,7 +62,7 @@ func (r *RESP) Encode(w *bufio.Writer) (err error) {
 
 // resp is a redis server protocol item.
 type resp struct {
-	respType byte
+	respType respType
 	// in Bulk this is the size field
 	// in array this is the count field
 	data  []byte
@@ -88,7 +88,7 @@ func (r *resp) copy(re *resp) {
 }
 
 func (r *resp) next() *resp {
-	if r.arraySize < len(r.array) { // reset只清空r.arraySize,保留r.array内存复用
+	if r.arraySize < len(r.array) {
 		subResp := r.array[r.arraySize]
 		subResp.reset()
 		r.arraySize++
@@ -147,34 +147,25 @@ func (r *resp) decodeInline(line []byte) (err error) {
 }
 
 func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
-	ls := len(line)                               // bytes : $bulkLength\r\n
-	bulkLengthBytes := line[1 : ls-2]             // bytes : $bulkLength
-	bulkLength, err := conv.Btoi(bulkLengthBytes) // bytes convert to int64
+	ls := len(line)
+	bulkLengthBytes := line[1 : ls-2]
+	bulkLength, err := conv.Btoi(bulkLengthBytes)
 	if err != nil {
 		return
 	}
-	if bulkLength == -1 { // NULL : $-1\r\n
+	if bulkLength == -1 {
 		r.data = r.data[:0]
 		return
 	}
-	br.Advance(-ls)                 // 回退br.b.r读计数到$之前
-	all := ls + int(bulkLength) + 2 // 计算bulk的真实数据长度
+	br.Advance(-ls)
+	all := ls + int(bulkLength) + 2
 	data, err := br.ReadExact(all)
 	if err == bufio.ErrBufferFull {
 		return err
 	} else if err != nil {
 		return
 	}
-	//br.Advance(-(ls - 1))               // ls-1的目的,回退br.b.r读计数到$位置,不-1会退到$前面
-	//all := ls - 1 + int(bulkLength) + 2 // 计算bulk的真实数据长度
-	//data, err := br.ReadExact(all)
-	//if err == bufio.ErrBufferFull {
-	//	br.Advance(-1)
-	//	return err
-	//} else if err != nil {
-	//	return
-	//}
-	r.data = append(r.data, data[1:len(data)-2]...) // 去除data的开头$标识和结尾\r\n
+	r.data = append(r.data, data[1:len(data)-2]...)
 	return
 }
 

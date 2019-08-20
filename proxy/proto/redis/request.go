@@ -21,7 +21,6 @@ var (
 	cmdQuitBytes   = []byte("4\r\nQUIT")
 	cmdPingBytes   = []byte("4\r\nPING")
 	cmdMSetBytes   = []byte("4\r\nMSET")
-	cmdSetBytes    = []byte("3\r\nSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
 	cmdGetBytes    = []byte("3\r\nGET")
 	cmdDelBytes    = []byte("3\r\nDEL")

@@ -94,7 +94,6 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 		// tryFetch when key moved
 		select {
 		case nc.c.action <- struct{}{}:
-			log.Info("----- try fetch")
 		default:
 		}
 	}
