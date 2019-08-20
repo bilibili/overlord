@@ -49,7 +49,7 @@ func TestRequestTypeBytes(t *testing.T) {
 
 func TestMCRequestFuncsOk(t *testing.T) {
 	req := newReq()
-	req.rTp = RequestTypeGet
+	req.respType = RequestTypeGet
 	req.key = []byte("abc")
 	req.data = []byte("\r\n")
 	assert.Equal(t, []byte{byte(RequestTypeGet)}, req.Cmd())
@@ -58,7 +58,7 @@ func TestMCRequestFuncsOk(t *testing.T) {
 
 	req.Put()
 
-	assert.Equal(t, RequestTypeUnknown, req.rTp)
+	assert.Equal(t, RequestTypeUnknown, req.respType)
 	assert.Len(t, req.keyLen, 2)
 	assert.Len(t, req.extraLen, 1)
 	assert.Len(t, req.status, 2)

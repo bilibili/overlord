@@ -90,6 +90,13 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 	addrBs, _, isAsk, _ := parseRedirect(data)
+	if !isAsk {
+		// tryFetch when key moved
+		select {
+		case nc.c.action <- struct{}{}:
+		default:
+		}
+	}
 	nc.sb.Reset()
 	nc.sb.Write(addrBs)
 	addr := nc.sb.String()

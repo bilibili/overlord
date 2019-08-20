@@ -1,7 +1,7 @@
 module overlord
 
 require (
-	bou.ke/monkey v1.0.1 // indirect
+	bou.ke/monkey v1.0.1
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Pallinder/go-randomdata v1.1.0
 	github.com/aviddiviner/go-murmur v0.0.0-20150519214947-b9740d71e571

@@ -228,9 +228,9 @@ var (
 // Get And Touch:
 // 	gat|gats <exptime> <key>*\r\n
 type MCRequest struct {
-	rTp  RequestType
-	key  []byte
-	data []byte
+	respType RequestType
+	key      []byte
+	data     []byte
 }
 
 var msgPool = &sync.Pool{
@@ -251,7 +251,7 @@ func NewReq() *MCRequest {
 
 // Put put req back to pool.
 func (r *MCRequest) Put() {
-	r.rTp = RequestTypeUnknown
+	r.respType = RequestTypeUnknown
 	r.key = r.key[:0]
 	r.data = r.data[:0]
 	msgPool.Put(r)
@@ -259,12 +259,12 @@ func (r *MCRequest) Put() {
 
 // CmdString will return string of cmd for prom report
 func (r *MCRequest) CmdString() string {
-	return r.rTp.String()
+	return r.respType.String()
 }
 
 // Cmd get Msg cmd.
 func (r *MCRequest) Cmd() []byte {
-	return r.rTp.Bytes()
+	return r.respType.Bytes()
 }
 
 // Key get Msg key.
@@ -273,16 +273,16 @@ func (r *MCRequest) Key() []byte {
 }
 
 func (r *MCRequest) String() string {
-	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.Bytes(), r.key, r.data)
+	return fmt.Sprintf("type:%s key:%s data:%s", r.respType.Bytes(), r.key, r.data)
 }
 
 // Slowlog record the slowlog entry
 func (r *MCRequest) Slowlog() (slog *proto.SlowlogEntry) {
 	slog = proto.NewSlowlogEntry(types.CacheTypeMemcache)
-	if r.rTp == RequestTypeGat || r.rTp == RequestTypeGats {
-		slog.Cmd = []string{r.rTp.String(), string(r.data), string(r.key), string(crlfBytes)}
+	if r.respType == RequestTypeGat || r.respType == RequestTypeGats {
+		slog.Cmd = []string{r.respType.String(), string(r.data), string(r.key), string(crlfBytes)}
 	} else {
-		slog.Cmd = []string{r.rTp.String(), string(r.key), string(r.data)}
+		slog.Cmd = []string{r.respType.String(), string(r.key), string(r.data)}
 	}
 	return slog
 }

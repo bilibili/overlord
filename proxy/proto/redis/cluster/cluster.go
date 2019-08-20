@@ -88,10 +88,12 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
 				ncp := c.getPipe(subm.Request().Key())
+				subm.MarkStartPipe()
 				ncp.Push(subm)
 			}
 		} else {
 			ncp := c.getPipe(m.Request().Key())
+			m.MarkStartPipe()
 			ncp.Push(m)
 		}
 	}
@@ -149,6 +151,7 @@ func (c *cluster) fetchproc() {
 		case <-time.After(30 * time.Minute):
 		}
 		c.tryFetch()
+		time.Sleep(time.Second)
 	}
 }
 

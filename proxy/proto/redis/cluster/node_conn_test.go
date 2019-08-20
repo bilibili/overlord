@@ -9,7 +9,7 @@ import (
 	"overlord/proxy/proto"
 	"overlord/proxy/proto/redis"
 
-	"github.com/bouk/monkey"
+	"bou.ke/monkey"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,6 +17,7 @@ func TestNodeConnMaxRedirect(t *testing.T) {
 	monkey.Patch(newNodeConn, func(_ *cluster, addr string) proto.NodeConn {
 		return &nodeConn{
 			nc: &redis.NodeConn{},
+			c:  &cluster{action: make(chan struct{})},
 		}
 	})
 

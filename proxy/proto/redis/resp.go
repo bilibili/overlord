@@ -37,7 +37,7 @@ type RESP = resp
 
 // Type return resp type.
 func (r *RESP) Type() byte {
-	return r.rTp
+	return r.respType
 }
 
 // Data return resp data.
@@ -47,7 +47,7 @@ func (r *RESP) Data() []byte {
 
 // Array return resp array.
 func (r *RESP) Array() []*RESP {
-	return r.array[:r.arrayn]
+	return r.array[:r.arraySize]
 }
 
 // Decode decode by Reader.
@@ -62,43 +62,43 @@ func (r *RESP) Encode(w *bufio.Writer) (err error) {
 
 // resp is a redis server protocol item.
 type resp struct {
-	rTp respType
+	respType respType
 	// in Bulk this is the size field
 	// in array this is the count field
 	data  []byte
 	array []*resp
-	// in order to reuse array.use arrayn to mark current obj.
-	arrayn int
+	// in order to reuse array.use arraySize to mark current obj.
+	arraySize int
 }
 
 func (r *resp) reset() {
-	r.rTp = respUnknown
+	r.respType = respUnknown
 	r.data = r.data[:0]
-	r.arrayn = 0
+	r.arraySize = 0
 }
 
 func (r *resp) copy(re *resp) {
 	r.reset()
-	r.rTp = re.rTp
+	r.respType = re.respType
 	r.data = append(r.data, re.data...)
-	for i := 0; i < re.arrayn; i++ {
+	for i := 0; i < re.arraySize; i++ {
 		nre := r.next()
 		nre.copy(re.array[i])
 	}
 }
 
 func (r *resp) next() *resp {
-	if r.arrayn < len(r.array) {
-		nr := r.array[r.arrayn]
-		nr.reset()
-		r.arrayn++
-		return nr
+	if r.arraySize < len(r.array) {
+		subResp := r.array[r.arraySize]
+		subResp.reset()
+		r.arraySize++
+		return subResp
 	}
-	nr := &resp{}
-	nr.reset()
-	r.array = append(r.array, nr)
-	r.arrayn++
-	return nr
+	subResp := &resp{}
+	subResp.reset()
+	r.array = append(r.array, subResp)
+	r.arraySize++
+	return subResp
 }
 
 func (r *resp) decode(br *bufio.Reader) (err error) {
@@ -108,9 +108,9 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	if err != nil {
 		return err
 	}
-	rTp := line[0]
-	r.rTp = rTp
-	switch rTp {
+	respType := line[0]
+	r.respType = respType
+	switch respType {
 	case respString, respInt, respError:
 		r.data = append(r.data, line[1:len(line)-2]...)
 	case respBulk:
@@ -123,6 +123,7 @@ func (r *resp) decode(br *bufio.Reader) (err error) {
 	return
 }
 
+// decodeInline Handle Telnet requests
 func (r *resp) decodeInline(line []byte) (err error) {
 	fields := bytes.Fields(line)
 	flen := len(fields)
@@ -130,16 +131,16 @@ func (r *resp) decodeInline(line []byte) (err error) {
 		err = ErrBadRequest
 		return
 	}
-	r.arrayn = flen
+	r.arraySize = flen
 	r.data = []byte(strconv.Itoa(flen))
 	r.array = make([]*resp, flen)
-	r.rTp = respArray
+	r.respType = respArray
 	for i, field := range fields {
 		r.array[i] = &resp{
-			rTp:    respBulk,
-			data:   []byte(fmt.Sprintf("%d\r\n%s", len(field), field)),
-			array:  nil,
-			arrayn: 0,
+			respType:  respBulk,
+			data:      []byte(fmt.Sprintf("%d\r\n%s", len(field), field)),
+			array:     nil,
+			arraySize: 0,
 		}
 	}
 	return
@@ -147,42 +148,41 @@ func (r *resp) decodeInline(line []byte) (err error) {
 
 func (r *resp) decodeBulk(line []byte, br *bufio.Reader) (err error) {
 	ls := len(line)
-	sBs := line[1 : ls-2]
-	size, err := conv.Btoi(sBs)
+	bulkLengthBytes := line[1 : ls-2]
+	bulkLength, err := conv.Btoi(bulkLengthBytes)
 	if err != nil {
 		return
 	}
-	if size == -1 {
+	if bulkLength == -1 {
 		r.data = r.data[:0]
 		return
 	}
-	br.Advance(-(ls - 1))
-	all := ls - 1 + int(size) + 2
+	br.Advance(-ls)
+	all := ls + int(bulkLength) + 2
 	data, err := br.ReadExact(all)
 	if err == bufio.ErrBufferFull {
-		br.Advance(-1)
 		return err
 	} else if err != nil {
 		return
 	}
-	r.data = append(r.data, data[:len(data)-2]...)
+	r.data = append(r.data, data[1:len(data)-2]...)
 	return
 }
 
 func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 	ls := len(line)
-	sBs := line[1 : ls-2]
-	size, err := conv.Btoi(sBs)
+	arrayLengthBytes := line[1 : ls-2]
+	arrayLength, err := conv.Btoi(arrayLengthBytes)
 	if err != nil {
 		return
 	}
-	if size == -1 {
+	if arrayLength == -1 {
 		r.data = r.data[:0]
 		return
 	}
-	r.data = append(r.data, sBs...)
+	r.data = append(r.data, arrayLengthBytes...)
 	mark := br.Mark()
-	for i := 0; i < int(size); i++ {
+	for i := 0; i < int(arrayLength); i++ {
 		nre := r.next()
 		if err = nre.decode(br); err != nil {
 			br.AdvanceTo(mark)
@@ -194,7 +194,7 @@ func (r *resp) decodeArray(line []byte, br *bufio.Reader) (err error) {
 }
 
 func (r *resp) encode(w *bufio.Writer) (err error) {
-	switch r.rTp {
+	switch r.respType {
 	case respInt, respString, respError:
 		err = r.encodePlain(w)
 	case respBulk:
@@ -206,7 +206,7 @@ func (r *resp) encode(w *bufio.Writer) (err error) {
 }
 
 func (r *resp) encodePlain(w *bufio.Writer) (err error) {
-	switch r.rTp {
+	switch r.respType {
 	case respInt:
 		_ = w.Write(respIntBytes)
 	case respError:
@@ -240,7 +240,7 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 		_ = w.Write(nullDataBytes)
 	}
 	_ = w.Write(crlfBytes)
-	for i := 0; i < r.arrayn; i++ {
+	for i := 0; i < r.arraySize; i++ {
 		if err = r.array[i].encode(w); err != nil {
 			return
 		}
@@ -251,8 +251,8 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 // // String for debug!!!
 // func (r *resp) String() string {
 // 	var sb strings.Builder
-// 	sb.Write([]byte{r.rTp})
-// 	switch r.rTp {
+// 	sb.Write([]byte{r.respType})
+// 	switch r.respType {
 // 	case respString, respInt, respError:
 // 		sb.Write(r.data)
 // 		sb.Write(crlfBytes)
@@ -260,9 +260,9 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 // 		sb.Write(r.data)
 // 		sb.Write(crlfBytes)
 // 	case respArray:
-// 		sb.Write([]byte(strconv.Itoa(r.arrayn)))
+// 		sb.Write([]byte(strconv.Itoa(r.arraySize)))
 // 		sb.Write(crlfBytes)
-// 		for i := 0; i < r.arrayn; i++ {
+// 		for i := 0; i < r.arraySize; i++ {
 // 			sb.WriteString(r.array[i].String())
 // 		}
 // 	default:

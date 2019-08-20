@@ -65,14 +65,15 @@ func putMsg(m *Message) {
 type Message struct {
 	Type types.CacheType
 
-	req  []Request
-	reqn int
-	subs []*Message
-	wg   *sync.WaitGroup
+	req    []Request
+	reqNum int
+	subs   []*Message
+	wg     *sync.WaitGroup
 
-	// Start Time, Write Time, ReadTime, EndTime
-	st, wt, rt, et time.Time
-	err            error
+	// Start Time, Write Time, ReadTime, EndTime, Start Pipe Time, End Pipe Time, Start Pipe Time, End Pipe Time
+	st, wt, rt, et, spt, ept, sit, eit time.Time
+	addr                               string
+	err                                error
 }
 
 // NewMessage will create new message object.
@@ -84,15 +85,14 @@ func NewMessage() *Message {
 // Reset will clean the msg
 func (m *Message) Reset() {
 	m.Type = types.CacheTypeUnknown
-	m.reqn = 0
-	m.st, m.wt, m.rt, m.et = defaultTime, defaultTime, defaultTime, defaultTime
+	m.reqNum = 0
+	m.st, m.wt, m.rt, m.et, m.spt, m.ept, m.sit, m.eit = defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime, defaultTime
 	m.err = nil
 }
 
 // clear will clean the msg
 func (m *Message) clear() {
 	m.Reset()
-	m.reqn = 0
 	m.req = nil
 	m.wg = nil
 	m.subs = nil
@@ -106,6 +106,31 @@ func (m *Message) TotalDur() time.Duration {
 // RemoteDur will return the remote execute time of remote mc node.
 func (m *Message) RemoteDur() time.Duration {
 	return m.rt.Sub(m.wt)
+}
+
+// WaitWriteDur ...
+func (m *Message) WaitWriteDur() time.Duration {
+	return m.wt.Sub(m.st)
+}
+
+// PreEndDur ...
+func (m *Message) PreEndDur() time.Duration {
+	return m.et.Sub(m.rt)
+}
+
+// PipeDur ...
+func (m *Message) PipeDur() time.Duration {
+	return m.ept.Sub(m.spt)
+}
+
+// InputDur ...
+func (m *Message) InputDur() time.Duration {
+	return m.eit.Sub(m.sit)
+}
+
+// Addr ...
+func (m *Message) Addr() string {
+	return m.addr
 }
 
 // MarkStart will set the start time of the command to now.
@@ -128,22 +153,47 @@ func (m *Message) MarkEnd() {
 	m.et = time.Now()
 }
 
+// MarkStartPipe ...
+func (m *Message) MarkStartPipe() {
+	m.spt = time.Now()
+}
+
+// MarkStartPipe ...
+func (m *Message) MarkEndPipe() {
+	m.ept = time.Now()
+}
+
+// MarkStartInput ...
+func (m *Message) MarkStartInput() {
+	m.sit = time.Now()
+}
+
+// MarkEndInput ...
+func (m *Message) MarkEndInput() {
+	m.eit = time.Now()
+}
+
+// MarkAddr ...
+func (m *Message) MarkAddr(addr string) {
+	m.addr = addr
+}
+
 // ResetSubs will return the Msg data to flush and reset
 func (m *Message) ResetSubs() {
 	if !m.IsBatch() {
 		return
 	}
-	for i := range m.subs[:m.reqn] {
+	for i := range m.subs[:m.reqNum] {
 		m.subs[i].Reset()
 	}
-	m.reqn = 0
+	m.reqNum = 0
 }
 
 // NextReq will iterator itself until nil.
 func (m *Message) NextReq() (req Request) {
-	if m.reqn < len(m.req) {
-		req = m.req[m.reqn]
-		m.reqn++
+	if m.reqNum < len(m.req) {
+		req = m.req[m.reqNum]
+		m.reqNum++
 	}
 	return
 }
@@ -151,12 +201,12 @@ func (m *Message) NextReq() (req Request) {
 // WithRequest with proto request.
 func (m *Message) WithRequest(req Request) {
 	m.req = append(m.req, req)
-	m.reqn++
+	m.reqNum++
 }
 
 func (m *Message) setRequest(req Request) {
 	m.req = m.req[:0]
-	m.reqn = 0
+	m.reqNum = 0
 	m.WithRequest(req)
 }
 
@@ -170,20 +220,20 @@ func (m *Message) Request() Request {
 
 // Requests return all request.
 func (m *Message) Requests() []Request {
-	if m.reqn == 0 {
+	if m.reqNum == 0 {
 		return nil
 	}
-	return m.req[:m.reqn]
+	return m.req[:m.reqNum]
 }
 
 // IsBatch returns whether or not batch.
 func (m *Message) IsBatch() bool {
-	return m.reqn > 1
+	return m.reqNum > 1
 }
 
 // Batch returns sub Msg if is batch.
 func (m *Message) Batch() []*Message {
-	slen := m.reqn
+	slen := m.reqNum
 	if slen == 0 {
 		return nil
 	}
@@ -236,7 +286,7 @@ func (m *Message) Err() error {
 	if !m.IsBatch() {
 		return nil
 	}
-	for _, s := range m.subs[:m.reqn] {
+	for _, s := range m.subs[:m.reqNum] {
 		if s.err != nil {
 			return s.err
 		}
@@ -260,18 +310,28 @@ func minInt(a, b int) int {
 func (m *Message) Slowlog() (slog *SlowlogEntry) {
 	if m.IsBatch() {
 		slog = NewSlowlogEntry(m.Type)
-		slog.Subs = make([]*SlowlogEntry, m.reqn)
+		slog.Subs = make([]*SlowlogEntry, m.reqNum)
 		for i, req := range m.Requests() {
 			slog.Subs[i] = req.Slowlog()
 			slog.Subs[i].StartTime = m.st
 			slog.Subs[i].RemoteDur = m.subs[i].rt.Sub(m.subs[i].wt)
 			slog.Subs[i].TotalDur = m.et.Sub(m.st)
+			slog.Subs[i].WaitWriteDur = m.subs[i].WaitWriteDur()
+			slog.Subs[i].PreEndDur = m.subs[i].PreEndDur()
+			slog.Subs[i].PipeDur = m.subs[i].PipeDur()
+			slog.Subs[i].InputDur = m.subs[i].InputDur()
+			slog.Subs[i].Addr = m.subs[i].Addr()
 		}
 	} else {
 		slog = m.Request().Slowlog()
 		slog.StartTime = m.st
 		slog.TotalDur = m.TotalDur()
 		slog.RemoteDur = m.RemoteDur()
+		slog.WaitWriteDur = m.WaitWriteDur()
+		slog.PreEndDur = m.PreEndDur()
+		slog.PipeDur = m.PipeDur()
+		slog.InputDur = m.InputDur()
+		slog.Addr = m.Addr()
 	}
 	return
 }

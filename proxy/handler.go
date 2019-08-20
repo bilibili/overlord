@@ -106,6 +106,7 @@ func (h *Handler) handle() {
 		wg.Wait()
 		// 3. encode
 		for _, msg := range msgs {
+			msg.MarkEndPipe()
 			if err = h.pc.Encode(msg); err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)
@@ -120,7 +121,6 @@ func (h *Handler) handle() {
 			h.deferHandle(messages, err)
 			return
 		}
-
 
 		// 4. check slowlog before release resource
 		if h.slowerThan != 0 {
@@ -142,10 +142,10 @@ func (h *Handler) handle() {
 
 func (h *Handler) allocMaxConcurrent(wg *sync.WaitGroup, msgs []*proto.Message, lastCount int) []*proto.Message {
 	var alloc int
-	if lm := len(msgs); lm == 0 {
+	if msgsLength := len(msgs); msgsLength == 0 {
 		alloc = concurrent
-	} else if lm < maxConcurrent && lm == lastCount {
-		alloc = lm * concurrent
+	} else if msgsLength < maxConcurrent && msgsLength == lastCount {
+		alloc = msgsLength * concurrent
 	}
 	if alloc > 0 {
 		proto.PutMsgs(msgs)

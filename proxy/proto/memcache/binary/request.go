@@ -265,7 +265,7 @@ var (
 // MCRequest is the mc client Msg type and data.
 type MCRequest struct {
 	magic    byte // Already known, since we're here
-	rTp      RequestType
+	respType RequestType
 	keyLen   []byte
 	extraLen []byte
 	// dataType []byte // Always 0
@@ -304,7 +304,7 @@ func newReq() *MCRequest {
 
 // Put put req back to pool.
 func (r *MCRequest) Put() {
-	r.rTp = RequestTypeUnknown
+	r.respType = RequestTypeUnknown
 	r.key = r.key[:0]
 	r.data = r.data[:0]
 	msgPool.Put(r)
@@ -312,12 +312,12 @@ func (r *MCRequest) Put() {
 
 // CmdString get cmd.
 func (r *MCRequest) CmdString() string {
-	return r.rTp.String()
+	return r.respType.String()
 }
 
 // Cmd get Msg cmd.
 func (r *MCRequest) Cmd() []byte {
-	return r.rTp.Bytes()
+	return r.respType.Bytes()
 }
 
 // Key get Msg key.
@@ -326,7 +326,7 @@ func (r *MCRequest) Key() []byte {
 }
 
 func (r *MCRequest) String() string {
-	return fmt.Sprintf("type:%s key:%s data:%s", r.rTp.String(), r.key, r.data)
+	return fmt.Sprintf("type:%s key:%s data:%s", r.respType.String(), r.key, r.data)
 }
 
 // Slowlog record the slowlog entry

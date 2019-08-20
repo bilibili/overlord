@@ -164,7 +164,7 @@ func TestReadWithEofError(t *testing.T) {
 	req.reply = &resp{}
 	req.resp = newresp(respArray, []byte("2"))
 	req.resp.array = append(req.resp.array, newresp(respBulk, []byte("3\r\nGET")))
-	req.resp.arrayn++
+	req.resp.arraySize++
 	msg.WithRequest(req)
 
 	err := nc.Read(msg)
@@ -179,13 +179,13 @@ func TestReadWithEofError(t *testing.T) {
 func newRequest(cmd string, args ...string) *Request {
 	respObj := &resp{}
 	respObj.array = append(respObj.array, newresp(respBulk, []byte(fmt.Sprintf("%d\r\n%s", len(cmd), cmd))))
-	respObj.arrayn++
+	respObj.arraySize++
 	maxLen := len(args) + 1
 	for i := 1; i < maxLen; i++ {
 		data := args[i-1]
 		line := fmt.Sprintf("%d\r\n%s", len(data), data)
 		respObj.array = append(respObj.array, newresp(respBulk, []byte(line)))
-		respObj.arrayn++
+		respObj.arraySize++
 	}
 	respObj.data = []byte(strconv.Itoa(len(args) + 1))
 	return &Request{
@@ -211,18 +211,18 @@ func getMergeType(cmd []byte) mergeType {
 	return mergeTypeNo
 }
 
-func newresp(rtype respType, data []byte) (robj *resp) {
+func newresp(rtype byte, data []byte) (robj *resp) {
 	robj = &resp{}
-	robj.rTp = rtype
+	robj.respType = rtype
 	robj.data = data
 	return
 }
 
 func newrespArray(resps []*resp) (robj *resp) {
 	robj = &resp{}
-	robj.rTp = respArray
+	robj.respType = respArray
 	robj.data = []byte((strconv.Itoa(len(resps))))
 	robj.array = resps
-	robj.arrayn = len(resps)
+	robj.arraySize = len(resps)
 	return
 }

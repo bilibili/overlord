@@ -28,7 +28,7 @@ func TestDecodeInlineSet(t *testing.T) {
 
 	req := nmsgs[0].Request().(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
-	assert.Equal(t, 3, req.resp.arrayn)
+	assert.Equal(t, 3, req.resp.arraySize)
 	assert.Equal(t, []byte("3\r\nSET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("1\r\na"), req.resp.array[1].data)
 	assert.Equal(t, []byte("1\r\nb"), req.resp.array[2].data)
@@ -41,7 +41,7 @@ func TestDecodeInlineGet(t *testing.T) {
 
 	req := nmsgs[0].Request().(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("1\r\na"), req.resp.array[1].data)
 }
@@ -53,7 +53,7 @@ func TestDecodeBasicOk(t *testing.T) {
 
 	req := nmsgs[0].Request().(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "baka", string(req.Key()))
@@ -83,7 +83,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Len(t, nmsgs[0].Batch(), 2)
 	req := msgs[0].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "baka", string(req.Key()))
@@ -93,7 +93,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	// MGET kaba
 	req = msgs[0].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "kaba", string(req.Key()))
@@ -104,7 +104,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Len(t, nmsgs[1].Batch(), 2)
 	req = msgs[1].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeOK, req.mType)
-	assert.Equal(t, 3, req.resp.arrayn)
+	assert.Equal(t, 3, req.resp.arraySize)
 	assert.Equal(t, "MSET", req.CmdString())
 	assert.Equal(t, []byte("MSET"), req.Cmd())
 	assert.Equal(t, "a", string(req.Key()))
@@ -115,7 +115,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	// MSET eee 12345
 	req = msgs[1].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeOK, req.mType)
-	assert.Equal(t, 3, req.resp.arrayn)
+	assert.Equal(t, 3, req.resp.arraySize)
 	assert.Equal(t, "MSET", req.CmdString())
 	assert.Equal(t, []byte("MSET"), req.Cmd())
 	assert.Equal(t, "eee", string(req.Key()))
@@ -127,7 +127,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	assert.Len(t, nmsgs[0].Batch(), 2)
 	req = msgs[2].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "enen", string(req.Key()))
@@ -137,7 +137,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	// MGET nime
 	req = msgs[2].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "nime", string(req.Key()))
@@ -147,7 +147,7 @@ func TestDecodeComplexOk(t *testing.T) {
 	// GET abcde
 	req = msgs[3].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeNo, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "GET", req.CmdString())
 	assert.Equal(t, []byte("GET"), req.Cmd())
 	assert.Equal(t, "abcde", string(req.Key()))
@@ -157,7 +157,7 @@ func TestDecodeComplexOk(t *testing.T) {
 
 	req = msgs[4].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeCount, req.mType)
-	assert.Equal(t, 2, req.resp.arrayn)
+	assert.Equal(t, 2, req.resp.arraySize)
 	assert.Equal(t, "DEL", req.CmdString())
 	assert.Equal(t, "a", string(req.Key()))
 	assert.Equal(t, []byte("2"), req.resp.data)
@@ -167,19 +167,19 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 	msg := proto.NewMessage()
 	req := getReq()
 	req.resp = &resp{
-		rTp:  respArray,
-		data: []byte("2"),
+		respType: respArray,
+		data:     []byte("2"),
 		array: []*resp{
 			&resp{
-				rTp:  respBulk,
-				data: []byte("3\r\nfoo"),
+				respType: respBulk,
+				data:     []byte("3\r\nfoo"),
 			},
 			&resp{
-				rTp:  respBulk,
-				data: []byte("4\r\nbara"),
+				respType: respBulk,
+				data:     []byte("4\r\nbara"),
 			},
 		},
-		arrayn: 2,
+		arraySize: 2,
 	}
 	msg.WithRequest(req)
 	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
@@ -212,8 +212,8 @@ func TestEncodeMergeOk(t *testing.T) {
 			MType: mergeTypeNo,
 			Reply: []*resp{
 				&resp{
-					rTp:  respString,
-					data: []byte("123456789"),
+					respType: respString,
+					data:     []byte("123456789"),
 				},
 			},
 			Expect: "-Error: command not support\r\n",
@@ -223,12 +223,12 @@ func TestEncodeMergeOk(t *testing.T) {
 			MType: mergeTypeOK,
 			Reply: []*resp{
 				&resp{
-					rTp:  respString,
-					data: []byte("OK"),
+					respType: respString,
+					data:     []byte("OK"),
 				},
 				&resp{
-					rTp:  respString,
-					data: []byte("OK"),
+					respType: respString,
+					data:     []byte("OK"),
 				},
 			},
 			Expect: "+OK\r\n",
@@ -238,12 +238,12 @@ func TestEncodeMergeOk(t *testing.T) {
 			MType: mergeTypeCount,
 			Reply: []*resp{
 				&resp{
-					rTp:  respInt,
-					data: []byte("1"),
+					respType: respInt,
+					data:     []byte("1"),
 				},
 				&resp{
-					rTp:  respInt,
-					data: []byte("1"),
+					respType: respInt,
+					data:     []byte("1"),
 				},
 			},
 			Expect: ":2\r\n",
@@ -253,16 +253,16 @@ func TestEncodeMergeOk(t *testing.T) {
 			MType: mergeTypeJoin,
 			Reply: []*resp{
 				&resp{
-					rTp:  respString,
-					data: []byte("abc"),
+					respType: respString,
+					data:     []byte("abc"),
 				},
 				&resp{
-					rTp:  respString,
-					data: []byte("ooo"),
+					respType: respString,
+					data:     []byte("ooo"),
 				},
 				&resp{
-					rTp:  respString,
-					data: []byte("mmm"),
+					respType: respString,
+					data:     []byte("mmm"),
 				},
 			},
 			Expect: "*3\r\n+abc\r\n+ooo\r\n+mmm\r\n",
@@ -329,14 +329,14 @@ func TestEncodeWithPing(t *testing.T) {
 	req := getReq()
 	req.mType = mergeTypeNo
 	req.resp = &resp{
-		rTp: respArray,
+		respType: respArray,
 		array: []*resp{
 			&resp{
-				rTp:  respBulk,
-				data: []byte("4\r\nPING"),
+				respType: respBulk,
+				data:     []byte("4\r\nPING"),
 			},
 		},
-		arrayn: 1,
+		arraySize: 1,
 	}
 	req.reply = &resp{}
 	msg.WithRequest(req)
