@@ -210,7 +210,7 @@ func TestNodeConnReadOk(t *testing.T) {
 			mcr, ok := msg.Request().(*MCRequest)
 			assert.Equal(t, true, ok)
 
-			actual := append([]byte{mcr.magic}, mcr.rTp.Bytes()...)
+			actual := append([]byte{mcr.magic}, mcr.respType.Bytes()...)
 			actual = append(actual, mcr.keyLen...)
 			actual = append(actual, mcr.extraLen...)
 			actual = append(actual, zeroBytes...)  // datatype

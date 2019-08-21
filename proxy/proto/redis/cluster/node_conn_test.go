@@ -17,7 +17,7 @@ func TestNodeConnMaxRedirect(t *testing.T) {
 	monkey.Patch(newNodeConn, func(_ *cluster, addr string) proto.NodeConn {
 		return &nodeConn{
 			nc: &redis.NodeConn{},
-			c: &cluster{action: make(chan struct{})},
+			c:  &cluster{action: make(chan struct{})},
 		}
 	})
 

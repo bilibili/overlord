@@ -280,13 +280,13 @@ func WithReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
 	req := m.NextReq()
 	if req == nil {
 		req := GetReq()
-		req.rTp = rtype
+		req.respType = rtype
 		req.key = key
 		req.data = data
 		m.WithRequest(req)
 	} else {
 		mcreq := req.(*MCRequest)
-		mcreq.rTp = rtype
+		mcreq.respType = rtype
 		mcreq.key = key
 		mcreq.data = data
 	}
@@ -381,19 +381,19 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			return
 		}
 
-		if mcr.rTp == RequestTypeQuit {
+		if mcr.respType == RequestTypeQuit {
 			err = proto.ErrQuit
 			return
 		}
 
-		if mcr.rTp == RequestTypeVersion {
+		if mcr.respType == RequestTypeVersion {
 			_ = p.bw.Write(versionReplyBytes)
 			_ = p.bw.Write(version.Bytes())
 			err = p.bw.Write(crlfBytes)
 			return
 		}
 
-		if mcr.rTp == RequestTypeSetNoreply {
+		if mcr.respType == RequestTypeSetNoreply {
 			return
 		}
 
@@ -410,7 +410,7 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			return
 		}
 		var bs []byte
-		if _, ok := withValueTypes[mcr.rTp]; ok {
+		if _, ok := withValueTypes[mcr.respType]; ok {
 			bs = bytes.TrimSuffix(mcr.data, endBytes)
 		} else {
 			bs = mcr.data

@@ -64,7 +64,7 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 	}
 	_ = n.bw.Write(magicReqBytes)
 
-	cmd := mcr.rTp
+	cmd := mcr.respType
 	if cmd == RequestTypeGetQ || cmd == RequestTypeGetKQ {
 		cmd = RequestTypeGetK
 	}

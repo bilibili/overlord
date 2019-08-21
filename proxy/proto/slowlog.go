@@ -32,10 +32,15 @@ type SlowlogEntry struct {
 	CacheType types.CacheType
 	Cmd       []string
 
-	StartTime time.Time
-	TotalDur  time.Duration
-	RemoteDur time.Duration
-	Subs      []*SlowlogEntry `json:"Subs,omitempty"`
+	StartTime    time.Time
+	TotalDur     time.Duration
+	RemoteDur    time.Duration
+	WaitWriteDur time.Duration
+	PreEndDur    time.Duration
+	PipeDur      time.Duration
+	InputDur     time.Duration
+	Addr         string
+	Subs         []*SlowlogEntry `json:"Subs,omitempty"`
 }
 
 // collapseSymbol is the fill in strings.

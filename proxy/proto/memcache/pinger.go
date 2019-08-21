@@ -48,7 +48,7 @@ func (m *mcPinger) Ping() (err error) {
 		return
 	}
 	_ = m.br.Read()
-	defer m.br.AdvanceTo(0)
+	defer m.br.Buffer().Reset()
 	var b []byte
 	if b, err = m.br.ReadLine(); err != nil {
 		err = errors.WithStack(err)
