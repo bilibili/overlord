@@ -80,8 +80,11 @@ NEXTGET:
 		return
 	}
 	switch req.respType {
+	case RequestTypeNoop, RequestTypeVersion:
+		return
 	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace, RequestTypeGet, RequestTypeGetK,
-		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend, RequestTypeTouch, RequestTypeGat:
+		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend,
+		RequestTypeTouch, RequestTypeGat:
 		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
 			p.br.Advance(-requestHeaderLen)
 			return

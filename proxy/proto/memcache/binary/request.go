@@ -14,12 +14,14 @@ const (
 )
 
 var (
-	magicReqBytes  = []byte{magicReq}
-	magicRespBytes = []byte{magicResp}
-	zeroBytes      = []byte{0x00}
-	zeroTwoBytes   = []byte{0x00, 0x00}
-	zeroFourBytes  = []byte{0x00, 0x00, 0x00, 0x00}
-	zeroEightBytes = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	magicReqBytes    = []byte{magicReq}
+	magicRespBytes   = []byte{magicResp}
+	zeroBytes        = []byte{0x00}
+	zeroTwoBytes     = []byte{0x00, 0x00}
+	zeroFourBytes    = []byte{0x00, 0x00, 0x00, 0x00}
+	zeroEightBytes   = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	versionRespBytes = []byte("1.5.2")
+	versionFourBytes = []byte{0x00, 0x00, 0x00, 0x05}
 )
 
 // RequestType is the protocol-agnostic identifier for the command
@@ -36,6 +38,7 @@ const (
 	RequestTypeDecr    RequestType = 0x06
 	RequestTypeGetQ    RequestType = 0x09
 	RequestTypeNoop    RequestType = 0x0a
+	RequestTypeVersion RequestType = 0x0b
 	RequestTypeGetK    RequestType = 0x0c
 	RequestTypeGetKQ   RequestType = 0x0d
 	RequestTypeAppend  RequestType = 0x0e
@@ -63,6 +66,7 @@ var (
 	decrBytes    = []byte{byte(RequestTypeDecr)}
 	getQBytes    = []byte{byte(RequestTypeGetQ)}
 	noopBytes    = []byte{byte(RequestTypeNoop)}
+	versionBytes = []byte{byte(RequestTypeVersion)}
 	getKBytes    = []byte{byte(RequestTypeGetK)}
 	getKQBytes   = []byte{byte(RequestTypeGetKQ)}
 	appendBytes  = []byte{byte(RequestTypeAppend)}
@@ -90,6 +94,7 @@ const (
 	decrString    = "decr"
 	getQString    = "getq"
 	noopString    = "noop"
+	versionString = "version"
 	getKString    = "getk"
 	getKQString   = "getkq"
 	appendString  = "append"
@@ -128,6 +133,8 @@ func (rt RequestType) Bytes() []byte {
 		return getQBytes
 	case RequestTypeNoop:
 		return noopBytes
+	case RequestTypeVersion:
+		return versionBytes
 	case RequestTypeGetK:
 		return getKBytes
 	case RequestTypeGetKQ:
@@ -181,6 +188,8 @@ func (rt RequestType) String() string {
 		return getQString
 	case RequestTypeNoop:
 		return noopString
+	case RequestTypeVersion:
+		return versionString
 	case RequestTypeGetK:
 		return getKString
 	case RequestTypeGetKQ:

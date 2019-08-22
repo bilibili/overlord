@@ -62,6 +62,10 @@ func (n *nodeConn) Write(m *proto.Message) (err error) {
 		err = errors.WithStack(ErrAssertReq)
 		return
 	}
+	if mcr.respType == RequestTypeNoop || mcr.respType == RequestTypeVersion {
+		return
+	}
+
 	_ = n.bw.Write(magicReqBytes)
 
 	cmd := mcr.respType
@@ -100,6 +104,14 @@ func (n *nodeConn) Read(m *proto.Message) (err error) {
 		return
 	}
 	mcr.data = mcr.data[:0]
+	if mcr.respType == RequestTypeNoop {
+		return
+	}
+	if mcr.respType == RequestTypeVersion {
+		copy(mcr.bodyLen, versionFourBytes)
+		mcr.data = append(mcr.data, versionRespBytes...)
+		return
+	}
 REREAD:
 	var bs []byte
 	if bs, err = n.br.ReadExact(requestHeaderLen); err == bufio.ErrBufferFull {
