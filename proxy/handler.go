@@ -195,19 +195,3 @@ func (h *Handler) closeWithError(err error) {
 		}
 	}
 }
-
-//// Auth  handler auth
-//func (h *Handler) Auth(msgs []*proto.Message) (err error) {
-//	if msgs[0].Request().CmdString() == "AUTH" {
-//		if string(msgs[0].Request().Key()) == h.cc.Password {
-//			err = h.pc.Auth(true)
-//			h.authorized = true
-//		} else {
-//			//err = errs.New("err password")
-//			err = h.pc.Auth(false)
-//		}
-//	} else {
-//		err = h.pc.Auth(false)
-//	}
-//	return
-//}
