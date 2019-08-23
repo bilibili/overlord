@@ -24,20 +24,29 @@ var (
 )
 
 type proxyConn struct {
-	c  *cluster
-	pc proto.ProxyConn
+	c          *cluster
+	pc         proto.ProxyConn
+	authorized bool
+	password   string
 }
 
 // NewProxyConn creates new redis cluster Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn, fer proto.Forwarder) proto.ProxyConn {
+func NewProxyConn(conn *libnet.Conn, fer proto.Forwarder, password string) proto.ProxyConn {
 	var c *cluster
 	if fer != nil {
 		c = fer.(*cluster)
 	}
 	r := &proxyConn{
-		c:  c,
-		pc: redis.NewProxyConn(conn),
+		c:        c,
+		pc:       redis.NewProxyConn(conn, password),
+		password: password,
 	}
+	if password != "" {
+		r.authorized = false
+	} else {
+		r.authorized = true
+	}
+
 	return r
 }
 
@@ -78,4 +87,26 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 
 func (pc *proxyConn) Flush() (err error) {
 	return pc.pc.Flush()
+}
+
+func (pc *proxyConn) CmdCheck(m *proto.Message) (bool, error) {
+	isSpecialDirective, err := pc.pc.CmdCheck(m)
+	pc.authorized = pc.pc.GetAuthorized()
+	return isSpecialDirective, err
+}
+
+func (pc *proxyConn) SetAuthorized(status bool) {
+	pc.authorized = status
+}
+
+func (pc *proxyConn) GetAuthorized() bool {
+	return pc.authorized
+}
+
+func (pc *proxyConn) SetPassword(password string) {
+	pc.password = password
+}
+
+func (pc *proxyConn) GetPassword() string {
+	return pc.password
 }

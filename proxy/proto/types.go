@@ -29,6 +29,8 @@ type ProxyConn interface {
 	Decode([]*Message) ([]*Message, error)
 	Encode(msg *Message) error
 	Flush() error
+	GetAuthorized() bool
+	CmdCheck(m *Message) (bool, error)
 }
 
 // NodeConn handle Msg to backend cache server and read response.

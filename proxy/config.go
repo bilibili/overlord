@@ -78,6 +78,7 @@ type ClusterConfig struct {
 	PingAutoEject     bool            `toml:"ping_auto_eject"`
 	SlowlogSlowerThan int             `toml:"slowlog_slower_than"`
 	Servers           []string        `toml:"servers"`
+	Password          string          `toml:"password"`
 }
 
 // ValidateStandalone validate redis/memcache address is valid or not
