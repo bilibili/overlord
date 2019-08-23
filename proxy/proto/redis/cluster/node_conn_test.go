@@ -16,12 +16,13 @@ import (
 func TestNodeConnMaxRedirect(t *testing.T) {
 	monkey.Patch(newNodeConn, func(_ *cluster, addr string) proto.NodeConn {
 		return &nodeConn{
-			nc: &redis.NodeConn{},
-			c:  &cluster{action: make(chan struct{})},
+			nc:   &redis.NodeConn{},
+			addr: addr,
+			c:    &cluster{action: make(chan struct{})},
 		}
 	})
 
-	nnc := newNodeConn(nil, "")
+	nnc := newNodeConn(&cluster{action: make(chan struct{})}, "")
 	cnc := nnc.(*nodeConn)
 	rnc := cnc.nc.(*redis.NodeConn)
 	bw := &bufio.Writer{}

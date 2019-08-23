@@ -260,13 +260,13 @@ func (pc *proxyConn) Flush() (err error) {
 func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialCmd bool, err error) {
 	isSpecialCmd = false
 
-	if err = m.Err(); err != nil {
-		se := errors.Cause(err).Error()
-		pc.bw.Write(respErrorBytes)
-		pc.bw.Write([]byte(se))
-		pc.bw.Write(crlfBytes)
-		return isSpecialCmd, err
-	}
+	//if err = m.Err(); err != nil {
+	//	se := errors.Cause(err).Error()
+	//	pc.bw.Write(respErrorBytes)
+	//	pc.bw.Write([]byte(se))
+	//	pc.bw.Write(crlfBytes)
+	//	return isSpecialCmd, err
+	//}
 	req, ok := m.Request().(*Request)
 	if !ok {
 		return isSpecialCmd, ErrBadAssert
