@@ -179,6 +179,6 @@ func (pc *proxyConn) GetAuthorized() bool {
 	return true
 }
 
-func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err error) {
+func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialCmd bool, err error) {
 	return false, err
 }

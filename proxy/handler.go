@@ -102,10 +102,10 @@ func (h *Handler) handle() {
 			return
 		}
 
-		// 2. handle special directive
-		isSpecialDirective := false
+		// 2. handle special command
+		isSpecialCmd := false
 		if len(msgs) > 0 {
-			isSpecialDirective, err = h.pc.CmdCheck(msgs[0])
+			isSpecialCmd, err = h.pc.CmdCheck(msgs[0])
 			if err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)
@@ -113,7 +113,7 @@ func (h *Handler) handle() {
 			}
 		}
 
-		if !isSpecialDirective && h.pc.GetAuthorized() {
+		if !isSpecialCmd && h.pc.GetAuthorized() {
 			// 3. send to cluster
 			h.forwarder.Forward(msgs)
 			wg.Wait()

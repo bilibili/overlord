@@ -90,9 +90,9 @@ func (pc *proxyConn) Flush() (err error) {
 }
 
 func (pc *proxyConn) CmdCheck(m *proto.Message) (bool, error) {
-	isSpecialDirective, err := pc.pc.CmdCheck(m)
+	isSpecialCmd, err := pc.pc.CmdCheck(m)
 	pc.authorized = pc.pc.GetAuthorized()
-	return isSpecialDirective, err
+	return isSpecialCmd, err
 }
 
 func (pc *proxyConn) SetAuthorized(status bool) {

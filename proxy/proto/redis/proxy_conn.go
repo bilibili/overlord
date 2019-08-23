@@ -257,32 +257,32 @@ func (pc *proxyConn) Flush() (err error) {
 	return pc.bw.Flush()
 }
 
-func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err error) {
-	isSpecialDirective = false
+func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialCmd bool, err error) {
+	isSpecialCmd = false
 
 	if err = m.Err(); err != nil {
 		se := errors.Cause(err).Error()
 		pc.bw.Write(respErrorBytes)
 		pc.bw.Write([]byte(se))
 		pc.bw.Write(crlfBytes)
-		return isSpecialDirective, err
+		return isSpecialCmd, err
 	}
 	req, ok := m.Request().(*Request)
 	if !ok {
-		return isSpecialDirective, ErrBadAssert
+		return isSpecialCmd, ErrBadAssert
 	}
 
 	if !req.IsSupport() {
 		err = pc.Bw().Write([]byte(fmt.Sprintf("-ERR unknown command `%s`, with args beginning with:\r\n", req.CmdString())))
-		return isSpecialDirective, err
+		return isSpecialCmd, err
 	}
 
 	if !req.IsSpecial() {
 		if !pc.authorized {
 			err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
-			return isSpecialDirective, err
+			return isSpecialCmd, err
 		}
-		return isSpecialDirective, err
+		return isSpecialCmd, err
 	}
 
 	if req.IsSpecial() {
@@ -294,20 +294,20 @@ func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err er
 			} else {
 				err = pc.Bw().Write([]byte("-ERR invalid password\r\n"))
 			}
-			isSpecialDirective = true
+			isSpecialCmd = true
 		} else if bytes.Equal(reqData, cmdPingBytes) {
 			if status := pc.authorized; status {
 				err = pc.Bw().Write([]byte("+PONG\r\n"))
 			} else {
 				err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
 			}
-			isSpecialDirective = true
+			isSpecialCmd = true
 		} else if bytes.Equal(reqData, cmdQuitBytes) {
 			err = pc.Bw().Write([]byte("+OK\r\n"))
-			isSpecialDirective = true
+			isSpecialCmd = true
 		} else if bytes.Equal(reqData, cmdCommandBytes) {
 			err = pc.Bw().Write([]byte("-1\r\n"))
-			isSpecialDirective = true
+			isSpecialCmd = true
 		}
 	} else {
 		if !pc.authorized {
