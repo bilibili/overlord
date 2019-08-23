@@ -34,24 +34,24 @@ func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	return p
 }
 
-func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
+func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	var err error
 	// if completed, means that we have parsed all the buffered
 	// if not completed, we need only to parse the buffered message
-	if p.completed {
-		err = p.br.Read()
+	if pc.completed {
+		err = pc.br.Read()
 		if err != nil {
 			return nil, err
 		}
 	}
 	for i := range msgs {
-		p.completed = false
+		pc.completed = false
 		// set msg type
 		msgs[i].Type = types.CacheTypeMemcacheBinary
 		// decode
-		err = p.decode(msgs[i])
+		err = pc.decode(msgs[i])
 		if err == bufio.ErrBufferFull {
-			p.completed = true
+			pc.completed = true
 			msgs[i].Reset()
 			return msgs[:i], nil
 		} else if err != nil {
@@ -63,17 +63,17 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	return msgs, nil
 }
 
-func (p *proxyConn) decode(m *proto.Message) (err error) {
+func (pc *proxyConn) decode(m *proto.Message) (err error) {
 NEXTGET:
 	// bufio reset buffer
-	head, err := p.br.ReadExact(requestHeaderLen)
+	head, err := pc.br.ReadExact(requestHeaderLen)
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
 		err = errors.WithStack(err)
 		return
 	}
-	req := p.request(m)
+	req := pc.request(m)
 	parseHeader(head, req, true)
 	if err != nil {
 		err = errors.WithStack(err)
@@ -82,14 +82,14 @@ NEXTGET:
 	switch req.respType {
 	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace, RequestTypeGet, RequestTypeGetK,
 		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend, RequestTypeTouch, RequestTypeGat:
-		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
-			p.br.Advance(-requestHeaderLen)
+		if err = pc.decodeCommon(m, req); err == bufio.ErrBufferFull {
+			pc.br.Advance(-requestHeaderLen)
 			return
 		}
 		return
 	case RequestTypeGetQ, RequestTypeGetKQ:
-		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
-			p.br.Advance(-requestHeaderLen)
+		if err = pc.decodeCommon(m, req); err == bufio.ErrBufferFull {
+			pc.br.Advance(-requestHeaderLen)
 			return
 		}
 		goto NEXTGET
@@ -98,9 +98,9 @@ NEXTGET:
 	return
 }
 
-func (p *proxyConn) decodeCommon(m *proto.Message, req *MCRequest) (err error) {
+func (pc *proxyConn) decodeCommon(m *proto.Message, req *MCRequest) (err error) {
 	bl := binary.BigEndian.Uint32(req.bodyLen)
-	body, err := p.br.ReadExact(int(bl))
+	body, err := pc.br.ReadExact(int(bl))
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
@@ -117,7 +117,7 @@ func (p *proxyConn) decodeCommon(m *proto.Message, req *MCRequest) (err error) {
 	return
 }
 
-func (p *proxyConn) request(m *proto.Message) *MCRequest {
+func (pc *proxyConn) request(m *proto.Message) *MCRequest {
 	req := m.NextReq()
 	if req == nil {
 		req = GetReq()
@@ -142,7 +142,7 @@ func parseHeader(bs []byte, req *MCRequest, isDecode bool) {
 }
 
 // Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
+func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	reqs := m.Requests()
 	for _, req := range reqs {
 		mcr, ok := req.(*MCRequest)
@@ -150,27 +150,35 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			err = errors.WithStack(ErrAssertReq)
 			return
 		}
-		_ = p.bw.Write(magicRespBytes) // NOTE: magic
-		_ = p.bw.Write(mcr.respType.Bytes())
-		_ = p.bw.Write(mcr.keyLen)
-		_ = p.bw.Write(mcr.extraLen)
-		_ = p.bw.Write(zeroBytes)
+		_ = pc.bw.Write(magicRespBytes) // NOTE: magic
+		_ = pc.bw.Write(mcr.respType.Bytes())
+		_ = pc.bw.Write(mcr.keyLen)
+		_ = pc.bw.Write(mcr.extraLen)
+		_ = pc.bw.Write(zeroBytes)
 		if me := m.Err(); me != nil {
-			_ = p.bw.Write(resopnseStatusInternalErrBytes)
+			_ = pc.bw.Write(resopnseStatusInternalErrBytes)
 		} else {
-			_ = p.bw.Write(mcr.status)
+			_ = pc.bw.Write(mcr.status)
 		}
-		_ = p.bw.Write(mcr.bodyLen)
-		_ = p.bw.Write(mcr.opaque)
-		err = p.bw.Write(mcr.cas)
+		_ = pc.bw.Write(mcr.bodyLen)
+		_ = pc.bw.Write(mcr.opaque)
+		err = pc.bw.Write(mcr.cas)
 
 		if err == nil && !bytes.Equal(mcr.bodyLen, zeroFourBytes) {
-			err = p.bw.Write(mcr.data)
+			err = pc.bw.Write(mcr.data)
 		}
 	}
 	return
 }
 
-func (p *proxyConn) Flush() (err error) {
-	return p.bw.Flush()
+func (pc *proxyConn) Flush() (err error) {
+	return pc.bw.Flush()
+}
+
+func (pc *proxyConn) GetAuthorized() bool {
+	return true
+}
+
+func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err error) {
+	return false, err
 }

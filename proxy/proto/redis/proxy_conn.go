@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 
 	"overlord/pkg/bufio"
@@ -14,11 +15,11 @@ import (
 )
 
 var (
-	nullBytes           = []byte("-1\r\n")
-	okBytes             = []byte("OK\r\n")
-	pongDataBytes       = []byte("PONG")
-	justOkBytes         = []byte("OK")
-	notSupportDataBytes = []byte("Error: command not support")
+	nullBytes     = []byte("-1\r\n")
+	okBytes       = []byte("OK\r\n")
+	pongDataBytes = []byte("+PONG\r\n")
+	justOkBytes   = []byte("+OK\r\n")
+	//notSupportDataBytes = []byte("Error: command not support")
 )
 
 // ProxyConn is export for redis cluster.
@@ -35,15 +36,24 @@ type proxyConn struct {
 	completed bool
 
 	resp *resp
+
+	authorized bool
+	password   string
 }
 
 // NewProxyConn creates new redis Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
+func NewProxyConn(conn *libnet.Conn, password string) proto.ProxyConn {
 	r := &proxyConn{
 		br:        bufio.NewReader(conn, bufio.Get(1024)),
 		bw:        bufio.NewWriter(conn),
 		completed: true,
+		password:  password,
 		resp:      &resp{},
+	}
+	if password != "" {
+		r.authorized = false
+	} else {
+		r.authorized = true
 	}
 	return r
 }
@@ -99,7 +109,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			err = ErrBadRequest
 			return
 		}
-		mid := pc.resp.arraySize / 2
+		mid := pc.resp.arraySize / 2 // Gets the number of command groups contained in the mset
 		for i := 0; i < mid; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeOK
@@ -187,22 +197,6 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	case mergeTypeCount:
 		err = pc.mergeCount(m)
 	default:
-		if !req.IsSupport() {
-			req.reply.respType = respError
-			req.reply.data = req.reply.data[:0]
-			req.reply.data = append(req.reply.data, notSupportDataBytes...)
-		} else if req.IsCtl() {
-			reqData := req.resp.array[0].data
-			if bytes.Equal(reqData, cmdPingBytes) {
-				req.reply.respType = respString
-				req.reply.data = req.reply.data[:0]
-				req.reply.data = append(req.reply.data, pongDataBytes...)
-			} else if bytes.Equal(reqData, cmdQuitBytes) {
-				req.reply.respType = respString
-				req.reply.data = req.reply.data[:0]
-				req.reply.data = append(req.reply.data, justOkBytes...)
-			}
-		}
 		err = req.reply.encode(pc.bw)
 	}
 	if err != nil {
@@ -261,4 +255,81 @@ func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 
 func (pc *proxyConn) Flush() (err error) {
 	return pc.bw.Flush()
+}
+
+func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err error) {
+	isSpecialDirective = false
+
+	if err = m.Err(); err != nil {
+		se := errors.Cause(err).Error()
+		pc.bw.Write(respErrorBytes)
+		pc.bw.Write([]byte(se))
+		pc.bw.Write(crlfBytes)
+		return isSpecialDirective, err
+	}
+	req, ok := m.Request().(*Request)
+	if !ok {
+		return isSpecialDirective, ErrBadAssert
+	}
+
+	if !req.IsSupport() {
+		err = pc.Bw().Write([]byte(fmt.Sprintf("-ERR unknown command `%s`, with args beginning with:\r\n", req.CmdString())))
+		return isSpecialDirective, err
+	}
+
+	if !req.IsSpecial() {
+		if !pc.authorized {
+			err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
+			return isSpecialDirective, err
+		}
+		return isSpecialDirective, err
+	}
+
+	if req.IsSpecial() {
+		reqData := req.resp.array[0].data
+		if bytes.Equal(reqData, cmdAuthBytes) {
+			if bytes.Equal(req.Key(), []byte(pc.password)) {
+				pc.authorized = true
+				err = pc.Bw().Write([]byte("+OK\r\n"))
+			} else {
+				err = pc.Bw().Write([]byte("-ERR invalid password\r\n"))
+			}
+			isSpecialDirective = true
+		} else if bytes.Equal(reqData, cmdPingBytes) {
+			if status := pc.authorized; status {
+				err = pc.Bw().Write([]byte("+PONG\r\n"))
+			} else {
+				err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
+			}
+			isSpecialDirective = true
+		} else if bytes.Equal(reqData, cmdQuitBytes) {
+			err = pc.Bw().Write([]byte("+OK\r\n"))
+			isSpecialDirective = true
+		} else if bytes.Equal(reqData, cmdCommandBytes) {
+			err = pc.Bw().Write([]byte("-1\r\n"))
+			isSpecialDirective = true
+		}
+	} else {
+		if !pc.authorized {
+			err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
+		}
+	}
+
+	return
+}
+
+func (pc *proxyConn) SetAuthorized(status bool) {
+	pc.authorized = status
+}
+
+func (pc *proxyConn) GetAuthorized() bool {
+	return pc.authorized
+}
+
+func (pc *proxyConn) SetPassword(password string) {
+	pc.password = password
+}
+
+func (pc *proxyConn) GetPassword() string {
+	return pc.password
 }

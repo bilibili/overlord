@@ -32,6 +32,8 @@ slowlog_slower_than = 10
 servers = [
     "127.0.0.1:11211:1 mc1",
 ]
+# Require clients to issue AUTH <PASSWORD> before processing any other commands.
+password = ""
 
 [[clusters]]
 # This be used to specify the name of cache cluster.
@@ -68,6 +70,8 @@ slowlog_slower_than = 10
 servers = [
     "127.0.0.1:6379:1 redis1",
 ]
+# Require clients to issue AUTH <PASSWORD> before processing any other commands.
+password = ""
 
 [[clusters]]
 # This be used to specify the name of cache cluster.
@@ -105,7 +109,8 @@ servers = [
     "127.0.0.1:7000",
     "127.0.0.1:7001",
 ]
-
+# Require clients to issue AUTH <PASSWORD> before processing any other commands.
+password = ""
 
 [[clusters]]
 # This be used to specify the name of cache cluster.
@@ -141,3 +146,5 @@ slowlog_slower_than = 10
 servers = [
     "127.0.0.1:12345",
 ]
+# Require clients to issue AUTH <PASSWORD> before processing any other commands.
+password = ""

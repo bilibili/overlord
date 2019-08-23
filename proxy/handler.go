@@ -71,9 +71,9 @@ func NewHandler(p *Proxy, cc *ClusterConfig, conn net.Conn, forwarder proto.Forw
 	case types.CacheTypeMemcacheBinary:
 		h.pc = mcbin.NewProxyConn(h.conn)
 	case types.CacheTypeRedis:
-		h.pc = redis.NewProxyConn(h.conn)
+		h.pc = redis.NewProxyConn(h.conn, h.cc.Password)
 	case types.CacheTypeRedisCluster:
-		h.pc = rclstr.NewProxyConn(h.conn, forwarder)
+		h.pc = rclstr.NewProxyConn(h.conn, forwarder, h.cc.Password)
 	default:
 		panic(types.ErrNoSupportCacheType)
 	}
@@ -101,28 +101,44 @@ func (h *Handler) handle() {
 			h.deferHandle(messages, err)
 			return
 		}
-		// 2. send to cluster
-		h.forwarder.Forward(msgs)
-		wg.Wait()
-		// 3. encode
-		for _, msg := range msgs {
-			msg.MarkEndPipe()
-			if err = h.pc.Encode(msg); err != nil {
+
+		// 2. handle special directive
+		isSpecialDirective := false
+		if len(msgs) > 0 {
+			isSpecialDirective, err = h.pc.CmdCheck(msgs[0])
+			if err != nil {
 				h.pc.Flush()
 				h.deferHandle(messages, err)
 				return
 			}
-			msg.MarkEnd()
-			if prom.On {
-				prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+		}
+
+		if !isSpecialDirective && h.pc.GetAuthorized() {
+			// 3. send to cluster
+			h.forwarder.Forward(msgs)
+			wg.Wait()
+
+			// 4. encode
+			for _, msg := range msgs {
+				msg.MarkEndPipe()
+				if err = h.pc.Encode(msg); err != nil {
+					h.pc.Flush()
+					h.deferHandle(messages, err)
+					return
+				}
+				msg.MarkEnd()
+				if prom.On {
+					prom.ProxyTime(h.cc.Name, msg.Request().CmdString(), int64(msg.TotalDur()/time.Microsecond))
+				}
 			}
 		}
+
 		if err = h.pc.Flush(); err != nil {
 			h.deferHandle(messages, err)
 			return
 		}
 
-		// 4. check slowlog before release resource
+		// 5. check slowlog before release resource
 		if h.slowerThan != 0 {
 			for _, msg := range msgs {
 				if msg.TotalDur() > h.slowerThan {
@@ -135,7 +151,7 @@ func (h *Handler) handle() {
 			msg.ResetSubs()
 			msg.Reset()
 		}
-		// 5. alloc MaxConcurrent
+		// 6. alloc MaxConcurrent
 		messages = h.allocMaxConcurrent(wg, messages, len(msgs))
 	}
 }
@@ -179,3 +195,19 @@ func (h *Handler) closeWithError(err error) {
 		}
 	}
 }
+
+//// Auth  handler auth
+//func (h *Handler) Auth(msgs []*proto.Message) (err error) {
+//	if msgs[0].Request().CmdString() == "AUTH" {
+//		if string(msgs[0].Request().Key()) == h.cc.Password {
+//			err = h.pc.Auth(true)
+//			h.authorized = true
+//		} else {
+//			//err = errs.New("err password")
+//			err = h.pc.Auth(false)
+//		}
+//	} else {
+//		err = h.pc.Auth(false)
+//	}
+//	return
+//}

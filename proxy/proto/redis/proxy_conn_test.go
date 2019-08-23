@@ -14,7 +14,7 @@ import (
 
 func _decodeMessage(t *testing.T, data string) []*proto.Message {
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, "")
 	msgs := proto.GetMsgs(16)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestDecodeBasicOk(t *testing.T) {
 func TestDecodeComplexOk(t *testing.T) {
 	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, "")
 	// test reuse command
 	msgs := proto.GetMsgs(16)
 	msgs[1].WithRequest(getReq())
@@ -182,22 +182,38 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 		arraySize: 2,
 	}
 	msg.WithRequest(req)
-	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
-	err := pc.Encode(msg)
+	conn, buf := mockconn.CreateDownStreamConn()
+	//conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), "")
+	_, err := pc.CmdCheck(msg)
 	assert.NoError(t, err)
-	assert.Equal(t, req.reply.data, notSupportDataBytes)
+	err = pc.Flush()
+	assert.NoError(t, err)
+	data := make([]byte, 2048)
+	size, err := buf.Read(data)
+	assert.NoError(t, err)
+	assert.Equal(t, data[:size], []byte("-ERR unknown command `foo`, with args beginning with:\r\n"))
 
 	req.resp.next()
 	req.resp.array[0].data = cmdPingBytes
-	err = pc.Encode(msg)
+	_, err = pc.CmdCheck(msg)
 	assert.NoError(t, err)
-	assert.Equal(t, req.reply.data, pongDataBytes)
+	err = pc.Flush()
+	assert.NoError(t, err)
+	data = make([]byte, 2048)
+	size, err = buf.Read(data)
+	assert.NoError(t, err)
+	assert.Equal(t, data[:size], pongDataBytes)
 
 	req.resp.array[0].data = cmdQuitBytes
-	err = pc.Encode(msg)
+	_, err = pc.CmdCheck(msg)
 	assert.NoError(t, err)
-	assert.Equal(t, req.reply.data, justOkBytes)
+	err = pc.Flush()
+	assert.NoError(t, err)
+	data = make([]byte, 2048)
+	size, err = buf.Read(data)
+	assert.NoError(t, err)
+	assert.Equal(t, data[:size], justOkBytes)
 }
 
 func TestEncodeMergeOk(t *testing.T) {
@@ -216,7 +232,7 @@ func TestEncodeMergeOk(t *testing.T) {
 					data:     []byte("123456789"),
 				},
 			},
-			Expect: "-Error: command not support\r\n",
+			Expect: "+123456789\r\n",
 		},
 		{
 			Name:  "mergeOK",
@@ -281,7 +297,7 @@ func TestEncodeMergeOk(t *testing.T) {
 				msg.Batch()
 			}
 			conn, buf := mockconn.CreateDownStreamConn()
-			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), "")
 			err := pc.Encode(msg)
 			if !assert.NoError(t, err) {
 				return
@@ -294,7 +310,6 @@ func TestEncodeMergeOk(t *testing.T) {
 			size, err := buf.Read(data)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.Expect, string(data[:size]))
-
 		})
 	}
 }
@@ -310,7 +325,7 @@ func TestEncodeWithError(t *testing.T) {
 	msg.Done()
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), "")
 	err := pc.Encode(msg)
 	assert.Error(t, err)
 	assert.Equal(t, mockErr, err)
@@ -342,8 +357,8 @@ func TestEncodeWithPing(t *testing.T) {
 	msg.WithRequest(req)
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
-	err := pc.Encode(msg)
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), "")
+	_, err := pc.CmdCheck(msg)
 	assert.NoError(t, err)
 	err = pc.Flush()
 	assert.NoError(t, err)

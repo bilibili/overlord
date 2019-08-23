@@ -40,25 +40,25 @@ func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	return p
 }
 
-func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
+func (pc *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	var err error
 	// if completed, means that we have parsed all the buffered
 	// if not completed, we need only to parse the buffered message
-	if p.completed {
-		err = p.br.Read()
+	if pc.completed {
+		err = pc.br.Read()
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	for i := range msgs {
-		p.completed = false
+		pc.completed = false
 		// set msg type
 		msgs[i].Type = types.CacheTypeMemcache
 		// decode
-		err = p.decode(msgs[i])
+		err = pc.decode(msgs[i])
 		if err == bufio.ErrBufferFull {
-			p.completed = true
+			pc.completed = true
 			msgs[i].Reset()
 			return msgs[:i], nil
 		} else if err != nil {
@@ -70,9 +70,9 @@ func (p *proxyConn) Decode(msgs []*proto.Message) ([]*proto.Message, error) {
 	return msgs, nil
 }
 
-func (p *proxyConn) decode(m *proto.Message) (err error) {
+func (pc *proxyConn) decode(m *proto.Message) (err error) {
 	// bufio reset buffer
-	line, err := p.br.ReadLine()
+	line, err := pc.br.ReadLine()
 	if err == bufio.ErrBufferFull {
 		return
 	} else if err != nil {
@@ -84,58 +84,58 @@ func (p *proxyConn) decode(m *proto.Message) (err error) {
 	switch string(line[bg:ed]) {
 	// Storage commands:
 	case setString:
-		return p.decodeStorage(m, line[ed:], RequestTypeSet)
+		return pc.decodeStorage(m, line[ed:], RequestTypeSet)
 	case addString:
-		return p.decodeStorage(m, line[ed:], RequestTypeAdd)
+		return pc.decodeStorage(m, line[ed:], RequestTypeAdd)
 	case replaceString:
-		return p.decodeStorage(m, line[ed:], RequestTypeReplace)
+		return pc.decodeStorage(m, line[ed:], RequestTypeReplace)
 	case appendString:
-		return p.decodeStorage(m, line[ed:], RequestTypeAppend)
+		return pc.decodeStorage(m, line[ed:], RequestTypeAppend)
 	case prependString:
-		return p.decodeStorage(m, line[ed:], RequestTypePrepend)
+		return pc.decodeStorage(m, line[ed:], RequestTypePrepend)
 	case casString:
-		return p.decodeStorage(m, line[ed:], RequestTypeCas)
+		return pc.decodeStorage(m, line[ed:], RequestTypeCas)
 	// Retrieval commands:
 	case getString:
-		return p.decodeRetrieval(m, line[ed:], RequestTypeGet)
+		return pc.decodeRetrieval(m, line[ed:], RequestTypeGet)
 	case getsString:
-		return p.decodeRetrieval(m, line[ed:], RequestTypeGets)
+		return pc.decodeRetrieval(m, line[ed:], RequestTypeGets)
 	// Deletion
 	case deleteString:
-		return p.decodeDelete(m, line[ed:], RequestTypeDelete)
+		return pc.decodeDelete(m, line[ed:], RequestTypeDelete)
 	// Increment/Decrement:
 	case incrString:
-		return p.decodeIncrDecr(m, line[ed:], RequestTypeIncr)
+		return pc.decodeIncrDecr(m, line[ed:], RequestTypeIncr)
 	case decrString:
-		return p.decodeIncrDecr(m, line[ed:], RequestTypeDecr)
+		return pc.decodeIncrDecr(m, line[ed:], RequestTypeDecr)
 	// Touch:
 	case touchString:
-		return p.decodeTouch(m, line[ed:], RequestTypeTouch)
+		return pc.decodeTouch(m, line[ed:], RequestTypeTouch)
 	// Get And Touch:
 	case gatString:
-		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
+		return pc.decodeGetAndTouch(m, line[ed:], RequestTypeGat)
 	case gatsString:
-		return p.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
+		return pc.decodeGetAndTouch(m, line[ed:], RequestTypeGats)
 	case quitString:
-		return p.decodeQuit(m, line[ed:])
+		return pc.decodeQuit(m, line[ed:])
 	case versionString:
-		return p.decodeVersion(m, line[ed:])
+		return pc.decodeVersion(m, line[ed:])
 	}
 	err = errors.WithStack(ErrBadRequest)
 	return
 }
 
-func (p *proxyConn) decodeVersion(m *proto.Message, key []byte) (err error) {
+func (pc *proxyConn) decodeVersion(m *proto.Message, key []byte) (err error) {
 	WithReq(m, RequestTypeVersion, key, crlfBytes)
 	return
 }
 
-func (p *proxyConn) decodeQuit(m *proto.Message, key []byte) (err error) {
+func (pc *proxyConn) decodeQuit(m *proto.Message, key []byte) (err error) {
 	WithReq(m, RequestTypeQuit, key, crlfBytes)
 	return
 }
 
-func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType) (err error) {
+func (pc *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -156,10 +156,10 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	}
 
 	keyOffset := len(bs) - keyE
-	p.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
-	data, err := p.br.ReadExact(keyOffset + length + 2)
+	pc.br.Advance(-keyOffset) // NOTE: data contains "<flags> <exptime> <bytes> <cas unique> [noreply]\r\n"
+	data, err := pc.br.ReadExact(keyOffset + length + 2)
 	if err == bufio.ErrBufferFull {
-		p.br.Advance(-((keyE - keyB) + 1 + len(mtype.Bytes())))
+		pc.br.Advance(-((keyE - keyB) + 1 + len(mtype.Bytes())))
 		return
 	} else if err != nil {
 		err = errors.WithStack(err)
@@ -174,7 +174,7 @@ func (p *proxyConn) decodeStorage(m *proto.Message, bs []byte, mtype RequestType
 	return
 }
 
-func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType RequestType) (err error) {
+func (pc *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	var (
 		b, e int
 		ns   = bs[:]
@@ -194,7 +194,7 @@ func (p *proxyConn) decodeRetrieval(m *proto.Message, bs []byte, reqType Request
 	return
 }
 
-func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestType) (err error) {
+func (pc *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -205,7 +205,7 @@ func (p *proxyConn) decodeDelete(m *proto.Message, bs []byte, reqType RequestTyp
 	return
 }
 
-func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestType) (err error) {
+func (pc *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -225,7 +225,7 @@ func (p *proxyConn) decodeIncrDecr(m *proto.Message, bs []byte, reqType RequestT
 	return
 }
 
-func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType) (err error) {
+func (pc *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	keyB, keyE := nextField(bs)
 	key := bs[keyB:keyE]
 	if !legalKey(key) {
@@ -245,7 +245,7 @@ func (p *proxyConn) decodeTouch(m *proto.Message, bs []byte, reqType RequestType
 	return
 }
 
-func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType RequestType) (err error) {
+func (pc *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType RequestType) (err error) {
 	eB, eE := nextField(bs)
 	expBs := bs[eB:eE]
 	if !bytes.Equal(expBs, zeroBytes) {
@@ -363,21 +363,21 @@ func revSpacIdx(bs []byte) int {
 }
 
 // Encode encode response and write into writer.
-func (p *proxyConn) Encode(m *proto.Message) (err error) {
+func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if me := m.Err(); me != nil {
 		se := errors.Cause(me).Error()
-		_ = p.bw.Write(serverErrorBytes)
-		_ = p.bw.Write([]byte(se))
-		err = p.bw.Write(crlfBytes)
+		_ = pc.bw.Write(serverErrorBytes)
+		_ = pc.bw.Write([]byte(se))
+		err = pc.bw.Write(crlfBytes)
 		return
 	}
 
 	if !m.IsBatch() {
 		mcr, ok := m.Request().(*MCRequest)
 		if !ok {
-			_ = p.bw.Write(serverErrorBytes)
-			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-			err = p.bw.Write(crlfBytes)
+			_ = pc.bw.Write(serverErrorBytes)
+			_ = pc.bw.Write([]byte(ErrAssertReq.Error()))
+			err = pc.bw.Write(crlfBytes)
 			return
 		}
 
@@ -387,9 +387,9 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		}
 
 		if mcr.respType == RequestTypeVersion {
-			_ = p.bw.Write(versionReplyBytes)
-			_ = p.bw.Write(version.Bytes())
-			err = p.bw.Write(crlfBytes)
+			_ = pc.bw.Write(versionReplyBytes)
+			_ = pc.bw.Write(version.Bytes())
+			err = pc.bw.Write(crlfBytes)
 			return
 		}
 
@@ -397,16 +397,16 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			return
 		}
 
-		err = p.bw.Write(mcr.data)
+		err = pc.bw.Write(mcr.data)
 		return
 	}
 
 	for _, req := range m.Requests() {
 		mcr, ok := req.(*MCRequest)
 		if !ok {
-			_ = p.bw.Write(serverErrorBytes)
-			_ = p.bw.Write([]byte(ErrAssertReq.Error()))
-			err = p.bw.Write(crlfBytes)
+			_ = pc.bw.Write(serverErrorBytes)
+			_ = pc.bw.Write([]byte(ErrAssertReq.Error()))
+			err = pc.bw.Write(crlfBytes)
 			return
 		}
 		var bs []byte
@@ -418,13 +418,21 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 		if len(bs) == 0 {
 			continue
 		}
-		_ = p.bw.Write(bs)
+		_ = pc.bw.Write(bs)
 	}
 
-	err = p.bw.Write(endBytes)
+	err = pc.bw.Write(endBytes)
 	return
 }
 
-func (p *proxyConn) Flush() (err error) {
-	return p.bw.Flush()
+func (pc *proxyConn) Flush() (err error) {
+	return pc.bw.Flush()
+}
+
+func (pc *proxyConn) GetAuthorized() bool {
+	return true
+}
+
+func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialDirective bool, err error) {
+	return false, err
 }

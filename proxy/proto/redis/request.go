@@ -17,27 +17,34 @@ var (
 	arrayLenTwo   = []byte("2")
 	arrayLenThree = []byte("3")
 
-	cmdEvalBytes   = []byte("4\r\nEVAL")
-	cmdQuitBytes   = []byte("4\r\nQUIT")
-	cmdPingBytes   = []byte("4\r\nPING")
-	cmdMSetBytes   = []byte("4\r\nMSET")
-	cmdMGetBytes   = []byte("4\r\nMGET")
-	cmdGetBytes    = []byte("3\r\nGET")
-	cmdDelBytes    = []byte("3\r\nDEL")
-	cmdExistsBytes = []byte("6\r\nEXISTS")
+	cmdEvalBytes    = []byte("4\r\nEVAL")
+	cmdQuitBytes    = []byte("4\r\nQUIT")
+	cmdPingBytes    = []byte("4\r\nPING")
+	cmdMSetBytes    = []byte("4\r\nMSET")
+	cmdMGetBytes    = []byte("4\r\nMGET")
+	cmdGetBytes     = []byte("3\r\nGET")
+	cmdDelBytes     = []byte("3\r\nDEL")
+	cmdExistsBytes  = []byte("6\r\nEXISTS")
+	cmdAuthBytes    = []byte("4\r\nAUTH")
+	cmdCommandBytes = []byte("7\r\nCOMMAND")
 
 	reqSupportCmdMap = map[string]struct{}{}
 	reqControlCmdMap = map[string]struct{}{}
+	reqSpecialCmdMap = map[string]struct{}{}
 )
 
 func init() {
 	supports := append(readCmds, writeCmds...)
 	supports = append(supports, controlCmds...)
+	supports = append(supports, specialCmds...)
 	for _, key := range supports {
 		reqSupportCmdMap[key] = struct{}{}
 	}
 	for _, key := range controlCmds {
 		reqControlCmdMap[key] = struct{}{}
+	}
+	for _, key := range specialCmds {
+		reqSpecialCmdMap[key] = struct{}{}
 	}
 }
 
@@ -177,6 +184,18 @@ func (r *Request) IsCtl() bool {
 		return false
 	}
 	_, ok := reqControlCmdMap[string(r.resp.array[0].data)]
+	return ok
+}
+
+// IsSpecial check command special.
+//
+// NOTE: use string([]byte) as a map key, it is very specific!!!
+// https://dave.cheney.net/high-performance-go-workshop/dotgo-paris.html#using_byte_as_a_map_key
+func (r *Request) IsSpecial() bool {
+	if r.resp.arraySize < 1 {
+		return false
+	}
+	_, ok := reqSpecialCmdMap[string(r.resp.array[0].data)]
 	return ok
 }
 
@@ -328,7 +347,6 @@ var (
 		"4\r\nWAIT",
 		"5\r\nBITOP",
 		"7\r\nEVALSHA",
-		"4\r\nAUTH",
 		"4\r\nECHO",
 		"4\r\nINFO",
 		"5\r\nPROXY",
@@ -338,8 +356,11 @@ var (
 		"6\r\nCONFIG",
 		"8\r\nCOMMANDS",
 	}
-	controlCmds = []string{
-		"4\r\nQUIT",
+	controlCmds = []string{}
+	specialCmds = []string{
+		"4\r\nAUTH",
 		"4\r\nPING",
+		"4\r\nQUIT",
+		"7\r\nCOMMAND",
 	}
 )
