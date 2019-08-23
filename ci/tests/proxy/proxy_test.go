@@ -38,6 +38,7 @@ var ccs = []*proxy.ClusterConfig{
 			"127.0.0.1:11211:10 mc1",
 			// "127.0.0.1:11213:10",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "mc-cluster",
@@ -59,6 +60,7 @@ var ccs = []*proxy.ClusterConfig{
 			"127.0.0.1:11211:10 mc2",
 			// "127.0.0.1:11213:10",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "mcbin-cluster",
@@ -80,6 +82,7 @@ var ccs = []*proxy.ClusterConfig{
 			// "127.0.0.1:11212:10",
 			// "127.0.0.1:11213:10",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "redis",
@@ -99,6 +102,7 @@ var ccs = []*proxy.ClusterConfig{
 		Servers: []string{
 			"127.0.0.1:6379:10",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "redis-cluster",
@@ -119,6 +123,7 @@ var ccs = []*proxy.ClusterConfig{
 			"127.0.0.1:7000",
 			"127.0.0.1:7001",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "no avaliable node ",
@@ -140,6 +145,7 @@ var ccs = []*proxy.ClusterConfig{
 			// "127.0.0.1:11212:10",
 			// "127.0.0.1:11213:10",
 		},
+		Password: "",
 	},
 	&proxy.ClusterConfig{
 		Name:             "reconn_test",
@@ -159,6 +165,7 @@ var ccs = []*proxy.ClusterConfig{
 		Servers: []string{
 			"127.0.0.1:21220:1",
 		},
+		Password: "",
 	},
 }
 
