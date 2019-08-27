@@ -1,5 +1,26 @@
 # Overlord-proxy
 
+## Version 1.8.4
+1. fix time record MarkEndInput, which reduce memory consumption by 60%
+2. try fetch cluster nodes when key moved
+
+## Version 1.8.3
+1. memcache/protocol: impl quit and noreply commands
+2. add RequestTypeVersion command for java xmemcache client
+3. refactor proxy connection for overlord
+4. support sunionstore and zunionstore
+
+## Version 1.8.2
+1. add overlord version of all sub commands
+2. add anzi rdb callback ignore receive for io.discard
+3. fixed reload bugs when add/reduce server
+4. add read sleep for flushing disk
+
+## Version 1.8.0
+1. add memcache proxy support and fixed reset subs
+2. add slowlog basic functions
+3. fixed anzi bugs and add more logging
+
 ## Version 1.7.4
 1. reduce node connection default memory allocation to 512k.
 2. fix memcache node connection bugs
