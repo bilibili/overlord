@@ -281,14 +281,14 @@ func WithReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
 	if req == nil {
 		req := GetReq()
 		req.respType = rtype
-		req.key = key
-		req.data = data
+		req.key = key[:]
+		req.data = data[:]
 		m.WithRequest(req)
 	} else {
 		mcreq := req.(*MCRequest)
 		mcreq.respType = rtype
-		mcreq.key = key
-		mcreq.data = data
+		mcreq.key = key[:]
+		mcreq.data = data[:]
 	}
 }
 
