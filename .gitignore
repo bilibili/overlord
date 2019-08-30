@@ -24,4 +24,3 @@ cmd/apicli/apicli
 cmd/anzi/anzi
 cmd/enri/enri
 coverage.txt
-go.sum

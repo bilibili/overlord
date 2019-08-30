@@ -45,7 +45,7 @@ func NewNodeConnPipe(conns int32, newNc func() NodeConn) (ncp *NodeConnPipe) {
 		errCh:  make(chan error, 1),
 	}
 	for i := int32(0); i < ncp.conns; i++ {
-		ncp.inputs[i] = make(chan *Message, pipeMaxCount*pipeMaxCount)
+		ncp.inputs[i] = make(chan *Message, pipeMaxCount*512)
 		ncp.mps[i] = newMsgPipe(ncp.inputs[i], newNc, ncp.errCh)
 	}
 	return

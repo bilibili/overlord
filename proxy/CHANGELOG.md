@@ -1,5 +1,24 @@
 # Overlord-proxy
 
+## Version 1.9.0
+1. complete memcache binary protocol.
+2. fix memcache text request key&data no copy bug.
+
+## Version 1.8.4
+1. fix time record MarkEndInput, which reduce memory consumption by 60%.
+2. try fetch cluster nodes when key moved.
+3. memcache command support (quit, version, noreply).
+
+## Version 1.8.2
+1. add slowlog feature.
+2. fixed reload bugs.
+3. fixed memcache.NodeConn bug.
+
+## Version 1.8.0
+1. add reload feature for cache type: redis, memcache, memcache_binary.
+2. add more metrics.
+3. add fuzz test for redis/memcache protocol.
+
 ## Version 1.7.4
 1. reduce node connection default memory allocation to 512k.
 2. fix memcache node connection bugs
