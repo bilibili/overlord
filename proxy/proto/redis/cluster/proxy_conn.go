@@ -91,7 +91,7 @@ func (pc *proxyConn) Flush() (err error) {
 
 func (pc *proxyConn) CmdCheck(m *proto.Message) (bool, error) {
 	isSpecialCmd, err := pc.pc.CmdCheck(m)
-	pc.authorized = pc.pc.GetAuthorized()
+	pc.authorized = pc.pc.IsAuthorized()
 	return isSpecialCmd, err
 }
 
@@ -99,7 +99,7 @@ func (pc *proxyConn) SetAuthorized(status bool) {
 	pc.authorized = status
 }
 
-func (pc *proxyConn) GetAuthorized() bool {
+func (pc *proxyConn) IsAuthorized() bool {
 	return pc.authorized
 }
 

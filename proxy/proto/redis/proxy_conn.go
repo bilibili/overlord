@@ -15,10 +15,12 @@ import (
 )
 
 var (
-	nullBytes     = []byte("-1\r\n")
-	okBytes       = []byte("OK\r\n")
-	pongDataBytes = []byte("+PONG\r\n")
-	justOkBytes   = []byte("+OK\r\n")
+	nullBytes            = []byte("-1\r\n")
+	okBytes              = []byte("OK\r\n")
+	pongDataBytes        = []byte("+PONG\r\n")
+	justOkBytes          = []byte("+OK\r\n")
+	invalidPasswordBytes = []byte("-ERR invalid password\r\n")
+	noAuthBytes          = []byte("-NOAUTH Authentication required.\r\n")
 	//notSupportDataBytes = []byte("Error: command not support")
 )
 
@@ -260,13 +262,6 @@ func (pc *proxyConn) Flush() (err error) {
 func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialCmd bool, err error) {
 	isSpecialCmd = false
 
-	//if err = m.Err(); err != nil {
-	//	se := errors.Cause(err).Error()
-	//	pc.bw.Write(respErrorBytes)
-	//	pc.bw.Write([]byte(se))
-	//	pc.bw.Write(crlfBytes)
-	//	return isSpecialCmd, err
-	//}
 	req, ok := m.Request().(*Request)
 	if !ok {
 		return isSpecialCmd, ErrBadAssert
@@ -274,44 +269,43 @@ func (pc *proxyConn) CmdCheck(m *proto.Message) (isSpecialCmd bool, err error) {
 
 	if !req.IsSupport() {
 		err = pc.Bw().Write([]byte(fmt.Sprintf("-ERR unknown command `%s`, with args beginning with:\r\n", req.CmdString())))
-		return isSpecialCmd, err
+		return
 	}
 
 	if !req.IsSpecial() {
 		if !pc.authorized {
-			err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
-			return isSpecialCmd, err
+			err = pc.Bw().Write(noAuthBytes)
+			return
 		}
-		return isSpecialCmd, err
+		return
 	}
 
 	if req.IsSpecial() {
+		isSpecialCmd = true
 		reqData := req.resp.array[0].data
 		if bytes.Equal(reqData, cmdAuthBytes) {
 			if bytes.Equal(req.Key(), []byte(pc.password)) {
 				pc.authorized = true
-				err = pc.Bw().Write([]byte("+OK\r\n"))
+				err = pc.Bw().Write(justOkBytes)
 			} else {
-				err = pc.Bw().Write([]byte("-ERR invalid password\r\n"))
+				pc.authorized = false
+				err = pc.Bw().Write(invalidPasswordBytes)
 			}
-			isSpecialCmd = true
+
 		} else if bytes.Equal(reqData, cmdPingBytes) {
 			if status := pc.authorized; status {
-				err = pc.Bw().Write([]byte("+PONG\r\n"))
+				err = pc.Bw().Write(pongDataBytes)
 			} else {
-				err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
+				err = pc.Bw().Write(noAuthBytes)
 			}
-			isSpecialCmd = true
 		} else if bytes.Equal(reqData, cmdQuitBytes) {
-			err = pc.Bw().Write([]byte("+OK\r\n"))
-			isSpecialCmd = true
+			err = pc.Bw().Write(justOkBytes)
 		} else if bytes.Equal(reqData, cmdCommandBytes) {
-			err = pc.Bw().Write([]byte("-1\r\n"))
-			isSpecialCmd = true
+			err = pc.Bw().Write([]byte(":-1\r\n"))
 		}
 	} else {
 		if !pc.authorized {
-			err = pc.Bw().Write([]byte("-NOAUTH Authentication required.\r\n"))
+			err = pc.Bw().Write(noAuthBytes)
 		}
 	}
 
@@ -322,7 +316,7 @@ func (pc *proxyConn) SetAuthorized(status bool) {
 	pc.authorized = status
 }
 
-func (pc *proxyConn) GetAuthorized() bool {
+func (pc *proxyConn) IsAuthorized() bool {
 	return pc.authorized
 }
 

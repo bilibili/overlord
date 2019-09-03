@@ -429,7 +429,7 @@ func (pc *proxyConn) Flush() (err error) {
 	return pc.bw.Flush()
 }
 
-func (pc *proxyConn) GetAuthorized() bool {
+func (pc *proxyConn) IsAuthorized() bool {
 	return true
 }
 

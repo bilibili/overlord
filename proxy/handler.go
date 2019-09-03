@@ -113,7 +113,7 @@ func (h *Handler) handle() {
 			}
 		}
 
-		if !isSpecialCmd && h.pc.GetAuthorized() {
+		if !isSpecialCmd && h.pc.IsAuthorized() {
 			// 3. send to cluster
 			h.forwarder.Forward(msgs)
 			wg.Wait()

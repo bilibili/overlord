@@ -29,7 +29,7 @@ type ProxyConn interface {
 	Decode([]*Message) ([]*Message, error)
 	Encode(msg *Message) error
 	Flush() error
-	GetAuthorized() bool
+	IsAuthorized() bool
 	CmdCheck(m *Message) (bool, error)
 }
 
