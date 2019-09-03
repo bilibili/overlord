@@ -1,10 +1,11 @@
 package slowlog
 
 import (
-	"overlord/pkg/log"
-	"overlord/proxy/proto"
 	"sync"
 	"sync/atomic"
+
+	"overlord/pkg/log"
+	"overlord/proxy/proto"
 )
 
 const slowlogMaxCount = 1024
@@ -89,11 +90,11 @@ func Get(name string) Handler {
 }
 
 // Init slowlog with file and http
-func Init(file string) error {
+func Init(fileName string, maxBytes int, backupCount int) error {
 	registerSlowlogHTTP()
-	if file == "" {
+	if fileName == "" {
 		return nil
 	}
-	log.Infof("setup slowlog for file [%s]", file)
-	return initFileHandler(file)
+	log.Infof("setup slowlog for file [%s]", fileName)
+	return initFileHandler(fileName, maxBytes, backupCount)
 }

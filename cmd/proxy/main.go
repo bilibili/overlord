@@ -71,7 +71,7 @@ func main() {
 		defer log.Close()
 	}
 	// init slowlog if need
-	err := slowlog.Init(slowlogFile)
+	err := slowlog.Init(slowlogFile, 500000000, 7)
 	if err != nil {
 		log.Errorf("fail to init slowlog due %s", err)
 	}
