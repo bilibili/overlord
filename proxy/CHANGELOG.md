@@ -1,5 +1,10 @@
 # Overlord-proxy
 
+## Version 1.8.5
+1. add slowlog file rotate based on size
+2. add slowlog file total limit
+3. increasing node connection inputs size
+
 ## Version 1.8.4
 1. fix time record MarkEndInput, which reduce memory consumption by 60%
 2. try fetch cluster nodes when key moved

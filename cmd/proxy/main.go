@@ -18,14 +18,16 @@ import (
 )
 
 var (
-	check             bool
-	stat              string
-	metrics           bool
-	confFile          string
-	clusterConfFile   string
-	reload            bool
-	slowlogFile       string
-	slowlogSlowerThan int
+	check              bool
+	stat               string
+	metrics            bool
+	confFile           string
+	clusterConfFile    string
+	reload             bool
+	slowlogFile        string
+	slowlogSlowerThan  int
+	slowlogMaxBytes    int
+	slowlogBackupCount int
 )
 
 type clustersFlag []string
@@ -54,6 +56,8 @@ func init() {
 	flag.BoolVar(&reload, "reload", false, "reloading the servers in cluster config file.")
 	flag.StringVar(&slowlogFile, "slowlog", "", "slowlog is the file where slowlog output")
 	flag.IntVar(&slowlogSlowerThan, "slower-than", 0, "slower-than is the microseconds which slowlog must slower than.")
+	flag.IntVar(&slowlogMaxBytes, "slower-max-bytes", 500000000, "slower-max-bytes is maximum size of slow log file.")
+	flag.IntVar(&slowlogBackupCount, "slower-backup-count", 7, "slower-backup-count is maximum backup count of slow log file.")
 }
 
 func main() {
@@ -71,7 +75,7 @@ func main() {
 		defer log.Close()
 	}
 	// init slowlog if need
-	err := slowlog.Init(slowlogFile)
+	err := slowlog.Init(slowlogFile, slowlogMaxBytes, slowlogBackupCount)
 	if err != nil {
 		log.Errorf("fail to init slowlog due %s", err)
 	}
