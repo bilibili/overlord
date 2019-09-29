@@ -15,6 +15,7 @@ import (
 // memcached binary protocol: https://github.com/memcached/memcached/wiki/BinaryProtocolRevamped
 const (
 	requestHeaderLen = 24
+	proxyReadBufSize = 1024
 )
 
 type proxyConn struct {
@@ -27,7 +28,7 @@ type proxyConn struct {
 func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	p := &proxyConn{
 		// TODO: optimus zero
-		br:        bufio.NewReader(rw, bufio.Get(1024)),
+		br:        bufio.NewReader(rw, bufio.Get(proxyReadBufSize)),
 		bw:        bufio.NewWriter(rw),
 		completed: true,
 	}
@@ -80,21 +81,30 @@ NEXTGET:
 		return
 	}
 	switch req.respType {
+	case RequestTypeNoop, RequestTypeVersion, RequestTypeQuit, RequestTypeQuitQ:
+		req.key = req.key[:0]
+		req.data = req.data[:0]
+		return
 	case RequestTypeSet, RequestTypeAdd, RequestTypeReplace, RequestTypeGet, RequestTypeGetK,
-		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend, RequestTypeTouch, RequestTypeGat:
+		RequestTypeDelete, RequestTypeIncr, RequestTypeDecr, RequestTypeAppend, RequestTypePrepend,
+		RequestTypeTouch, RequestTypeGat:
 		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
 			p.br.Advance(-requestHeaderLen)
 			return
 		}
 		return
-	case RequestTypeGetQ, RequestTypeGetKQ:
+	case RequestTypeGetQ, RequestTypeGetKQ, RequestTypeSetQ, RequestTypeAddQ, RequestTypeReplaceQ,
+		RequestTypeIncrQ, RequestTypeDecrQ, RequestTypeAppendQ, RequestTypePrependQ:
+	REQAGAIN:
 		if err = p.decodeCommon(m, req); err == bufio.ErrBufferFull {
-			p.br.Advance(-requestHeaderLen)
-			return
+			if err = p.br.Read(); err != nil {
+				return
+			}
+			goto REQAGAIN // NOTE: try to read again for this request
 		}
 		goto NEXTGET
 	}
-	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command:%x", req.respType)
+	err = errors.Wrapf(ErrBadRequest, "MC decoder unsupport command:%d", req.respType)
 	return
 }
 

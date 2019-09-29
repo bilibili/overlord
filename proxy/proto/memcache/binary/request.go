@@ -14,12 +14,14 @@ const (
 )
 
 var (
-	magicReqBytes  = []byte{magicReq}
-	magicRespBytes = []byte{magicResp}
-	zeroBytes      = []byte{0x00}
-	zeroTwoBytes   = []byte{0x00, 0x00}
-	zeroFourBytes  = []byte{0x00, 0x00, 0x00, 0x00}
-	zeroEightBytes = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	magicReqBytes    = []byte{magicReq}
+	magicRespBytes   = []byte{magicResp}
+	zeroBytes        = []byte{0x00}
+	zeroTwoBytes     = []byte{0x00, 0x00}
+	zeroFourBytes    = []byte{0x00, 0x00, 0x00, 0x00}
+	zeroEightBytes   = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	versionRespBytes = []byte{'1', '.', '5', '.', '1', '2'}
+	versionFourBytes = []byte{0x00, 0x00, 0x00, 0x06}
 )
 
 // RequestType is the protocol-agnostic identifier for the command
@@ -27,84 +29,114 @@ type RequestType byte
 
 // all memcache request type
 const (
-	RequestTypeGet     RequestType = 0x00
-	RequestTypeSet     RequestType = 0x01
-	RequestTypeAdd     RequestType = 0x02
-	RequestTypeReplace RequestType = 0x03
-	RequestTypeDelete  RequestType = 0x04
-	RequestTypeIncr    RequestType = 0x05
-	RequestTypeDecr    RequestType = 0x06
-	RequestTypeGetQ    RequestType = 0x09
-	RequestTypeNoop    RequestType = 0x0a
-	RequestTypeGetK    RequestType = 0x0c
-	RequestTypeGetKQ   RequestType = 0x0d
-	RequestTypeAppend  RequestType = 0x0e
-	RequestTypePrepend RequestType = 0x0f
-	// RequestTypeSetQ     = 0x11
-	// RequestTypeAddQ     = 0x12
-	// RequestTypeReplaceQ = 0x13
-	// RequestTypeIncrQ    = 0x15
-	// RequestTypeDecrQ    = 0x16
-	// RequestTypeAppendQ  = 0x19
-	// RequestTypePrependQ = 0x1a
-	RequestTypeTouch RequestType = 0x1c
-	RequestTypeGat   RequestType = 0x1d
-	// RequestTypeGatQ    = 0x1e
-	RequestTypeUnknown RequestType = 0xff
+	RequestTypeGet      RequestType = 0x00
+	RequestTypeSet      RequestType = 0x01
+	RequestTypeAdd      RequestType = 0x02
+	RequestTypeReplace  RequestType = 0x03
+	RequestTypeDelete   RequestType = 0x04
+	RequestTypeIncr     RequestType = 0x05
+	RequestTypeDecr     RequestType = 0x06
+	RequestTypeQuit     RequestType = 0x07
+	RequestTypeGetQ     RequestType = 0x09
+	RequestTypeNoop     RequestType = 0x0a
+	RequestTypeVersion  RequestType = 0x0b
+	RequestTypeGetK     RequestType = 0x0c
+	RequestTypeGetKQ    RequestType = 0x0d
+	RequestTypeAppend   RequestType = 0x0e
+	RequestTypePrepend  RequestType = 0x0f
+	RequestTypeSetQ     RequestType = 0x11
+	RequestTypeAddQ     RequestType = 0x12
+	RequestTypeReplaceQ RequestType = 0x13
+	RequestTypeIncrQ    RequestType = 0x15
+	RequestTypeDecrQ    RequestType = 0x16
+	RequestTypeQuitQ    RequestType = 0x17
+	RequestTypeAppendQ  RequestType = 0x19
+	RequestTypePrependQ RequestType = 0x1a
+	RequestTypeTouch    RequestType = 0x1c
+	RequestTypeGat      RequestType = 0x1d
+	RequestTypeGatQ     RequestType = 0x1e
+	RequestTypeUnknown  RequestType = 0xff
 )
 
 var (
-	getBytes     = []byte{byte(RequestTypeGet)}
-	setBytes     = []byte{byte(RequestTypeSet)}
-	addBytes     = []byte{byte(RequestTypeAdd)}
-	replaceBytes = []byte{byte(RequestTypeReplace)}
-	deleteBytes  = []byte{byte(RequestTypeDelete)}
-	incrBytes    = []byte{byte(RequestTypeIncr)}
-	decrBytes    = []byte{byte(RequestTypeDecr)}
-	getQBytes    = []byte{byte(RequestTypeGetQ)}
-	noopBytes    = []byte{byte(RequestTypeNoop)}
-	getKBytes    = []byte{byte(RequestTypeGetK)}
-	getKQBytes   = []byte{byte(RequestTypeGetKQ)}
-	appendBytes  = []byte{byte(RequestTypeAppend)}
-	prependBytes = []byte{byte(RequestTypePrepend)}
-	// setQBytes     = []byte{byte(RequestTypeSetQ)}
-	// addQBytes     = []byte{byte(RequestTypeAddQ)}
-	// replaceQBytes = []byte{byte(RequestTypeReplaceQ)}
-	// incrQBytes    = []byte{byte(RequestTypeIncrQ)}
-	// decrQBytes    = []byte{byte(RequestTypeDecrQ)}
-	// appendQBytes  = []byte{byte(RequestTypeAppendQ)}
-	// prependQBytes = []byte{byte(RequestTypePrependQ)}
-	touchBytes = []byte{byte(RequestTypeTouch)}
-	gatBytes   = []byte{byte(RequestTypeGat)}
-	// gatQBytes     = []byte{byte(RequestTypeGatQ)}
-	unknownBytes = []byte{byte(RequestTypeUnknown)}
+	noNeedNodeTypes = map[RequestType]struct{}{
+		RequestTypeQuit:    struct{}{},
+		RequestTypeNoop:    struct{}{},
+		RequestTypeVersion: struct{}{},
+		RequestTypeQuitQ:   struct{}{},
+	}
+	qReplaceNoQTypes = map[RequestType]RequestType{
+		RequestTypeGetQ:     RequestTypeGetK,
+		RequestTypeGetKQ:    RequestTypeGetK,
+		RequestTypeSetQ:     RequestTypeSet,
+		RequestTypeAddQ:     RequestTypeAdd,
+		RequestTypeReplaceQ: RequestTypeReplace,
+		RequestTypeIncrQ:    RequestTypeIncr,
+		RequestTypeDecrQ:    RequestTypeDecr,
+		RequestTypeAppendQ:  RequestTypeAppend,
+		RequestTypePrependQ: RequestTypePrepend,
+		RequestTypeGatQ:     RequestTypeGat,
+	}
+)
+
+var (
+	getBytes      = []byte{byte(RequestTypeGet)}
+	setBytes      = []byte{byte(RequestTypeSet)}
+	addBytes      = []byte{byte(RequestTypeAdd)}
+	replaceBytes  = []byte{byte(RequestTypeReplace)}
+	deleteBytes   = []byte{byte(RequestTypeDelete)}
+	incrBytes     = []byte{byte(RequestTypeIncr)}
+	decrBytes     = []byte{byte(RequestTypeDecr)}
+	quitBytes     = []byte{byte(RequestTypeQuit)}
+	getQBytes     = []byte{byte(RequestTypeGetQ)}
+	noopBytes     = []byte{byte(RequestTypeNoop)}
+	versionBytes  = []byte{byte(RequestTypeVersion)}
+	getKBytes     = []byte{byte(RequestTypeGetK)}
+	getKQBytes    = []byte{byte(RequestTypeGetKQ)}
+	appendBytes   = []byte{byte(RequestTypeAppend)}
+	prependBytes  = []byte{byte(RequestTypePrepend)}
+	setQBytes     = []byte{byte(RequestTypeSetQ)}
+	addQBytes     = []byte{byte(RequestTypeAddQ)}
+	replaceQBytes = []byte{byte(RequestTypeReplaceQ)}
+	incrQBytes    = []byte{byte(RequestTypeIncrQ)}
+	decrQBytes    = []byte{byte(RequestTypeDecrQ)}
+	quitQBytes    = []byte{byte(RequestTypeQuitQ)}
+	appendQBytes  = []byte{byte(RequestTypeAppendQ)}
+	prependQBytes = []byte{byte(RequestTypePrependQ)}
+	touchBytes    = []byte{byte(RequestTypeTouch)}
+	gatBytes      = []byte{byte(RequestTypeGat)}
+	gatQBytes     = []byte{byte(RequestTypeGatQ)}
+	unknownBytes  = []byte{byte(RequestTypeUnknown)}
 )
 
 const (
-	getString     = "get"
-	setString     = "set"
-	addString     = "add"
-	replaceString = "replace"
-	deleteString  = "delete"
-	incrString    = "incr"
-	decrString    = "decr"
-	getQString    = "getq"
-	noopString    = "noop"
-	getKString    = "getk"
-	getKQString   = "getkq"
-	appendString  = "append"
-	prependString = "prepend"
-	// setQString     = "setq"
-	// addQString     = "addq"
-	// replaceQString = "replaceq"
-	// incrQString    = "incrq"
-	// decrQString    = "decrq"
-	// appendQString  = "appendq"
-	// prependQString = "prependq"
-	touchString = "touch"
-	gatString   = "gat"
-	// gatQString     = "gatq"
-	unknownString = "unknown"
+	getString      = "get"
+	setString      = "set"
+	addString      = "add"
+	replaceString  = "replace"
+	deleteString   = "delete"
+	incrString     = "incr"
+	decrString     = "decr"
+	quitString     = "quit"
+	getQString     = "getq"
+	noopString     = "noop"
+	versionString  = "version"
+	getKString     = "getk"
+	getKQString    = "getkq"
+	appendString   = "append"
+	prependString  = "prepend"
+	setQString     = "setq"
+	addQString     = "addq"
+	replaceQString = "replaceq"
+	incrQString    = "incrq"
+	decrQString    = "decrq"
+	quitQString    = "quitq"
+	appendQString  = "appendq"
+	prependQString = "prependq"
+	touchString    = "touch"
+	gatString      = "gat"
+	gatQString     = "gatq"
+	unknownString  = "unknown"
 )
 
 // Bytes get reqtype bytes.
@@ -124,10 +156,14 @@ func (rt RequestType) Bytes() []byte {
 		return incrBytes
 	case RequestTypeDecr:
 		return decrBytes
+	case RequestTypeQuit:
+		return quitBytes
 	case RequestTypeGetQ:
 		return getQBytes
 	case RequestTypeNoop:
 		return noopBytes
+	case RequestTypeVersion:
+		return versionBytes
 	case RequestTypeGetK:
 		return getKBytes
 	case RequestTypeGetKQ:
@@ -136,26 +172,28 @@ func (rt RequestType) Bytes() []byte {
 		return appendBytes
 	case RequestTypePrepend:
 		return prependBytes
-	// case RequestTypeSetQ:
-	// 	return setQBytes
-	// case RequestTypeAddQ:
-	// 	return addQBytes
-	// case RequestTypeReplaceQ:
-	// 	return replaceQBytes
-	// case RequestTypeIncrQ:
-	// 	return incrQBytes
-	// case RequestTypeDecrQ:
-	// 	return decrQBytes
-	// case RequestTypeAppendQ:
-	// 	return appendQBytes
-	// case RequestTypePrependQ:
-	// 	return prependQBytes
+	case RequestTypeSetQ:
+		return setQBytes
+	case RequestTypeAddQ:
+		return addQBytes
+	case RequestTypeReplaceQ:
+		return replaceQBytes
+	case RequestTypeIncrQ:
+		return incrQBytes
+	case RequestTypeDecrQ:
+		return decrQBytes
+	case RequestTypeQuitQ:
+		return quitQBytes
+	case RequestTypeAppendQ:
+		return appendQBytes
+	case RequestTypePrependQ:
+		return prependQBytes
 	case RequestTypeTouch:
 		return touchBytes
 	case RequestTypeGat:
 		return gatBytes
-		// case RequestTypeGatQ:
-		// 	return gatQBytes
+	case RequestTypeGatQ:
+		return gatQBytes
 	}
 	return unknownBytes
 }
@@ -177,10 +215,14 @@ func (rt RequestType) String() string {
 		return incrString
 	case RequestTypeDecr:
 		return decrString
+	case RequestTypeQuit:
+		return quitString
 	case RequestTypeGetQ:
 		return getQString
 	case RequestTypeNoop:
 		return noopString
+	case RequestTypeVersion:
+		return versionString
 	case RequestTypeGetK:
 		return getKString
 	case RequestTypeGetKQ:
@@ -189,26 +231,28 @@ func (rt RequestType) String() string {
 		return appendString
 	case RequestTypePrepend:
 		return prependString
-	// case RequestTypeSetQ:
-	// 	return setQString
-	// case RequestTypeAddQ:
-	// 	return addQString
-	// case RequestTypeReplaceQ:
-	// 	return replaceQString
-	// case RequestTypeIncrQ:
-	// 	return incrQString
-	// case RequestTypeDecrQ:
-	// 	return decrQString
-	// case RequestTypeAppendQ:
-	// 	return appendQString
-	// case RequestTypePrependQ:
-	// 	return prependQString
+	case RequestTypeSetQ:
+		return setQString
+	case RequestTypeAddQ:
+		return addQString
+	case RequestTypeReplaceQ:
+		return replaceQString
+	case RequestTypeIncrQ:
+		return incrQString
+	case RequestTypeDecrQ:
+		return decrQString
+	case RequestTypeQuitQ:
+		return quitQString
+	case RequestTypeAppendQ:
+		return appendQString
+	case RequestTypePrependQ:
+		return prependQString
 	case RequestTypeTouch:
 		return touchString
 	case RequestTypeGat:
 		return gatString
-		// case RequestTypeGatQ:
-		// 	return gatQString
+	case RequestTypeGatQ:
+		return gatQString
 	}
 	return unknownString
 }

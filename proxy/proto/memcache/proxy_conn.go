@@ -16,6 +16,8 @@ import (
 // memcached protocol: https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 const (
 	serverErrorPrefix = "SERVER_ERROR "
+
+	proxyReadBufSize = 1024
 )
 
 var (
@@ -33,7 +35,7 @@ type proxyConn struct {
 func NewProxyConn(rw *libnet.Conn) proto.ProxyConn {
 	p := &proxyConn{
 		// TODO: optimus zero
-		br:        bufio.NewReader(rw, bufio.Get(1024)),
+		br:        bufio.NewReader(rw, bufio.Get(proxyReadBufSize)),
 		bw:        bufio.NewWriter(rw),
 		completed: true,
 	}
@@ -254,12 +256,10 @@ func (p *proxyConn) decodeGetAndTouch(m *proto.Message, bs []byte, reqType Reque
 			return
 		}
 	}
-
 	var (
 		b, e int
 		ns   = bs[eE:]
 	)
-
 	for {
 		ns = ns[e:]
 		b, e = nextField(ns)
@@ -281,14 +281,18 @@ func WithReq(m *proto.Message, rtype RequestType, key []byte, data []byte) {
 	if req == nil {
 		req := GetReq()
 		req.respType = rtype
-		req.key = key
-		req.data = data
+		req.key = req.key[:0]
+		req.key = append(req.key, key...)
+		req.data = req.data[:0]
+		req.data = append(req.data, data...)
 		m.WithRequest(req)
 	} else {
 		mcreq := req.(*MCRequest)
 		mcreq.respType = rtype
-		mcreq.key = key
-		mcreq.data = data
+		mcreq.key = mcreq.key[:0]
+		mcreq.key = append(mcreq.key, key...)
+		mcreq.data = mcreq.data[:0]
+		mcreq.data = append(mcreq.data, data...)
 	}
 }
 
@@ -385,14 +389,12 @@ func (p *proxyConn) Encode(m *proto.Message) (err error) {
 			err = proto.ErrQuit
 			return
 		}
-
 		if mcr.respType == RequestTypeVersion {
 			_ = p.bw.Write(versionReplyBytes)
 			_ = p.bw.Write(version.Bytes())
 			err = p.bw.Write(crlfBytes)
 			return
 		}
-
 		if mcr.respType == RequestTypeSetNoreply {
 			return
 		}

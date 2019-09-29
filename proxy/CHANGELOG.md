@@ -1,5 +1,9 @@
 # Overlord-proxy
 
+## Version 1.9.0
+1. complete memcache binary protocol.
+2. fix memcache text request key&data no copy bug.
+
 ## Version 1.8.5
 1. add slowlog file rotate based on size
 2. add slowlog file total limit

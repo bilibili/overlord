@@ -9,8 +9,8 @@ import (
 // Define overlord version consts
 const (
 	OverlordMajor = 1
-	OverlordMinor = 8
-	OverlordPatch = 5
+	OverlordMinor = 9
+	OverlordPatch = 0
 )
 
 var (
