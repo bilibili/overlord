@@ -13,16 +13,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	proxyReadBufSize = 1024
-)
-
 var (
-	nullBytes           = []byte("-1\r\n")
-	okBytes             = []byte("OK\r\n")
-	pongDataBytes       = []byte("PONG")
-	justOkBytes         = []byte("OK")
-	notSupportDataBytes = []byte("Error: command not support")
+	nullBytes            = []byte("-1\r\n")
+	okBytes              = []byte("OK\r\n")
+	pongDataBytes        = []byte("PONG")
+	justOkBytes          = []byte("OK")
+	invalidPasswordBytes = []byte("ERR invalid password")
+	noAuthBytes          = []byte("NOAUTH Authentication required.")
+	noPasswordSetBytes   = []byte("ERR Client sent AUTH, but no password is set.")
+	notSupportDataBytes  = []byte("Error: command not support")
 )
 
 // ProxyConn is export for redis cluster.
@@ -34,21 +33,24 @@ func (pc *ProxyConn) Bw() *bufio.Writer {
 }
 
 type proxyConn struct {
-	br        *bufio.Reader
-	bw        *bufio.Writer
-	completed bool
-
-	resp *resp
+	br         *bufio.Reader
+	bw         *bufio.Writer
+	completed  bool
+	resp       *resp
+	authorized bool
+	password   string
 }
 
 // NewProxyConn creates new redis Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
+func NewProxyConn(conn *libnet.Conn, password string) proto.ProxyConn {
 	r := &proxyConn{
-		br:        bufio.NewReader(conn, bufio.Get(proxyReadBufSize)),
+		br:        bufio.NewReader(conn, bufio.Get(1024)),
 		bw:        bufio.NewWriter(conn),
 		completed: true,
 		resp:      &resp{},
+		password:  password,
 	}
+	r.authorized = password == ""
 	return r
 }
 
@@ -183,31 +185,57 @@ func (pc *proxyConn) Encode(m *proto.Message) (err error) {
 	if !ok {
 		return ErrBadAssert
 	}
-	switch req.mType {
-	case mergeTypeOK:
-		err = pc.mergeOK(m)
-	case mergeTypeJoin:
-		err = pc.mergeJoin(m)
-	case mergeTypeCount:
-		err = pc.mergeCount(m)
-	default:
-		if !req.IsSupport() {
-			req.reply.respType = respError
-			req.reply.data = req.reply.data[:0]
-			req.reply.data = append(req.reply.data, notSupportDataBytes...)
-		} else if req.IsCtl() {
-			reqData := req.resp.array[0].data
-			if bytes.Equal(reqData, cmdPingBytes) {
-				req.reply.respType = respString
-				req.reply.data = req.reply.data[:0]
-				req.reply.data = append(req.reply.data, pongDataBytes...)
-			} else if bytes.Equal(reqData, cmdQuitBytes) {
-				req.reply.respType = respString
-				req.reply.data = req.reply.data[:0]
-				req.reply.data = append(req.reply.data, justOkBytes...)
-			}
-		}
+	// general supported cmd need authorized
+	if !pc.authorized && !req.IsAuth() {
+		req.reply.respType = respError
+		req.reply.data = req.reply.data[:0]
+		req.reply.data = append(req.reply.data, noAuthBytes...)
 		err = req.reply.encode(pc.bw)
+	} else {
+
+		switch req.mType {
+		case mergeTypeOK:
+			err = pc.mergeOK(m)
+		case mergeTypeJoin:
+			err = pc.mergeJoin(m)
+		case mergeTypeCount:
+			err = pc.mergeCount(m)
+		default:
+			if !req.IsSupport() {
+				req.reply.respType = respError
+				req.reply.data = req.reply.data[:0]
+				req.reply.data = append(req.reply.data, notSupportDataBytes...)
+			} else if req.IsCtl() {
+				reqData := req.resp.array[0].data
+				if bytes.Equal(reqData, cmdPingBytes) {
+					req.reply.respType = respString
+					req.reply.data = req.reply.data[:0]
+					req.reply.data = append(req.reply.data, pongDataBytes...)
+				} else if bytes.Equal(reqData, cmdQuitBytes) {
+					req.reply.respType = respString
+					req.reply.data = req.reply.data[:0]
+					req.reply.data = append(req.reply.data, justOkBytes...)
+				} else if bytes.Equal(reqData, cmdAuthBytes) {
+					if bytes.Equal(req.Key(), []byte(pc.password)) {
+						pc.authorized = true
+						req.reply.respType = respString
+						req.reply.data = req.reply.data[:0]
+						req.reply.data = append(req.reply.data, justOkBytes...)
+					} else if pc.password == "" {
+						req.reply.respType = respError
+						req.reply.data = req.reply.data[:0]
+						req.reply.data = append(req.reply.data, noPasswordSetBytes...)
+					} else {
+						pc.authorized = false
+						req.reply.respType = respError
+						req.reply.data = req.reply.data[:0]
+						req.reply.data = append(req.reply.data, invalidPasswordBytes...)
+					}
+
+				}
+			}
+			err = req.reply.encode(pc.bw)
+		}
 	}
 	if err != nil {
 		err = errors.WithStack(err)
