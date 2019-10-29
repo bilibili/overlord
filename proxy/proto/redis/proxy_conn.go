@@ -13,6 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	proxyReadBufSize = 1024
+)
+
 var (
 	nullBytes            = []byte("-1\r\n")
 	okBytes              = []byte("OK\r\n")
@@ -44,7 +48,7 @@ type proxyConn struct {
 // NewProxyConn creates new redis Encoder and Decoder.
 func NewProxyConn(conn *libnet.Conn, password string) proto.ProxyConn {
 	r := &proxyConn{
-		br:        bufio.NewReader(conn, bufio.Get(1024)),
+		br:        bufio.NewReader(conn, bufio.Get(proxyReadBufSize)),
 		bw:        bufio.NewWriter(conn),
 		completed: true,
 		resp:      &resp{},
