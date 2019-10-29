@@ -65,7 +65,7 @@ func TestDecodeBasicOk(t *testing.T) {
 func TestDecodeComplexOk(t *testing.T) {
 	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, "")
 	// test reuse command
 	msgs := proto.GetMsgs(16)
 	msgs[1].WithRequest(getReq())
