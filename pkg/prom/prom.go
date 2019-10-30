@@ -78,7 +78,7 @@ func metrics() {
 	})
 }
 
-// ProxyTime log timing information (in milliseconds).
+// ProxyTime log timing information (in Microsecond).
 func ProxyTime(cluster, node string, ts int64) {
 	if proxyTimer == nil {
 		return
@@ -86,7 +86,7 @@ func ProxyTime(cluster, node string, ts int64) {
 	proxyTimer.WithLabelValues(cluster, node).Observe(float64(ts))
 }
 
-// HandleTime log timing information (in milliseconds).
+// HandleTime log timing information (in Microsecond).
 func HandleTime(cluster, node, cmd string, ts int64) {
 	if handlerTimer == nil {
 		return
