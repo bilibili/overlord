@@ -39,7 +39,7 @@ func NewFileHandler(basePath string) Handler {
 
 func (r *fileHandler) Log(lv Level, msg string) {
 	_ = r.roll()
-	_ = r.l.Output(6, fmt.Sprintf("[%s] %s", lv, msg))
+	_ = r.l.Output(5, fmt.Sprintf("[%s] %s", lv, msg))
 }
 
 func (r *fileHandler) Close() error {
