@@ -4,6 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"fmt"
+	"strconv"
 	"sync"
 
 	"overlord/pkg/types"
@@ -22,6 +23,7 @@ var (
 	cmdPingBytes   = []byte("4\r\nPING")
 	cmdMSetBytes   = []byte("4\r\nMSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
+	cmdSetBytes    = []byte("3\r\nSET")
 	cmdGetBytes    = []byte("3\r\nGET")
 	cmdDelBytes    = []byte("3\r\nDEL")
 	cmdExistsBytes = []byte("6\r\nEXISTS")
@@ -43,9 +45,11 @@ func init() {
 
 // errors
 var (
-	ErrBadAssert  = errs.New("bad assert for redis")
-	ErrBadCount   = errs.New("bad count number")
-	ErrBadRequest = errs.New("bad request")
+	ErrBadAssert       = errs.New("bad assert for redis")
+	ErrBadCount        = errs.New("bad count number")
+	ErrBadRequest      = errs.New("bad request")
+	ErrWrongParamCount = errs.New("wrong param count")
+	ErrIgnoreMerged    = errs.New("ignore merged request")
 )
 
 // mergeType is used to decript the merge operation.
@@ -61,9 +65,11 @@ const (
 
 // Request is the type of a complete redis command
 type Request struct {
-	resp  *resp
-	reply *resp
-	mType mergeType
+	resp         *resp
+	reply        *resp
+	mType        mergeType
+	merged       bool
+	batchOpCount int
 }
 
 var reqPool = &sync.Pool{
@@ -81,6 +87,7 @@ func newReq() *Request {
 	r := &Request{}
 	r.resp = &resp{}
 	r.reply = &resp{}
+	r.merged = false
 	return r
 }
 
@@ -143,7 +150,25 @@ func (r *Request) Put() {
 	r.resp.reset()
 	r.reply.reset()
 	r.mType = mergeTypeNo
+	r.merged = false
+	r.batchOpCount = 0
 	reqPool.Put(r)
+}
+
+func (r *Request) Merge(reqs []proto.Request) (err error) {
+	for i := range reqs {
+		req := reqs[i].(*Request)
+		if (req.resp.arraySize-1)%r.batchOpCount != 0 {
+			return ErrWrongParamCount
+		}
+		req.merged = true
+		for i := 1; i < req.resp.arraySize; i++ {
+			nr := r.resp.next()
+			nr.copy(req.resp.array[i])
+		}
+	}
+	r.resp.data = []byte(strconv.Itoa(r.resp.arraySize))
+	return
 }
 
 // RESP return request resp.

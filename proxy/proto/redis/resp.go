@@ -3,10 +3,9 @@ package redis
 import (
 	"bytes"
 	"fmt"
-	"strconv"
-
 	"overlord/pkg/bufio"
 	"overlord/pkg/conv"
+	"strconv"
 )
 
 // respType is the type of redis resp
@@ -240,6 +239,11 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 		_ = w.Write(nullDataBytes)
 	}
 	_ = w.Write(crlfBytes)
+	err = r.encodeArrayData(w)
+	return
+}
+
+func (r *resp) encodeArrayData(w *bufio.Writer) (err error) {
 	for i := 0; i < r.arraySize; i++ {
 		if err = r.array[i].encode(w); err != nil {
 			return
@@ -248,25 +252,26 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 	return
 }
 
-// // String for debug!!!
-// func (r *resp) String() string {
-// 	var sb strings.Builder
-// 	sb.Write([]byte{r.respType})
-// 	switch r.respType {
-// 	case respString, respInt, respError:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respBulk:
-// 		sb.Write(r.data)
-// 		sb.Write(crlfBytes)
-// 	case respArray:
-// 		sb.Write([]byte(strconv.Itoa(r.arraySize)))
-// 		sb.Write(crlfBytes)
-// 		for i := 0; i < r.arraySize; i++ {
-// 			sb.WriteString(r.array[i].String())
-// 		}
-// 	default:
-// 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
-// 	}
-// 	return sb.String()
-// }
+//
+//// String for debug!!!
+//func (r *resp) String() string {
+//	var sb strings.Builder
+//	sb.Write([]byte{r.respType})
+//	switch r.respType {
+//	case respString, respInt, respError:
+//		sb.Write(r.data)
+//		sb.Write(crlfBytes)
+//	case respBulk:
+//		sb.Write(r.data)
+//		sb.Write(crlfBytes)
+//	case respArray:
+//		sb.Write([]byte(strconv.Itoa(r.arraySize)))
+//		sb.Write(crlfBytes)
+//		for i := 0; i < r.arraySize; i++ {
+//			sb.WriteString(r.array[i].String())
+//		}
+//	default:
+//		panic(fmt.Sprintf("not support robj:%s", sb.String()))
+//	}
+//	return strings.ReplaceAll(sb.String(), "\r\n", " ")
+//}

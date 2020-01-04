@@ -95,16 +95,21 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 	}
 	for _, m := range msgs {
 		if m.IsBatch() {
+			ctxMap := make(map[string]*nodeConnPipeContext)
 			for _, subm := range m.Batch() {
 				key := subm.Request().Key()
-				ncp, ok := conns.getPipes(f.trimHashTag(key))
+				ctx, ok := conns.getPipesContext(key)
 				if !ok {
 					m.WithError(ErrForwarderHashNoNode)
 					return errors.WithStack(ErrForwarderHashNoNode)
 				}
+				if _, ok = ctxMap[ctx.identifier]; !ok {
+					ctxMap[ctx.identifier] = ctx
+				}
+				ctxMap[ctx.identifier].msgs = append(ctxMap[ctx.identifier].msgs, subm)
 				subm.MarkStartPipe()
-				ncp.Push(subm)
 			}
+			f.batchPush(ctxMap)
 		} else {
 			key := m.Request().Key()
 			ncp, ok := conns.getPipes(f.trimHashTag(key))
@@ -159,6 +164,21 @@ func (f *defaultForwarder) Close() error {
 		return nil
 	}
 	return nil
+}
+
+func (f *defaultForwarder) batchPush(ctxMap map[string]*nodeConnPipeContext) {
+	for _, ctx := range ctxMap {
+		mainMsg := ctx.msgs[0]
+		var reqs []proto.Request
+		for i := 1; i < len(ctx.msgs); i++ {
+			reqs = append(reqs, ctx.msgs[i].Request())
+		}
+		if err := mainMsg.Request().Merge(reqs); err != nil {
+			// todo report error
+		}
+
+		ctx.ncp.Push(mainMsg)
+	}
 }
 
 func (f *defaultForwarder) trimHashTag(key []byte) []byte {
@@ -229,6 +249,12 @@ func (c *connections) init(addrs, ans []string, ws []int, alias bool, oldNcps ma
 	return copyed
 }
 
+type nodeConnPipeContext struct {
+	identifier string
+	ncp        *proto.NodeConnPipe
+	msgs       []*proto.Message
+}
+
 func (c *connections) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
 	var addr string
 	if addr, ok = c.ring.GetNode(key); !ok {
@@ -240,6 +266,27 @@ func (c *connections) getPipes(key []byte) (ncp *proto.NodeConnPipe, ok bool) {
 		}
 	}
 	ncp, ok = c.nodePipe[addr]
+	return
+}
+
+func (c *connections) getPipesContext(key []byte) (ctx *nodeConnPipeContext, ok bool) {
+	var addr string
+	if addr, ok = c.ring.GetNode(key); !ok {
+		return
+	}
+	if c.alias {
+		if addr, ok = c.aliasMap[addr]; !ok {
+			return
+		}
+	}
+	ncp, ok := c.nodePipe[addr]
+	if !ok {
+		return
+	}
+	ctx = &nodeConnPipeContext{
+		identifier: addr,
+		ncp:        ncp,
+	}
 	return
 }
 

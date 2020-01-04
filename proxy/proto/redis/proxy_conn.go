@@ -107,6 +107,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 		for i := 0; i < mid; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeOK
+			r.batchOpCount = 2
 			r.resp.reset() // NOTE: *3\r\n
 			r.resp.respType = respArray
 			r.resp.data = append(r.resp.data, arrayLenThree...)
@@ -126,6 +127,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 		for i := 1; i < pc.resp.arraySize; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeJoin
+			r.batchOpCount = 1
 			r.resp.reset() // NOTE: *2\r\n
 			r.resp.respType = respArray
 			r.resp.data = append(r.resp.data, arrayLenTwo...)
@@ -133,7 +135,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			nre1 := r.resp.next() // NOTE: $3\r\nGET\r\n
 			nre1.reset()
 			nre1.respType = respBulk
-			nre1.data = append(nre1.data, cmdGetBytes...)
+			nre1.data = append(nre1.data, cmdMGetBytes...)
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i])
@@ -142,6 +144,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 		for i := 1; i < pc.resp.arraySize; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeCount
+			r.batchOpCount = 1
 			r.resp.reset() // NOTE: *2\r\n
 			r.resp.respType = respArray
 			r.resp.data = append(r.resp.data, arrayLenTwo...)
@@ -228,6 +231,9 @@ func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 		if !ok {
 			return ErrBadAssert
 		}
+		if req.merged {
+			continue
+		}
 		ival, err := conv.Btoi(req.reply.data)
 		if err != nil {
 			return ErrBadCount
@@ -242,22 +248,44 @@ func (pc *proxyConn) mergeCount(m *proto.Message) (err error) {
 
 func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 	reqs := m.Requests()
-	_ = pc.bw.Write(respArrayBytes)
-	if len(reqs) == 0 {
-		err = pc.bw.Write(nullBytes)
-		return
-	}
-	_ = pc.bw.Write([]byte(strconv.Itoa(len(reqs))))
-	if err = pc.bw.Write(crlfBytes); err != nil {
-		return
-	}
+
+	var finalReqs []*Request
+	sum := 0
 	for _, mreq := range reqs {
 		req, ok := mreq.(*Request)
 		if !ok {
 			return ErrBadAssert
 		}
-		if err = req.reply.encode(pc.bw); err != nil {
-			return
+		if req.merged {
+			continue
+		}
+
+		finalReqs = append(finalReqs, req)
+		ival, err := conv.Btoi(req.reply.data)
+		if err != nil {
+			return ErrBadCount
+		}
+		sum += int(ival)
+	}
+
+	_ = pc.bw.Write(respArrayBytes)
+	if len(finalReqs) == 0 {
+		err = pc.bw.Write(nullBytes)
+		return
+	}
+	_ = pc.bw.Write([]byte(strconv.Itoa(sum)))
+	if err = pc.bw.Write(crlfBytes); err != nil {
+		return
+	}
+	for _, req := range finalReqs {
+		if req.reply.respType == respArray {
+			if err = req.reply.encodeArrayData(pc.bw); err != nil {
+				return
+			}
+		} else {
+			if err = req.reply.encode(pc.bw); err != nil {
+				return
+			}
 		}
 	}
 	return
