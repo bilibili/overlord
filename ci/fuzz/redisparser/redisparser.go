@@ -14,15 +14,15 @@ import (
 )
 
 var (
-	pc proto.ProxyConn
+	pc   proto.ProxyConn
 	msgs []*proto.Message
-	nc *libnet.Conn
+	nc   *libnet.Conn
 )
 
 func Fuzz(data []byte) int {
 	conn := _createConn(data)
 	nc := libnet.NewConn(conn, time.Second, time.Second)
-	pc = redis.NewProxyConn(nc)
+	pc = redis.NewProxyConn(nc, true)
 	msgs = proto.GetMsgs(4)
 	nmsgs, err := pc.Decode(msgs)
 	if err == bufio.ErrBufferFull {
@@ -56,7 +56,7 @@ func (m mockAddr) String() string {
 
 type mockConn struct {
 	addr   mockAddr
-	buf   *bytes.Buffer
+	buf    *bytes.Buffer
 	err    error
 	closed int32
 }
@@ -107,8 +107,8 @@ func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
 // _createConn is useful tools for handler test
 func _createConn(data []byte) net.Conn {
 	mconn := &mockConn{
-		addr:   "127.0.0.1:12345",
-		buf:   bytes.NewBuffer(data),
+		addr: "127.0.0.1:12345",
+		buf:  bytes.NewBuffer(data),
 	}
 	return mconn
 }

@@ -39,15 +39,25 @@ type proxyConn struct {
 	completed bool
 
 	resp *resp
+
+	mgetCmd []byte
+	msetCmd []byte
 }
 
 // NewProxyConn creates new redis Encoder and Decoder.
-func NewProxyConn(conn *libnet.Conn) proto.ProxyConn {
+func NewProxyConn(conn *libnet.Conn, useBatchCmd bool) proto.ProxyConn {
 	r := &proxyConn{
 		br:        bufio.NewReader(conn, bufio.Get(proxyReadBufSize)),
 		bw:        bufio.NewWriter(conn),
 		completed: true,
 		resp:      &resp{},
+	}
+	if useBatchCmd {
+		r.mgetCmd = cmdMGetBytes
+		r.msetCmd = cmdMSetBytes
+	} else {
+		r.mgetCmd = cmdGetBytes
+		r.msetCmd = cmdSetBytes
 	}
 	return r
 }
@@ -115,7 +125,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			nre1 := r.resp.next() // NOTE: $4\r\nMSET\r\n
 			nre1.reset()
 			nre1.respType = respBulk
-			nre1.data = append(nre1.data, cmdMSetBytes...)
+			nre1.data = append(nre1.data, pc.msetCmd...)
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i*2+1])
@@ -135,7 +145,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			nre1 := r.resp.next() // NOTE: $3\r\nGET\r\n
 			nre1.reset()
 			nre1.respType = respBulk
-			nre1.data = append(nre1.data, cmdMGetBytes...)
+			nre1.data = append(nre1.data, pc.mgetCmd...)
 			// array resp: key
 			nre2 := r.resp.next() // NOTE: $klen\r\nkey\r\n
 			nre2.copy(pc.resp.array[i])
