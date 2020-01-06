@@ -14,7 +14,7 @@ import (
 
 func _decodeMessage(t *testing.T, data string) []*proto.Message {
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	msgs := proto.GetMsgs(16)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestDecodeBasicOk(t *testing.T) {
 func TestDecodeComplexOk(t *testing.T) {
 	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	// test reuse command
 	msgs := proto.GetMsgs(16)
 	msgs[1].WithRequest(getReq())
@@ -183,7 +183,7 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 	}
 	msg.WithRequest(req)
 	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
 	assert.Equal(t, req.reply.data, notSupportDataBytes)
@@ -281,7 +281,7 @@ func TestEncodeMergeOk(t *testing.T) {
 				msg.Batch()
 			}
 			conn, buf := mockconn.CreateDownStreamConn()
-			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 			err := pc.Encode(msg)
 			if !assert.NoError(t, err) {
 				return
@@ -310,7 +310,7 @@ func TestEncodeWithError(t *testing.T) {
 	msg.Done()
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 	err := pc.Encode(msg)
 	assert.Error(t, err)
 	assert.Equal(t, mockErr, err)
@@ -342,7 +342,7 @@ func TestEncodeWithPing(t *testing.T) {
 	msg.WithRequest(req)
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
 	err = pc.Flush()

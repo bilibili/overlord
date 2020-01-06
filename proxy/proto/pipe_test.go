@@ -40,6 +40,10 @@ func (n *mockNodeConn) Close() error {
 
 type mockRequest struct{}
 
+func (r *mockRequest) Merge([]Request) error {
+	return nil
+}
+
 func (*mockRequest) CmdString() string { return "" }
 func (*mockRequest) Cmd() []byte       { return nil }
 func (*mockRequest) Key() []byte {
@@ -52,11 +56,11 @@ func (*mockRequest) Slowlog() *SlowlogEntry { return nil }
 
 func TestPipe(t *testing.T) {
 	nc1 := &mockNodeConn{}
-	ncp1 := NewNodeConnPipe(1, func() NodeConn {
+	ncp1 := NewNodeConnPipe(1, 32, func() NodeConn {
 		return nc1
 	})
 	nc2 := &mockNodeConn{}
-	ncp2 := NewNodeConnPipe(2, func() NodeConn {
+	ncp2 := NewNodeConnPipe(2, 32, func() NodeConn {
 		return nc2
 	})
 	wg := &sync.WaitGroup{}
@@ -78,7 +82,7 @@ func TestPipe(t *testing.T) {
 	nc3 := &mockNodeConn{}
 	nc3.num = whenErrNum
 	nc3.err = errors.New("some error")
-	ncp3 := NewNodeConnPipe(1, func() NodeConn {
+	ncp3 := NewNodeConnPipe(1, 32, func() NodeConn {
 		return nc3
 	})
 	wg = &sync.WaitGroup{}

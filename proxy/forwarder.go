@@ -55,7 +55,7 @@ func NewForwarder(cc *ClusterConfig) proto.Forwarder {
 		dto := time.Duration(cc.DialTimeout) * time.Millisecond
 		rto := time.Duration(cc.ReadTimeout) * time.Millisecond
 		wto := time.Duration(cc.WriteTimeout) * time.Millisecond
-		return rclstr.NewForwarder(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, dto, rto, wto, []byte(cc.HashTag))
+		return rclstr.NewForwarder(cc.Name, cc.ListenAddr, cc.Servers, cc.NodeConnections, cc.NodePipeCount, dto, rto, wto, []byte(cc.HashTag))
 	}
 	panic("unsupported protocol")
 }
@@ -241,7 +241,7 @@ func (c *connections) init(addrs, ans []string, ws []int, alias bool, oldNcps ma
 			c.nodePipe[toAddr] = cnn
 			copyed[toAddr] = true
 		} else {
-			c.nodePipe[toAddr] = proto.NewNodeConnPipe(c.cc.NodeConnections, func() proto.NodeConn {
+			c.nodePipe[toAddr] = proto.NewNodeConnPipe(c.cc.NodeConnections, c.cc.NodePipeCount, func() proto.NodeConn {
 				return newNodeConn(c.cc, toAddr)
 			})
 		}
