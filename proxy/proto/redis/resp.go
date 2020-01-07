@@ -252,26 +252,25 @@ func (r *resp) encodeArrayData(w *bufio.Writer) (err error) {
 	return
 }
 
-//
-//// String for debug!!!
-//func (r *resp) String() string {
-//	var sb strings.Builder
-//	sb.Write([]byte{r.respType})
-//	switch r.respType {
-//	case respString, respInt, respError:
-//		sb.Write(r.data)
-//		sb.Write(crlfBytes)
-//	case respBulk:
-//		sb.Write(r.data)
-//		sb.Write(crlfBytes)
-//	case respArray:
-//		sb.Write([]byte(strconv.Itoa(r.arraySize)))
-//		sb.Write(crlfBytes)
-//		for i := 0; i < r.arraySize; i++ {
-//			sb.WriteString(r.array[i].String())
-//		}
-//	default:
-//		panic(fmt.Sprintf("not support robj:%s", sb.String()))
-//	}
-//	return strings.ReplaceAll(sb.String(), "\r\n", " ")
-//}
+// // String for debug!!!
+// func (r *resp) String() string {
+// 	var sb strings.Builder
+// 	sb.Write([]byte{r.respType})
+// 	switch r.respType {
+// 	case respString, respInt, respError:
+// 		sb.Write(r.data)
+// 		sb.Write(crlfBytes)
+// 	case respBulk:
+// 		sb.Write(r.data)
+// 		sb.Write(crlfBytes)
+// 	case respArray:
+// 		sb.Write([]byte(strconv.Itoa(r.arraySize)))
+// 		sb.Write(crlfBytes)
+// 		for i := 0; i < r.arraySize; i++ {
+// 			sb.WriteString(r.array[i].String())
+// 		}
+// 	default:
+// 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
+// 	}
+// 	return strings.ReplaceAll(sb.String(), "\r\n", " ")
+// }
