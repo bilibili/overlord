@@ -271,11 +271,15 @@ func (pc *proxyConn) mergeJoin(m *proto.Message) (err error) {
 		}
 
 		finalReqs = append(finalReqs, req)
-		ival, err := conv.Btoi(req.reply.data)
-		if err != nil {
-			return ErrBadCount
+		if req.reply.respType == respArray {
+			ival, err := conv.Btoi(req.reply.data)
+			if err != nil {
+				return ErrBadCount
+			}
+			sum += int(ival)
+		} else {
+			sum += 1
 		}
-		sum += int(ival)
 	}
 
 	_ = pc.bw.Write(respArrayBytes)
