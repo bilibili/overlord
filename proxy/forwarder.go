@@ -98,7 +98,7 @@ func (f *defaultForwarder) Forward(msgs []*proto.Message) error {
 			ctxMap := make(map[string]*nodeConnPipeContext)
 			for _, subm := range m.Batch() {
 				key := subm.Request().Key()
-				ctx, ok := conns.getPipesContext(key)
+				ctx, ok := conns.getPipesContext(f.trimHashTag(key))
 				if !ok {
 					m.WithError(ErrForwarderHashNoNode)
 					return errors.WithStack(ErrForwarderHashNoNode)
