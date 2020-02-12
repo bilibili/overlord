@@ -48,7 +48,7 @@ func parseSlots(data []byte) (*nodeSlots, error) {
 			return nil, err
 		}
 		nodes[node.addr] = node
-		if node.role != roleMaster {
+		if !strings.Contains(node.role, roleMaster) {
 			continue
 		}
 		subSlots := node.slots
