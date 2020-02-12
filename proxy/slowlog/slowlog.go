@@ -13,7 +13,7 @@ const slowlogMaxCount = 1024
 func newStore(name string) *Store {
 	return &Store{
 		name:   name,
-		cursor: -1,
+		cursor: 0,
 		msgs:   make([]atomic.Value, slowlogMaxCount),
 	}
 }
@@ -21,7 +21,7 @@ func newStore(name string) *Store {
 // Store is the collector of slowlog
 type Store struct {
 	name   string
-	cursor int32
+	cursor uint32
 	msgs   []atomic.Value
 }
 
@@ -32,8 +32,8 @@ func (s *Store) Record(msg *proto.SlowlogEntry) {
 	}
 
 	for {
-		if atomic.CompareAndSwapInt32(&s.cursor, s.cursor, s.cursor+1) {
-			idx := s.cursor % slowlogMaxCount
+		if atomic.CompareAndSwapUint32(&s.cursor, s.cursor, s.cursor+1) {
+			idx := (s.cursor - 1) % slowlogMaxCount
 			s.msgs[idx].Store(msg)
 			if fh != nil {
 				fh.save(s.name, msg)
