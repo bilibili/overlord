@@ -4,6 +4,7 @@ import (
 	"bytes"
 	errs "errors"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -123,10 +124,14 @@ func (c *cluster) Close() error {
 func (c *cluster) getPipe(key []byte) (ncp *proto.NodeConnPipe) {
 	realKey := c.trimHashTag(key)
 	crc := hashkit.Crc16(realKey) & musk
-	sn := c.slotNode.Load().(*slotNode)
-	addr := sn.nSlots.slots[crc]
-	ncp = sn.nodePipe[addr]
-	return
+	for {
+		sn := c.slotNode.Load().(*slotNode)
+		addr := sn.nSlots.slots[crc]
+		if ncp, ok := sn.nodePipe[addr]; ok {
+			return ncp
+		}
+		runtime.Gosched()
+	}
 }
 
 func (c *cluster) trimHashTag(key []byte) []byte {

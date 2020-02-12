@@ -30,13 +30,12 @@ require (
 	github.com/prometheus/common v0.0.0-20190107103113-2998b132700a // indirect
 	github.com/prometheus/procfs v0.0.0-20190104112138-b1a0a9a36d74 // indirect
 	github.com/sirupsen/logrus v1.3.0 // indirect
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
 	github.com/urfave/cli v1.18.0
 	go.etcd.io/etcd v0.0.0-20190109224148-fae6e92407e0
-	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c // indirect
-	golang.org/x/net v0.0.0-20190328230028-74de082e2cca // indirect
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
+	golang.org/x/tools/gopls v0.3.1 // indirect
 	google.golang.org/grpc v1.17.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
