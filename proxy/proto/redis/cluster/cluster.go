@@ -4,7 +4,6 @@ import (
 	"bytes"
 	errs "errors"
 	"net"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,8 @@ import (
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 
 // errors
 var (
+	ErrClusterDown   = errs.New("cluster occur error, may retry latter")
 	ErrClusterClosed = errs.New("cluster executor already closed")
 )
 
@@ -87,14 +89,28 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 	}
 	for _, m := range msgs {
 		if m.IsBatch() {
+			isFail := false
 			for _, subm := range m.Batch() {
 				ncp := c.getPipe(subm.Request().Key())
-				subm.MarkStartPipe()
+				if ncp == nil {
+					m.WithError(ErrClusterDown)
+					isFail = true
+					continue
+				}
 				ncp.Push(subm)
+			}
+
+			if isFail {
+				return errs.WithStack(ErrClusterDown)
 			}
 		} else {
 			ncp := c.getPipe(m.Request().Key())
 			m.MarkStartPipe()
+			subm.MarkStartPipe()
+			if ncp == nil {
+				m.WithError(ErrClusterDown)
+				return errors.WithStack(ErrClusterDown)
+			}
 			ncp.Push(m)
 		}
 	}
@@ -124,14 +140,10 @@ func (c *cluster) Close() error {
 func (c *cluster) getPipe(key []byte) (ncp *proto.NodeConnPipe) {
 	realKey := c.trimHashTag(key)
 	crc := hashkit.Crc16(realKey) & musk
-	for {
-		sn := c.slotNode.Load().(*slotNode)
-		addr := sn.nSlots.slots[crc]
-		if ncp, ok := sn.nodePipe[addr]; ok {
-			return ncp
-		}
-		runtime.Gosched()
-	}
+	sn := c.slotNode.Load().(*slotNode)
+	addr := sn.nSlots.slots[crc]
+	ncp = sn.nodePipe[addr]
+	return
 }
 
 func (c *cluster) trimHashTag(key []byte) []byte {
