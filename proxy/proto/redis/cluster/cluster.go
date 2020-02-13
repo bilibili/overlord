@@ -101,14 +101,22 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 			}
 
 			if isFail {
-				return errs.WithStack(ErrClusterDown)
+				select {
+				case c.action <- struct{}{}:
+				default:
+				}
+				return errors.WithStack(ErrClusterDown)
 			}
 		} else {
 			ncp := c.getPipe(m.Request().Key())
 			m.MarkStartPipe()
-			subm.MarkStartPipe()
+			m.MarkStartPipe()
 			if ncp == nil {
 				m.WithError(ErrClusterDown)
+				select {
+				case c.action <- struct{}{}:
+				default:
+				}
 				return errors.WithStack(ErrClusterDown)
 			}
 			ncp.Push(m)
