@@ -19,6 +19,7 @@ require (
 	github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.6.4 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mesos/mesos-go v0.0.8
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -34,9 +35,14 @@ require (
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
 	github.com/urfave/cli v1.18.0
 	go.etcd.io/etcd v0.0.0-20190109224148-fae6e92407e0
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
-	golang.org/x/tools/gopls v0.3.1 // indirect
 	google.golang.org/grpc v1.17.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
 )
+
+go 1.12

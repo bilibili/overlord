@@ -14,8 +14,6 @@ import (
 	"overlord/pkg/log"
 	libnet "overlord/pkg/net"
 	"overlord/proxy/proto"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -89,36 +87,14 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 	}
 	for _, m := range msgs {
 		if m.IsBatch() {
-			isFail := false
 			for _, subm := range m.Batch() {
 				ncp := c.getPipe(subm.Request().Key())
-				if ncp == nil {
-					m.WithError(ErrClusterDown)
-					isFail = true
-					continue
-				}
+				m.MarkStartPipe()
 				ncp.Push(subm)
-			}
-
-			if isFail {
-				select {
-				case c.action <- struct{}{}:
-				default:
-				}
-				return errors.WithStack(ErrClusterDown)
 			}
 		} else {
 			ncp := c.getPipe(m.Request().Key())
 			m.MarkStartPipe()
-			m.MarkStartPipe()
-			if ncp == nil {
-				m.WithError(ErrClusterDown)
-				select {
-				case c.action <- struct{}{}:
-				default:
-				}
-				return errors.WithStack(ErrClusterDown)
-			}
 			ncp.Push(m)
 		}
 	}
@@ -180,6 +156,13 @@ func (c *cluster) fetchproc() {
 	}
 }
 
+func (c *cluster) toFetch() {
+	select {
+	case c.action <- struct{}{}:
+	default:
+	}
+}
+
 func (c *cluster) tryFetch() bool {
 	// for map's access is random in golang.
 	shuffleMap := make(map[string]struct{})
@@ -235,19 +218,14 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		}
 		sn.nodePipe[addr] = ncp
 	}
-
-	for slot, addr := range masters {
-		if _, ok := sn.nodePipe[addr]; !ok {
-			log.Warnf("fail to find master %s in sn.nodePipe for slot %d of cluster %s", addr, slot, c.name)
-			log.Infof("nslots is corrupted detial: nSlots.nodes=%v\n\tnSlots.slots=%v", nSlots.nodes, nSlots.slots)
-			select {
-			case c.action <- struct{}{}:
-			default:
-			}
+	// check
+	for slot, addr := range sn.nSlots.slots {
+		if np, ok := sn.nodePipe[addr]; addr == "" || !ok || np == nil {
+			log.Warnf("fail to find addr:%s in sn.nodePipe for slot:%d of cluster:%s detail masters:%+v nSlots.slots:%+v", addr, slot, c.name, masters, nSlots.slots)
+			c.toFetch()
 			return
 		}
 	}
-
 	c.servers = masters
 	c.slotNode.Store(sn)
 	for addr, ncp := range oncp {
@@ -267,7 +245,7 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 		if log.V(2) {
 			log.Errorf("Redis Cluster NodeConnPipe action error:%v", err)
 		}
-		c.action <- struct{}{}
+		c.toFetch()
 	}
 }
 
