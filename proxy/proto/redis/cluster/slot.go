@@ -2,6 +2,8 @@ package cluster
 
 import (
 	errs "errors"
+	"fmt"
+	"overlord/pkg/log"
 	"strconv"
 	"strings"
 )
@@ -69,6 +71,12 @@ func parseSlots(data []byte) (*nodeSlots, error) {
 				}
 				slaveSlots[slot] = append(slaveSlots[slot], node.addr)
 			}
+		}
+	}
+	for _, addr := range slots {
+		if _, ok := nodes[addr]; !ok || addr == "" {
+			log.Error("fail to parse %s", string(data))
+			return nil, fmt.Errorf("error when parse nodes slots")
 		}
 	}
 	return &nodeSlots{nodes: nodes, slots: slots, slaveSlots: slaveSlots}, nil

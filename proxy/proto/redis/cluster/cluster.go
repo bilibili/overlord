@@ -235,6 +235,19 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		}
 		sn.nodePipe[addr] = ncp
 	}
+
+	for slot, addr := range masters {
+		if _, ok := sn.nodePipe[addr]; !ok {
+			log.Warn("fail to find master %s in sn.nodePipe for slot %d of cluster %s", addr, slot, c.name)
+			log.Info("nslots is corrupted detial: nSlots.nodes=%v\n\tnSlots.slots=%v", nSlots.nodes, nSlots.slots)
+			select {
+			case c.action <- struct{}{}:
+			default:
+			}
+			return
+		}
+	}
+
 	c.servers = masters
 	c.slotNode.Store(sn)
 	for addr, ncp := range oncp {
