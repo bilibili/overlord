@@ -238,8 +238,8 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 
 	for slot, addr := range masters {
 		if _, ok := sn.nodePipe[addr]; !ok {
-			log.Warn("fail to find master %s in sn.nodePipe for slot %d of cluster %s", addr, slot, c.name)
-			log.Info("nslots is corrupted detial: nSlots.nodes=%v\n\tnSlots.slots=%v", nSlots.nodes, nSlots.slots)
+			log.Warnf("fail to find master %s in sn.nodePipe for slot %d of cluster %s", addr, slot, c.name)
+			log.Infof("nslots is corrupted detial: nSlots.nodes=%v\n\tnSlots.slots=%v", nSlots.nodes, nSlots.slots)
 			select {
 			case c.action <- struct{}{}:
 			default:

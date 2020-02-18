@@ -75,7 +75,7 @@ func parseSlots(data []byte) (*nodeSlots, error) {
 	}
 	for _, addr := range slots {
 		if _, ok := nodes[addr]; !ok || addr == "" {
-			log.Error("fail to parse %s", string(data))
+			log.Errorf("fail to parse %s", string(data))
 			return nil, fmt.Errorf("error when parse nodes slots")
 		}
 	}
