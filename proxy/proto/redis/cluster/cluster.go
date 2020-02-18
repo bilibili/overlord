@@ -97,6 +97,7 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 					isFail = true
 					continue
 				}
+				m.MarkStartPipe()
 				ncp.Push(subm)
 			}
 
@@ -109,8 +110,6 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 			}
 		} else {
 			ncp := c.getPipe(m.Request().Key())
-			m.MarkStartPipe()
-			m.MarkStartPipe()
 			if ncp == nil {
 				m.WithError(ErrClusterDown)
 				select {
@@ -119,6 +118,7 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 				}
 				return errors.WithStack(ErrClusterDown)
 			}
+			m.MarkStartPipe()
 			ncp.Push(m)
 		}
 	}
