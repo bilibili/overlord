@@ -25,7 +25,6 @@ const (
 
 // errors
 var (
-	ErrClusterDown   = errs.New("cluster occur error, may retry latter")
 	ErrClusterClosed = errs.New("cluster executor already closed")
 )
 
@@ -89,7 +88,7 @@ func (c *cluster) Forward(msgs []*proto.Message) error {
 		if m.IsBatch() {
 			for _, subm := range m.Batch() {
 				ncp := c.getPipe(subm.Request().Key())
-				m.MarkStartPipe()
+				subm.MarkStartPipe()
 				ncp.Push(subm)
 			}
 		} else {
