@@ -83,6 +83,7 @@ func ProxyTime(cluster, node string, ts int64) {
 	if proxyTimer == nil {
 		return
 	}
+	node = ""
 	proxyTimer.WithLabelValues(cluster, node).Observe(float64(ts))
 }
 
@@ -91,6 +92,7 @@ func HandleTime(cluster, node, cmd string, ts int64) {
 	if handlerTimer == nil {
 		return
 	}
+	cmd = ""
 	handlerTimer.WithLabelValues(cluster, node, cmd).Observe(float64(ts))
 }
 
@@ -99,6 +101,7 @@ func ErrIncr(cluster, node, cmd, err string) {
 	if gerr == nil {
 		return
 	}
+	cmd = ""
 	gerr.WithLabelValues(cluster, node, cmd, err).Inc()
 }
 
