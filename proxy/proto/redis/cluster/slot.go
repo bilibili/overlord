@@ -2,6 +2,7 @@ package cluster
 
 import (
 	errs "errors"
+	"overlord/pkg/log"
 	"strconv"
 	"strings"
 )
@@ -12,6 +13,7 @@ const slotsCount = 16384
 var (
 	ErrAbsentField   = errs.New("Node fields is absent")
 	ErrEmptyNodeLine = errs.New("empty line of cluster nodes")
+	ErrParseNodeSlot = errs.New("error when parse nodes slots")
 )
 
 var (
@@ -71,21 +73,28 @@ func parseSlots(data []byte) (*nodeSlots, error) {
 			}
 		}
 	}
+	// check slot=>addr
+	for slot, addr := range slots {
+		if node, ok := nodes[addr]; addr == "" || !ok || node == nil {
+			log.Errorf("parse failed slot:%d miss addr, original:%s", slot, string(data))
+			return nil, ErrParseNodeSlot
+		}
+	}
 	return &nodeSlots{nodes: nodes, slots: slots, slaveSlots: slaveSlots}, nil
 }
 
 // nodeSlots is the slots map collections.
 type nodeSlots struct {
 	nodes      map[string]*node
-	slaveSlots [][]string
 	slots      []string
+	slaveSlots [][]string
 }
 
 // getMasters return all the Masters address.
 func (ns *nodeSlots) getMasters() []string {
 	masters := make([]string, 0)
 	for _, node := range ns.nodes {
-		if node.role == roleMaster && node.isNormal() {
+		if node.role == roleMaster {
 			masters = append(masters, node.addr)
 		}
 	}

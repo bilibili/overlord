@@ -155,6 +155,13 @@ func (c *cluster) fetchproc() {
 	}
 }
 
+func (c *cluster) toFetch() {
+	select {
+	case c.action <- struct{}{}:
+	default:
+	}
+}
+
 func (c *cluster) tryFetch() bool {
 	// for map's access is random in golang.
 	shuffleMap := make(map[string]struct{})
@@ -210,6 +217,14 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		}
 		sn.nodePipe[addr] = ncp
 	}
+	// check
+	for slot, addr := range sn.nSlots.slots {
+		if np, ok := sn.nodePipe[addr]; addr == "" || !ok || np == nil {
+			log.Warnf("fail to find addr:%s in sn.nodePipe for slot:%d of cluster:%s detail masters:%+v nSlots.slots:%+v", addr, slot, c.name, masters, nSlots.slots)
+			c.toFetch()
+			return
+		}
+	}
 	c.servers = masters
 	c.slotNode.Store(sn)
 	for addr, ncp := range oncp {
@@ -229,7 +244,7 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 		if log.V(2) {
 			log.Errorf("Redis Cluster NodeConnPipe action error:%v", err)
 		}
-		c.action <- struct{}{}
+		c.toFetch()
 	}
 }
 
