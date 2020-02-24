@@ -20,6 +20,7 @@ var (
 	cmdEvalBytes   = []byte("4\r\nEVAL")
 	cmdQuitBytes   = []byte("4\r\nQUIT")
 	cmdPingBytes   = []byte("4\r\nPING")
+	cmdAuthBytes   = []byte("4\r\nAUTH")
 	cmdMSetBytes   = []byte("4\r\nMSET")
 	cmdMGetBytes   = []byte("4\r\nMGET")
 	cmdGetBytes    = []byte("3\r\nGET")
@@ -168,6 +169,13 @@ func (r *Request) IsSupport() bool {
 	return ok
 }
 
+func (r *Request) IsAuth() bool {
+	if r.IsCtl() {
+		return bytes.Equal(r.resp.array[0].data, cmdAuthBytes)
+	}
+	return false
+}
+
 // IsCtl is control command.
 //
 // NOTE: use string([]byte) as a map key, it is very specific!!!
@@ -307,13 +315,13 @@ var (
 		"5\r\nPFADD",
 		"7\r\nPFMERGE",
 		"4\r\nEVAL",
-		"11\r\nSUNIONSTORE",
-		"11\r\nZUNIONSTORE",
 	}
 	notSupportCmds = []string{
 		"6\r\nMSETNX",
 		"10\r\nSDIFFSTORE",
 		"11\r\nSINTERSTORE",
+		"11\r\nSUNIONSTORE",
+		"11\r\nZUNIONSTORE",
 		"5\r\nBLPOP",
 		"5\r\nBRPOP",
 		"10\r\nBRPOPLPUSH",
@@ -328,7 +336,6 @@ var (
 		"4\r\nWAIT",
 		"5\r\nBITOP",
 		"7\r\nEVALSHA",
-		"4\r\nAUTH",
 		"4\r\nECHO",
 		"4\r\nINFO",
 		"5\r\nPROXY",
@@ -341,5 +348,6 @@ var (
 	controlCmds = []string{
 		"4\r\nQUIT",
 		"4\r\nPING",
+		"4\r\nAUTH",
 	}
 )
