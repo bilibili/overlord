@@ -10,7 +10,7 @@ import (
 const (
 	OverlordMajor = 1
 	OverlordMinor = 9
-	OverlordPatch = 0
+	OverlordPatch = 5
 )
 
 var (

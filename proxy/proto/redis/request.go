@@ -254,6 +254,7 @@ var (
 		"7\r\nPFCOUNT",
 	}
 	writeCmds = []string{
+		"6\r\nUNLINK",
 		"3\r\nDEL",
 		"6\r\nEXPIRE",
 		"8\r\nEXPIREAT",
