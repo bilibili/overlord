@@ -150,10 +150,17 @@ func (c *cluster) fetchproc() {
 	for {
 		select {
 		case <-c.action:
-		case <-time.After(30 * time.Minute):
+		case <-time.After(7 * 24 * time.Hour):
 		}
 		c.tryFetch()
 		time.Sleep(time.Second)
+	}
+}
+
+func (c *cluster) toFetch() {
+	select {
+	case c.action <- struct{}{}:
+	default:
 	}
 }
 
@@ -212,6 +219,14 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		}
 		sn.nodePipe[addr] = ncp
 	}
+	// check
+	for slot, addr := range sn.nSlots.slots {
+		if np, ok := sn.nodePipe[addr]; addr == "" || !ok || np == nil {
+			log.Warnf("fail to find addr:%s in sn.nodePipe for slot:%d of cluster:%s detail masters:%+v nSlots.slots:%+v", addr, slot, c.name, masters, nSlots.slots)
+			c.toFetch()
+			return
+		}
+	}
 	c.servers = masters
 	c.slotNode.Store(sn)
 	for addr, ncp := range oncp {
@@ -231,7 +246,7 @@ func (c *cluster) pipeEvent(errCh <-chan error) {
 		if log.V(2) {
 			log.Errorf("Redis Cluster NodeConnPipe action error:%v", err)
 		}
-		c.action <- struct{}{}
+		c.toFetch()
 	}
 }
 

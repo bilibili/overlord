@@ -93,10 +93,7 @@ func (nc *nodeConn) Read(m *proto.Message) (err error) {
 	addrBs, _, isAsk, _ := parseRedirect(data)
 	if !isAsk {
 		// tryFetch when key moved
-		select {
-		case nc.c.action <- struct{}{}:
-		default:
-		}
+		nc.c.toFetch()
 	}
 	nc.sb.Reset()
 	nc.sb.Write(addrBs)

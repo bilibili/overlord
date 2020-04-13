@@ -18,7 +18,7 @@ func NewStdHandler() Handler {
 
 // Log stdout loging
 func (h *stdoutHandler) Log(lv Level, msg string) {
-	_ = h.out.Output(6, fmt.Sprintf("[%s] %s", lv, msg))
+	_ = h.out.Output(5, fmt.Sprintf("[%s] %s", lv, msg))
 }
 
 // Close stdout loging
