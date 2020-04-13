@@ -55,20 +55,22 @@ type cluster struct {
 	fakeSlotsBytes []byte
 	once           sync.Once
 
-	state int32
+	state     int32
+	pipeCount int
 }
 
 // NewForwarder new proto Forwarder.
-func NewForwarder(name, listen string, servers []string, conns int32, dto, rto, wto time.Duration, hashTag []byte) proto.Forwarder {
+func NewForwarder(name, listen string, servers []string, conns int32, pipeCount int, dto, rto, wto time.Duration, hashTag []byte) proto.Forwarder {
 	c := &cluster{
-		name:    name,
-		servers: servers,
-		conns:   conns,
-		dto:     dto,
-		rto:     rto,
-		wto:     wto,
-		hashTag: hashTag,
-		action:  make(chan struct{}),
+		name:      name,
+		servers:   servers,
+		conns:     conns,
+		dto:       dto,
+		rto:       rto,
+		wto:       wto,
+		hashTag:   hashTag,
+		action:    make(chan struct{}),
+		pipeCount: pipeCount,
 	}
 	if !c.tryFetch() {
 		_ = c.Close()
@@ -205,7 +207,7 @@ func (c *cluster) initSlotNode(nSlots *nodeSlots) {
 		ncp, ok := oncp[addr]
 		if !ok {
 			toAddr := addr // NOTE: avoid closure
-			ncp = proto.NewNodeConnPipe(c.conns, func() proto.NodeConn {
+			ncp = proto.NewNodeConnPipe(c.conns, c.pipeCount, func() proto.NodeConn {
 				return newNodeConn(c, toAddr)
 			})
 			go c.pipeEvent(ncp.ErrorEvent())

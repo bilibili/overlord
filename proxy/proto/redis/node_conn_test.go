@@ -20,6 +20,10 @@ import (
 type mockCmd struct {
 }
 
+func (c *mockCmd) Merge([]proto.Request) error {
+	return nil
+}
+
 func (*mockCmd) CmdString() string {
 	return ""
 }

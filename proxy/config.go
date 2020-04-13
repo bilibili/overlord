@@ -74,6 +74,7 @@ type ClusterConfig struct {
 	ReadTimeout       int             `toml:"read_timeout"`
 	WriteTimeout      int             `toml:"write_timeout"`
 	NodeConnections   int32           `toml:"node_connections"`
+	NodePipeCount     int             `toml:"node_pipe_count"`
 	PingFailLimit     int             `toml:"ping_fail_limit"`
 	PingAutoEject     bool            `toml:"ping_auto_eject"`
 	SlowlogSlowerThan int             `toml:"slowlog_slower_than"`
@@ -148,6 +149,10 @@ func (cc *ClusterConfig) SetDefault() {
 
 	if cc.NodeConnections == 0 {
 		cc.NodeConnections = 2
+	}
+
+	if cc.NodePipeCount == 0 {
+		cc.NodePipeCount = 32
 	}
 
 	if len(cc.ListenAddr) == 0 {

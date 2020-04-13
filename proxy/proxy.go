@@ -109,7 +109,7 @@ func (p *Proxy) accept(cc *ClusterConfig, l net.Listener, forwarder proto.Forwar
 				case types.CacheTypeMemcacheBinary:
 					encoder = mcbin.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
 				case types.CacheTypeRedis:
-					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+					encoder = redis.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 				case types.CacheTypeRedisCluster:
 					encoder = rclstr.NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), nil)
 				}

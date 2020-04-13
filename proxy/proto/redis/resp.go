@@ -3,10 +3,9 @@ package redis
 import (
 	"bytes"
 	"fmt"
-	"strconv"
-
 	"overlord/pkg/bufio"
 	"overlord/pkg/conv"
+	"strconv"
 )
 
 // respType is the type of redis resp
@@ -240,6 +239,11 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 		_ = w.Write(nullDataBytes)
 	}
 	_ = w.Write(crlfBytes)
+	err = r.encodeArrayData(w)
+	return
+}
+
+func (r *resp) encodeArrayData(w *bufio.Writer) (err error) {
 	for i := 0; i < r.arraySize; i++ {
 		if err = r.array[i].encode(w); err != nil {
 			return
@@ -268,5 +272,5 @@ func (r *resp) encodeArray(w *bufio.Writer) (err error) {
 // 	default:
 // 		panic(fmt.Sprintf("not support robj:%s", sb.String()))
 // 	}
-// 	return sb.String()
+// 	return strings.ReplaceAll(sb.String(), "\r\n", " ")
 // }

@@ -14,7 +14,7 @@ import (
 
 func _decodeMessage(t *testing.T, data string) []*proto.Message {
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	msgs := proto.GetMsgs(16)
 	nmsgs, err := pc.Decode(msgs)
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestDecodeBasicOk(t *testing.T) {
 func TestDecodeComplexOk(t *testing.T) {
 	data := "*3\r\n$4\r\nMGET\r\n$4\r\nbaka\r\n$4\r\nkaba\r\n*5\r\n$4\r\nMSET\r\n$1\r\na\r\n$1\r\nb\r\n$3\r\neee\r\n$5\r\n12345\r\n*3\r\n$4\r\nMGET\r\n$4\r\nenen\r\n$4\r\nnime\r\n*2\r\n$3\r\nGET\r\n$5\r\nabcde\r\n*3\r\n$3\r\nDEL\r\n$1\r\na\r\n$1\r\nb\r\n"
 	conn := libnet.NewConn(mockconn.CreateConn([]byte(data), 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	// test reuse command
 	msgs := proto.GetMsgs(16)
 	msgs[1].WithRequest(getReq())
@@ -84,21 +84,21 @@ func TestDecodeComplexOk(t *testing.T) {
 	req := msgs[0].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arraySize)
-	assert.Equal(t, "GET", req.CmdString())
-	assert.Equal(t, []byte("GET"), req.Cmd())
+	assert.Equal(t, "MGET", req.CmdString())
+	assert.Equal(t, []byte("MGET"), req.Cmd())
 	assert.Equal(t, "baka", string(req.Key()))
 	assert.Equal(t, []byte("2"), req.resp.data)
-	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
+	assert.Equal(t, []byte("4\r\nMGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nbaka"), req.resp.array[1].data)
 	// MGET kaba
 	req = msgs[0].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arraySize)
-	assert.Equal(t, "GET", req.CmdString())
-	assert.Equal(t, []byte("GET"), req.Cmd())
+	assert.Equal(t, "MGET", req.CmdString())
+	assert.Equal(t, []byte("MGET"), req.Cmd())
 	assert.Equal(t, "kaba", string(req.Key()))
 	assert.Equal(t, []byte("2"), req.resp.data)
-	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
+	assert.Equal(t, []byte("4\r\nMGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nkaba"), req.resp.array[1].data)
 	// MSET a b
 	assert.Len(t, nmsgs[1].Batch(), 2)
@@ -128,21 +128,21 @@ func TestDecodeComplexOk(t *testing.T) {
 	req = msgs[2].Requests()[0].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arraySize)
-	assert.Equal(t, "GET", req.CmdString())
-	assert.Equal(t, []byte("GET"), req.Cmd())
+	assert.Equal(t, "MGET", req.CmdString())
+	assert.Equal(t, []byte("MGET"), req.Cmd())
 	assert.Equal(t, "enen", string(req.Key()))
 	assert.Equal(t, []byte("2"), req.resp.data)
-	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
+	assert.Equal(t, []byte("4\r\nMGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nenen"), req.resp.array[1].data)
 	// MGET nime
 	req = msgs[2].Requests()[1].(*Request)
 	assert.Equal(t, mergeTypeJoin, req.mType)
 	assert.Equal(t, 2, req.resp.arraySize)
-	assert.Equal(t, "GET", req.CmdString())
-	assert.Equal(t, []byte("GET"), req.Cmd())
+	assert.Equal(t, "MGET", req.CmdString())
+	assert.Equal(t, []byte("MGET"), req.Cmd())
 	assert.Equal(t, "nime", string(req.Key()))
 	assert.Equal(t, []byte("2"), req.resp.data)
-	assert.Equal(t, []byte("3\r\nGET"), req.resp.array[0].data)
+	assert.Equal(t, []byte("4\r\nMGET"), req.resp.array[0].data)
 	assert.Equal(t, []byte("4\r\nnime"), req.resp.array[1].data)
 	// GET abcde
 	req = msgs[3].Requests()[0].(*Request)
@@ -183,7 +183,7 @@ func TestEncodeNotSupportCtl(t *testing.T) {
 	}
 	msg.WithRequest(req)
 	conn := libnet.NewConn(mockconn.CreateConn(nil, 1), time.Second, time.Second)
-	pc := NewProxyConn(conn)
+	pc := NewProxyConn(conn, true)
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
 	assert.Equal(t, req.reply.data, notSupportDataBytes)
@@ -281,7 +281,7 @@ func TestEncodeMergeOk(t *testing.T) {
 				msg.Batch()
 			}
 			conn, buf := mockconn.CreateDownStreamConn()
-			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+			pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 			err := pc.Encode(msg)
 			if !assert.NoError(t, err) {
 				return
@@ -310,7 +310,7 @@ func TestEncodeWithError(t *testing.T) {
 	msg.Done()
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 	err := pc.Encode(msg)
 	assert.Error(t, err)
 	assert.Equal(t, mockErr, err)
@@ -342,7 +342,7 @@ func TestEncodeWithPing(t *testing.T) {
 	msg.WithRequest(req)
 
 	conn, buf := mockconn.CreateDownStreamConn()
-	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second))
+	pc := NewProxyConn(libnet.NewConn(conn, time.Second, time.Second), true)
 	err := pc.Encode(msg)
 	assert.NoError(t, err)
 	err = pc.Flush()

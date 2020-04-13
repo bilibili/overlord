@@ -272,6 +272,10 @@ func (r *MCRequest) Key() []byte {
 	return r.key
 }
 
+func (r *MCRequest) Merge([]proto.Request) (err error) {
+	return
+}
+
 func (r *MCRequest) String() string {
 	return fmt.Sprintf("type:%s key:%s data:%s", r.respType.Bytes(), r.key, r.data)
 }
