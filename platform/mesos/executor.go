@@ -311,8 +311,8 @@ func (ec *Executor) newStatus(id ms.TaskID) ms.TaskStatus {
 		TaskID:     id,
 		Source:     ms.SOURCE_EXECUTOR.Enum(),
 		ExecutorID: &ec.executor.ExecutorID,
-		// TODO:rand id
-		UUID: []byte(uuid.NewRandom()),
+		Timestamp:  protoFloat64(float64(time.Now().Unix())),
+		UUID:       []byte(uuid.NewRandom()),
 	}
 }
 
@@ -334,6 +334,8 @@ func (ec *Executor) update(status ms.TaskStatus) error {
 }
 
 func protoString(s string) *string { return &s }
+
+func protoFloat64(f float64) *float64 { return &f }
 
 func (ec *Executor) kill(id ms.TaskID) {
 	status := ec.newStatus(id)
