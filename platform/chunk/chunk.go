@@ -36,7 +36,7 @@ var (
 func getHosts(offers ...ms.Offer) []string {
 	hmap := make(map[string]struct{})
 	for _, offer := range offers {
-		hmap[offer.GetHostname()] = struct{}{}
+		hmap[ValidateIPAddress(offer.GetHostname())] = struct{}{}
 	}
 	hosts := make([]string, 0)
 	for h := range hmap {
@@ -152,7 +152,7 @@ func mapIntoHostRes(offers []ms.Offer, mem float64, cpu float64) (hosts []*hostR
 		count := minInt(memNode, cpuNode, portsNode) / 2 * 2
 
 		log.Infof("[chunk] get the resources memory:%f cpu:%f ports-count:%d and finally count %d", m, c, len(ports), count)
-		hosts = append(hosts, &hostRes{name: offer.GetHostname(), count: count})
+		hosts = append(hosts, &hostRes{name: ValidateIPAddress(offer.GetHostname()), count: count})
 	}
 	return
 }
@@ -161,7 +161,7 @@ func mapIntoPortsMap(offers []ms.Offer) map[string][]int {
 	innerMap := make(map[string][]int)
 	for _, offer := range offers {
 		ports := getOfferRange(offer, ResNamePorts)
-		innerMap[offer.GetHostname()] = ports
+		innerMap[ValidateIPAddress(offer.GetHostname())] = ports
 	}
 	return innerMap
 }

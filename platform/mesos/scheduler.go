@@ -293,8 +293,9 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 	}
 	task.Data, _ = json.Marshal(data)
 	for _, offer := range offers {
+		agentIP := chunk.ValidateIPAddress(offer.Hostname)
 		// try to recover from origin agent with the same info.
-		if offer.Hostname == ip {
+		if agentIP == ip {
 			if !checkOffer(offer, info.CPU, info.MaxMemory, uport) {
 				err = errOffer
 				return
@@ -307,7 +308,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 				log.Info("recover task successfully")
 				// decline other offer
 				for _, offer := range offers {
-					if offer.Hostname != ip {
+					if agentIP != ip {
 						decline := calls.Decline(offer.ID)
 						calls.CallNoData(context.Background(), s.cli, decline)
 					}
@@ -369,7 +370,7 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 	)
 
 	for _, offer := range offers {
-		ofm[offer.GetHostname()] = offer
+		ofm[chunk.ValidateIPAddress(offer.GetHostname())] = offer
 	}
 	for _, addr := range dist.Addrs {
 		task := ms.TaskInfo{
@@ -392,7 +393,7 @@ func (s *Scheduler) acceptOffer(info *create.CacheInfo, dist *chunk.Dist, offers
 	}
 
 	for _, offer := range offers {
-		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[chunk.ValidateIPAddress(offer.Hostname)]...)}.WithOffers(offer.ID))
 		err = calls.CallNoData(context.Background(), s.cli, accept)
 		if err != nil {
 			err = errors.WithStack(err)
@@ -526,7 +527,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		return
 	}
 	for _, offer := range offers {
-		ofm[offer.GetHostname()] = offer
+		ofm[chunk.ValidateIPAddress(offer.GetHostname())] = offer
 	}
 	for _, ck := range jobChunks {
 		for _, node := range ck.Nodes {
@@ -554,7 +555,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		}
 	}
 	for _, offer := range offers {
-		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[offer.Hostname]...)}.WithOffers(offer.ID))
+		accept := calls.Accept(calls.OfferOperations{calls.OpLaunch(tasks[chunk.ValidateIPAddress(offer.Hostname)]...)}.WithOffers(offer.ID))
 		err = calls.CallNoData(context.Background(), s.cli, accept)
 		if err != nil {
 			err = errors.WithStack(err)

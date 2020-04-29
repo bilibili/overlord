@@ -74,7 +74,7 @@ func TestChunksRecover(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 3)
 	t.Logf("before recover %v", chunks)
-	disabledHost := offers[5].Hostname
+	disabledHost := ValidateIPAddress(offers[5].Hostname)
 	newChunk, err := ChunksRecover(chunks, disabledHost, 100, 1, offers[:5]...)
 	assert.NoError(t, err)
 	assert.Len(t, newChunk, 3)
@@ -84,7 +84,7 @@ func TestChunksRecover(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 5)
 	t.Logf("before recover %v", chunks)
-	disabledHost = offers[5].Hostname
+	disabledHost = ValidateIPAddress(offers[5].Hostname)
 	newChunk, err = ChunksRecover(chunks, disabledHost, 100, 1, offers[:5]...)
 	assert.NoError(t, err)
 	assert.Len(t, newChunk, 5)
@@ -94,7 +94,7 @@ func TestChunksRecover(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 6)
 	t.Logf("before recover %v", chunks)
-	disabledHost = offers[5].Hostname
+	disabledHost = ValidateIPAddress(offers[5].Hostname)
 	newChunk, err = ChunksRecover(chunks, disabledHost, 100, 1, offers[:5]...)
 	assert.NoError(t, err)
 	assert.Len(t, newChunk, 6)
