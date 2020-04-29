@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"overlord/platform/chunk"
-	"overlord/pkg/etcd"
-	"overlord/pkg/log"
 	"strings"
 	"text/template"
+
+	"overlord/pkg/etcd"
+	"overlord/pkg/log"
+	"overlord/platform/chunk"
 )
 
 // maybe global defines
@@ -116,6 +117,11 @@ func (c *RedisClusterJob) buildTplTree() (err error) {
 			}
 
 			err = c.e.Set(ctx, fmt.Sprintf("%s/jobid", instanceDir), c.info.JobID)
+			if err != nil {
+				return err
+			}
+
+			err = c.e.Set(ctx, fmt.Sprintf("%s/cluster", instanceDir), c.info.Name)
 			if err != nil {
 				return err
 			}
