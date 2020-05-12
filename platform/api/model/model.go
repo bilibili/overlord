@@ -31,6 +31,16 @@ func (pc *ParamCluster) Validate() error {
 	return nil
 }
 
+// ValidateGroup will check if the group param is in the predefined groups.
+func (pc *ParamCluster) ValidateGroup(groups []*Group) error {
+	for _, group := range groups {
+		if group.Name == pc.Group {
+			return nil
+		}
+	}
+	return fmt.Errorf("error: group %s unknown", pc.Group)
+}
+
 // ParamScale parase from data to used to scale cluster
 type ParamScale struct {
 	Name   string `json:"name" validate:"required"`

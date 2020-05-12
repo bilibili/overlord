@@ -25,9 +25,4 @@ const SPEC_OPTIONS = [{
   value: 'custom'
 }]
 
-const GROUP_OPTIONS = [{
-  name: '上海核心',
-  value: 'sh001'
-}]
-
-export { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS }
+export { TYPE_OPTIONS, SPEC_OPTIONS }

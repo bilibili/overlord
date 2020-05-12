@@ -10,6 +10,7 @@ type ServerConfig struct {
 	Listen   string                `toml:"listen"`
 	Etcd     string                `toml:"etcd"`
 	Versions []*VersionConfig      `toml:"versions"`
+	Groups   map[string]string     `toml:"groups"`
 	Monitor  *MonitorConfig        `toml:"monitor"`
 	Cluster  *DefaultClusterConfig `toml:"cluster"`
 	*log.Config

@@ -11,6 +11,10 @@ stdout = true
   name_var = "cluster"
   org_id = 1
 
+[groups]
+  sh001 = "上海核心"
+  bj001 = "北京核心"
+
 [[versions]]                    # 版本信息
   cache_type = "redis"
   versions = ["4.0.11", "3.2.8"]

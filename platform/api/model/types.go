@@ -11,6 +11,12 @@ type Version struct {
 	Versions  []string `json:"versions"`
 }
 
+// Group is the group with slug and cn name
+type Group struct {
+	Name   string `json:"name"`
+	NameCN string `json:"name_cn"`
+}
+
 // Job is the json-encodable struct
 type Job struct {
 	ID    string `json:"id"`

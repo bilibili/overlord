@@ -24,6 +24,11 @@ const getVersionsApi = params => {
   return http.get('api/v1/versions')
 }
 
+// 获取 group 列表
+const getGroupsApi = params => {
+  return http.get('api/v1/groups')
+}
+
 // 获取 appid 详情
 const getAppidDetailApi = params => {
   return http.get(`api/v1/appids/${params}`)
@@ -76,6 +81,7 @@ export {
   getAppidsApi,
   getJobsApi,
   getVersionsApi,
+  getGroupsApi,
   getAppidDetailApi,
   getClusterDetailApi,
   removeCorrelationApi,
