@@ -125,11 +125,16 @@ func (e *Etcd) Watch(ctx context.Context, k string) (ch chan string, err error) 
 	ch = make(chan string)
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			resp, err := watcher.Next(ctx)
 			fmt.Println(resp, err)
-			// TODO:rewatch if err.
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", k, err)
+				continue
 			}
 			ch <- resp.Node.Value
 		}
@@ -176,9 +181,15 @@ func (e *Etcd) WatchOnExpire(ctx context.Context, dir string) (key chan string, 
 	key = make(chan string)
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			resp, err := watcher.Next(ctx)
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", dir, err)
+				continue
 			}
 			if resp.Action == "expire" {
 				key <- resp.Node.Key
@@ -209,9 +220,15 @@ func (e *Etcd) WatchOn(ctx context.Context, path string, interestings ...string)
 	key = make(chan *cli.Node)
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			resp, err = watcher.Next(ctx)
 			if err != nil {
 				log.Errorf("watch etcd node %s err %v", path, err)
+				continue
 			}
 			if len(evtMap) == 0 {
 				key <- resp.Node
@@ -238,9 +255,15 @@ func (e *Etcd) WatchOneshot(ctx context.Context, path string, interestings ...st
 
 	watcher := e.kapi.Watcher(path, &cli.WatcherOptions{Recursive: true})
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 		resp, err = watcher.Next(ctx)
 		if err != nil {
 			log.Errorf("watch etcd node %s err %v", path, err)
+			continue
 		}
 
 		if _, ok := evtMap[resp.Action]; ok {
