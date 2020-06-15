@@ -518,6 +518,7 @@ func (s *Scheduler) dispatchCluster(t job.Job, num int, mem, cpu float64, offers
 		Name:      t.Name,
 		JobID:     t.ID,
 		Version:   t.Version,
+		Image:     t.Image,
 		Number:    t.Num,
 		Group:     t.Group,
 	})
@@ -663,6 +664,7 @@ func (s *Scheduler) dispatchSingleton(t job.Job, offers []ms.Offer) (err error) 
 		Number:    t.Num,
 		Thread:    int(t.CPU) + 1,
 		Version:   t.Version,
+		Image:     t.Image,
 		Dist:      dist,
 		Group:     t.Group,
 	}

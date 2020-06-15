@@ -21,6 +21,7 @@ type CacheInfo struct {
 	Thread int
 
 	Version string
+	Image   string
 
 	Dist  *chunk.Dist
 	Group string

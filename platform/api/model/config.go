@@ -43,4 +43,5 @@ func (mc *MonitorConfig) Href(cname string) string {
 type VersionConfig struct {
 	CacheType string   `toml:"cache_type"`
 	Versions  []string `toml:"versions"`
+	Image     string   `toml:"image"`
 }
