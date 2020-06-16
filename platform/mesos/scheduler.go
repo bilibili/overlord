@@ -283,7 +283,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 	task := &ms.TaskInfo{
 		Name:      ip + ":" + port,
 		TaskID:    ms.TaskID{Value: fmt.Sprintf("%s:%s-%s-%d", ip, port, cluster, id+1)},
-		Executor:  s.buildExcutor(ip+port, []ms.Resource{}),
+		Executor:  s.buildExcutor(fmt.Sprintf("%s:%s", ip, port), []ms.Resource{}),
 		Resources: makeResources(info.CPU, info.MaxMemory, uport),
 	}
 	data := &TaskData{
