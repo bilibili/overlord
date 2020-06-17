@@ -327,7 +327,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 			newDist *chunk.Dist
 		)
 		for i, addr := range info.Dist.Addrs {
-			if addr.String() == ip+port {
+			if addr.String() == fmt.Sprintf("%s:%s", ip, port) {
 				info.Dist.Addrs = append(info.Dist.Addrs[:i], info.Dist.Addrs[i+1:]...)
 				alias = addr.ID
 			}
