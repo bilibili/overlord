@@ -80,12 +80,12 @@
         </el-form-item>
 
         <el-form-item label="分组" required>
-          <el-select v-model="clusterForm.group" class="group-select" filterable placeholder="请选择需要关联 APPID">
+          <el-select v-model="clusterForm.group" class="group-select" filterable placeholder="请选择分组">
             <el-option
               v-for="item in groupOptions"
               :key="item.name"
-              :label="item.name"
-              :value="item.value">
+              :label="item.name_cn"
+              :value="item.name">
             </el-option>
           </el-select>
         </el-form-item>
@@ -112,8 +112,8 @@
 </template>
 
 <script>
-import { getVersionsApi, createClusterApi, getAppidsApi } from '@/http/api'
-import { TYPE_OPTIONS, SPEC_OPTIONS, GROUP_OPTIONS } from '@/constants/CREATE_TYPES'
+import { getVersionsApi, getGroupsApi, createClusterApi, getAppidsApi } from '@/http/api'
+import { TYPE_OPTIONS, SPEC_OPTIONS } from '@/constants/CREATE_TYPES'
 
 export default {
   data () {
@@ -168,12 +168,12 @@ export default {
         spec: '0.25c2g',
         total_memory: null,
         version: null,
-        group: 'sh001',
+        group: null,
         appids: []
       },
       typeOptions: TYPE_OPTIONS,
       specOptions: SPEC_OPTIONS,
-      groupOptions: GROUP_OPTIONS,
+      groupOptions: [],
       allVersionOptions: [],
       versionOptions: [],
       specCustomForm: {
@@ -185,6 +185,7 @@ export default {
     }
   },
   created () {
+    this.getGroups()
     this.getAppids()
     this.getVersions()
   },
@@ -213,6 +214,15 @@ export default {
         this.clusterForm.version = this.versionOptions[0]
       } catch (_) {
         this.$message.error('版本列表获取失败')
+      }
+    },
+    async getGroups () {
+      try {
+        const { data } = await getGroupsApi()
+        this.groupOptions = data.items
+        this.clusterForm.group = null
+      } catch (_) {
+        this.$message.error('分组列表获取失败')
       }
     },
     submitForm (formName) {

@@ -66,4 +66,6 @@ func initRouter(ge *gin.Engine) {
 	appids.DELETE("/:appid", removeAppid)
 
 	e.GET("/versions", getAllVersions)
+	e.GET("/groups", getAllGroups)
+
 }

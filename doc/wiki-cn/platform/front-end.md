@@ -36,8 +36,7 @@ yarn run lint
     │   ├── assets                  // 资源文件
     │   │   ├── Starbounder-2.otf
     │   ├── constants               // 常量文件
-    │   │   ├── CREATE_TYPES.js
-    │   │   └── GROUP.js
+    │   │   └── CREATE_TYPES.js
     │   ├── http
     │   │   ├── api.js              // API 方法
     │   │   ├── config.js           // axios 基本配置

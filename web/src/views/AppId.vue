@@ -28,7 +28,7 @@
           <el-button type="text" size="large" @click="dialogVisible = true">添加关联</el-button>
         </div>
         <div class="appid-group" v-for="(groupItem, index) in groupedClusters" :key="index">
-          <div class="appid-group__title">{{ GROUP_MAP[groupItem.group] }}</div>
+          <div class="appid-group__title">{{ groupMap[groupItem.group] }}</div>
           <el-table :data="groupItem.clusters" border max-height="500">
             <el-table-column prop="name" label="集群名称" min-width="100">
             </el-table-column>
@@ -71,7 +71,7 @@
         </el-table-column>
         <el-table-column prop="group" label="机房">
           <template slot-scope="{ row }">
-            {{ GROUP_MAP[row.group] }}
+            {{ groupMap[row.group] }}
           </template>
         </el-table-column>
         <el-table-column label="详情" width="230">
@@ -102,15 +102,14 @@
 </template>
 
 <script>
-import GROUP_MAP from '@/constants/GROUP'
-import { getAppidsApi, getAppidDetailApi, removeCorrelationApi, addCorrelationApi, addAppIdApi } from '@/http/api'
+import { getAppidsApi, getAppidDetailApi, getGroupsApi, removeCorrelationApi, addCorrelationApi, addAppIdApi } from '@/http/api'
 import { mapState } from 'vuex'
 import { throttle } from 'lodash'
 
 export default {
   data () {
     return {
-      GROUP_MAP,
+      groupMap: {},
       filterText: null,
       appidTree: [],
       defaultProps: {
@@ -133,6 +132,7 @@ export default {
     }
   },
   created () {
+    this.getGroups()
     this.getAppids()
   },
   computed: {
@@ -162,6 +162,17 @@ export default {
         this.$message.error(`获取失败：${error}`)
       }
       this.appidLoading = false
+    },
+    async getGroups () {
+      try {
+        const { data } = await getGroupsApi()
+        this.groupMap = data.items.reduce(function (map, obj) {
+          map[obj.name] = obj.name_cn
+          return map
+        }, {})
+      } catch (_) {
+        this.$message.error('分组列表获取失败')
+      }
     },
     filterNode (value, data) {
       if (!value) return true
