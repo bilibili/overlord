@@ -46,7 +46,7 @@ func NewNodeConnPipe(conns int32, pipeMaxCount int, newNc func() NodeConn) (ncp 
 	}
 	for i := int32(0); i < ncp.conns; i++ {
 		ncp.inputs[i] = make(chan *Message, pipeMaxCount*pipeMaxCount*16)
-		ncp.mps[i] = newMsgPipe(pipeMaxCount, ncp.inputs[i], newNc, ncp.errCh)
+		ncp.mps[i] = newMsgPipe(pipeMaxCount, ncp.inputs[i], newNc, ncp)
 	}
 	return
 }
@@ -89,8 +89,8 @@ func (ncp *NodeConnPipe) ErrorEvent() <-chan error {
 
 // Close close pipe.
 func (ncp *NodeConnPipe) Close() {
-	close(ncp.errCh)
 	ncp.l.Lock()
+	close(ncp.errCh)
 	ncp.state = closed
 	for _, input := range ncp.inputs {
 		close(input)
@@ -108,15 +108,15 @@ type msgPipe struct {
 	pipeMaxCount int
 	count        int
 
-	errCh chan<- error
+	ncp *NodeConnPipe
 }
 
 // newMsgPipe new msgPipe and return.
-func newMsgPipe(pipeMaxCount int, input <-chan *Message, newNc func() NodeConn, errCh chan<- error) (mp *msgPipe) {
+func newMsgPipe(pipeMaxCount int, input <-chan *Message, newNc func() NodeConn, ncp *NodeConnPipe) (mp *msgPipe) {
 	mp = &msgPipe{
 		newNc:        newNc,
 		input:        input,
-		errCh:        errCh,
+		ncp:          ncp,
 		batch:        make([]*Message, pipeMaxCount),
 		pipeMaxCount: pipeMaxCount,
 	}
@@ -208,10 +208,12 @@ func (mp *msgPipe) pipe() {
 
 func (mp *msgPipe) reNewNc(nc NodeConn, err error) NodeConn {
 	if err != nil {
+		mp.ncp.l.Lock()
 		select {
-		case mp.errCh <- err: // NOTE: action
+		case mp.ncp.errCh <- err: // NOTE: action
 		default:
 		}
+		mp.ncp.l.Unlock()
 	}
 	nc.Close()
 	mp.nc.Store(mp.newNc())
