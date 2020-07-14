@@ -296,8 +296,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 		agentIP := chunk.ValidateIPAddress(offer.Hostname)
 		// try to recover from origin agent with the same info.
 		if agentIP == ip {
-			if !checkOffer(offer, info.CPU, info.MaxMemory, uport) {
-				err = errOffer
+			if err = checkOffer(offer, info.CPU, info.MaxMemory, uport); err != nil {
 				return
 			}
 			task.AgentID = offer.GetAgentID()
@@ -743,10 +742,9 @@ func (s *Scheduler) restartNode(job job.Job, offers []ms.Offer) (err error) {
 	taskid := ms.TaskID{
 		Value: id,
 	}
-	if err = s.tryRecovery(taskid, offers, true); err == nil {
-		return
+	if err = s.tryRecovery(taskid, offers, true); err != nil {
+		log.Errorf("try restart node from origin agent fail: %v", err)
 	}
-	log.Errorf("try restart node from origin agent fail")
 	return
 }
 

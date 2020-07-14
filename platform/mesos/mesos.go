@@ -2,6 +2,7 @@ package mesos
 
 import (
 	"context"
+	"fmt"
 	"overlord/pkg/log"
 	"strconv"
 
@@ -47,23 +48,31 @@ func makeResources(cpu, mem float64, ports ...uint64) (r ms.Resources) {
 	return
 }
 
-func checkOffer(offer ms.Offer, cpu, mem float64, port uint64) bool {
+func checkOffer(offer ms.Offer, cpu, mem float64, port uint64) error {
 	for _, res := range offer.GetResources() {
 		switch {
 		case res.GetName() == "cpus":
-			return res.GetScalar().Value > cpu
+			if res.GetScalar().Value < cpu {
+				return fmt.Errorf("cpu insufficent: need %f but only %f", cpu, res.GetScalar().Value)
+			}
 		case res.GetName() == "mem":
-			return res.GetScalar().Value > mem
+			if res.GetScalar().Value < mem {
+				return fmt.Errorf("mem insufficent: need %f but only %f", mem, res.GetScalar().Value)
+			}
 		case res.GetName() == "ports":
+			var fulfilled bool
 			for _, rg := range res.GetRanges().GetRange() {
-				if port > rg.GetBegin() && port < rg.GetEnd() {
-					return true
+				if port >= rg.GetBegin() && port <= rg.GetEnd() {
+					fulfilled = true
+					break
 				}
 			}
-			return false
+			if !fulfilled {
+				return fmt.Errorf("port insufficent: need %d but only %v", port, res.GetRanges().GetRange())
+			}
 		}
 	}
-	return false
+	return nil
 }
 
 func failure(_ context.Context, e *scheduler.Event) error {
