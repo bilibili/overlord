@@ -283,7 +283,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 	task := &ms.TaskInfo{
 		Name:      ip + ":" + port,
 		TaskID:    ms.TaskID{Value: fmt.Sprintf("%s:%s-%s-%d", ip, port, cluster, id+1)},
-		Executor:  s.buildExcutor(ip+port, []ms.Resource{}),
+		Executor:  s.buildExcutor(fmt.Sprintf("%s:%s", ip, port), []ms.Resource{}),
 		Resources: makeResources(info.CPU, info.MaxMemory, uport),
 	}
 	data := &TaskData{
@@ -327,7 +327,7 @@ func (s *Scheduler) tryRecovery(t ms.TaskID, offers []ms.Offer, force bool) (err
 			newDist *chunk.Dist
 		)
 		for i, addr := range info.Dist.Addrs {
-			if addr.String() == ip+port {
+			if addr.String() == fmt.Sprintf("%s:%s", ip, port) {
 				info.Dist.Addrs = append(info.Dist.Addrs[:i], info.Dist.Addrs[i+1:]...)
 				alias = addr.ID
 			}
