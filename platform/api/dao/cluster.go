@@ -395,6 +395,7 @@ func (d *Dao) createCreateClusterJob(p *model.ParamCluster) (*job.Job, error) {
 		OpType:  job.OpCreate,
 		Name:    p.Name,
 		Version: p.Version,
+		Image:   d.getClusterImage(p.CacheType),
 		Num:     p.Number,
 		Group:   p.Group,
 	}
@@ -490,4 +491,13 @@ func (d *Dao) createDestroyClusterJob(ctx context.Context, cname string) (j *job
 		CacheType: t.CacheType,
 	}
 	return
+}
+
+func (d *Dao) getClusterImage(ctype string) string {
+	for _, v := range d.vs {
+		if v.CacheType == ctype {
+			return v.Image
+		}
+	}
+	return ""
 }

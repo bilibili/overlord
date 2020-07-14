@@ -5,6 +5,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
+	"overlord/pkg/container"
 	"overlord/pkg/dir"
 	"overlord/pkg/etcd"
 	"overlord/pkg/log"
@@ -47,6 +50,7 @@ type DeployInfo struct {
 
 	Port    int
 	Version string
+	Image   string
 	Role    string
 
 	// TplTree is the Tree which contains a key as path of the file,
@@ -61,6 +65,7 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		val         string
 		instanceDir = fmt.Sprintf(etcd.InstanceDir, ip, port)
 		workdir     = fmt.Sprintf(_workDir, port)
+		cinfo       CacheInfo
 	)
 
 	sub, cancel := context.WithCancel(context.Background())
@@ -75,6 +80,22 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 		return
 	}
 	info.CacheType = types.CacheType(val)
+
+	info.Cluster, err = e.Get(sub, fmt.Sprintf("%s/cluster", instanceDir))
+	if err != nil {
+		return
+	}
+	if info.Cluster == "" {
+		err = fmt.Errorf("cluster empty for %s:%d", ip, port)
+		return
+	}
+	val, err = e.ClusterInfo(sub, info.Cluster)
+	err = json.Unmarshal([]byte(val), &cinfo)
+	if err != nil {
+		return
+	}
+	// NOTE:(everpcpc) more info could be extracted from clusterinfo
+	info.Image = cinfo.Image
 
 	if info.CacheType == types.CacheTypeRedisCluster {
 		val, err = e.Get(sub, fmt.Sprintf("%s/role", instanceDir))
@@ -117,8 +138,6 @@ func GenDeployInfo(e *etcd.Etcd, ip string, port int) (info *DeployInfo, err err
 	if err != nil {
 		return
 	}
-
-	info.Cluster, _ = e.Get(sub, fmt.Sprintf("%s/cluster", instanceDir))
 
 	info.Version, err = e.Get(sub, fmt.Sprintf("%s/version", instanceDir))
 	return
@@ -335,8 +354,7 @@ func cleanDirtyDir(port int) error {
 	return os.RemoveAll(fmt.Sprintf(_workDir, port))
 }
 
-// SetupCacheService will create new cache service
-func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
+func setupWorkDir(info *DeployInfo) (workdir string, err error) {
 	// 0 . clean dir before
 	err = cleanDirtyDir(info.Port)
 	if err != nil {
@@ -355,7 +373,7 @@ func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
 
 	// 2. execute given command
 	//   2.0 mk working dir
-	workdir := fmt.Sprintf(_workDir, info.Port)
+	workdir = fmt.Sprintf(_workDir, info.Port)
 	err = dir.MkDirAll(workdir)
 	if err != nil {
 		log.Errorf("fail to create working dir")
@@ -364,6 +382,17 @@ func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
 	err = renderMetaIntoFile(workdir, info)
 	if err != nil {
 		log.Errorf("fail to create meta data file due to %s", err)
+		return
+	}
+
+	return
+}
+
+// SetupCacheService will create new cache service
+func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
+	// 1. setup workdir with metadata
+	_, err = setupWorkDir(info)
+	if err != nil {
 		return
 	}
 
@@ -377,6 +406,32 @@ func SetupCacheService(info *DeployInfo) (p *proc.Proc, err error) {
 
 	p = newproc(info.CacheType, info.Version, info.Port)
 	err = p.Start()
+	return
+}
+
+// SetupCacheContainer will create new cache service with container
+func SetupCacheContainer(info *DeployInfo) (c *container.Container, err error) {
+	workdir, err := setupWorkDir(info)
+	if err != nil {
+		return
+	}
+	var containerName string
+	var cmd []string
+
+	switch info.CacheType {
+	case types.CacheTypeMemcache, types.CacheTypeMemcacheBinary:
+		containerName = fmt.Sprintf("memcache-%s-%d", info.Cluster, info.Port)
+		cmd = []string{"memcached", "-l", "0.0.0.0", "-p", strconv.Itoa(info.Port)}
+	case types.CacheTypeRedis, types.CacheTypeRedisCluster:
+		containerName = fmt.Sprintf("redis-%s-%d", info.Cluster, info.Port)
+		cmd = []string{"redis-server", filepath.Join(workdir, "redis.conf")}
+	}
+
+	c, err = container.New(info.Image+":"+info.Version, containerName, workdir, cmd)
+	if err != nil {
+		return
+	}
+	err = c.Start()
 	return
 }
 

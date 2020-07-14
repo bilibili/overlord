@@ -12,15 +12,16 @@ func New(cfg *model.ServerConfig) *Dao {
 		panic(err)
 	}
 
-	d := &Dao{e: e, m: cfg.Monitor, c: cfg.Cluster}
+	d := &Dao{e: e, m: cfg.Monitor, c: cfg.Cluster, vs: cfg.Versions}
 	return d
 }
 
 // Dao is the dao level abstraction
 type Dao struct {
-	e *etcd.Etcd
-	m *model.MonitorConfig
-	c *model.DefaultClusterConfig
+	e  *etcd.Etcd
+	m  *model.MonitorConfig
+	c  *model.DefaultClusterConfig
+	vs []*model.VersionConfig
 }
 
 func (d *Dao) ETCD() *etcd.Etcd {

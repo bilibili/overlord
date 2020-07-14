@@ -41,6 +41,7 @@ type Job struct {
 
 	CacheType types.CacheType
 	Version   string  // service version
+	Image     string  // service image
 	Num       int     // num of instances ,if redis-cluster,mean master number.
 	MaxMem    float64 // max memory MB use of instance.
 	CPU       float64 // cpu count for each instance.
