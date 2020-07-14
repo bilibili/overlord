@@ -246,7 +246,7 @@ func (ec *Executor) Run(c context.Context) {
 			log.Infof("gracefully exiting because framework checkpointing is NOT enabled")
 			return
 		}
-		if time.Now().Sub(disconnected) > ec.cfg.RecoveryTimeout {
+		if time.Since(disconnected) > ec.cfg.RecoveryTimeout {
 			log.Infof("failed to re-establish subscription with agent within %v, aborting", ec.cfg.RecoveryTimeout)
 			return
 		}

@@ -130,11 +130,13 @@ func buildHTTPSched(cfg *Config) calls.Caller {
 
 func (s *Scheduler) buildFrameworkInfo() *ms.FrameworkInfo {
 	frameworkInfo := &ms.FrameworkInfo{
-		User:         s.c.User,
-		Name:         s.c.Name,
-		ID:           &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
-		Checkpoint:   &s.c.Checkpoint,
-		Capabilities: []ms.FrameworkInfo_Capability{ms.FrameworkInfo_Capability{Type: ms.FrameworkInfo_Capability_MULTI_ROLE}},
+		User:       s.c.User,
+		Name:       s.c.Name,
+		ID:         &ms.FrameworkID{Value: mstore.GetIgnoreErrors(s)()},
+		Checkpoint: &s.c.Checkpoint,
+		Capabilities: []ms.FrameworkInfo_Capability{
+			{Type: ms.FrameworkInfo_Capability_MULTI_ROLE},
+		},
 	}
 	if s.c.FailOver > 0 {
 		failOverTimeout := time.Duration(s.c.FailOver).Seconds()
@@ -725,7 +727,11 @@ func (s *Scheduler) destroyCluster(t job.Job, offers []ms.Offer) {
 	s.db.RMDir(ctx, fmt.Sprintf("%s/%s", etcd.ClusterDir, ci.Name))
 	for _, node := range nodes {
 		err = s.db.RMDir(ctx, etcd.InstanceDirPrefix+"/"+node.Value)
-		log.Errorf("rm instance dir (%s) fail err %v", node.Value, err)
+		if err != nil {
+			log.Errorf("rm instance dir (%s) fail err %v", node.Value, err)
+		} else {
+			log.Infof("instance dir (%s) removed", node.Value)
+		}
 	}
 }
 
