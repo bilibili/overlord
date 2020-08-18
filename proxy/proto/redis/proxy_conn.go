@@ -109,7 +109,7 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 	cmd := pc.resp.array[0].data // NOTE: when array, first is command
 
 	if bytes.Equal(cmd, cmdMSetBytes) {
-		if pc.resp.arraySize%2 == 0 {
+		if pc.resp.arraySize < 3 || pc.resp.arraySize%2 == 0 {
 			err = ErrBadRequest
 			return
 		}
@@ -134,6 +134,10 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			nre3.copy(pc.resp.array[i*2+2])
 		}
 	} else if bytes.Equal(cmd, cmdMGetBytes) {
+		if pc.resp.arraySize < 2 {
+			err = ErrBadRequest
+			return
+		}
 		for i := 1; i < pc.resp.arraySize; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeJoin
@@ -151,6 +155,10 @@ func (pc *proxyConn) decode(msg *proto.Message) (err error) {
 			nre2.copy(pc.resp.array[i])
 		}
 	} else if bytes.Equal(cmd, cmdDelBytes) || bytes.Equal(cmd, cmdExistsBytes) {
+		if pc.resp.arraySize < 2 {
+			err = ErrBadRequest
+			return
+		}
 		for i := 1; i < pc.resp.arraySize; i++ {
 			r := nextReq(msg)
 			r.mType = mergeTypeCount
