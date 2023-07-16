@@ -206,16 +206,16 @@ func (n *Node) parseNodes(data []byte) (nodes []*Node) {
 		var slot []int64
 		for _, content := range fields[8:] {
 			if bytes.Contains(content, []byte("->-")) {
-				migrate := bytes.Split(content[:len(content)], []byte("->-"))
+				migrate := bytes.Split(content[:], []byte("->-"))
 				slot, _ := strconv.ParseInt(string(migrate[0]), 10, 64)
 				node.migrating[slot] = string(migrate[1])
 			} else if bytes.Contains(content, []byte("-<-")) {
-				migrate := bytes.Split(content[:len(content)], []byte("-<-"))
+				migrate := bytes.Split(content[:], []byte("-<-"))
 				slot, _ := strconv.ParseInt(string(migrate[0]), 10, 64)
 				node.importing[slot] = string(migrate[1])
 			} else {
 
-				scope := bytes.Split(content[:len(content)], []byte("-"))
+				scope := bytes.Split(content[:], []byte("-"))
 				start, _ := strconv.ParseInt(string(scope[0]), 10, 64)
 				slot = append(slot, start)
 				if len(scope) == 2 {
